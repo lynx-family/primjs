@@ -1,0 +1,15 @@
+# Copyright 2024 The Lynx Authors. All rights reserved.
+# Licensed under the Apache License Version 2.0 that can be found in the
+# LICENSE file in the root directory of this source tree.
+
+import("//Primjs.gni")
+config("config") {
+  include_dirs = [ "." ]
+}
+
+napi_source_set("native_quickjs") {
+  sources = [ "js_native_api_QuickJS.cc" ]
+  public = [ "./napi_env_quickjs.h" ]
+  public_configs = [ ":config" ]
+  public_deps = [ "../..:quickjs_lib" ]
+}

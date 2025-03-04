@@ -1,0 +1,38 @@
+declare_args() {
+  # The Prim snapshot needs to be built by code that is compiled with a
+  # toolchain that matches the bit-width of the target CPU, but runs on
+  # the host.
+  snapshot_toolchain = ""
+}
+
+if (snapshot_toolchain == "") {
+  if (current_os == host_os && current_cpu == host_cpu) {
+    # This is not a cross-compile, so build the snapshot with the current
+    # toolchain.
+    snapshot_toolchain = current_toolchain
+  } else if (current_os == host_os && current_cpu == "x86" &&
+             host_cpu == "x64") {
+    # This is an x64 -> x86 cross-compile, but x64 hosts can usually run x86
+    # binaries built for the same OS, so build the snapshot with the current
+    # toolchain here, too.
+    snapshot_toolchain = current_toolchain
+  } else if (current_os == host_os && host_cpu == "arm64" &&
+             current_cpu == "arm") {
+    # Trying to compile 32-bit arm on arm64. Good luck!
+    snapshot_toolchain = current_toolchain
+  } else if (host_cpu == "x64" &&
+             (current_cpu == "mips" || current_cpu == "mips64")) {
+    # We don't support snapshot generation for big-endian targets,
+    # therefore snapshots will need to be built using native mksnapshot
+    # in combination with qemu
+    snapshot_toolchain = current_toolchain
+  } else if (is_android && host_os == "linux" && target_cpu == "arm64") {
+    snapshot_toolchain = "//build/toolchain/${host_os}:clang_arm64"
+  } else {
+    snapshot_toolchain = current_toolchain
+  }
+}
+
+assert(snapshot_toolchain != "",
+       "Do not know how to build a snapshot for $current_toolchain " +
+           "on $host_os $host_cpu")

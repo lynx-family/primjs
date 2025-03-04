@@ -1,0 +1,42 @@
+# Copyright 2024 The Lynx Authors. All rights reserved.
+# Licensed under the Apache License Version 2.0 that can be found in the
+# LICENSE file in the root directory of this source tree.
+
+import("//testing/test.gni")
+executable("run_test262") {
+  testonly = true
+  sources = [ "run-test262.cc" ]
+
+  public_deps = [ "../../src:quickjs_lib" ]
+
+  data_deps = [
+    ":test262_conf_copy",
+    ":test262_sources",
+  ]
+
+  defines = [ "QJS_UNITTEST" ]
+
+  # FIXME():run-test262.c:444:33: error: incompatible pointer
+  # types passing 'int *' to parameter of type 'size_t *'
+  # (aka 'unsigned long *') [-Werror,-Wincompatible-pointer-types]
+  # cflags = [
+  #   "-Wno-incompatible-pointer-types",
+  #   "-Wno-c99-designator"
+  # ]
+}
+
+# copy test262 into the $root_build_dir/quickjs_test/test262
+copy("test262_sources") {
+  sources = [ "//third_party/test262" ]
+  outputs = [ "$root_build_dir/quickjs_test/test262" ]
+}
+
+# the test262.config will copy into
+# "$root_out_dir/quickjs_test/{{source_file_part}}"
+copy("test262_conf_copy") {
+  sources = [
+    "test262.conf",
+    "test262_errors.txt",
+  ]
+  outputs = [ "$root_out_dir/quickjs_test/{{source_file_part}}" ]
+}

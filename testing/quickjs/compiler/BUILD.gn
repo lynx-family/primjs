@@ -1,0 +1,91 @@
+# Copyright 2024 The Lynx Authors. All rights reserved.
+# Licensed under the Apache License Version 2.0 that can be found in the
+# LICENSE file in the root directory of this source tree.
+
+import("//Primjs.gni")
+import("//testing/test.gni")
+
+copy("test_cases_copy") {
+  sources = [ "unit_test" ]
+  outputs = [ "$root_out_dir/qjs_tests/{{source_file_part}}" ]
+}
+
+copy("quickjs_test_cases_copy") {
+  sources = [
+    "common_test",
+    "finalization_registry_test",
+    "qjs_debug_test",
+    "structuredClone",
+    "unit_test",
+    "weak_ref_test",
+  ]
+  outputs = [ "$root_out_dir/quick_tests/{{source_file_part}}" ]
+}
+
+test_case_dir = rebase_path("$root_out_dir/quick_tests/", "//")
+
+config("config") {
+  include_dirs = [
+    ".",
+    "../../../src/interpreter",
+    "../../../src/inspector",
+    "${root_gen_dir}",
+  ]
+
+  defines = [ "TEST_CASE_DIR=\"${test_case_dir}\"" ]
+}
+
+unittest_set("quickjs_testset") {
+  public_configs = [ ":config" ]
+  public_deps = [ "../../../src:quickjs_lib" ]
+
+  sources = [
+    "test_common.cc",
+    "test_finalization_registry.cc",
+    "test_parse_program.cc",
+    "test_primjs_version.cc",
+    "test_promise_rejection.cc",
+    "test_weak_ref.cc",
+  ]
+  cflags = [ "-Wno-c99-designator" ]
+  data_deps = [ ":quickjs_test_cases_copy" ]
+}
+
+unit_test("quickjs_unittest") {
+  testonly = true
+
+  sources = []
+
+  public_deps = [ ":quickjs_testset" ]
+  data_deps = [ ":test_cases_copy" ]
+}
+
+unittest_set("qjs_debug_testset") {
+  public_configs = [ ":config" ]
+  public_deps = [ "../../../src:quickjs_lib" ]
+
+  sources = [
+    "test-heap-profiler.cc",
+    "test_debug_base.cc",
+    "test_debug_common.cc",
+    "test_debug_complex_properties.cc",
+    "test_debug_parse_script_flag.cc",
+    "test_debug_pause.cc",
+    "test_debug_step.cc",
+    "test_shared_context_debug.cc",
+  ]
+  defines = [
+    "LEPUS_PC",
+    "LEPUS_TEST",
+    "ENABLE_CLI = 1",
+  ]
+
+  cflags = [ "-Wno-c99-designator" ]
+  data_deps = [ ":quickjs_test_cases_copy" ]
+}
+
+unit_test("qjs_debug_test") {
+  testonly = true
+  sources = []
+  public_deps = [ ":qjs_debug_testset" ]
+}

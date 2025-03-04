@@ -1,0 +1,13 @@
+# Copyright 2024 The Lynx Authors. All rights reserved.
+# Licensed under the Apache License Version 2.0 that can be found in the
+# LICENSE file in the root directory of this source tree.
+buildconfig = "//build/config/BUILDCONFIG.gn"
+script_executable = "python3"
+
+secondary_source = "//build/secondary/"
+
+default_args = {
+  use_xcode = true
+  is_debug = false
+  use_flutter_cxx = false
+}

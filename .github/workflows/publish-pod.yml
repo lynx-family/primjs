@@ -1,0 +1,33 @@
+name: Publish Pod
+
+on:
+  push:
+    tags:
+      - '*'
+
+jobs:
+  publish-pod:
+    runs-on: macos-13
+    steps:
+      - name: Download Source
+        uses: actions/checkout@v4.2.2
+      - name: Install SSH Key
+        uses: kielabokkie/ssh-key-and-known-hosts-action@v1
+        with:
+          ssh-private-key: ${{ secrets.PRIVATE_SSH_KEY }}
+          ssh-host: github.com
+      - name: Bundle Install
+        run: |-
+          SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk bundle install --path .bundle
+      - name: Get Tag Information
+        run: |-
+          version=$(echo ${{ github.ref }} | awk -F "/" '{print $3}')
+          echo "VERSION=$version" >> $GITHUB_OUTPUT;
+        id: get_tag
+      - name: Publish to CocoaPods Repo
+        env:
+          COCOAPODS_TRUNK_TOKEN: ${{ secrets.REPO_PRIMJS_COCOAPODS_TRUNK_TOKEN }}
+          POD_VERSION: ${{ steps.get_tag.outputs.VERSION }}
+        run: |-
+          pod repo add-cdn trunk https://cdn.cocoapods.org/
+          COCOAPODS_TRUNK_TOKEN=$COCOAPODS_TRUNK_TOKEN POD_VERSION=$POD_VERSION pod trunk push PrimJS.podspec  --skip-import-validation --allow-warnings

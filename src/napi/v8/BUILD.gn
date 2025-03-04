@@ -1,0 +1,53 @@
+# Copyright 2024 The Lynx Authors. All rights reserved.
+# Licensed under the Apache License Version 2.0 that can be found in the
+# LICENSE file in the root directory of this source tree.
+
+import("//Primjs.gni")
+config("v8_config") {
+  defines = [ "JS_ENGINE_V8" ]
+  include_dirs = [ "//third_party/v8/include" ]
+}
+
+if (target_os == "mac") {
+  napi_source_set("v8") {
+    public = [ "napi_env_v8.h" ]
+    sources = [ "//${napi_src_dir}/v8/js_native_api_v8.cc" ]
+    public_configs = [ ":v8_config" ]
+    libs = [
+      "//third_party/v8/darwin/lib/libcppgc_base.a",
+      "//third_party/v8/darwin/lib/libfuzzer_support.a",
+      "//third_party/v8/darwin/lib/libinspector_fuzzer.a",
+      "//third_party/v8/darwin/lib/libjson_fuzzer.a",
+      "//third_party/v8/darwin/lib/libparser_fuzzer.a",
+      "//third_party/v8/darwin/lib/libregexp_builtins_fuzzer.a",
+      "//third_party/v8/darwin/lib/libregexp_fuzzer.a",
+      "//third_party/v8/darwin/lib/libtorque_base.a",
+      "//third_party/v8/darwin/lib/libtorque_generated_definitions.a",
+      "//third_party/v8/darwin/lib/libtorque_generated_initializers.a",
+      "//third_party/v8/darwin/lib/libtorque_ls_base.a",
+      "//third_party/v8/darwin/lib/libv8_base_without_compiler.a",
+      "//third_party/v8/darwin/lib/libv8_bigint.a",
+      "//third_party/v8/darwin/lib/libv8_compiler.a",
+      "//third_party/v8/darwin/lib/libv8_compiler_for_mksnapshot_source_set.a",
+      "//third_party/v8/darwin/lib/libv8_heap_base.a",
+      "//third_party/v8/darwin/lib/libv8_init.a",
+      "//third_party/v8/darwin/lib/libv8_initializers.a",
+      "//third_party/v8/darwin/lib/libv8_libbase.a",
+      "//third_party/v8/darwin/lib/libv8_libplatform.a",
+      "//third_party/v8/darwin/lib/libv8_monolith.a",
+      "//third_party/v8/darwin/lib/libv8_snapshot.a",
+      "//third_party/v8/darwin/lib/libv8_turboshaft.a",
+    ]
+  }
+} else if (target_os == "linux") {
+  napi_source_set("v8") {
+    public = [ "napi_env_v8.h" ]
+    sources = [ "//${napi_src_dir}/v8/js_native_api_v8.cc" ]
+    public_configs = [ ":v8_config" ]
+    libs = [ "//third_party/v8/linux/lib/libv8_monolith.a" ]
+  }
+} else {
+  napi_source_set("v8") {
+    sources = []
+  }
+}

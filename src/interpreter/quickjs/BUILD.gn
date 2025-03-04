@@ -1,0 +1,21 @@
+# Copyright 2024 The Lynx Authors. All rights reserved.
+# Licensed under the Apache License Version 2.0 that can be found in the
+# LICENSE file in the root directory of this source tree.
+import("//Primjs.gni")
+primjs_source_set("quickjs") {
+  sources = [
+    "source/cutils.cc",
+    "source/libbf.cc",
+    "source/libregexp.cc",
+    "source/libunicode.cc",
+    "source/primjs_monitor.cc",
+    "source/quickjs-libc.cc",
+    "source/quickjs.cc",
+    "source/quickjs_gc.cc",
+    "source/quickjs_queue.cc",
+    "source/quickjs_version.cc",
+  ]
+  if (use_bignum) {
+    sources += [ "source/libbf.cc" ]
+  }
+}

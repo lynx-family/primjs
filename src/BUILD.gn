@@ -1,0 +1,57 @@
+# Copyright 2024 The Lynx Authors. All rights reserved.
+# Licensed under the Apache License Version 2.0 that can be found in the
+# LICENSE file in the root directory of this source tree.
+
+import("//Primjs.gni")
+
+static_library("quickjs_lib") {
+  public_deps = [
+    "basic",
+    "gc",
+    "interpreter",
+  ]
+  if (enable_quickjs_debugger) {
+    public_deps += [ "inspector" ]
+  }
+
+  complete_static_lib = true
+  output_dir = "$root_out_dir"
+  output_name = "quickjs"
+}
+
+static_library("napi_lib") {
+  output_name = "napi"
+  output_dir = "$root_out_dir"
+  deps = [
+    ":quickjs_lib",
+    "napi:napi",
+    "napi:napi_env",
+    "napi:napi_quickjs",
+    "napi:napi_runtime",
+  ]
+
+  if (is_ios || is_mac) {
+    deps += [ "napi:napi_jsc" ]
+  }
+  complete_static_lib = true
+}
+
+executable("qjs_exe") {
+  testonly = true
+  sources = [ "../testing/quickjs/compiler/qjs.cc" ]
+  public_deps = [
+    "gc",
+    "interpreter",
+  ]
+  if (enable_quickjs_debugger) {
+    public_deps += [ "inspector" ]
+  }
+  output_name = "qjs"
+}
+
+group("src") {
+  deps = [
+    ":napi_lib",
+    ":quickjs_lib",
+  ]
+}

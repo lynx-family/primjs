@@ -1,0 +1,25 @@
+From 36be6b75a3b9623b8a23102b312eac9f526aca5d Mon Sep 17 00:00:00 2001
+From: zhangyuping <zhangyuping@tiktok.com>
+Date: Wed, 18 Dec 2024 16:15:31 +0800
+Subject: [PATCH] Avoid excessive U\+ in error messages
+
+---
+ harness/regExpUtils.js | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/harness/regExpUtils.js b/harness/regExpUtils.js
+index 9b4c58ae1d..194f610aa7 100644
+--- a/harness/regExpUtils.js
++++ b/harness/regExpUtils.js
+@@ -54,7 +54,7 @@ function testPropertyEscapes(regExp, string, expression) {
+       const hex = printCodePoint(symbol.codePointAt(0));
+       assert(
+         regExp.test(symbol),
+-        `\`${ expression }\` should match U+${ hex } (\`${ symbol }\`)`
++        `\`${ expression }\` should match ${ hex } (\`${ symbol }\`)`
+       );
+     }
+   }
+-- 
+2.45.2
+

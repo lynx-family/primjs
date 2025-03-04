@@ -1,0 +1,87 @@
+# Copyright 2024 The Lynx Authors. All rights reserved.
+# Licensed under the Apache License Version 2.0 that can be found in the
+# LICENSE file in the root directory of this source tree.
+
+import("//config.gni")
+
+template("primjs_source_set") {
+  source_set(target_name) {
+    forward_variables_from(invoker,
+                           "*",
+                           [
+                             "configs",
+                             "public_configs",
+                           ])
+
+    if (!defined(deps)) {
+      deps = []
+    }
+
+    if (!defined(configs)) {
+      configs = []
+    }
+    if (defined(invoker.configs)) {
+      configs += invoker.configs
+    }
+
+    if (!defined(public_configs)) {
+      public_configs = []
+    }
+    if (defined(invoker.public_configs)) {
+      public_configs += invoker.public_configs
+    }
+    public_configs += [ "//:quickjs_public_config" ]
+
+    if (defined(exclude_configs)) {
+      configs -= exclude_configs
+    }
+
+    if (defined(exclude_deps)) {
+      deps -= exclude_deps
+    }
+    if (use_rtti) {
+      configs -= [ "//build/config/compiler:no_rtti" ]
+    }
+  }
+}
+
+template("napi_source_set") {
+  source_set(target_name) {
+    forward_variables_from(invoker,
+                           "*",
+                           [
+                             "configs",
+                             "public_configs",
+                           ])
+
+    if (!defined(deps)) {
+      deps = []
+    }
+
+    if (!defined(configs)) {
+      configs = []
+    }
+    if (defined(invoker.configs)) {
+      configs += invoker.configs
+    }
+
+    if (!defined(public_configs)) {
+      public_configs = []
+    }
+    if (defined(invoker.public_configs)) {
+      public_configs += invoker.public_configs
+    }
+    public_configs += [ "//:napi_public_config" ]
+
+    if (defined(exclude_configs)) {
+      configs -= exclude_configs
+    }
+
+    if (defined(exclude_deps)) {
+      deps -= exclude_deps
+    }
+    if (use_rtti) {
+      configs -= [ "//build/config/compiler:no_rtti" ]
+    }
+  }
+}

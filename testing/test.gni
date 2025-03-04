@@ -1,0 +1,170 @@
+# Copyright 2024 The Lynx Authors. All rights reserved.
+# Licensed under the Apache License Version 2.0 that can be found in the
+# LICENSE file in the root directory of this source tree.
+import("//Primjs.gni")
+
+template("unit_test") {
+  assert(defined(invoker.sources), "missing sources for ${target_name}")
+  executable("${target_name}") {
+    forward_variables_from(invoker,
+                           "*",
+                           [
+                             "deps",
+                             "configs",
+                           ])
+    testonly = true
+    if (defined(invoker.deps)) {
+      deps = invoker.deps
+      deps += [ "//third_party/googletest:gtest_main" ]
+    } else {
+      deps = [ "//third_party/googletest:gtest_main" ]
+    }
+    if (defined(invoker.configs)) {
+      configs += invoker.configs
+    }
+    if (defined(configs_to_exclude)) {
+      configs -= configs_to_exclude
+    }
+    if (use_rtti) {
+      configs -= [ "//build/config/compiler:no_rtti" ]
+    }
+  }
+}
+
+template("unittest_set") {
+  assert(defined(invoker.sources), "missing sources for ${target_name}")
+  source_set("${target_name}") {
+    forward_variables_from(invoker,
+                           "*",
+                           [
+                             "deps",
+                             "configs",
+                           ])
+    testonly = true
+    if (defined(invoker.deps)) {
+      deps = invoker.deps
+      deps += [
+        "//third_party/googletest:gmock",
+        "//third_party/googletest:gtest",
+      ]
+    } else {
+      deps = [
+        "//third_party/googletest:gmock",
+        "//third_party/googletest:gtest",
+      ]
+    }
+    if (defined(invoker.configs)) {
+      configs += invoker.configs
+    }
+    if (defined(configs_to_exclude)) {
+      configs -= configs_to_exclude
+    }
+    if (use_rtti) {
+      configs -= [ "//build/config/compiler:no_rtti" ]
+    }
+  }
+}
+
+template("mocktest_set") {
+  assert(defined(invoker.sources), "missing sources for ${target_name}")
+  source_set("${target_name}") {
+    forward_variables_from(invoker,
+                           "*",
+                           [
+                             "deps",
+                             "configs",
+                           ])
+    testonly = true
+    if (defined(invoker.deps)) {
+      deps = invoker.deps
+      deps += [ "//third_party/googletest:gmock" ]
+    } else {
+      deps = [ "//third_party/googletest:gmock" ]
+    }
+    if (defined(invoker.configs)) {
+      configs += invoker.configs
+    }
+    if (defined(configs_to_exclude)) {
+      configs -= configs_to_exclude
+    }
+  }
+}
+
+template("mocktest_exec") {
+  assert(defined(invoker.sources), "missing sources for ${target_name}")
+  executable("${target_name}") {
+    forward_variables_from(invoker,
+                           "*",
+                           [
+                             "deps",
+                             "configs",
+                           ])
+    testonly = true
+    if (defined(invoker.deps)) {
+      deps = invoker.deps
+      deps += [ "//third_party/googletest:gmock_main" ]
+    } else {
+      deps = [ "//third_party/googletest:gmock_main" ]
+    }
+    if (defined(invoker.configs)) {
+      configs += invoker.configs
+    }
+    if (defined(configs_to_exclude)) {
+      configs -= configs_to_exclude
+    }
+  }
+}
+
+template("benchmark_set") {
+  assert(defined(invoker.sources), "missing sources for ${target_name}")
+  source_set("${target_name}") {
+    forward_variables_from(invoker,
+                           "*",
+                           [
+                             "deps",
+                             "configs",
+                           ])
+    testonly = true
+    if (defined(invoker.deps)) {
+      deps = invoker.deps
+      deps += [ "//third_party/benchmark:benchmark" ]
+    } else {
+      deps = [ "//third_party/benchmark:benchmark" ]
+    }
+    if (defined(invoker.configs)) {
+      configs += invoker.configs
+    }
+    if (defined(configs_to_exclude)) {
+      configs -= configs_to_exclude
+    }
+  }
+  libs = [ "pthread" ]
+}
+
+template("benchmark_test") {
+  assert(defined(invoker.sources), "missing sources for ${target_name}")
+  executable("${target_name}") {
+    forward_variables_from(invoker,
+                           "*",
+                           [
+                             "deps",
+                             "configs",
+                           ])
+    testonly = true
+    if (defined(invoker.deps)) {
+      deps = invoker.deps
+      deps += [ "//third_party/benchmark:benchmark_main" ]
+    } else {
+      deps = [ "//third_party/benchmark:benchmark_main" ]
+    }
+    if (defined(invoker.configs)) {
+      configs += invoker.configs
+    }
+    if (defined(configs_to_exclude)) {
+      configs -= configs_to_exclude
+    }
+    if (!is_android) {
+      configs += [ "//build/config/gcc:no_exceptions" ]
+    }
+  }
+}

@@ -1,0 +1,77 @@
+name: android sdk release
+
+on:
+  push:
+    tags:
+      - '*'
+
+permissions:
+  contents: write
+
+jobs:
+  android-release:
+    runs-on: lynx-ubuntu-22.04-medium
+
+    steps:
+    - name: Download Source
+      uses: actions/checkout@v4.2.2
+
+    - name: Install SSH Key
+      uses: kielabokkie/ssh-key-and-known-hosts-action@v1
+      with:
+        ssh-private-key: ${{ secrets.PRIVATE_SSH_KEY }}
+        ssh-host: github.com
+
+    - name: Set up JDK 11
+      uses: actions/setup-java@v1
+      with:
+        java-version: 11
+
+    - name: Get Tag Information
+      run: |-
+        version=$(echo ${{ github.ref }} | awk -F "/" '{print $3}')
+        echo "VERSION=$version" >> $GITHUB_OUTPUT;
+      id: get_tag
+
+    - name: Cache Gradle packages
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+        restore-keys: |
+          ${{ runner.os }}-gradle-
+
+    - name: Build artifact
+      run: |-
+        pushd Android
+        chmod +x ./gradlew
+        ./gradlew :app:assemblerelease
+        ./gradlew :app:publish \
+        -Pversion=${{ steps.get_tag.outputs.VERSION }} \
+        -Psigning.keyId=${{ secrets.SIGNING_KEY_ID }} \
+        -Psigning.password=${{ secrets.SIGNING_PASSWORD }} \
+        -Psigning.secretKey=${{ secrets.SIGNING_SECRET_KEY }}
+        ./gradlew :app:zipArtifacts -Pversion=${{ steps.get_tag.outputs.VERSION }} :app:getArtifactList
+        popd
+        pushd Android/app/build/
+        artifact_list=$(<artifact-list)
+        echo "artifact_list=$artifact_list" >> $GITHUB_OUTPUT;
+        popd
+      id: build_artifact
+
+    - name: Push to release
+      uses: ncipollo/release-action@v1
+      with:
+        tag: ${{ steps.get_tag.outputs.VERSION }}
+        token: ${{ secrets.GITHUB_TOKEN }}
+        replacesArtifacts: true
+        allowUpdates: true
+        artifacts: "Android/app/build/outputs/aar/primjs-release.aar"
+
+    - name: Publish artifact to maven
+      uses: lynx-infra/maven-publish-action@c48e3067642c7ceccf807cd52e6644a257cd8ded
+      with:
+        portal_api_token: ${{ secrets.PORTAL_API_TOKEN }}
+        artifact_path_list: ${{ steps.build_artifact.outputs.artifact_list }}

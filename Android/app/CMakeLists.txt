@@ -1,0 +1,5 @@
+cmake_minimum_required(VERSION 3.5.1)
+project("primjs aar")
+enable_language(C CXX ASM)
+set(CMAKE_ASM_COMPILER_TARGET "${CMAKE_CXX_COMPILER_TARGET}")
+add_subdirectory(${CMAKE_SOURCE_DIR}/../../ binary)

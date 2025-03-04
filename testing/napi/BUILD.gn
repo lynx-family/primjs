@@ -1,0 +1,29 @@
+# Copyright 2024 The Lynx Authors. All rights reserved.
+# Licensed under the Apache License Version 2.0 that can be found in the
+# LICENSE file in the root directory of this source tree.
+import("//testing/test.gni")
+
+unittest_set("napi_testset") {
+  defines = [ "JS_ENGINE_QJS" ]
+  public_deps = [ "../../src/napi:napi_v8" ]
+  deps = [
+    "../../src/napi:napi",
+    "../../src/napi:napi_env",
+    "../../src/napi:napi_quickjs",
+    "../../src/napi:napi_runtime",
+  ]
+  if (target_os == "mac") {
+    defines += [ "JS_ENGINE_JSC" ]
+    deps += [ "../../src/napi:napi_jsc" ]
+  }
+  public = [ "testlib.h" ]
+  sources = [ "testlib.cc" ]
+}
+
+unit_test("napi_unittest") {
+  testonly = true
+
+  sources = []
+
+  public_deps = [ ":napi_testset" ]
+}

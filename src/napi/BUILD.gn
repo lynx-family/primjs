@@ -1,0 +1,66 @@
+# Copyright 2024 The Lynx Authors. All rights reserved.
+# Licensed under the Apache License Version 2.0 that can be found in the
+# LICENSE file in the root directory of this source tree.
+import("//Primjs.gni")
+config("napi_public_config") {
+  include_dirs = [ "." ]
+
+  defines = [
+    "PRIMJS_MIN_LOG_LEVEL=5",  # disable alog in unittests
+  ]
+  if (use_rtti) {
+    defines += [ "NAPI_CPP_RTTI" ]
+  } else {
+    defines += [ "NAPI_DISABLE_CPP_RTTI" ]
+  }
+}
+
+napi_source_set("napi") {
+  public = [
+    "js_native_api.h",
+    "js_native_api_types.h",
+    "napi.h",
+    "napi_module.h",
+  ]
+  sources = [
+    "napi.cc",
+    "napi_module.cc",
+  ]
+  public_deps = [ "./common:common" ]
+  public_configs = [ ":napi_public_config" ]
+}
+
+napi_source_set("napi_env") {
+  public_deps = [
+    ":napi",
+    "./env:env",
+  ]
+}
+
+napi_source_set("napi_runtime") {
+  public_deps = [
+    ":napi",
+    "env:runtime",
+  ]
+}
+
+napi_source_set("napi_jsc") {
+  public_deps = [
+    ":napi",
+    "jsc:jsc",
+  ]
+}
+
+napi_source_set("napi_quickjs") {
+  public_deps = [
+    ":napi",
+    "quickjs:native_quickjs",
+  ]
+}
+
+napi_source_set("napi_v8") {
+  public_deps = [
+    ":napi",
+    "v8:v8",
+  ]
+}

@@ -1,0 +1,18 @@
+# Copyright 2024 The Lynx Authors. All rights reserved.
+import("//Primjs.gni")
+import("snapshot_toolchain.gni")
+
+if (enable_primjs_snapshot && current_toolchain == snapshot_toolchain) {
+  if (enable_quickjs_debugger) {
+    embedded_file = "embedded-inspector.S"
+  } else {
+    embedded_file = "embedded.S"
+  }
+
+  primjs_source_set("primjs") {
+    sources = [ "$target_os/$embedded_file" ]
+  }
+} else {
+  primjs_source_set("primjs") {
+  }
+}
