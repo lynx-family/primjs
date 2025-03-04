@@ -1,0 +1,23 @@
+# Copyright 2024 The Lynx Authors. All rights reserved.
+# Licensed under the Apache License Version 2.0 that can be found in the
+# LICENSE file in the root directory of this source tree.
+
+import("//Primjs.gni")
+
+config("jsc_config") {
+  include_dirs = [ "." ]
+
+  cflags_cc = [
+    "-Wno-unused-function",
+    "-Wno-deprecated-declarations",
+    "-Wno-sign-compare",
+  ]
+  defines = [ "PRIMJS_MIN_LOG_LEVEL=5" ]  # disable alog in unittests
+}
+
+napi_source_set("jsc") {
+  sources = [ "js_native_api_JavaScriptCore.cc" ]
+  public = [ "js_native_api_JavaScriptCore.h" ]
+  public_configs = [ ":jsc_config" ]
+  frameworks = [ "JavaScriptCore.framework" ]
+}

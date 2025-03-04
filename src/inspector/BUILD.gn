@@ -1,0 +1,29 @@
+# Copyright 2024 The Lynx Authors. All rights reserved.
+# Licensed under the Apache License Version 2.0 that can be found in the
+# LICENSE file in the root directory of this source tree.
+
+import("//Primjs.gni")
+primjs_source_set("inspector") {
+  sources = [
+    "cpuprofiler/cpu_profiler.cc",
+    "cpuprofiler/profile_generator.cc",
+    "cpuprofiler/profile_tree.cc",
+    "cpuprofiler/profiler_sampling.cc",
+    "cpuprofiler/tracing_cpu_profiler.cc",
+    "debugger/debugger.cc",
+    "debugger/debugger_breakpoint.cc",
+    "debugger/debugger_callframe.cc",
+    "debugger/debugger_properties.cc",
+    "debugger/debugger_queue.cc",
+    "heapprofiler/edge.cc",
+    "heapprofiler/entry.cc",
+    "heapprofiler/gen.cc",
+    "heapprofiler/heapexplorer.cc",
+    "heapprofiler/heapprofiler.cc",
+    "heapprofiler/serialize.cc",
+    "heapprofiler/snapshot.cc",
+    "protocols.cc",
+    "runtime/runtime.cc",
+    "string_tools.cc",
+  ]
+}

@@ -1,0 +1,143 @@
+# Copyright 2024 The Lynx Authors. All rights reserved.
+# Licensed under the Apache License Version 2.0 that can be found in the
+# LICENSE file in the root directory of this source tree.
+import("//Primjs.gni")
+import("//testing/test.gni")
+
+config("quickjs_public_config") {
+  include_dirs = [
+    ".",
+    "./src/",
+    "./src/interpreter",
+  ]
+
+  defines = [
+    "PRIMJS_MIN_LOG_LEVEL=5",  # disable alog in unittests
+    "ENABLE_BUILTIN_SERIALIZE=1",
+    "CONFIG_VERSION=\"2019-09-10\"",
+    "LYNX_SIMPLIFY=1",
+  ]
+
+  if (enable_quickjs_debugger) {
+    defines += [ "ENABLE_QUICKJS_DEBUGGER=1" ]
+    include_dirs += [
+      "./src",
+      "./src/inspector",
+    ]
+  }
+
+  if (use_lepusng) {
+    defines += [ "ENABLE_LEPUSNG" ]
+  }
+
+  if (use_bignum) {
+    defines += [ "CONFIG_BIGNUM" ]
+  }
+
+  if (force_gc) {
+    defines += [ "FORCE_GC_AT_MALLOC" ]
+  }
+
+  if (dump_bytecode) {
+    defines += [ "DUMP_BYTECODE" ]
+  }
+
+  if (enable_mem) {
+    defines += [
+      "DUMP_LEAKS",
+      "DEBUG_MEMORY",
+      "DUMP_LEAKS",
+    ]
+  }
+
+  if (enable_primjs_snapshot) {
+    defines += [ "ENABLE_PRIMJS_SNAPSHOT" ]
+  }
+
+  if (enable_compatible_mm) {
+    defines += [ "ENABLE_COMPATIBLE_MM" ]
+  }
+
+  if (enable_force_gc) {
+    defines += [ "ENABLE_FORCE_GC" ]
+  }
+
+  if (enable_tracing_gc_log) {
+    defines += [ "ENABLE_TRACING_GC_LOG" ]
+  }
+
+  if (gen_android_embedded) {
+    defines += [ "GEN_ANDROID_EMBEDDED" ]
+  }
+
+  if (enable_gc_debug_tools) {
+    defines += [ "ENABLE_GC_DEBUG_TOOLS" ]
+  }
+
+  if (enable_primjs_trace) {
+    defines += [ "ENABLE_PRIMJS_TRACE" ]
+  }
+
+  if (enable_unittests) {
+    defines += [
+      "QJS_UNITTEST",
+      "HEAPPROFILER_UNITTEST",
+    ]
+  }
+
+  if (enable_tracing_gc) {
+    defines += [ "ENABLE_TRACING_GC" ]
+  }
+
+  cflags_cc = [
+    "-Wno-unused-private-field",
+    "-Wno-unused-variable",
+    "-Wno-unused-local-typedef",
+    "-Wno-sometimes-uninitialized",
+    "-Wno-uninitialized",
+    "-Wno-unused-function",
+    "-Wno-format",
+    "-Wno-unused-but-set-variable",
+    "-Wno-unknown-warning-option",
+    "-Wno-sign-compare",
+  ]
+  if (target_os != "android" || current_toolchain == snapshot_toolchain) {
+    cflags_cc += [
+      "-Wno-c99-designator",
+      "-Wno-reorder-init-list",
+    ]
+  }
+}
+
+config("napi_public_config") {
+  include_dirs = [
+    ".",
+    "./src",
+    "./src/napi",
+    "./src/napi/common",
+    "./src/napi/env",
+    "./src/napi/internal",
+    "./src/napi/jsc/",
+    "./src/napi/quickjs",
+    "./src/napi/v8",
+    "./src/interpreter",
+  ]
+
+  defines = [
+    "PRIMJS_MIN_LOG_LEVEL=5",  # disable alog in unittests
+  ]
+  if (use_rtti) {
+    defines += [ "NAPI_CPP_RTTI" ]
+  } else {
+    defines += [ "NAPI_DISABLE_CPP_RTTI" ]
+  }
+}
+
+group("all") {
+  deps = [ "src:src" ]
+
+  if (enable_unittests) {
+    testonly = true
+    deps += [ "./testing" ]
+  }
+}

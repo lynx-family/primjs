@@ -1,0 +1,77 @@
+# Copyright 2024 The Lynx Authors. All rights reserved.
+# Licensed under the Apache License Version 2.0 that can be found in the
+# LICENSE file in the root directory of this source tree.
+
+if (is_android) {
+  import("//build/config/android/config.gni")
+}
+
+if (target_cpu == "arm" || target_cpu == "arm64") {
+  import("//build/config/arm.gni")
+}
+
+# global configs
+declare_args() {
+  # Compile for test cases.
+  # Lynx
+  enable_unittests = false
+
+  # Whether to enable unit tests
+
+  # Compile lepusng
+  use_lepusng = true
+  just_lepusng = true
+
+  # Open support of bignum
+  # Conflict with lepusng!
+  use_bignum = false
+
+  # Force qjs run gc at malloc
+  force_gc = false
+
+  # dump memory leaks
+  enable_mem = false
+
+  # dump bytecode
+  dump_bytecode = false
+
+  enable_quickjs_debugger = true
+
+  # Enable primjs snapshot version (with pre-generated embedded.S)
+  enable_primjs_snapshot = false
+
+  # Enable primjs compatible memory management
+  enable_compatible_mm = false
+
+  # Enable tracing gc debug tools
+  enable_gc_debug_tools = false
+
+  # Enable force tracing gc
+  enable_force_gc = false
+
+  # Enable tracing gc log
+  enable_tracing_gc_log = false
+
+  gen_android_embedded = false
+
+  use_rtti = false
+
+  # Enable primjs trace
+  enable_primjs_trace = false
+
+  enable_tracing_gc = false
+  napi_src_dir = "//src/napi/"
+}
+
+if (target_cpu != "arm64") {
+  enable_primjs_snapshot = false
+  enable_compatible_mm = false
+}
+
+if (!enable_primjs_snapshot) {
+  enable_compatible_mm = false
+  enable_tracing_gc = false
+  enable_primjs_trace = false
+  enable_gc_debug_tools = false
+  enable_gc_debug_tools = false
+}

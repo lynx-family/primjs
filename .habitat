@@ -1,0 +1,1 @@
+solutions = [{'name': '.', 'deps_file': 'DEPS', 'url': 'https://github.com/lynx-family/primjs'}]

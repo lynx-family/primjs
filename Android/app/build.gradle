@@ -1,0 +1,147 @@
+// Copyright 2024 The Lynx Authors. All rights reserved.
+// Licensed under the Apache License Version 2.0 that can be found in the
+// LICENSE file in the root directory of this source tree.
+
+plugins {
+    id 'com.android.library'
+}
+apply from: './publish.gradle'
+
+
+android {
+    namespace 'com.lynx.primjs'
+    compileSdk 30
+
+    defaultConfig {
+        minSdk 16
+        targetSdk 30
+        versionCode 1
+        versionName "1.0"
+
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        externalNativeBuild {
+            cmake {
+                cppFlags '-std=c++17'
+                arguments(
+                        '-DANDROID_PLATFORM=android-14',
+                        '-DANDROID_TOOLCHAIN=clang',
+                        '-DANDROID_LD=lld',
+                        '-DCMAKE_BUILD_TYPE=Release',
+                        '-DANDROID_STL='+getCppLib(),
+                        '-DENABLE_LITE='+enable_lite,
+                        '-DENABLE_LEPUSNG='+enable_lepusng,
+                        '-DENABLE_CODECACHE='+enable_codecache,
+                        '-DCACHE_PROFILE='+cache_profile,
+                        '-DENABLE_QUICKJS_DEBUGGER='+enable_quickjs_debugger,
+                        '-DENABLE_MEM='+enable_mem,
+                        '-DFORCE_GC='+force_gc,
+                        '-DENABLE_PRIMJS_SNAPSHOT='+enable_primjs_snapshot,
+                        '-DDISABLE_NANBOX='+disable_nanbox,
+                        '-DENABLE_COMPATIBLE_MM='+enable_compatible_mm,
+                        '-DJS_V8_LIBRARY='+"${projectDir}/build/jniLibs/v8so/jni/",
+                        '-DENABLE_BUILD_AAR=TRUE', 
+                        '-LH'
+                )
+                targets "napi", "quick", "napi_v8"
+            }
+            ndk {
+                abiFilters "arm64-v8a", "armeabi-v7a", "x86"
+            }
+        }
+        packagingOptions {
+            exclude 'lib/*/libv8_libfull.cr.so'
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+    configurations {
+        extractJNI
+    }
+    externalNativeBuild {
+        cmake {
+            path "CMakeLists.txt"
+        }
+    }
+    buildFeatures {
+        viewBinding true
+        prefabPublishing true
+
+    }
+    prefab {
+        quick {
+            headers "../../include"
+        }
+    }
+
+    libraryVariants.all { variant ->
+        variant.outputs.all { output ->
+            outputFileName = "primjs-${variant.baseName}.aar"
+        }
+    }
+}
+
+task SyncDependencies(type: Exec) {
+    workingDir "${rootProject.projectDir}/.."
+    commandLine "tools/hab", "sync", ".", "-f"
+}
+
+task extractJNIFiles {
+    doLast {
+        configurations.extractJNI.files.each {
+            def file = it.absoluteFile
+            def packageName = file.name.tokenize('-')[0].replace(".aar", "")
+            println "Extracting ${packageName}"
+            copy {
+                from zipTree(file) 
+                into "$projectDir/build/jniLibs/${packageName}"
+                include "jni/**"
+            }
+        }
+    }
+}
+preBuild.dependsOn SyncDependencies
+preBuild.dependsOn extractJNIFiles
+
+def getCppLib() {
+    if (project.property('use_cpp_shared') == 'true') {
+        return 'c++_shared'
+    } else {
+        return 'c++_static'
+    }
+}
+
+// AGP 4.1 not support headerOnly, and prefab has confict with c++_static flag,
+// so we need to remove prefab meta files manually
+task removePrefabMetaFiles {
+    afterEvaluate {
+        project.android.libraryVariants.all { variant ->
+            def prefabPackageTask = project.tasks.findByName("prefab${variant.name.capitalize()}Package")
+            if (prefabPackageTask != null) {
+                def outputDir = prefabPackageTask.getOutputDirectory()
+                dependsOn prefabPackageTask
+                prefabPackageTask.doLast {
+                    FileTree fileTree = project.fileTree(outputDir)
+                    fileTree.each { file ->
+                        if (file.name.endsWith("abi.json") || file.name.endsWith(".so")) {
+                            println("remove prefab meta file: " + file.name + ", " + file.parent)
+                            file.delete()
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+dependencies {
+    extractJNI fileTree(dir: 'libs', include: ['*.aar'])
+}

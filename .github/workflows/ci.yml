@@ -1,0 +1,81 @@
+name: ci
+
+on:
+  push:
+    branches:
+      - develop
+  pull_request:
+    branches:
+      - develop
+
+jobs:
+  coding-style:
+    runs-on: lynx-ubuntu-22.04-medium
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          echo "to be done"
+  lint-pod:
+    runs-on: lynx-darwin-14-medium
+    steps:
+      - name: Download Source
+        uses: actions/checkout@v4.2.2
+      - name: Install SSH Key
+        uses: kielabokkie/ssh-key-and-known-hosts-action@v1
+        with:
+          ssh-private-key: ${{ secrets.PRIVATE_SSH_KEY }}
+          ssh-host: github.com
+      - name: Bundle Install
+        run: |-
+          SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk bundle install --path .bundle
+      - name: Lint
+        run: |-
+          POD_VERSION=0.0.1-for-ci-test pod spec lint PrimJS.podspec --verbose --skip-import-validation --allow-warnings
+  
+  check-unittests-linux:
+    runs-on: lynx-ubuntu-22.04-medium
+    steps:
+      - name: Download Source
+        uses: actions/checkout@v4.2.2
+      - name: Install SSH Key
+        uses: kielabokkie/ssh-key-and-known-hosts-action@v1
+        with:
+          ssh-private-key: ${{ secrets.PRIVATE_SSH_KEY }}
+          ssh-host: github.com
+      - name: Set up Python 3.9
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.9"
+      - name: Install deps
+        run: |
+          source tools/envsetup.sh
+          hab sync . -f
+      - name: Build unittests
+        run: |
+          source tools/envsetup.sh
+          python3 tools/ci/check_test_build.py
+      - name: Run unittests
+        run: 
+          python3 tools/ci/check_test_run.py
+
+  check-unittests-darwin:
+    runs-on: lynx-darwin-14-medium
+    steps:
+      - name: Download Source
+        uses: actions/checkout@v4.2.2
+      - name: Install SSH Key
+        uses: kielabokkie/ssh-key-and-known-hosts-action@v1
+        with:
+          ssh-private-key: ${{ secrets.PRIVATE_SSH_KEY }}
+          ssh-host: github.com
+      - name: Install deps
+        run: |
+          source tools/envsetup.sh
+          hab sync . -f
+      - name: Build unittests
+        run: |
+          source tools/envsetup.sh
+          python3 tools/ci/check_test_build.py
+      - name: Run unittests
+        run: 
+          python3 tools/ci/check_test_run.py

@@ -1,0 +1,24 @@
+# Copyright 2024 The Lynx Authors. All rights reserved.
+# Licensed under the Apache License Version 2.0 that can be found in the
+# LICENSE file in the root directory of this source tree.
+
+import("//Primjs.gni")
+
+config("config") {
+  include_dirs = [
+    "./",
+    "../..",
+  ]
+}
+
+napi_source_set("env") {
+  sources = [ "napi_env.cc" ]
+  public = [ "napi_env.h" ]
+  configs = [ ":config" ]
+}
+
+napi_source_set("runtime") {
+  sources = [ "napi_runtime.cc" ]
+  public = [ "napi_runtime.h" ]
+  configs = [ ":config" ]
+}
