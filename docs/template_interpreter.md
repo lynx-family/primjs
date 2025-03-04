@@ -155,30 +155,3 @@ Due to the PrimJs Template interpreter using the x0 and x1 registers to cache th
   
 
  It is important to note that when both the stack top and second-to-top are already cached, pushing another value onto the stack requires a spill. This means the original second-to-top is pushed onto the operand stack, the original stack top moves to the second-to-top in the x0 register, and the pushed value is placed in x1 as the new stack top.  
-
-## Performance
-
-Thanks to the various optimization measures introduced above, the PrimJs Template interpreter achieves a significant performance improvement compared to the QuickJS CPP interpreter. Using the benchmark suite [`Octane`](https://github.com/mozilla/arewefastyet/tree/master/benchmarks/v8-v7) as an example, the performance comparison data is shown in the table below:  
-
-**Test Environment:**
-- Device: Apple MacBook Pro 13" M1
-- Processor: Apple M1 chip with 8-core CPU (4 performance cores and 4 efficiency cores)
-- Memory: 16GB
-- CPU Clock Speed: 3.2 GHz
-
-
-
-|**Test Cases**    |**QuickJs CPP interpreter**    |**PrimJs Template interpreter**    |**Performance Improvement**    |
-|-|-|-|-|
-|Richards    |928    |1159    |24.89%    |
-|DeltaBlue    |1045    |1329    |27.18%    |
-|Crypto    |906    |1402    |54.75%    |
-|RayTrace    |1219    |1883    |54.47%    |
-|EarleyBoyer    |2008    |3406    |69.62%    |
-|RegExp    |292    |356    |21.92%    |
-|Splay    |2098    |3675    |75.17%    |
-|NavierStokes    |1582    |2988    |88.87%    |
-|**total score**    |1096    |1647    |50.27%    |
-
-  
-
