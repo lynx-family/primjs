@@ -16,12 +16,6 @@ jobs:
     - name: Download Source
       uses: actions/checkout@v4.2.2
 
-    - name: Install SSH Key
-      uses: kielabokkie/ssh-key-and-known-hosts-action@v1
-      with:
-        ssh-private-key: ${{ secrets.PRIVATE_SSH_KEY }}
-        ssh-host: github.com
-
     - name: Set up JDK 11
       uses: actions/setup-java@v1
       with:
