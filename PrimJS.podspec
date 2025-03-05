@@ -28,7 +28,7 @@ Pod::Spec.new do |s|
   s.license = "MIT"
   s.author = { "pandazyp" => "2823543594@qq.com" }
 
-  s.source = { :git => "git@github.com:lynx-family/primjs.git", :tag => s.version.to_s }
+  s.source = { :git => "https://github.com/lynx-family/primjs.git", :tag => s.version.to_s }
 
   s.compiler_flags = "-Wall", "-Wno-shorten-64-to-32", "-Os"
   s.ios.deployment_target = "9.0"

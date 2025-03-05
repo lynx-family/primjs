@@ -12,7 +12,7 @@ system = platform.system().lower()
 deps = {
     "build": {
         "type": "git",
-        "url": "git@github.com:lynx-family/buildroot.git",
+        "url": "https://github.com/lynx-family/buildroot.git",
         "commit": "b74a2ad3759ed710e67426eb4ce8e559405ed63f",
         "ignore_in_git": True,
         "condition": system in ["linux", "darwin", "windows"],
