@@ -1,8 +1,16 @@
-# PrimJS JavaScript Engine
+<div align="center">
+
+<p>
+  <a href="https://lynxjs.org/guide/scripting-runtime/main-thread-runtime.html#primjs">
+    <img width="500" alt="PrimJS logo" src=".github/splash.png" />
+  </a>
+</p>
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://www.apache.org/licenses/LICENSE-2.0.txt)
 
 PrimJS is a lightweight, high-performance JavaScript engine designed specifically for the [Lynx](https://github.com/lynx-family/lynx) cross-platform framework. Fully supporting ES2019, PrimJS is built on top of [QuickJS](https://bellard.org/quickjs/) and delivers superior performance and a better development experience compared to QuickJS. 
+
+</div>
 
 ## Key features include:
 - **[Optimized Interpreter](./docs/template_interpreter.md):** PrimJS introduces a template interpreter leveraging stack caching and register optimizations, significantly enhancing performance.
