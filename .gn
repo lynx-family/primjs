@@ -10,4 +10,5 @@ default_args = {
   use_xcode = true
   is_debug = false
   use_flutter_cxx = false
+  enable_optimize_with_O2 = true
 }

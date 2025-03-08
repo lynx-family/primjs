@@ -35,7 +35,7 @@ declare_args() {
   # dump bytecode
   dump_bytecode = false
 
-  enable_quickjs_debugger = true
+  enable_quickjs_debugger = false
 
   # Enable primjs snapshot version (with pre-generated embedded.S)
   enable_primjs_snapshot = false

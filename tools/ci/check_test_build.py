@@ -42,6 +42,7 @@ def CheckUnitTestsBuild(options):
     enable_coverage = true
     use_rtti = true
     is_debug = true
+    enable_quickjs_debugger = true
     {}
     {}
   """.format(
@@ -69,6 +70,7 @@ def CheckUnitTestsBuild(options):
         enable_tracing_gc = true
         enable_coverage = true
         use_rtti = true
+        enable_quickjs_debugger = true
         {}
         {}
   """.format(
