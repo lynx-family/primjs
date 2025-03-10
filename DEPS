@@ -138,4 +138,11 @@ deps = {
             "0001-Avoid-excessive-U-in-error-messages.patch",
         ),
     },
+    "./tools_shared": {
+        "type": "solution",
+        "url": "https://github.com/lynx-family/tools-shared.git",
+        "commit": "271dba582cab4409de488da3fa6e6761fb2a1cdd",
+        "deps_file": "dependencies/DEPS",
+        "ignore_in_git": True,
+    },
 }

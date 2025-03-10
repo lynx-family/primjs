@@ -25,6 +25,7 @@ PRIMJS_envsetup() {
     export PATH=${PRIMJS_BUILDTOOLS_DIR}/llvm/bin:$PATH
     export PATH=${SCRIPT_DIR}/cli:$PATH
     export PATH=${SCRIPT_DIR}/release:$PATH
+    export PATH=${PRIMJS_ROOT_DIR}/tools_shared:$PATH
 
 }
 PRIMJS_envsetup "${BASH_SOURCE:-$0}"

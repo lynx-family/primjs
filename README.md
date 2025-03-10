@@ -85,6 +85,13 @@ We are devoted to ensuring a positive, inclusive, and safe environment for all c
 
 [coc]: CODE_OF_CONDUCT.md
 
+### [Contributing Guide][contributing]
+We welcome you to join and become a member of Lynx Authors. It's people like you that make this project great.
+
+Please refer to lynx [contributing guide][contributing] for details.
+
+[contributing]: https://github.com/lynx-family/lynx/blob/develop/CONTRIBUTING.md
+
 ### Open Source Roadmap
 
 ## Discussions
