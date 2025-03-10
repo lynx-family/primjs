@@ -11,7 +11,7 @@
 
 Pod::Spec.new do |s|
   s.name = "PrimJS"
-  s.version = "#{ ENV['POD_VERSION'] }"
+  s.version = "#{ ENV['POD_VERSION'] || File.read('PRIMJS_VERSION').strip}"
   s.summary = "A short description of PrimJS."
   s.homepage = "https://github.com/lynx-family/primjs"
 
