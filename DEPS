@@ -102,7 +102,7 @@ deps = {
     },
     "Android/app/libs/v8so-release.aar": {
         "type": "http",
-        "url": f"https://github.com/lynx-family/v8-build/releases/download/11.1.277.1/v8so-release.aar",
+        "url": f"https://github.com/lynx-family/v8-build/releases/download/11.1.277.2/v8so-release.aar",
         "ignore_in_git": True,
         "decompress": False,
     },
