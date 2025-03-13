@@ -12489,6 +12489,7 @@ static __exception int js_parse_postfix_expr(JSParseState *s, int parse_flags) {
         if (next_token(s)) /* update line number before emitting code */
           return -1;
       do_get_var:
+        emit_line_num(s, true);
         emit_op(s, OP_scope_get_var);
         emit_u32(s, name);
         emit_u16(s, s->cur_func->scope_level);
@@ -12522,6 +12523,7 @@ static __exception int js_parse_postfix_expr(JSParseState *s, int parse_flags) {
         emit_atom(s, JS_ATOM_new_target);
         emit_u16(s, 0);
       } else {
+        emit_line_num(s, false);
         caller_start = s->token.ptr;
         if (js_parse_postfix_expr(s, FALSE | PF_LASTEST_ISNEW)) return -1;
         caller_end = s->token.ptr;
@@ -12620,6 +12622,7 @@ static __exception int js_parse_postfix_expr(JSParseState *s, int parse_flags) {
 
       if (call_type == FUNC_CALL_NORMAL) {
       parse_func_call2:
+        emit_line_num(s, false);
         switch (opcode = get_prev_opcode(fd)) {
           case OP_get_field:
             /* keep the object on the stack */
@@ -13477,6 +13480,7 @@ static __exception int js_parse_statement_or_decl(JSParseState *s,
         js_parse_error(s, "line terminator not allowed after throw");
         goto fail;
       }
+      emit_line_num(s, false);
       if (js_parse_expr(s)) goto fail;
       emit_op(s, OP_throw);
       if (js_parse_expect_semi(s)) goto fail;
@@ -14052,6 +14056,7 @@ static __exception int js_parse_statement_or_decl(JSParseState *s,
 
     default:
     hasexpr:
+      emit_line_num(s, false);
       if (js_parse_expr(s)) goto fail;
       if (s->cur_func->eval_ret_idx >= 0) {
         /* store the expression value so that it can be returned
