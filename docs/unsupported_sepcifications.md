@@ -422,5 +422,5 @@ switch (0) {
   default:
     function* x() {}
 } // The async function has the same effect.
-x; // Qjs cannot correctly raise a Reference-Error, which means that objects created in the switch env are beging used by the outside  scope.
+x; // Qjs cannot correctly raise a Reference-Error, which means that objects created in the switch env are beginning used by the outside  scope.
 ```
