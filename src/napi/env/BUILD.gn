@@ -18,7 +18,10 @@ napi_source_set("env") {
 }
 
 napi_source_set("runtime") {
-  sources = [ "napi_runtime.cc" ]
+  sources = [
+    "napi_runtime_internal.h",
+    "napi_runtime.cc"
+     ]
   public = [ "napi_runtime.h" ]
   configs = [ ":config" ]
 }

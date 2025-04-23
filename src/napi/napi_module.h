@@ -36,6 +36,7 @@ typedef struct napi_module {
 EXTERN_C_START
 // do not use `napi_module_register` to prevent symbol conflict with node.js
 NAPI_EXTERN void napi_module_register_xx(napi_module* mod);
+NAPI_EXTERN void napi_module_register_primjs(napi_module* mod);
 
 NAPI_EXTERN const napi_module* napi_find_module(const char* name);
 EXTERN_C_END

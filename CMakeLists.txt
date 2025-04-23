@@ -168,6 +168,7 @@ set(napi_sources
     ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/env/napi_runtime.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/quickjs/js_native_api_QuickJS.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/napi_module.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/js_native_api_adaptor.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/napi.cc)
 
 if(${ENABLE_CODECACHE})

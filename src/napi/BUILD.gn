@@ -19,12 +19,14 @@ napi_source_set("napi") {
   public = [
     "js_native_api.h",
     "js_native_api_types.h",
+    "js_native_api_adaptor.h",
     "napi.h",
     "napi_module.h",
   ]
   sources = [
     "napi.cc",
     "napi_module.cc",
+    "js_native_api_adaptor.cc"
   ]
   public_deps = [ "./common:common" ]
   public_configs = [ ":napi_public_config" ]
