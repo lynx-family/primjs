@@ -483,10 +483,6 @@ class NAPI_EXTERN Number : public Value {
 
   NAPI_INLINE operator int64_t() const { return Int64Value(); }
 
-  NAPI_INLINE operator uint64_t() const {
-    return static_cast<uint64_t>(Int64Value());
-  }
-
   NAPI_INLINE operator float() const { return FloatValue(); }
 
   NAPI_INLINE operator double() const { return DoubleValue(); }

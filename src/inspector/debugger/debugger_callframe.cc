@@ -236,15 +236,29 @@ static void GetFrameLineAndCol(LEPUSContext *ctx, LEPUSValue current_frame,
     LEPUSValue filename = DEBUGGER_COMPATIBLE_CALL_RET(
         ctx, js_function_proto_fileName, ctx, function);
     HandleScope block_scope(ctx, &filename, HANDLE_TYPE_LEPUS_VALUE);
+    uint8_t is_lepusNG = 0;
     if ((!LEPUS_IsUndefined(filename))) {
-      DebuggerSetPropertyStr(ctx, current_frame, "url",
-                             LEPUS_DupValue(ctx, filename));
-      LEPUSScriptSource *source = b->script;
       const char *url = LEPUS_ToCString(ctx, filename);
-      if (source == nullptr) {
-        source = GetScriptByScriptURL(ctx, url);
+      if (url && url[0] == '\0') {
+        // for lepusNG debug lepus.js
+        LEPUSScriptSource *source = GetScriptByIndex(ctx, 0);
+        const char *script_url = source ? source->url : nullptr;
+        if (script_url && (strcmp(script_url, "lepus.js") == 0)) {
+          is_lepusNG = 1;
+          auto *info = ctx->debugger_info;
+          DebuggerSetPropertyStr(
+              ctx, current_frame, "url",
+              LEPUS_DupValue(ctx, info->literal_pool.lepus_js));
+          script_id_value = LEPUS_NewInt32(ctx, source ? source->id : -1);
+        }
       }
-      script_id_value = LEPUS_NewInt32(ctx, source ? source->id : -1);
+
+      if (!is_lepusNG) {
+        DebuggerSetPropertyStr(ctx, current_frame, "url",
+                               LEPUS_DupValue(ctx, filename));
+        LEPUSScriptSource *source = b->script;
+        script_id_value = LEPUS_NewInt32(ctx, source ? source->id : -1);
+      }
       if (!ctx->rt->gc_enable) {
         LEPUS_FreeCString(ctx, url);
         LEPUS_FreeValue(ctx, filename);

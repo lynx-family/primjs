@@ -202,6 +202,7 @@ QJS_HIDE void AdjustBreakpoint(LEPUSDebuggerInfo *info, const char *url,
     LEPUSFunctionBytecode *b = list_entry(el, LEPUSFunctionBytecode, link);
     if (!b || !b->has_debug) continue;
     if (b->script && b->script != bsrc) continue;
+    if (!b->script && url && strcmp(url, "lepus.js") != 0) continue;
 
     const uint8_t *p_end, *p, *p_prev;
     int pc, pc_prev;
@@ -257,9 +258,6 @@ QJS_HIDE void AdjustBreakpoints(LEPUSContext *ctx, LEPUSScriptSource *script) {
 
 QJS_HIDE const uint8_t *FindBreakpointBytecode(LEPUSContext *ctx,
                                                LEPUSBreakpoint *bp) {
-  if (bp->script_id == -1) {
-    return nullptr;
-  }
   LEPUSDebuggerInfo *info = ctx->debugger_info;
   if (!info) return nullptr;
   struct list_head *el;
@@ -435,11 +433,11 @@ static char *GenerateBreakpointId(LEPUSContext *ctx, const char *url,
 }
 
 QJS_STATIC bool IsBreakpointEqual(LEPUSContext *ctx, LEPUSBreakpoint *a,
-                                  int32_t script_id, const char *script_url,
-                                  int32_t line_number, int64_t column_number,
+                                  int32_t script_id, int32_t line_number,
+                                  int64_t column_number,
                                   LEPUSValue condition_b) {
-  bool res1 = a->script_id == script_id && !strcmp(a->script_url, script_url) &&
-              a->line == line_number && a->column == column_number;
+  bool res1 = a->script_id == script_id && a->line == line_number &&
+              a->column == column_number;
   if (res1) {
     LEPUSValue condition_a = a->condition;
 
@@ -494,7 +492,7 @@ QJS_STATIC LEPUSBreakpoint *AddBreakpoint(
   // detect breakpoint existance
   for (int32_t idx = 0; idx < bp_num; idx++) {
     LEPUSBreakpoint *t = info->bps + idx;
-    if (IsBreakpointEqual(ctx, t, script_id, url, line_number, column_number,
+    if (IsBreakpointEqual(ctx, t, script_id, line_number, column_number,
                           condition_val)) {
       return t;
     }

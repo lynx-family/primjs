@@ -205,9 +205,6 @@ LEPUSFunctionBytecode **GetDebuggerAllFunction(LEPUSContext *ctx,
 void SetFunctionDebugFileName(LEPUSContext *ctx, LEPUSFunctionBytecode *b,
                               const char *filename, int len) {
   assert(b->has_debug);
-  if (b->debug.filename) {
-    return;
-  }
   if (filename) {
     b->debug.filename = LEPUS_NewAtom(ctx, filename);
   } else {
@@ -254,10 +251,6 @@ void SetFunctionDebugSource(LEPUSContext *ctx, LEPUSFunctionBytecode *b,
   b->debug.source_len = source_len;
   b->debug.source = js_strmalloc((const char *)source, source_len);
   return;
-}
-
-void SetFunctionScript(LEPUSFunctionBytecode *b, LEPUSScriptSource *script) {
-  b->script = script;
 }
 
 int64_t *GetFunctionLineNums(LEPUSContext *ctx, const LEPUSFunctionBytecode *b,
@@ -356,9 +349,8 @@ QJS_HIDE LEPUSScriptSource *GetScriptByIndex(LEPUSContext *ctx,
 }
 
 // add lepus.js script info into rt->script_list
-LEPUSScriptSource *AddDebuggerScript(LEPUSContext *ctx, char *script_source,
-                                     char *filename, int32_t source_len,
-                                     int32_t end_line_num) {
+void AddDebuggerScript(LEPUSContext *ctx, char *script_source,
+                       int32_t source_len, int32_t end_line_num) {
   LEPUSScriptSource *script = static_cast<LEPUSScriptSource *>(lepus_mallocz(
       ctx, sizeof(LEPUSScriptSource), ALLOC_TAG_LEPUSScriptSource));
   HandleScope func_scope{ctx, script, HANDLE_TYPE_DIR_HEAP_OBJ};
@@ -367,8 +359,8 @@ LEPUSScriptSource *AddDebuggerScript(LEPUSContext *ctx, char *script_source,
     script->is_debug_file = true;
     script->end_line = end_line_num;
     script->length = source_len;
-    script->url =
-        static_cast<char *>(lepus_strdup(ctx, filename, ALLOC_TAG_WITHOUT_PTR));
+    script->url = static_cast<char *>(
+        lepus_strdup(ctx, "lepus.js", ALLOC_TAG_WITHOUT_PTR));
     script->source = static_cast<char *>(
         lepus_malloc(ctx, source_len + 1, ALLOC_TAG_WITHOUT_PTR));
     if (script->source) {
@@ -377,15 +369,7 @@ LEPUSScriptSource *AddDebuggerScript(LEPUSContext *ctx, char *script_source,
     script->source_map_url = NULL;
     ctx->debugger_info->script_num++;
     list_add_tail(&script->link, &ctx->debugger_info->script_list);
-    if (ctx->debugger_info->is_debugger_enabled) {
-      SendScriptParsedNotification(ctx, script);
-    }
   }
-  return script;
-}
-
-void InitDebuggerScript(LEPUSContext *ctx, LEPUSScriptSource *script) {
-  AdjustBreakpoints(ctx, script);
 }
 
 QJS_HIDE const char *GetScriptSourceByScriptId(LEPUSContext *ctx,

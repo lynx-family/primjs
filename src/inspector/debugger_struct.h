@@ -54,6 +54,7 @@ extern "C" {
   V(undefined, "undefined")                                     \
   V(capital_undefined, "Undefined")                             \
   V(object, "object")                                           \
+  V(lepus_js, "lepus.js")                                       \
   V(lepus, "lepus")                                             \
   V(arraybuffer, "arraybuffer")                                 \
   V(function, "function")                                       \
