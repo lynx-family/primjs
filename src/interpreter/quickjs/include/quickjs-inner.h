@@ -975,11 +975,9 @@ typedef struct LEPUSFunctionBytecode {
   // <Primjs begin>
   struct list_head gc_link;
   uint32_t function_id;  // for lepusNG debugger encode
-#ifdef ENABLE_QUICKJS_DEBUGGER
+#ifdef ENABLE_CHECK_TOOLS
   LEPUSContext *ctx;
-#if defined(ANDROID) || defined(__ANDROID__)
   pid_t tid;
-#endif
 #endif
   // <Primjs end>
   struct {
@@ -1354,11 +1352,9 @@ struct LEPUSObject {
     JSRegExp regexp;        /* JS_CLASS_REGEXP: 8/16 bytes */
     LEPUSValue object_data; /* for JS_SetObjectData(): 8/16/16 bytes */
   } u;
-#ifdef ENABLE_QUICKJS_DEBUGGER
+#ifdef ENABLE_CHECK_TOOLS
   LEPUSContext *ctx;
-#if defined(ANDROID) || defined(__ANDROID__)
   pid_t tid;
-#endif
 #endif
   /* byte sizes: 40/48/72 */
 };
@@ -3220,11 +3216,8 @@ void SetObjectCtxCheckStatus(LEPUSContext *ctx, bool enable);
 
 void trig_gc(JSMallocState *s, size_t size, bool is_outer = false);
 
-#ifdef ENABLE_QUICKJS_DEBUGGER
-#if defined(ANDROID) || defined(__ANDROID__)
+#ifdef ENABLE_CHECK_TOOLS
 QJS_HIDE pid_t get_tid();
-#endif
-QJS_HIDE void CheckObjectCtx(LEPUSContext *ctx, LEPUSValue obj);
 #endif
 
 #endif  // SRC_INTERPRETER_QUICKJS_INCLUDE_QUICKJS_INNER_H_

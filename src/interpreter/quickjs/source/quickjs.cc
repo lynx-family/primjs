@@ -54,7 +54,7 @@ extern "C" {
 
 #include <cstdint>
 #include <cstdlib>
-#if defined(ANDROID) || defined(__ANDROID__)
+#if defined(ANDROID) || defined(__ANDROID__) || defined(OS_IOS)
 #include <errno.h>
 #include <sys/syscall.h>
 #include <unistd.h>
@@ -4587,11 +4587,9 @@ QJS_HIDE LEPUSValue JS_NewObjectFromShape(LEPUSContext *ctx, JSShape *sh,
   p->first_weak_ref = NULL;
   p->u.opaque = NULL;
   p->shape = sh;
-#ifdef ENABLE_QUICKJS_DEBUGGER
+#ifdef ENABLE_CHECK_TOOLS
   p->ctx = ctx;
-#if defined(ANDROID) || defined(__ANDROID__)
   p->tid = get_tid();
-#endif
 #endif
   p->prop = static_cast<JSProperty *>(
       lepus_malloc(ctx, sizeof(JSProperty) * sh->prop_size));
@@ -5425,6 +5423,9 @@ void LEPUS_FreeValue(LEPUSContext *ctx, LEPUSValue v) {
   DCHECK(!ctx->gc_enable);
   if (LEPUS_VALUE_HAS_REF_COUNT(v)) {
     LEPUSRefCountHeader *p = (LEPUSRefCountHeader *)LEPUS_VALUE_GET_PTR(v);
+#ifdef ENABLE_CHECK_TOOLS
+    CheckObjectCtx(ctx, v);
+#endif
     if (--p->ref_count <= 0) {
       __JS_FreeValue(ctx, v);
     }
@@ -5434,6 +5435,9 @@ void LEPUS_FreeValue(LEPUSContext *ctx, LEPUSValue v) {
 void LEPUS_FreeValueRT(LEPUSRuntime *rt, LEPUSValue v) {
   if (LEPUS_VALUE_HAS_REF_COUNT(v)) {
     LEPUSRefCountHeader *p = (LEPUSRefCountHeader *)LEPUS_VALUE_GET_PTR(v);
+#ifdef ENABLE_CHECK_TOOLS
+    CheckObjectRt(rt, v);
+#endif
     if (--p->ref_count <= 0) {
       __JS_FreeValueRT(rt, v);
     }
@@ -8847,7 +8851,7 @@ int JS_SetPropertyInternalImpl(LEPUSContext *ctx, LEPUSValueConst this_obj,
   }
   p = LEPUS_VALUE_GET_OBJ(this_obj);
 
-#ifdef ENABLE_QUICKJS_DEBUGGER
+#ifdef ENABLE_CHECK_TOOLS
   CheckObjectCtx(ctx, val);
 #endif
 
@@ -18502,7 +18506,7 @@ QJS_STATIC inline LEPUSValue JS_CallInternalTI(LEPUSContext *caller_ctx,
                                                LEPUSValue this_obj,
                                                LEPUSValue new_target, int argc,
                                                LEPUSValue *argv, int flags) {
-#ifdef ENABLE_QUICKJS_DEBUGGER
+#ifdef ENABLE_CHECK_TOOLS
   CheckObjectCtx(caller_ctx, func_obj);
 #endif
 
@@ -31542,11 +31546,9 @@ LEPUSValue js_create_function(LEPUSContext *ctx, JSFunctionDef *fd) {
   }
 
   b->stack_size = stack_size;
-#ifdef ENABLE_QUICKJS_DEBUGGER
+#ifdef ENABLE_CHECK_TOOLS
   b->ctx = ctx;
-#if defined(ANDROID) || defined(__ANDROID__)
   b->tid = get_tid();
-#endif
 #endif
 
   if (fd->js_mode & JS_MODE_STRIP) {
@@ -56137,17 +56139,26 @@ void UpdateOuterObjSize(LEPUSRuntime *rt, int size) {
 #endif
 }
 
-#ifdef ENABLE_QUICKJS_DEBUGGER
+#ifdef ENABLE_CHECK_TOOLS
+pid_t get_tid() {
 #if defined(ANDROID) || defined(__ANDROID__)
-pid_t get_tid() { return syscall(SYS_gettid); }
+  return syscall(SYS_gettid);
+#elif defined(OS_IOS)
+  uint64_t tid64;
+  pthread_threadid_np(NULL, &tid64);
+  return (pid_t)tid64;
+#else
+  return 0;
 #endif
+}
 
 void CheckObjectCtx(LEPUSContext *ctx, LEPUSValue obj) {
   if (ctx->object_ctx_check) {
     bool inconsistent_ctx =
-        (LEPUS_VALUE_IS_OBJECT(obj) &&
+        (LEPUS_VALUE_IS_OBJECT(obj) && LEPUS_VALUE_GET_OBJ(obj)->ctx &&
          (LEPUS_VALUE_GET_OBJ(obj)->ctx) != ctx) ||
         (LEPUS_VALUE_IS_FUNCTION_BYTECODE(obj) &&
+         static_cast<LEPUSFunctionBytecode *>(LEPUS_VALUE_GET_PTR(obj))->ctx &&
          static_cast<LEPUSFunctionBytecode *>(LEPUS_VALUE_GET_PTR(obj))->ctx !=
              ctx);
     if (inconsistent_ctx) {
@@ -56160,26 +56171,35 @@ void CheckObjectCtx(LEPUSContext *ctx, LEPUSValue obj) {
 #endif
       abort();
     }
-#if 0
-#if defined(ANDROID) || defined(__ANDROID__)
     pid_t tid = get_tid();
     bool inconsistent_tid =
-        (LEPUS_VALUE_IS_OBJECT(obj) &&
+        (LEPUS_VALUE_IS_OBJECT(obj) && LEPUS_VALUE_GET_OBJ(obj)->tid &&
          (LEPUS_VALUE_GET_OBJ(obj)->tid) != tid) ||
         (LEPUS_VALUE_IS_FUNCTION_BYTECODE(obj) &&
+         static_cast<LEPUSFunctionBytecode *>(LEPUS_VALUE_GET_PTR(obj))->tid &&
          static_cast<LEPUSFunctionBytecode *>(LEPUS_VALUE_GET_PTR(obj))->tid !=
              tid);
 
     if (inconsistent_tid) {
+#if defined(ANDROID) || defined(__ANDROID__)
       __android_log_print(ANDROID_LOG_FATAL, "PRIMJS_GC",
                           "CheckObjectCtx failed, inconsistent_tid; obj: %p, "
                           "ori_tid: %d, cur_tid: %d ctx: %p\n",
                           LEPUS_VALUE_GET_OBJ(obj),
                           (int)(LEPUS_VALUE_GET_OBJ(obj)->tid), (int)tid, ctx);
+#endif
       abort();
     }
-#endif
-#endif
+  }
+}
+void CheckObjectRt(LEPUSRuntime *rt, LEPUSValue obj) {
+  LEPUSContext *ctx = nullptr;
+  struct list_head *el, *el1;
+  list_for_each_safe(el, el1, &rt->context_list) {
+    ctx = list_entry(el, LEPUSContext, link);
+  }
+  if (ctx && ctx->object_ctx_check) {
+    CheckObjectCtx(ctx, obj);
   }
 }
 #endif

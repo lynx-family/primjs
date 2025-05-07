@@ -31,6 +31,7 @@ option(ENABLE_ASAN "Enable address sanitizer" OFF)
 option(ENABLE_BIGNUM "Enable bignum" OFF)
 option(ENABLE_UNITTESTS "Enable build unittests" OFF)
 option(ENABLE_BUILD_AAR "Enable build aar" OFF)
+option(ENABLE_CHECK_TOOLS "Enable check tools" OFF)
 
 set(CMAKE_COMMON_FLAGS
     "${CMAKE_COMMON_FLAGS} -Os -fPIC -ffunction-sections -fdata-sections \
@@ -74,6 +75,10 @@ if(${DISABLE_NANBOX})
   add_definitions(-DDISABLE_NANBOX=1)
 else()
   add_definitions(-DDISABLE_NANBOX=0)
+endif()
+
+if(ENABLE_CHECK_TOOLS MATCHES ${REGEX_TRUE})
+  add_definitions(-DENABLE_CHECK_TOOLS)
 endif()
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Android")

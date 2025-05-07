@@ -1005,10 +1005,18 @@ char *LEPUS_GetGCTimingInfo(LEPUSContext *ctx, bool is_start);
 void LEPUS_PushHandle(LEPUSContext *ctx, void *ptr, int type);
 void LEPUS_ResetHandle(LEPUSContext *ctx, void *ptr, int type);
 
+#ifdef ENABLE_CHECK_TOOLS
+void CheckObjectCtx(LEPUSContext *ctx, LEPUSValue obj);
+void CheckObjectRt(LEPUSRuntime *rt, LEPUSValue obj);
+#endif
+
 static inline LEPUSValue LEPUS_DupValue(LEPUSContext *ctx, LEPUSValueConst v) {
   if (LEPUS_VALUE_HAS_REF_COUNT(v)) {
     LEPUSRefCountHeader *p = (LEPUSRefCountHeader *)LEPUS_VALUE_GET_PTR(v);
     p->ref_count++;
+#ifdef ENABLE_CHECK_TOOLS
+    CheckObjectCtx(ctx, v);
+#endif
   }
   return (LEPUSValue)v;
 }
@@ -1029,6 +1037,9 @@ static inline LEPUSValue LEPUS_DupValueRT(LEPUSRuntime *rt, LEPUSValueConst v) {
   if (LEPUS_VALUE_HAS_REF_COUNT(v)) {
     LEPUSRefCountHeader *p = (LEPUSRefCountHeader *)LEPUS_VALUE_GET_PTR(v);
     p->ref_count++;
+#ifdef ENABLE_CHECK_TOOLS
+    CheckObjectRt(rt, v);
+#endif
   }
   return (LEPUSValue)v;
 }
