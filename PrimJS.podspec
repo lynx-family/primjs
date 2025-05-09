@@ -11,7 +11,14 @@
 
 Pod::Spec.new do |s|
   s.name = "PrimJS"
-  s.version = "#{ ENV['POD_VERSION'] || File.read('PRIMJS_VERSION').strip}"
+  s.version = begin
+    raw_version = ENV['POD_VERSION'] || File.read('PRIMJS_VERSION').strip
+    if raw_version.match?(/^[0-9a-f]{40}$/i)
+      "0.0.1-for-ci-test"  
+    else
+      raw_version
+    end
+  end
   s.summary = "A short description of PrimJS."
   s.homepage = "https://github.com/lynx-family/primjs"
 
@@ -28,8 +35,13 @@ Pod::Spec.new do |s|
   s.license = "MIT"
   s.author = { "pandazyp" => "2823543594@qq.com" }
 
-  s.source = { :git => "https://github.com/lynx-family/primjs.git", :tag => s.version.to_s }
-
+  s.source = { :git => "https://github.com/lynx-family/primjs.git", }.tap do |source_hash|
+    if ENV['POD_VERSION'] =~ /^[0-9a-f]{40}$/i
+      source_hash[:commit] = ENV['POD_VERSION']
+    else
+      source_hash[:tag] = s.version.to_s
+    end
+  end
   s.compiler_flags = "-Wall", "-Wno-shorten-64-to-32", "-Os"
   s.ios.deployment_target = "9.0"
   s.pod_target_xcconfig = {
@@ -114,6 +126,13 @@ Pod::Spec.new do |s|
       ssp.dependency "PrimJS/log"
       ssp.dependency "PrimJS/quickjs"
       ssp.frameworks = "JavaScriptCore"
+    end
+
+    sp.subspec "adapter" do |ssp|
+      ssp.source_files = "src/napi/adapter/*.{h,cc}"
+      ssp.public_header_files = "src/napi/adapter/js_native_api_adapter.h"
+      ssp.dependency "PrimJS/napi/core"
+      ssp.dependency "PrimJS/napi/env"
     end
   end
 

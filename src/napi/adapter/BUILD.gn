@@ -1,0 +1,15 @@
+# Copyright 2024 The Lynx Authors. All rights reserved.
+# Licensed under the Apache License Version 2.0 that can be found in the
+# LICENSE file in the root directory of this source tree.
+
+import("//Primjs.gni")
+config("config") {
+  include_dirs = [ "." ]
+}
+
+napi_source_set("adapter") {
+  sources = [ "js_native_api_adapter.cc" ]
+  public = [ "./js_native_api_adapter.h" ]
+  public_configs = [ ":config" ]
+  public_deps = [ "../..:napi_lib" ]
+}

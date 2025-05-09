@@ -648,8 +648,7 @@ struct napi_env__ {
   V(call_threadsafe_function)         \
   V(delete_threadsafe_function)       \
   V(open_error_scope)                 \
-  V(close_error_scope)                \
-  NAPI_RUNTIME_CODECACHE_CALL(V)
+  V(close_error_scope)
 
 #define NAPI_ENV_CALL(API, ENV, ...) \
   napi_env(ENV)->napi_##API((ENV), __VA_ARGS__)

@@ -183,6 +183,8 @@ endif()
 
 set(napi_v8_sources ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/v8/js_native_api_v8.cc)
 
+set(napi_adapter_sources ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/adapter/js_native_api_adapter.cc)
+
 include_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}/src
   ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter
@@ -191,7 +193,8 @@ include_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/env
   ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/internal
   ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/quickjs
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/v8)
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/v8
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/adapter)
 
 set(JS_V8_HEADERS ${CMAKE_SOURCE_DIR}/../../third_party/v8/include)
 
@@ -208,10 +211,13 @@ if(NOT (${CMAKE_CURRENT_SOURCE_DIR} STREQUAL ${CMAKE_SOURCE_DIR}))
   set(napi_v8_sources
       ${napi_v8_sources}
       PARENT_SCOPE)
+  set(napi_adapter_sources
+      ${napi_adapter_sources}
+      PARENT_SCOPE)
 endif()
 
 set_source_files_properties(
-  ${napi_sources} ${napi_v8_sources}
+  ${napi_sources} ${napi_v8_sources} ${napi_adapter_sources}
   PROPERTIES
     COMPILE_FLAGS
     "${CMAKE_CXX_FLAGS} -fvisibility=hidden -fvisibility-inlines-hidden")
@@ -233,6 +239,7 @@ if(ENABLE_BUILD_AAR)
   add_library(quick SHARED ${quickjs_sources})
   add_library(napi SHARED ${napi_sources})
   add_library(napi_v8 SHARED ${napi_v8_sources})
+  add_library(napi_adapter SHARED ${napi_adapter_sources})
   find_library(log_lib log)
   target_link_libraries(quick ${log_lib})
   target_link_libraries(napi quick)
@@ -240,6 +247,7 @@ if(ENABLE_BUILD_AAR)
   target_include_directories(napi_v8 PRIVATE ${JS_V8_HEADERS})
   target_link_libraries(
     napi_v8 PUBLIC ${JS_V8_LIBRARY}/${ANDROID_ABI}/libv8_libfull.cr.so)
+  target_link_libraries(napi_adapter napi)
 endif()
 
 if(WIN32)
