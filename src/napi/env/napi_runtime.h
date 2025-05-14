@@ -67,6 +67,16 @@ NAPI_EXTERN void napi_attach_runtime_with_configuration(
 
 NAPI_EXTERN void napi_detach_runtime(napi_env env);
 
+NAPI_EXTERN napi_status napi_runtime_get_threadsafe_function_context(
+    napi_threadsafe_function func, void** result);
+
+NAPI_EXTERN napi_status napi_runtime_call_threadsafe_function(
+    napi_threadsafe_function func, void* data,
+    napi_threadsafe_function_call_mode is_blocking);
+
+NAPI_EXTERN napi_status
+napi_runtime_delete_threadsafe_function(napi_threadsafe_function func);
+
 EXTERN_C_END
 
 #ifdef USE_PRIMJS_NAPI

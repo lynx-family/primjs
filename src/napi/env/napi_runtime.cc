@@ -363,23 +363,22 @@ class Work : AutoCloseable {
   std::atomic_bool canceled_{false};
 };
 
-napi_status napi_create_async_work(napi_env env, napi_value async_resource,
-                                   napi_value async_resource_name,
-                                   napi_async_execute_callback execute,
-                                   napi_async_complete_callback complete,
-                                   void* data, napi_async_work* result) {
+napi_status napi_runtime_create_async_work(
+    napi_env env, napi_value async_resource, napi_value async_resource_name,
+    napi_async_execute_callback execute, napi_async_complete_callback complete,
+    void* data, napi_async_work* result) {
   *result = reinterpret_cast<napi_async_work>(
       Work::New(env->rt, execute, complete, data));
   return napi_clear_last_error(env);
 }
 
-napi_status napi_delete_async_work(napi_env env, napi_async_work work) {
+napi_status napi_runtime_delete_async_work(napi_env env, napi_async_work work) {
   Work::Delete(reinterpret_cast<Work*>(work));
 
   return napi_clear_last_error(env);
 }
 
-napi_status napi_queue_async_work(napi_env env, napi_async_work work) {
+napi_status napi_runtime_queue_async_work(napi_env env, napi_async_work work) {
   Work* w = reinterpret_cast<Work*>(work);
 
   w->ScheduleWork();
@@ -387,7 +386,7 @@ napi_status napi_queue_async_work(napi_env env, napi_async_work work) {
   return napi_clear_last_error(env);
 }
 
-napi_status napi_cancel_async_work(napi_env env, napi_async_work work) {
+napi_status napi_runtime_cancel_async_work(napi_env env, napi_async_work work) {
   Work* w = reinterpret_cast<Work*>(work);
 
   if (!w->CancelWork()) {
@@ -599,7 +598,7 @@ class ThreadSafeFunction {
   std::shared_ptr<Mutex<SharedState>> state_;
 };
 
-napi_status napi_create_threadsafe_function(
+napi_status napi_runtime_create_threadsafe_function(
     napi_env env, void* thread_finalize_data, napi_finalize thread_finalize_cb,
     void* context, napi_threadsafe_function_call_js call_js_cb,
     napi_threadsafe_function* result) {
@@ -609,23 +608,6 @@ napi_status napi_create_threadsafe_function(
   *result = reinterpret_cast<napi_threadsafe_function>(tsfn);
 
   return napi_clear_last_error(env);
-}
-
-napi_status napi_get_threadsafe_function_context(napi_threadsafe_function func,
-                                                 void** result) {
-  *result = reinterpret_cast<ThreadSafeFunction*>(func)->Context();
-  return napi_ok;
-}
-
-napi_status napi_call_threadsafe_function(
-    napi_threadsafe_function func, void* data,
-    napi_threadsafe_function_call_mode is_blocking) {
-  return reinterpret_cast<ThreadSafeFunction*>(func)->Call(data, is_blocking);
-}
-
-napi_status napi_delete_threadsafe_function(napi_threadsafe_function func) {
-  ThreadSafeFunction::Delete(reinterpret_cast<ThreadSafeFunction*>(func));
-  return napi_ok;
 }
 
 class ErrorScope {
@@ -646,12 +628,14 @@ class ErrorScope {
   napi_env env_;
 };
 
-napi_status napi_open_error_scope(napi_env env, napi_error_scope* result) {
+napi_status napi_runtime_open_error_scope(napi_env env,
+                                          napi_error_scope* result) {
   *result = reinterpret_cast<napi_error_scope>(new ErrorScope(env));
   return napi_ok;
 }
 
-napi_status napi_close_error_scope(napi_env env, napi_error_scope scope) {
+napi_status napi_runtime_close_error_scope(napi_env env,
+                                           napi_error_scope scope) {
   delete reinterpret_cast<ErrorScope*>(scope);
   return napi_ok;
 }
@@ -714,6 +698,24 @@ napi_status napi_dump_code_cache_status(napi_env env, void* dump_vec) {
 
 }  // namespace
 
+napi_status napi_runtime_get_threadsafe_function_context(
+    napi_threadsafe_function func, void** result) {
+  *result = reinterpret_cast<ThreadSafeFunction*>(func)->Context();
+  return napi_ok;
+}
+
+napi_status napi_runtime_call_threadsafe_function(
+    napi_threadsafe_function func, void* data,
+    napi_threadsafe_function_call_mode is_blocking) {
+  return reinterpret_cast<ThreadSafeFunction*>(func)->Call(data, is_blocking);
+}
+
+napi_status napi_runtime_delete_threadsafe_function(
+    napi_threadsafe_function func) {
+  ThreadSafeFunction::Delete(reinterpret_cast<ThreadSafeFunction*>(func));
+  return napi_ok;
+}
+
 napi_runtime_configuration napi_create_runtime_configuration() {
   return new napi_runtime_configuration__{};
 }
@@ -756,9 +758,15 @@ void napi_attach_runtime_with_configuration(
     napi_env env, napi_runtime_configuration configuration) {
   env->rt = new napi_runtime__(env, configuration);
 
+#define SET_INTERNAL_METHOD(API) env->napi_##API = napi_runtime_##API;
+
+  FOR_EACH_NAPI_RUNTIME_CALL(SET_INTERNAL_METHOD)
+
+#undef SET_INTERNAL_METHOD
+
 #define SET_METHOD(API) env->napi_##API = napi_##API;
 
-  FOR_EACH_NAPI_RUNTIME_CALL(SET_METHOD)
+  NAPI_RUNTIME_CODECACHE_CALL(SET_METHOD)
 
 #undef SET_METHOD
 }

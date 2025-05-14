@@ -127,6 +127,13 @@ Pod::Spec.new do |s|
       ssp.dependency "PrimJS/quickjs"
       ssp.frameworks = "JavaScriptCore"
     end
+
+    sp.subspec "adapter" do |ssp|
+      ssp.source_files = "src/napi/adapter/*.{h,cc}"
+      ssp.public_header_files = "src/napi/adapter/js_native_api_adapter.h"
+      ssp.dependency "PrimJS/napi/core"
+      ssp.dependency "PrimJS/napi/env"
+    end
   end
 
   s.subspec "log" do |sp|
