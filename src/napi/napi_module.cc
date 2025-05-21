@@ -32,6 +32,10 @@ static spin_lock mod_lock;
 
 static napi_module* modlist = nullptr;
 
+void napi_module_register_primjs(napi_module* mod) {
+  napi_module_register_xx(mod);
+}
+
 void napi_module_register_xx(napi_module* mod) {
   std::lock_guard<spin_lock> lock(mod_lock);
 
