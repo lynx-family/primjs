@@ -4,8 +4,9 @@
 import("//Primjs.gni")
 primjs_source_set("quickjs") {
   sources = [
+    "source/bignum.cc",
     "source/cutils.cc",
-    "source/libbf.cc",
+    "source/dtoa.cc",
     "source/libregexp.cc",
     "source/libunicode.cc",
     "source/primjs_monitor.cc",
@@ -15,7 +16,4 @@ primjs_source_set("quickjs") {
     "source/quickjs_queue.cc",
     "source/quickjs_version.cc",
   ]
-  if (use_bignum) {
-    sources += [ "source/libbf.cc" ]
-  }
 }

@@ -103,7 +103,7 @@ static LEPUSValue JS_Assert(LEPUSContext *ctx, LEPUSValueConst this_obj,
 }
 
 /* load a file as a UTF-8 encoded string */
-static LEPUSValue js_std_load_file(LEPUSContext *ctx, LEPUSValueConst this_val,
+static LEPUSValue js_std_read_file(LEPUSContext *ctx, LEPUSValueConst this_val,
                                    int argc, LEPUSValueConst *argv) {
   uint8_t *buf;
   const char *filename;
@@ -116,6 +116,23 @@ static LEPUSValue js_std_load_file(LEPUSContext *ctx, LEPUSValueConst this_val,
   if (!ctx->rt->gc_enable) LEPUS_FreeCString(ctx, filename);
   if (!buf) return LEPUS_NULL;
   ret = LEPUS_NewStringLen(ctx, (char *)buf, buf_len);
+  free(buf);
+  return ret;
+}
+
+static LEPUSValue js_std_load_file(LEPUSContext *ctx, LEPUSValueConst this_val,
+                                   int argc, LEPUSValueConst *argv) {
+  uint8_t *buf;
+  const char *filename;
+  LEPUSValue ret;
+  size_t buf_len;
+
+  filename = LEPUS_ToCString(ctx, argv[0]);
+  if (!filename) return LEPUS_EXCEPTION;
+  buf = lepus_load_file(ctx, &buf_len, filename);
+  if (!ctx->rt->gc_enable) LEPUS_FreeCString(ctx, filename);
+  if (!buf) return LEPUS_NULL;
+  ret = LEPUS_Eval(ctx, (char *)buf, buf_len, filename, LEPUS_EVAL_TYPE_GLOBAL);
   free(buf);
   return ret;
 }
@@ -166,32 +183,36 @@ int main(int argc, char **argv) {
   }
   lepus_std_add_helpers(ctx, 0, NULL);
 
-  LEPUSValue global_obj = LEPUS_GetGlobalObject(ctx);
-  LEPUSValue cfunc = LEPUS_NewCFunction(ctx, js_std_load_file, "read", 1);
-  HandleScope func_scope(ctx, &cfunc, HANDLE_TYPE_LEPUS_VALUE);
-  LEPUS_SetPropertyStr(ctx, global_obj, "read", cfunc);
-  cfunc = LEPUS_NewCFunction(
-      ctx,
-      [](LEPUSContext *ctx, LEPUSValue this_obj, int32_t argc,
-         LEPUSValue *argv) {
-        LEPUS_RunGC(LEPUS_GetRuntime(ctx));
-        return LEPUS_UNDEFINED;
-      },
-      "", 0);
-  LEPUS_SetPropertyStr(ctx, global_obj, "gc", cfunc);
-  if (!LEPUS_IsGCMode(ctx)) {
-    LEPUS_FreeValue(ctx, global_obj);
-  }
-  JS_AddIntrinsicAssert(ctx);
+  {
+    LEPUSValue global_obj = LEPUS_GetGlobalObject(ctx);
+    LEPUSValue cfunc = LEPUS_NewCFunction(ctx, js_std_read_file, "read", 1);
+    HandleScope func_scope(ctx, &cfunc, HANDLE_TYPE_LEPUS_VALUE);
+    LEPUS_SetPropertyStr(ctx, global_obj, "read", cfunc);
+    cfunc = LEPUS_NewCFunction(ctx, js_std_load_file, "load", 1);
+    LEPUS_SetPropertyStr(ctx, global_obj, "load", cfunc);
+    cfunc = LEPUS_NewCFunction(
+        ctx,
+        [](LEPUSContext *ctx, LEPUSValue this_obj, int32_t argc,
+           LEPUSValue *argv) {
+          LEPUS_RunGC(LEPUS_GetRuntime(ctx));
+          return LEPUS_UNDEFINED;
+        },
+        "", 0);
+    LEPUS_SetPropertyStr(ctx, global_obj, "gc", cfunc);
+    if (!LEPUS_IsGCMode(ctx)) {
+      LEPUS_FreeValue(ctx, global_obj);
+    }
+    JS_AddIntrinsicAssert(ctx);
 
-  if (eval_file(ctx, filename)) goto fail;
-  lepus_std_loop(ctx);
-  js_dump_unhandled_rejection(ctx);
+    if (eval_file(ctx, filename)) goto fail;
+    lepus_std_loop(ctx);
+    js_dump_unhandled_rejection(ctx);
 
-  if (dump_memory) {
-    LEPUSMemoryUsage stats;
-    LEPUS_ComputeMemoryUsage(rt, &stats);
-    LEPUS_DumpMemoryUsage(stdout, &stats, rt);
+    if (dump_memory) {
+      LEPUSMemoryUsage stats;
+      LEPUS_ComputeMemoryUsage(rt, &stats);
+      LEPUS_DumpMemoryUsage(stdout, &stats, rt);
+    }
   }
 
   lepus_std_free_handlers(rt);

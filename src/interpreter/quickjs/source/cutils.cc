@@ -133,7 +133,7 @@ int dbuf_put(DynBuf *s, const uint8_t *data, size_t len) {
   if (unlikely((s->size + len) > s->allocated_size)) {
     if (dbuf_realloc(s, s->size + len)) return -1;
   }
-  memcpy(s->buf + s->size, data, len);
+  memcpy_no_ub(s->buf + s->size, data, len);
   s->size += len;
   return 0;
 }
@@ -162,6 +162,7 @@ dbuf_printf(DynBuf *s, const char *fmt, ...) {
   va_start(ap, fmt);
   len = vsnprintf(buf, sizeof(buf), fmt, ap);
   va_end(ap);
+  if (len < 0) return -1;
   if (len < sizeof(buf)) {
     /* fast case */
     return dbuf_put(s, (uint8_t *)buf, len);

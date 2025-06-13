@@ -30,10 +30,6 @@ config("quickjs_public_config") {
     defines += [ "ENABLE_LEPUSNG" ]
   }
 
-  if (use_bignum) {
-    defines += [ "CONFIG_BIGNUM" ]
-  }
-
   if (force_gc) {
     defines += [ "FORCE_GC_AT_MALLOC" ]
   }

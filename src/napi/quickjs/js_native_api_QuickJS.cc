@@ -2085,8 +2085,8 @@ napi_status napi_get_arraybuffer_info(napi_env env, napi_value arraybuffer,
 
 napi_status napi_is_typedarray(napi_env env, napi_value value, bool* result) {
   LEPUSClassID class_id = LEPUS_GetClassID(env->ctx->ctx, ToJSValue(value));
-  *result =
-      class_id >= JS_CLASS_UINT8C_ARRAY && class_id <= JS_CLASS_FLOAT64_ARRAY;
+  *result = class_id >= JS_CLASS_UINT8C_ARRAY &&
+            class_id <= JS_CLASS_BIG_UINT64_ARRAY;
   return napi_clear_last_error(env);
 }
 

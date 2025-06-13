@@ -31,6 +31,9 @@ option(ENABLE_ASAN "Enable address sanitizer" OFF)
 option(ENABLE_BIGNUM "Enable bignum" OFF)
 option(ENABLE_UNITTESTS "Enable build unittests" OFF)
 option(ENABLE_BUILD_AAR "Enable build aar" OFF)
+option(ENABLE_CHECK_TOOLS "Enable check tools" OFF)
+option(ENABLE_PRIMJS_TRACE "Enable primjs trace" OFF)
+option(ENABLE_VIRTUAL_SP "Enable use virtual sp" OFF)
 
 set(CMAKE_COMMON_FLAGS
     "${CMAKE_COMMON_FLAGS} -Os -fPIC -ffunction-sections -fdata-sections \
@@ -70,6 +73,7 @@ else()
 endif()
 
 add_definitions(-DEMSCRIPTEN)
+set(PRIMJS_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 
 if(${ENABLE_MEM})
   add_definitions(-DDEBUG_MEMORY)
@@ -91,6 +95,19 @@ else()
   add_definitions(-DDISABLE_NANBOX=0)
 endif()
 
+if(ENABLE_PRIMJS_TRACE)
+  add_definitions(-DENABLE_PRIMJS_TRACE=1)
+endif()
+
+if(ENABLE_CHECK_TOOLS MATCHES ${REGEX_TRUE})
+  add_definitions(-DENABLE_CHECK_TOOLS)
+endif()
+
+if (ENABLE_PRIMJS_SNAPSHOT)
+  add_definitions(-DENABLE_PRIMJS_SNAPSHOT)
+  add_definitions(-DENABLE_COMPATIBLE_MM)
+endif()
+
 if(ENABLE_PRIMJS_HARMONY)
   set(PLATFORM_ABI ${OHOS_ARCH})
   add_definitions(-DOS_HARMONY)
@@ -110,20 +127,23 @@ if(${ENABLE_PRIMJS_SNAPSHOT} AND (${PLATFORM_ABI} MATCHES "arm64"))
   if(${ENABLE_COMPATIBLE_MM} AND (${PLATFORM_ABI} MATCHES "arm64"))
     add_definitions(-DENABLE_COMPATIBLE_MM)
   endif()
+  set(primjs_embedded_sources ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/primjs/interp/call_stub.cc)
   if(${ENABLE_QUICKJS_DEBUGGER})
     set(primjs_embedded_sources
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/primjs/android/embedded-inspector.S
+      ${primjs_embedded_sources}
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/primjs/interp/android/embedded-inspector.S
     )
   else()
     set(primjs_embedded_sources
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/primjs/android/embedded.S)
+        ${primjs_embedded_sources}
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/primjs/interp/android/embedded.S)
   endif()
 else()
 
 endif()
 
 # armeabi can't use fenv.h/fesetround()
-if(${PLATFORM_ABI} MATCHES " armeabi ")
+if(${PLATFORM_ABI} MATCHES "armeabi")
   add_definitions(-DLYNX_ARMEABI=0)
 endif()
 
@@ -131,6 +151,12 @@ if(ENABLE_UNITTESTS)
   add_definitions(-DQJS_UNITTEST)
   add_definitions(-DLYNX_SIMPLIFY)
   add_definitions(-DHEAPPROFILER_UNITTEST)
+endif()
+
+if(ENABLE_VIRTUAL_SP)
+  add_definitions(-DUSE_VIRTUAL_STACK=1)
+else()
+  add_definitions(-DUSE_VIRTUAL_STACK=0)
 endif()
 
 if(WIN32)
@@ -147,7 +173,9 @@ set(quickjs_sources
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gc/sweeper.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gc/thread_pool.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gc/collector.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/bignum.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/cutils.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/dtoa.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/libregexp.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/libunicode.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/primjs_monitor.cc
@@ -156,12 +184,6 @@ set(quickjs_sources
     ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/quickjs_version.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/quickjs-libc.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/quickjs.cc)
-
-if(ENABLE_BIGNUM)
-  set(quickjs_sources
-      ${quickjs_sources}
-      ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/libbf.cc)
-endif()
 
 if(${ENABLE_QUICKJS_DEBUGGER})
   add_definitions(-DENABLE_QUICKJS_DEBUGGER)
@@ -379,12 +401,20 @@ if(WIN32)
     /DEBUG)
 endif()
 
+set(quickjs_sources
+  ${quickjs_sources}
+  "${CMAKE_CURRENT_SOURCE_DIR}/src/basic/log/primjs_logging.cc")
+
 if(ENABLE_UNITTESTS)
+  add_subdirectory(src/interpreter/primjs)
+  add_library(primjs_static STATIC ${quickjs_sources})
   set(qjs_sources ${CMAKE_CURRENT_SOURCE_DIR}/testing/quickjs/compiler/qjs.cc)
+  add_executable(qjs ${qjs_sources})
+  target_link_libraries(qjs primjs_static)
   set(test262_sources
-      ${CMAKE_CURRENT_SOURCE_DIR}/testing/quickjs/run-test262.cc)
+     ${CMAKE_CURRENT_SOURCE_DIR}/testing/quickjs/run-test262.cc)
   add_executable(run-test262 ${test262_sources} ${quickjs_sources})
-  add_executable(qjs ${qjs_sources} ${quickjs_sources})
+  target_link_libraries(run-test262 primjs_static)
   set_target_properties(qjs run-test262 PROPERTIES RUNTIME_OUTPUT_DIRECTORY
-                                                   ${CMAKE_BINARY_DIR})
+                                                  ${CMAKE_BINARY_DIR})
 endif()

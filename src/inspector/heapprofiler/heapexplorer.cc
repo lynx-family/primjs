@@ -15,6 +15,7 @@
 #include "gc/trace-gc.h"
 #include "inspector/heapprofiler/gen.h"
 #include "inspector/heapprofiler/heapprofiler.h"
+#include "quickjs/include/bignum.h"
 
 namespace quickjs {
 namespace heapprofiler {
@@ -105,12 +106,10 @@ HeapEntry* QjsHeapExplorer::AddEntry(LEPUSContext* ctx, const HeapObjPtr& obj) {
               ((str->len << str->is_wide_char) + 1 - str->is_wide_char));
       if (name && !ctx->gc_enable) LEPUS_FreeCString(ctx, name);
     } break;
-#ifdef CONFIG_BIGNUM
-    case HeapObjPtr ::kLEPUSBigFloat: {
+    case HeapObjPtr ::kJSBigInt: {
       entry = snapshot_->AddEntry(HeapEntry::kBigInt, "bigint", obj_id,
-                                  sizeof(JSBigFloat));
+                                  sizeof(JSBigInt));
     } break;
-#endif
     case HeapObjPtr::kJSSymbol: {
       auto* symbol = static_cast<const JSString*>(obj.ptr_);
       auto val = DEBUGGER_COMPATIBLE_CALL_RET(
@@ -172,7 +171,7 @@ HeapEntry* QjsHeapExplorer::AddEntry(LEPUSContext* ctx, const HeapObjPtr& obj) {
       std::string name;
       if (p->class_id == JS_CLASS_ARRAY || p->class_id == JS_CLASS_ARGUMENTS ||
           (JS_CLASS_UINT8C_ARRAY <= p->class_id &&
-           p->class_id <= JS_CLASS_FLOAT64_ARRAY)) {
+           p->class_id <= JS_CLASS_BIG_UINT64_ARRAY)) {
         entry = snapshot_->AddEntry(HeapEntry::kArray, "[]", obj_id,
                                     sizeof(LEPUSObject));
       } else {
