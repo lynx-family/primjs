@@ -10,7 +10,7 @@ on:
 
 jobs:
   test-harmony-ci:
-    runs-on: ubuntu-latest
+    runs-on: lynx-ubuntu-22.04-medium
     container: 
       image: ghcr.io/lynx-family/harmony:5.0.9.310
       credentials:
