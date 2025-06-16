@@ -1,0 +1,30 @@
+name: ci-test-harmony
+
+on:
+  push:
+    branches:
+      - develop
+  pull_request:
+    branches:
+      - develop
+
+jobs:
+  test-harmony-ci:
+    runs-on: ubuntu-latest
+    container: 
+      image: ghcr.io/lynx-family/harmony:5.0.9.310
+      credentials:
+        username: lynx-family
+        password: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Show env
+        run: |
+          env
+      - name: Download Source
+        uses: actions/checkout@v4.2.2
+      - name: Show file system
+        run: |
+          ls -al
+      - name: Assemble HAP
+        run: |
+          cd harmony && hvigorw assembleApp 
