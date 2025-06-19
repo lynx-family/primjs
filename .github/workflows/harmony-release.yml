@@ -1,0 +1,48 @@
+name: harmony sdk release
+
+# on:
+#   workflow_dispatch:
+#     inputs:
+#       tag:
+#         description: 'release tag'
+#         required: true
+#         type: string
+on:
+  pull_request:
+    branches: [ develop ]
+  
+jobs:
+  harmony-release:
+    runs-on: lynx-custom-dind
+    container: 
+      image: ghcr.io/lynx-family/ubuntu24.04-harmony:lastest
+      options: --cap-add=NET_ADMIN
+      credentials:
+        username: lynx-family
+        password: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Set MTU
+        run: |
+          sudo apt install --no-install-recommends -y iproute2 
+          sudo ip link set dev eth0 mtu 1450 # remain 50 for k8s overlay
+          echo "MTU set successfully"
+      - name: Check env
+        run: |
+          whoami
+          pwd
+          ls -l 
+          ls -l /__w/primjs/primjs
+      - name: Download Source
+        uses: actions/checkout@v4.2.2
+      - name: Install deps
+        shell: bash
+        run: |
+          source tools/envsetup.sh
+          hab sync . -f
+      - name: Build & Publish
+        run: |
+          ohpm config set publish_id ${{ secrets.HARMONY_PUBLISH_ID }}
+          cd harmony
+          echo ${{ secrets.HARMONY_PUBLISH_KEY }} > publish.key
+          ohpm config set key_path ./publish.key
+          ohpm run publish
