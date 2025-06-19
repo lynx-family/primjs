@@ -76,7 +76,7 @@ def run_package_har(module_name, module_path, verbose):
 def do_publish(har_path):
     print(f'start publish {har_path}.')
 
-    cmd = f'ohpm -v publish {har_path}'
+    cmd = f'ohpm publish {har_path}'
 
     check_call(cmd, shell=True, cwd=HARMONY_DIR)
 
