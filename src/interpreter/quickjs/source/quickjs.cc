@@ -56142,12 +56142,13 @@ void SetObjectCtxCheckStatus(LEPUSContext *ctx, bool enable) {
 
 void UpdateOuterObjSize(LEPUSRuntime *rt, int size) {
 #ifdef ENABLE_COMPATIBLE_MM
+  if (size == 0) return;
   if (rt->gc_enable) {
     JSMallocState *s = &rt->malloc_state;
     s->allocate_state.outer_heap_size += size;
-    if (s->allocate_state.outer_heap_size > OUTER_HEAP_SIZE_LIMIT) {
+    if (s->allocate_state.outer_heap_size >
+        s->allocate_state.footprint_limit / 2) {
       trig_gc(s, size, true);
-      s->allocate_state.outer_heap_size = 0;
     }
   }
 #endif
