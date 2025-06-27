@@ -37,7 +37,6 @@ android {
                         '-DFORCE_GC='+force_gc,
                         '-DENABLE_PRIMJS_SNAPSHOT='+enable_primjs_snapshot,
                         '-DDISABLE_NANBOX='+disable_nanbox,
-                        '-DENABLE_CHECK_TOOLS='+enable_check_tools,
                         '-DENABLE_COMPATIBLE_MM='+enable_compatible_mm,
                         '-DJS_V8_LIBRARY='+"${projectDir}/build/jniLibs/v8so/jni/",
                         '-DENABLE_BUILD_AAR=TRUE', 
