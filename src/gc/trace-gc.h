@@ -4,7 +4,6 @@
 
 #ifndef SRC_GC_TRACE_GC_H_
 #define SRC_GC_TRACE_GC_H_
-#include <string>
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -137,11 +136,6 @@ class NAPIHandleScope {
   napi_func *reset_napi_env;
 };
 
-class GCObserver {
- public:
-  virtual ~GCObserver() = default;
-  virtual void OnGC(std::string mem_info) = 0;
-};
 #ifdef USE_PRIMJS_NAPI
 #include "primjs_napi_undefs.h"
 #endif

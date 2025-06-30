@@ -9,10 +9,6 @@
 // LICENSE file in the root directory of this source tree.
 #include "js_native_api_v8.cc.h"
 
-#ifdef USE_PRIMJS_NAPI
-#include "primjs_napi_defines.h"
-#endif
-
 static napi_status napi_run_script(napi_env env, const char* script,
                                    size_t length, const char* filename,
                                    napi_value* result) {

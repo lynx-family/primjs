@@ -6036,10 +6036,6 @@ void LEPUS_RunGC(LEPUSRuntime *rt) {
   /* decrement the reference of the children of each object. mark =
      1 after this pass. */
   // <Primjs begin>
-  if (rt->gc_depth > 0) {
-    return;
-  }
-  rt->gc_depth++;
   rt->c_stack_depth = 0;
   /*
    * Temporaily detach all closure variable references of async functions
@@ -6061,7 +6057,6 @@ void LEPUS_RunGC(LEPUSRuntime *rt) {
 
   /* free the GC objects in a cycle */
   gc_free_cycles(rt);
-  rt->gc_depth--;
   return;
 }
 
@@ -56150,20 +56145,6 @@ void UpdateOuterObjSize(LEPUSRuntime *rt, int size) {
       s->allocate_state.outer_heap_size = 0;
     }
   }
-#endif
-}
-
-void LEPUS_SetGCObserver(LEPUSRuntime *rt, void *opaque) {
-#ifdef ENABLE_COMPATIBLE_MM
-  rt->gc_observer = opaque;
-#endif
-}
-
-void *LEPUS_GetGCObserver(LEPUSRuntime *rt) {
-#ifdef ENABLE_COMPATIBLE_MM
-  return rt->gc_observer;
-#else
-  return nullptr;
 #endif
 }
 

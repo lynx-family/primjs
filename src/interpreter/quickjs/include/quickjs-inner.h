@@ -421,8 +421,6 @@ struct LEPUSRuntime {
   SettingsOption settings_option;
   // Primjs end
   JSMallocState malloc_state;
-  void *gc_observer;
-  int gc_depth;
 #ifdef ENABLE_TRACING_GC
   LEPUSObject *boilerplateArg0;
   LEPUSObject *boilerplateArg1;
