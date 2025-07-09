@@ -716,9 +716,9 @@ LEPUSRuntime *LEPUS_NewRuntime2(const struct LEPUSMallocFunctions *mf,
                                 void *opaque, uint32_t mode);
 void LEPUS_FreeRuntime(LEPUSRuntime *rt);
 typedef void LEPUS_MarkFunc(LEPUSRuntime *rt, LEPUSValueConst val,
-                            int local_idx);
+                            uint64_t trace_tool);
 void LEPUS_MarkValue(LEPUSRuntime *rt, LEPUSValueConst val,
-                     LEPUS_MarkFunc *mark_func, int local_idx);
+                     LEPUS_MarkFunc *mark_func, uint64_t trace_tool);
 void LEPUS_RunGC(LEPUSRuntime *rt);
 LEPUS_BOOL LEPUS_IsInGCSweep(LEPUSRuntime *rt);
 
@@ -855,7 +855,7 @@ typedef struct LEPUSClassExoticMethods {
 
 typedef void LEPUSClassFinalizer(LEPUSRuntime *rt, LEPUSValue val);
 typedef void LEPUSClassGCMark(LEPUSRuntime *rt, LEPUSValueConst val,
-                              LEPUS_MarkFunc *mark_func, int local_idx);
+                              LEPUS_MarkFunc *mark_func, uint64_t trace_tool);
 #define LEPUS_CALL_FLAG_CONSTRUCTOR (1 << 0)
 typedef LEPUSValue LEPUSClassCall(LEPUSContext *ctx, LEPUSValueConst func_obj,
                                   LEPUSValueConst this_val, int argc,

@@ -2019,7 +2019,7 @@ static __attribute__((unused)) int JS_DefinePropertyValue_RC(
 static __attribute__((unused)) void JS_MarkValue_RC(LEPUSRuntime *rt,
                                                     LEPUSValueConst val,
                                                     LEPUS_MarkFunc *mark_func,
-                                                    int local_idx = -1);
+                                                    uint64_t trace_tool = 0);
 static __attribute__((unused)) int JS_ToBoolFree_RC(LEPUSContext *ctx,
                                                     LEPUSValue val);
 static __attribute__((unused)) int JS_IsInstanceOf_RC(LEPUSContext *ctx,

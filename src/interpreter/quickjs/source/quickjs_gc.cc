@@ -23583,13 +23583,13 @@ static const LEPUSCFunctionListEntry js_reflect_obj[] = {
 static void js_proxy_finalizer(LEPUSRuntime *rt, LEPUSValue val) {}
 
 static void js_proxy_mark(LEPUSRuntime *rt, LEPUSValueConst val,
-                          LEPUS_MarkFunc *mark_func, int local_idx) {
+                          LEPUS_MarkFunc *mark_func, uint64_t trace_tool) {
   JSProxyData *s =
       static_cast<JSProxyData *>(LEPUS_GetOpaque(val, JS_CLASS_PROXY));
   if (s) {
-    JS_MarkValue_GC(rt, s->target, mark_func, local_idx);
-    JS_MarkValue_GC(rt, s->handler, mark_func, local_idx);
-    JS_MarkValue_GC(rt, s->proto, mark_func, local_idx);
+    JS_MarkValue_GC(rt, s->target, mark_func, trace_tool);
+    JS_MarkValue_GC(rt, s->handler, mark_func, trace_tool);
+    JS_MarkValue_GC(rt, s->proto, mark_func, trace_tool);
   }
 }
 
@@ -24572,12 +24572,12 @@ static void js_finalizationRegistry_finalizer(LEPUSRuntime *rt,
 
 static void js_finalizationRegistry_mark(LEPUSRuntime *rt, LEPUSValueConst val,
                                          LEPUS_MarkFunc *mark_func,
-                                         int local_idx) {
+                                         uint64_t trace_tool) {
   // trace_gc, remove
   LEPUSObject *p = LEPUS_VALUE_GET_OBJ(val);
   LEPUSValue ccb = p->prop[0].u.value;
   if (!LEPUS_IsNull(ccb)) return;
-  JS_MarkValue_GC(rt, ccb, mark_func, local_idx);
+  JS_MarkValue_GC(rt, ccb, mark_func, trace_tool);
 }
 
 static LEPUSValue js_map_constructor(LEPUSContext *ctx,
@@ -32485,8 +32485,8 @@ void Visitor::VisitRootHeapObjForTask(Queue *q, void *ptr) noexcept {
   atomic_release_local_idx(m, local_idx);
 }
 
-void set_mark_func(LEPUSRuntime *rt, LEPUSValueConst val, int local_idx) {
-  rt->gc->GetVisitor()->VisitRootLEPUSValue(val, local_idx);
+void set_mark_func(LEPUSRuntime *rt, LEPUSValueConst val, uint64_t trace_tool) {
+  rt->gc->GetVisitor()->VisitRootLEPUSValue(val, (int)trace_tool);
 }
 
 void Visitor::VisitRootLEPUSValue(LEPUSValue &val, int local_idx) noexcept {
