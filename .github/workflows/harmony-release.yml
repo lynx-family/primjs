@@ -10,19 +10,13 @@ on:
   
 jobs:
   harmony-release:
-    runs-on: lynx-custom-dind
+    runs-on: lynx-container
     container: 
       image: ghcr.io/lynx-family/ubuntu24.04-harmony:lastest
-      options: --cap-add=NET_ADMIN
       credentials:
         username: lynx-family
         password: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      - name: Set MTU
-        run: |
-          sudo apt install --no-install-recommends -y iproute2 
-          sudo ip link set dev eth0 mtu 1450 # remain 50 for k8s overlay
-          echo "MTU set successfully"
       - name: Install Rust toolchain
         uses: actions-rs/toolchain@v1
         with:
