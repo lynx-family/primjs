@@ -31,7 +31,7 @@ jobs:
         uses: actions/checkout@v4.2.2
       - name: Get Tag Information
         run: |-
-          version=$(echo ${{ github.ref }} | awk -F "/" '{print $3}')
+          version="${{ github.event.inputs.tag }}"
           echo "VERSION=$version" >> $GITHUB_OUTPUT;
         id: get_tag
       - name: Install deps
