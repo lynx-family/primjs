@@ -2012,7 +2012,7 @@ LEPUSValue js_dynamic_import(LEPUSContext *ctx, LEPUSValueConst specifier);
 #ifdef __cplusplus
 }
 #endif
-
+void set_mark_func(LEPUSRuntime *rt, LEPUSValueConst val, uint64_t trace_tool);
 /* <rc begin> */
 static __attribute__((unused)) int JS_DefineProperty_RC(
     LEPUSContext *ctx, LEPUSValueConst this_obj, JSAtom prop,

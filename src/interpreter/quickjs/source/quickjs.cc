@@ -14237,6 +14237,7 @@ void RegisterLepusRefCallbacks(LEPUSRuntime *rt,
   rt->js_callbacks_.free_str_cache = funcs->free_str_cache;
   rt->js_callbacks_.lepus_ref_equal = funcs->lepus_ref_equal;
   rt->js_callbacks_.lepus_ref_tostring = funcs->lepus_ref_tostring;
+  rt->js_callbacks_.ref_counted_obj_visitor = funcs->ref_counted_obj_visitor;
   return;
 }
 
