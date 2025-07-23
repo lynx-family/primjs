@@ -940,10 +940,9 @@ napi_status napi_get_property_names(napi_env env, napi_value object,
                      LEPUS_GPN_STRING_MASK | LEPUS_GPN_SYMBOL_MASK |
                          LEPUS_GPN_ENUM_ONLY | LEPUS_PROP_THROW) != -1);
 
-  std::vector<LEPUSValue> values;
-  values.reserve(props_length);
+  std::vector<LEPUSValue> values(props_length);
   for (uint32_t i = 0; i < props_length; i++) {
-    values.emplace_back(LEPUS_AtomToValue(ctx, props[i].atom));
+    values[i] = LEPUS_AtomToValue(ctx, props[i].atom);
     JS_FreeAtom_Comp(ctx, props[i].atom);
   }
   js_free_comp(ctx, props);
