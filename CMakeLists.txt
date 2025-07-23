@@ -209,13 +209,15 @@ set(napi_adapter_sources ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/adapter/js_native_
 include_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}/src
   ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/napi
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/common
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/env
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/internal
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/quickjs
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/v8
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/adapter)
+  ${CMAKE_CURRENT_SOURCE_DIR}/include/primjs
+  ${CMAKE_CURRENT_SOURCE_DIR}/include/primjs/napi
+  ${CMAKE_CURRENT_SOURCE_DIR}/include/primjs/napi/common
+  ${CMAKE_CURRENT_SOURCE_DIR}/include/primjs/napi/env
+  ${CMAKE_CURRENT_SOURCE_DIR}/include/primjs/napi/internal
+  ${CMAKE_CURRENT_SOURCE_DIR}/include/primjs/napi/quickjs
+  ${CMAKE_CURRENT_SOURCE_DIR}/include/primjs/napi/v8
+  ${CMAKE_CURRENT_SOURCE_DIR}/include/primjs/napi/adapter
+  ${CMAKE_CURRENT_SOURCE_DIR}/include/primjs/napi/harmony)
 
 if (ENABLE_PRIMJS_HARMONY)
   get_filename_component(PARENT_PARENT_DIR ${CMAKE_SOURCE_DIR}/../.. ABSOLUTE)

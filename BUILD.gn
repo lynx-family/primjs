@@ -113,13 +113,13 @@ config("napi_public_config") {
   include_dirs = [
     ".",
     "./src",
-    "./src/napi",
-    "./src/napi/common",
-    "./src/napi/env",
-    "./src/napi/internal",
-    "./src/napi/jsc/",
-    "./src/napi/quickjs",
-    "./src/napi/v8",
+    "./include/primjs/napi",
+    "./include/primjs/napi/common",
+    "./include/primjs/napi/env",
+    "./include/primjs/napi/internal",
+    "./include/primjs/napi/jsc/",
+    "./include/primjs/napi/quickjs",
+    "./include/primjs/napi/v8",
     "./src/interpreter",
   ]
 

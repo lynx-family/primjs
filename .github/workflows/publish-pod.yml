@@ -2,8 +2,10 @@ name: Publish Pod
 
 on:
   push:
-    tags:
-      - '*'
+    tag:
+        description: 'release tag'
+        required: true
+        type: string
 
 jobs:
   publish-pod:

@@ -100,19 +100,19 @@ Pod::Spec.new do |s|
     # sp.pod_target_xcconfig   = { "GCC_PREPROCESSOR_DEFINITIONS" => "ENABLE_CODECACHE PROFILE_CODECACHE" }
     sp.pod_target_xcconfig = { "HEADER_SEARCH_PATHS" => "\"${PODS_ROOT}/PrimJS\"" }
     sp.subspec "core" do |ssp|
-      ssp.source_files = ["src/napi/*.{h,cc}", "src/napi/common/*.{h,cc}"]
-      ssp.public_header_files = ["src/napi/*.h", "src/napi/common/*.h"]
+      ssp.source_files = ["src/napi/*.cc", "include/primjs/napi/*.h", "src/napi/common/*.cc", "include/primjs/napi/common/*.h"]
+      ssp.public_header_files = ["include/primjs/napi/*.h", "include/primjs/napi/common/*.h"]
     end
 
     sp.subspec "env" do |ssp|
-      ssp.source_files = "src/napi/env/*.{h,cc}"
-      ssp.public_header_files = "src/napi/env/*.h"
+      ssp.source_files = ["src/napi/env/*.cc", "include/primjs/napi/env/*.h"]
+      ssp.public_header_files = "include/primjs/napi/env/*.h"
       ssp.dependency "PrimJS/napi/core"
     end
 
     sp.subspec "quickjs" do |ssp|
-      ssp.source_files = "src/napi/quickjs/*.{h,cc}"
-      ssp.public_header_files = "src/napi/quickjs/napi_env_quickjs.h"
+      ssp.source_files = ["src/napi/quickjs/*.cc", "include/primjs/napi/quickjs/*.h"]
+      ssp.public_header_files = "include/primjs/napi/quickjs/napi_env_quickjs.h"
       ssp.dependency "PrimJS/napi/core"
       ssp.dependency "PrimJS/quickjs"
     end
@@ -120,8 +120,8 @@ Pod::Spec.new do |s|
       # To test wasm with JavaScriptCore on Playground, uncomment the next line.
       # ssp.pod_target_xcconfig = { "GCC_PREPROCESSOR_DEFINITIONS" => "JSC_OBJC_API_ENABLED=0 NAPI_ENABLE_WASM=1" }
       ssp.pod_target_xcconfig = { "GCC_PREPROCESSOR_DEFINITIONS" => "JSC_OBJC_API_ENABLED=0" }
-      ssp.source_files = "src/napi/jsc/*.{h,cc}"
-      ssp.public_header_files = "src/napi/jsc/napi_env_jsc.h"
+      ssp.source_files = ["src/napi/jsc/*.cc", "include/primjs/napi/jsc/*.h"]
+      ssp.public_header_files = "include/primjs/napi/jsc/napi_env_jsc.h"
       ssp.dependency "PrimJS/napi/core"
       ssp.dependency "PrimJS/log"
       ssp.dependency "PrimJS/quickjs"
@@ -129,8 +129,8 @@ Pod::Spec.new do |s|
     end
 
     sp.subspec "adapter" do |ssp|
-      ssp.source_files = "src/napi/adapter/*.{h,cc}"
-      ssp.public_header_files = "src/napi/adapter/js_native_api_adapter.h"
+      ssp.source_files = ["src/napi/adapter/*.cc", "include/primjs/napi/adapter/*.h"]
+      ssp.public_header_files = "include/primjs/napi/adapter/js_native_api_adapter.h"
       ssp.dependency "PrimJS/napi/core"
       ssp.dependency "PrimJS/napi/env"
     end

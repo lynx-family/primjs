@@ -2,8 +2,10 @@ name: android sdk release
 
 on:
   push:
-    tags:
-      - '*'
+    tag:
+        description: 'release tag'
+        required: true
+        type: string
 
 permissions:
   contents: write
