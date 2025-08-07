@@ -75,15 +75,10 @@ test/built-ins/Array/prototype/at/returns-undefined-for-holes-in-sparse-arrays.j
 test/built-ins/Array/prototype/at/returns-undefined-for-out-of-range-index.js:16: Test262Error: The value of `typeof Array.prototype.at` is expected to be "function" Expected SameValue(«undefined», «function») to be true
 test/built-ins/Array/prototype/concat/create-proto-from-ctor-realm-array.js:27: TypeError: $262.createRealm is not a function
 test/built-ins/Array/prototype/concat/create-proto-from-ctor-realm-non-array.js:28: TypeError: $262.createRealm is not a function
-test/built-ins/Array/prototype/every/callbackfn-resize-arraybuffer.js:16: Test262Error: Expected SameValue(«undefined», «function») to be true
-test/built-ins/Array/prototype/filter/callbackfn-resize-arraybuffer.js:16: Test262Error: Expected SameValue(«undefined», «function») to be true
 test/built-ins/Array/prototype/filter/create-proto-from-ctor-realm-array.js:28: TypeError: $262.createRealm is not a function
 test/built-ins/Array/prototype/filter/create-proto-from-ctor-realm-non-array.js:29: TypeError: $262.createRealm is not a function
-test/built-ins/Array/prototype/find/callbackfn-resize-arraybuffer.js:16: Test262Error: Expected SameValue(«undefined», «function») to be true
-test/built-ins/Array/prototype/findIndex/callbackfn-resize-arraybuffer.js:16: Test262Error: Expected SameValue(«undefined», «function») to be true
 test/built-ins/Array/prototype/findLast/array-altered-during-loop.js:27: TypeError: arr.findLast is not a function
 test/built-ins/Array/prototype/findLast/call-with-boolean.js:11: TypeError: cannot read property 'call' of undefined
-test/built-ins/Array/prototype/findLast/callbackfn-resize-arraybuffer.js:16: Test262Error: Expected SameValue(«undefined», «function») to be true
 test/built-ins/Array/prototype/findLast/length.js:13: TypeError: cannot read property 'length' of undefined
 test/built-ins/Array/prototype/findLast/name.js:17: TypeError: cannot read property 'name' of undefined
 test/built-ins/Array/prototype/findLast/predicate-call-parameters.js:26: TypeError: arr.findLast is not a function
@@ -99,7 +94,6 @@ test/built-ins/Array/prototype/findLast/return-found-value-predicate-result-is-t
 test/built-ins/Array/prototype/findLast/return-undefined-if-predicate-returns-false-value.js:25: TypeError: arr.findLast is not a function
 test/built-ins/Array/prototype/findLastIndex/array-altered-during-loop.js:27: TypeError: arr.findLastIndex is not a function
 test/built-ins/Array/prototype/findLastIndex/call-with-boolean.js:11: TypeError: cannot read property 'call' of undefined
-test/built-ins/Array/prototype/findLastIndex/callbackfn-resize-arraybuffer.js:16: Test262Error: Expected SameValue(«undefined», «function») to be true
 test/built-ins/Array/prototype/findLastIndex/length.js:13: TypeError: cannot read property 'length' of undefined
 test/built-ins/Array/prototype/findLastIndex/name.js:17: TypeError: cannot read property 'name' of undefined
 test/built-ins/Array/prototype/findLastIndex/predicate-call-parameters.js:25: TypeError: arr.findLastIndex is not a function
@@ -113,83 +107,15 @@ test/built-ins/Array/prototype/findLastIndex/return-abrupt-from-property.js:25: 
 test/built-ins/Array/prototype/findLastIndex/return-abrupt-from-this-length.js:19: Test262Error: Expected a Test262Error but got a TypeError
 test/built-ins/Array/prototype/findLastIndex/return-index-predicate-result-is-true.js:25: TypeError: arr.findLastIndex is not a function
 test/built-ins/Array/prototype/findLastIndex/return-negative-one-if-predicate-returns-false-value.js:25: TypeError: arr.findLastIndex is not a function
-test/built-ins/Array/prototype/forEach/callbackfn-resize-arraybuffer.js:16: Test262Error: Expected SameValue(«undefined», «function») to be true
-test/built-ins/Array/prototype/map/callbackfn-resize-arraybuffer.js:16: Test262Error: Expected SameValue(«undefined», «function») to be true
 test/built-ins/Array/prototype/map/create-proto-from-ctor-realm-array.js:28: TypeError: $262.createRealm is not a function
 test/built-ins/Array/prototype/map/create-proto-from-ctor-realm-non-array.js:29: TypeError: $262.createRealm is not a function
 test/built-ins/Array/prototype/slice/create-proto-from-ctor-realm-array.js:28: TypeError: $262.createRealm is not a function
 test/built-ins/Array/prototype/slice/create-proto-from-ctor-realm-non-array.js:29: TypeError: $262.createRealm is not a function
-test/built-ins/Array/prototype/some/callbackfn-resize-arraybuffer.js:16: Test262Error: Expected SameValue(«undefined», «function») to be true
 test/built-ins/Array/prototype/sort/call-with-primitive.js:30: SyntaxError: invalid number literal
 test/built-ins/Array/prototype/splice/create-proto-from-ctor-realm-array.js:28: TypeError: $262.createRealm is not a function
 test/built-ins/Array/prototype/splice/create-proto-from-ctor-realm-non-array.js:29: TypeError: $262.createRealm is not a function
 test/built-ins/Array/prototype/toString/non-callable-join-string-tag.js:25: SyntaxError: invalid number literal
-test/built-ins/ArrayBuffer/options-maxbytelength-diminuitive.js:20: Test262Error: Expected a RangeError to be thrown but no exception was thrown at all
-test/built-ins/ArrayBuffer/options-maxbytelength-excessive.js:25: Test262Error: Expected a RangeError to be thrown but no exception was thrown at all
-test/built-ins/ArrayBuffer/options-maxbytelength-negative.js:23: Test262Error: Expected a RangeError to be thrown but no exception was thrown at all
-test/built-ins/ArrayBuffer/options-maxbytelength-object.js:39: Test262Error: Expected a TypeError to be thrown but no exception was thrown at all
-test/built-ins/ArrayBuffer/options-maxbytelength-poisoned.js:23: Test262Error: Expected a Test262Error to be thrown but no exception was thrown at all
-test/built-ins/ArrayBuffer/options-maxbytelength-undefined.js:23: Test262Error: Expected SameValue(«undefined», «false») to be true
-test/built-ins/ArrayBuffer/options-non-object.js:24: SyntaxError: invalid number literal
 test/built-ins/ArrayBuffer/proto-from-ctor-realm.js:21: TypeError: $262.createRealm is not a function
-test/built-ins/ArrayBuffer/prototype/maxByteLength/detached-buffer.js:20: Test262Error: Expected SameValue(«undefined», «0») to be true
-test/built-ins/ArrayBuffer/prototype/maxByteLength/invoked-as-accessor.js:15: Test262Error: Expected a TypeError to be thrown but no exception was thrown at all
-test/built-ins/ArrayBuffer/prototype/maxByteLength/invoked-as-func.js:17: TypeError: cannot read property 'get' of undefined
-test/built-ins/ArrayBuffer/prototype/maxByteLength/length.js:27: TypeError: cannot read property 'get' of undefined
-test/built-ins/ArrayBuffer/prototype/maxByteLength/name.js:19: TypeError: cannot read property 'get' of undefined
-test/built-ins/ArrayBuffer/prototype/maxByteLength/prop-desc.js:19: TypeError: cannot read property 'set' of undefined
-test/built-ins/ArrayBuffer/prototype/maxByteLength/return-maxbytelength-non-resizable.js:21: Test262Error: Expected SameValue(«undefined», «0») to be true
-test/built-ins/ArrayBuffer/prototype/maxByteLength/return-maxbytelength-resizable.js:21: Test262Error: Expected SameValue(«undefined», «0») to be true
-test/built-ins/ArrayBuffer/prototype/maxByteLength/this-has-no-arraybufferdata-internal.js:19: TypeError: cannot read property 'get' of undefined
-test/built-ins/ArrayBuffer/prototype/maxByteLength/this-is-not-object.js:17: TypeError: cannot read property 'get' of undefined
-test/built-ins/ArrayBuffer/prototype/maxByteLength/this-is-sharedarraybuffer.js:20: TypeError: cannot read property 'get' of undefined
-test/built-ins/ArrayBuffer/prototype/resizable/detached-buffer.js:26: Test262Error: Expected SameValue(«undefined», «false») to be true
-test/built-ins/ArrayBuffer/prototype/resizable/invoked-as-accessor.js:15: Test262Error: Expected a TypeError to be thrown but no exception was thrown at all
-test/built-ins/ArrayBuffer/prototype/resizable/invoked-as-func.js:17: TypeError: cannot read property 'get' of undefined
-test/built-ins/ArrayBuffer/prototype/resizable/length.js:27: TypeError: cannot read property 'get' of undefined
-test/built-ins/ArrayBuffer/prototype/resizable/name.js:19: TypeError: cannot read property 'get' of undefined
-test/built-ins/ArrayBuffer/prototype/resizable/prop-desc.js:19: TypeError: cannot read property 'set' of undefined
-test/built-ins/ArrayBuffer/prototype/resizable/return-resizable.js:23: Test262Error: Expected SameValue(«undefined», «false») to be true
-test/built-ins/ArrayBuffer/prototype/resizable/this-has-no-arraybufferdata-internal.js:19: TypeError: cannot read property 'get' of undefined
-test/built-ins/ArrayBuffer/prototype/resizable/this-is-not-object.js:17: TypeError: cannot read property 'get' of undefined
-test/built-ins/ArrayBuffer/prototype/resizable/this-is-sharedarraybuffer.js:20: TypeError: cannot read property 'get' of undefined
-test/built-ins/ArrayBuffer/prototype/resize/descriptor.js:18: Test262Error: obj should have an own property resize
-test/built-ins/ArrayBuffer/prototype/resize/extensible.js:15: Test262Error: Expected true but got false
-test/built-ins/ArrayBuffer/prototype/resize/length.js:30: TypeError: not an object
-test/built-ins/ArrayBuffer/prototype/resize/name.js:27: TypeError: not an object
-test/built-ins/ArrayBuffer/prototype/resize/new-length-excessive.js:21: Test262Error: Expected a RangeError but got a TypeError
-test/built-ins/ArrayBuffer/prototype/resize/new-length-negative.js:21: Test262Error: Expected a RangeError but got a TypeError
-test/built-ins/ArrayBuffer/prototype/resize/new-length-non-number.js:31: Test262Error: Expected SameValue(«0», «2») to be true
-test/built-ins/ArrayBuffer/prototype/resize/nonconstructor.js:18: TypeError: cannot convert to object
-test/built-ins/ArrayBuffer/prototype/resize/resize-grow.js:51: Test262Error: Expected SameValue(«undefined», «function») to be true
-test/built-ins/ArrayBuffer/prototype/resize/resize-same-size-zero-explicit.js:52: Test262Error: Expected SameValue(«undefined», «function») to be true
-test/built-ins/ArrayBuffer/prototype/resize/resize-same-size-zero-implicit.js:52: Test262Error: Expected SameValue(«undefined», «function») to be true
-test/built-ins/ArrayBuffer/prototype/resize/resize-same-size.js:52: Test262Error: Expected SameValue(«undefined», «function») to be true
-test/built-ins/ArrayBuffer/prototype/resize/resize-shrink-zero-explicit.js:51: Test262Error: Expected SameValue(«undefined», «function») to be true
-test/built-ins/ArrayBuffer/prototype/resize/resize-shrink-zero-implicit.js:51: Test262Error: Expected SameValue(«undefined», «function») to be true
-test/built-ins/ArrayBuffer/prototype/resize/resize-shrink.js:51: Test262Error: Expected SameValue(«undefined», «function») to be true
-test/built-ins/ArrayBuffer/prototype/resize/this-is-detached.js:23: Test262Error: Expected SameValue(«undefined», «function») to be true
-test/built-ins/ArrayBuffer/prototype/resize/this-is-not-arraybuffer-object.js:18: Test262Error: Expected SameValue(«undefined», «function») to be true
-test/built-ins/ArrayBuffer/prototype/resize/this-is-not-object.js:43: SyntaxError: invalid number literal
-test/built-ins/ArrayBuffer/prototype/resize/this-is-not-resizable-arraybuffer-object.js:21: Test262Error: Expected SameValue(«undefined», «function») to be true
-test/built-ins/ArrayBuffer/prototype/transfer/descriptor.js:18: Test262Error: obj should have an own property transfer
-test/built-ins/ArrayBuffer/prototype/transfer/extensible.js:15: Test262Error: Expected true but got false
-test/built-ins/ArrayBuffer/prototype/transfer/from-fixed-to-larger.js:38: TypeError: source.transfer is not a function
-test/built-ins/ArrayBuffer/prototype/transfer/from-fixed-to-same.js:40: TypeError: source.transfer is not a function
-test/built-ins/ArrayBuffer/prototype/transfer/from-fixed-to-smaller.js:38: TypeError: source.transfer is not a function
-test/built-ins/ArrayBuffer/prototype/transfer/from-fixed-to-zero.js:38: TypeError: source.transfer is not a function
-test/built-ins/ArrayBuffer/prototype/transfer/from-resizable-to-larger.js:38: TypeError: source.transfer is not a function
-test/built-ins/ArrayBuffer/prototype/transfer/from-resizable-to-same.js:40: TypeError: source.transfer is not a function
-test/built-ins/ArrayBuffer/prototype/transfer/from-resizable-to-smaller.js:38: TypeError: source.transfer is not a function
-test/built-ins/ArrayBuffer/prototype/transfer/from-resizable-to-zero.js:38: TypeError: source.transfer is not a function
-test/built-ins/ArrayBuffer/prototype/transfer/length.js:30: TypeError: not an object
-test/built-ins/ArrayBuffer/prototype/transfer/name.js:27: TypeError: not an object
-test/built-ins/ArrayBuffer/prototype/transfer/new-length-excessive.js:23: Test262Error: Expected a RangeError but got a TypeError
-test/built-ins/ArrayBuffer/prototype/transfer/new-length-non-number.js:33: Test262Error: Expected SameValue(«0», «2») to be true
-test/built-ins/ArrayBuffer/prototype/transfer/nonconstructor.js:18: TypeError: cannot convert to object
-test/built-ins/ArrayBuffer/prototype/transfer/this-is-detached.js:23: Test262Error: Expected SameValue(«undefined», «function») to be true
-test/built-ins/ArrayBuffer/prototype/transfer/this-is-not-arraybuffer-object.js:18: Test262Error: Expected SameValue(«undefined», «function») to be true
-test/built-ins/ArrayBuffer/prototype/transfer/this-is-not-object.js:43: SyntaxError: invalid number literal
 test/built-ins/AsyncFromSyncIteratorPrototype/next/absent-value-not-passed.js:21: TypeError: $DONE() not called
 test/built-ins/AsyncFromSyncIteratorPrototype/return/absent-value-not-passed.js:21: TypeError: $DONE() not called
 test/built-ins/AsyncFunction/proto-from-ctor-realm.js:35: TypeError: $262.createRealm is not a function
@@ -270,22 +196,13 @@ test/built-ins/BigInt/tostring-throws.js:15: Test262Error: Expected a Test262Err
 test/built-ins/BigInt/valueof-throws.js:15: Test262Error: Expected a Test262Error but got a ReferenceError
 test/built-ins/BigInt/wrapper-object-ordinary-toprimitive.js:28: SyntaxError: invalid number literal
 test/built-ins/Boolean/proto-from-ctor-realm.js:23: TypeError: $262.createRealm is not a function
-test/built-ins/DataView/custom-proto-access-resizes-buffer-invalid-by-length.js:21: Test262Error: Expected SameValue(«undefined», «function») to be true
-test/built-ins/DataView/custom-proto-access-resizes-buffer-invalid-by-offset.js:20: Test262Error: Expected SameValue(«undefined», «function») to be true
-test/built-ins/DataView/custom-proto-access-resizes-buffer-valid-by-length.js:20: Test262Error: Expected SameValue(«undefined», «function») to be true
-test/built-ins/DataView/custom-proto-access-resizes-buffer-valid-by-offset.js:20: Test262Error: Expected SameValue(«undefined», «function») to be true
 test/built-ins/DataView/proto-from-ctor-realm-sab.js:25: TypeError: $262.createRealm is not a function
 test/built-ins/DataView/proto-from-ctor-realm.js:24: TypeError: $262.createRealm is not a function
-test/built-ins/DataView/prototype/byteLength/resizable-array-buffer-auto.js:48: Test262Error: Expected SameValue(«undefined», «function») to be true
-test/built-ins/DataView/prototype/byteLength/resizable-array-buffer-fixed.js:39: Test262Error: Expected SameValue(«undefined», «function») to be true
-test/built-ins/DataView/prototype/byteOffset/resizable-array-buffer-auto.js:45: Test262Error: Expected SameValue(«undefined», «function») to be true
-test/built-ins/DataView/prototype/byteOffset/resizable-array-buffer-fixed.js:39: Test262Error: Expected SameValue(«undefined», «function») to be true
 test/built-ins/DataView/prototype/getBigInt64/detached-buffer-after-toindex-byteoffset.js:30: Test262Error: DataView access at index Infinity should throw Expected a RangeError but got a TypeError
 test/built-ins/DataView/prototype/getBigInt64/index-is-out-of-range.js:27: Test262Error: DataView access at index Infinity should throw Expected a RangeError but got a TypeError
 test/built-ins/DataView/prototype/getBigInt64/length.js:32: TypeError: not an object
 test/built-ins/DataView/prototype/getBigInt64/name.js:31: TypeError: not an object
 test/built-ins/DataView/prototype/getBigInt64/negative-byteoffset-throws.js:23: Test262Error: DataView access at index -1 should throw Expected a RangeError but got a TypeError
-test/built-ins/DataView/prototype/getBigInt64/resizable-buffer.js:22: SyntaxError: invalid number literal
 test/built-ins/DataView/prototype/getBigInt64/return-abrupt-from-tonumber-byteoffset.js:28: Test262Error: valueOf Expected a Test262Error but got a TypeError
 test/built-ins/DataView/prototype/getBigInt64/return-value-clean-arraybuffer.js:39: SyntaxError: invalid number literal
 test/built-ins/DataView/prototype/getBigInt64/return-values-custom-offset.js:58: SyntaxError: invalid number literal
@@ -300,7 +217,6 @@ test/built-ins/DataView/prototype/getBigUint64/index-is-out-of-range.js:11: Test
 test/built-ins/DataView/prototype/getBigUint64/length.js:16: TypeError: not an object
 test/built-ins/DataView/prototype/getBigUint64/name.js:16: TypeError: not an object
 test/built-ins/DataView/prototype/getBigUint64/negative-byteoffset-throws.js:11: Test262Error: DataView access at index -1 should throw Expected a RangeError but got a TypeError
-test/built-ins/DataView/prototype/getBigUint64/resizable-buffer.js:22: SyntaxError: invalid number literal
 test/built-ins/DataView/prototype/getBigUint64/return-abrupt-from-tonumber-byteoffset.js:16: Test262Error: valueOf Expected a Test262Error but got a TypeError
 test/built-ins/DataView/prototype/getBigUint64/return-value-clean-arraybuffer.js:14: SyntaxError: invalid number literal
 test/built-ins/DataView/prototype/getBigUint64/return-values-custom-offset.js:33: SyntaxError: invalid number literal
@@ -310,14 +226,6 @@ test/built-ins/DataView/prototype/getBigUint64/toindex-byteoffset-errors.js:43: 
 test/built-ins/DataView/prototype/getBigUint64/toindex-byteoffset-toprimitive.js:36: SyntaxError: invalid number literal
 test/built-ins/DataView/prototype/getBigUint64/toindex-byteoffset-wrapped-values.js:24: SyntaxError: invalid number literal
 test/built-ins/DataView/prototype/getBigUint64/toindex-byteoffset.js:24: SyntaxError: invalid number literal
-test/built-ins/DataView/prototype/getFloat32/resizable-buffer.js:35: Test262Error: implements ArrayBuffer.prototype.resize Expected SameValue(«undefined», «function») to be true
-test/built-ins/DataView/prototype/getFloat64/resizable-buffer.js:35: Test262Error: implements ArrayBuffer.prototype.resize Expected SameValue(«undefined», «function») to be true
-test/built-ins/DataView/prototype/getInt8/resizable-buffer.js:35: Test262Error: implements ArrayBuffer.prototype.resize Expected SameValue(«undefined», «function») to be true
-test/built-ins/DataView/prototype/getInt16/resizable-buffer.js:35: Test262Error: implements ArrayBuffer.prototype.resize Expected SameValue(«undefined», «function») to be true
-test/built-ins/DataView/prototype/getInt32/resizable-buffer.js:35: Test262Error: implements ArrayBuffer.prototype.resize Expected SameValue(«undefined», «function») to be true
-test/built-ins/DataView/prototype/getUint8/resizable-buffer.js:35: Test262Error: implements ArrayBuffer.prototype.resize Expected SameValue(«undefined», «function») to be true
-test/built-ins/DataView/prototype/getUint16/resizable-buffer.js:35: Test262Error: implements ArrayBuffer.prototype.resize Expected SameValue(«undefined», «function») to be true
-test/built-ins/DataView/prototype/getUint32/resizable-buffer.js:35: Test262Error: implements ArrayBuffer.prototype.resize Expected SameValue(«undefined», «function») to be true
 test/built-ins/DataView/prototype/setBigInt64/detached-buffer-after-bigint-value.js:17: Test262Error: Expected a Test262Error but got a TypeError
 test/built-ins/DataView/prototype/setBigInt64/detached-buffer-after-toindex-byteoffset.js:15: Test262Error: DataView access at index Infinity should throw Expected a RangeError but got a TypeError
 test/built-ins/DataView/prototype/setBigInt64/detached-buffer.js:17: SyntaxError: invalid number literal
@@ -327,7 +235,6 @@ test/built-ins/DataView/prototype/setBigInt64/length.js:16: TypeError: not an ob
 test/built-ins/DataView/prototype/setBigInt64/name.js:16: TypeError: not an object
 test/built-ins/DataView/prototype/setBigInt64/negative-byteoffset-throws.js:15: SyntaxError: invalid number literal
 test/built-ins/DataView/prototype/setBigInt64/range-check-after-value-conversion.js:15: Test262Error: setBigInt64(100, poisoned) Expected a Test262Error but got a TypeError
-test/built-ins/DataView/prototype/setBigInt64/resizable-buffer.js:22: SyntaxError: invalid number literal
 test/built-ins/DataView/prototype/setBigInt64/return-abrupt-from-tobigint-value.js:16: Test262Error: valueOf Expected a Test262Error but got a TypeError
 test/built-ins/DataView/prototype/setBigInt64/return-abrupt-from-tonumber-byteoffset-symbol.js:17: SyntaxError: invalid number literal
 test/built-ins/DataView/prototype/setBigInt64/return-abrupt-from-tonumber-byteoffset.js:26: SyntaxError: invalid number literal
@@ -335,15 +242,6 @@ test/built-ins/DataView/prototype/setBigInt64/set-values-little-endian-order.js:
 test/built-ins/DataView/prototype/setBigInt64/set-values-return-undefined.js:30: ReferenceError: BigInt is not defined
 test/built-ins/DataView/prototype/setBigInt64/to-boolean-littleendian.js:15: SyntaxError: invalid number literal
 test/built-ins/DataView/prototype/setBigInt64/toindex-byteoffset.js:25: SyntaxError: invalid number literal
-test/built-ins/DataView/prototype/setBigUint64/resizable-buffer.js:22: SyntaxError: invalid number literal
-test/built-ins/DataView/prototype/setFloat32/resizable-buffer.js:35: Test262Error: implements ArrayBuffer.prototype.resize Expected SameValue(«undefined», «function») to be true
-test/built-ins/DataView/prototype/setFloat64/resizable-buffer.js:35: Test262Error: implements ArrayBuffer.prototype.resize Expected SameValue(«undefined», «function») to be true
-test/built-ins/DataView/prototype/setInt8/resizable-buffer.js:35: Test262Error: implements ArrayBuffer.prototype.resize Expected SameValue(«undefined», «function») to be true
-test/built-ins/DataView/prototype/setInt16/resizable-buffer.js:35: Test262Error: implements ArrayBuffer.prototype.resize Expected SameValue(«undefined», «function») to be true
-test/built-ins/DataView/prototype/setInt32/resizable-buffer.js:35: Test262Error: implements ArrayBuffer.prototype.resize Expected SameValue(«undefined», «function») to be true
-test/built-ins/DataView/prototype/setUint8/resizable-buffer.js:35: Test262Error: implements ArrayBuffer.prototype.resize Expected SameValue(«undefined», «function») to be true
-test/built-ins/DataView/prototype/setUint16/resizable-buffer.js:35: Test262Error: implements ArrayBuffer.prototype.resize Expected SameValue(«undefined», «function») to be true
-test/built-ins/DataView/prototype/setUint32/resizable-buffer.js:35: Test262Error: implements ArrayBuffer.prototype.resize Expected SameValue(«undefined», «function») to be true
 test/built-ins/Date/parse/year-zero.js:13: Test262Error: reject minus zero as extended year Expected SameValue(«-62159440500000», «NaN») to be true
 test/built-ins/Date/proto-from-ctor-realm-one.js:25: TypeError: $262.createRealm is not a function
 test/built-ins/Date/proto-from-ctor-realm-two.js:25: TypeError: $262.createRealm is not a function
@@ -800,47 +698,7 @@ test/built-ins/ShadowRealm/prototype/importValue/throws-typeerror-import-syntax-
 test/built-ins/ShadowRealm/prototype/importValue/throws-typeerror-import-throws.js:18: ReferenceError: ShadowRealm is not defined
 test/built-ins/ShadowRealm/prototype/importValue/validates-realm-object.js:11: ReferenceError: ShadowRealm is not defined
 test/built-ins/ShadowRealm/prototype/proto.js:15: ReferenceError: ShadowRealm is not defined
-test/built-ins/SharedArrayBuffer/options-maxbytelength-diminuitive.js:20: Test262Error: Expected a RangeError to be thrown but no exception was thrown at all
-test/built-ins/SharedArrayBuffer/options-maxbytelength-excessive.js:25: Test262Error: Expected a RangeError to be thrown but no exception was thrown at all
-test/built-ins/SharedArrayBuffer/options-maxbytelength-negative.js:23: Test262Error: Expected a RangeError to be thrown but no exception was thrown at all
-test/built-ins/SharedArrayBuffer/options-maxbytelength-object.js:39: Test262Error: Expected a TypeError to be thrown but no exception was thrown at all
-test/built-ins/SharedArrayBuffer/options-maxbytelength-poisoned.js:23: Test262Error: Expected a Test262Error to be thrown but no exception was thrown at all
-test/built-ins/SharedArrayBuffer/options-maxbytelength-undefined.js:23: Test262Error: Expected SameValue(«undefined», «false») to be true
-test/built-ins/SharedArrayBuffer/options-non-object.js:24: SyntaxError: invalid number literal
 test/built-ins/SharedArrayBuffer/proto-from-ctor-realm.js:23: TypeError: $262.createRealm is not a function
-test/built-ins/SharedArrayBuffer/prototype/grow/descriptor.js:18: Test262Error: obj should have an own property grow
-test/built-ins/SharedArrayBuffer/prototype/grow/extensible.js:15: Test262Error: Expected true but got false
-test/built-ins/SharedArrayBuffer/prototype/grow/grow-larger-size.js:25: Test262Error: Expected SameValue(«undefined», «function») to be true
-test/built-ins/SharedArrayBuffer/prototype/grow/grow-same-size.js:25: Test262Error: Expected SameValue(«undefined», «function») to be true
-test/built-ins/SharedArrayBuffer/prototype/grow/grow-smaller-size.js:25: Test262Error: Expected SameValue(«undefined», «function») to be true
-test/built-ins/SharedArrayBuffer/prototype/grow/length.js:30: TypeError: not an object
-test/built-ins/SharedArrayBuffer/prototype/grow/name.js:27: TypeError: not an object
-test/built-ins/SharedArrayBuffer/prototype/grow/new-length-excessive.js:20: Test262Error: Expected a RangeError but got a TypeError
-test/built-ins/SharedArrayBuffer/prototype/grow/new-length-negative.js:20: Test262Error: Expected a RangeError but got a TypeError
-test/built-ins/SharedArrayBuffer/prototype/grow/new-length-non-number.js:30: Test262Error: Expected SameValue(«0», «2») to be true
-test/built-ins/SharedArrayBuffer/prototype/grow/nonconstructor.js:18: TypeError: cannot convert to object
-test/built-ins/SharedArrayBuffer/prototype/grow/this-is-not-arraybuffer-object.js:18: Test262Error: Expected SameValue(«undefined», «function») to be true
-test/built-ins/SharedArrayBuffer/prototype/grow/this-is-not-object.js:43: SyntaxError: invalid number literal
-test/built-ins/SharedArrayBuffer/prototype/grow/this-is-not-resizable-arraybuffer-object.js:21: Test262Error: Expected SameValue(«undefined», «function») to be true
-test/built-ins/SharedArrayBuffer/prototype/growable/invoked-as-accessor.js:15: Test262Error: Expected a TypeError to be thrown but no exception was thrown at all
-test/built-ins/SharedArrayBuffer/prototype/growable/invoked-as-func.js:17: TypeError: cannot read property 'get' of undefined
-test/built-ins/SharedArrayBuffer/prototype/growable/length.js:27: TypeError: cannot read property 'get' of undefined
-test/built-ins/SharedArrayBuffer/prototype/growable/name.js:19: TypeError: cannot read property 'get' of undefined
-test/built-ins/SharedArrayBuffer/prototype/growable/prop-desc.js:19: TypeError: cannot read property 'set' of undefined
-test/built-ins/SharedArrayBuffer/prototype/growable/return-growable.js:23: Test262Error: Expected SameValue(«undefined», «false») to be true
-test/built-ins/SharedArrayBuffer/prototype/growable/this-has-no-arraybufferdata-internal.js:19: TypeError: cannot read property 'get' of undefined
-test/built-ins/SharedArrayBuffer/prototype/growable/this-is-arraybuffer.js:20: TypeError: cannot read property 'get' of undefined
-test/built-ins/SharedArrayBuffer/prototype/growable/this-is-not-object.js:17: TypeError: cannot read property 'get' of undefined
-test/built-ins/SharedArrayBuffer/prototype/maxByteLength/invoked-as-accessor.js:15: Test262Error: Expected a TypeError to be thrown but no exception was thrown at all
-test/built-ins/SharedArrayBuffer/prototype/maxByteLength/invoked-as-func.js:17: TypeError: cannot read property 'get' of undefined
-test/built-ins/SharedArrayBuffer/prototype/maxByteLength/length.js:27: TypeError: cannot read property 'get' of undefined
-test/built-ins/SharedArrayBuffer/prototype/maxByteLength/name.js:19: TypeError: cannot read property 'get' of undefined
-test/built-ins/SharedArrayBuffer/prototype/maxByteLength/prop-desc.js:19: TypeError: cannot read property 'set' of undefined
-test/built-ins/SharedArrayBuffer/prototype/maxByteLength/return-maxbytelength-growable.js:20: Test262Error: Expected SameValue(«undefined», «0») to be true
-test/built-ins/SharedArrayBuffer/prototype/maxByteLength/return-maxbytelength-non-growable.js:20: Test262Error: Expected SameValue(«undefined», «0») to be true
-test/built-ins/SharedArrayBuffer/prototype/maxByteLength/this-has-no-arraybufferdata-internal.js:19: TypeError: cannot read property 'get' of undefined
-test/built-ins/SharedArrayBuffer/prototype/maxByteLength/this-is-arraybuffer.js:20: TypeError: cannot read property 'get' of undefined
-test/built-ins/SharedArrayBuffer/prototype/maxByteLength/this-is-not-object.js:17: TypeError: cannot read property 'get' of undefined
 test/built-ins/String/proto-from-ctor-realm.js:22: TypeError: $262.createRealm is not a function
 test/built-ins/String/prototype/at/index-argument-tointeger.js:27: Test262Error: Expected SameValue(«undefined», «function») to be true
 test/built-ins/String/prototype/at/index-non-numeric-argument-tointeger-invalid.js:18: Test262Error: Expected SameValue(«undefined», «function») to be true
@@ -923,14 +781,12 @@ test/built-ins/ThrowTypeError/unique-per-realm-function-proto.js:20: Test262Erro
 }») to be true
 test/built-ins/TypedArray/prototype/Symbol.toStringTag/BigInt/detached-buffer.js:21: ReferenceError: BigInt64Array is not defined
 test/built-ins/TypedArray/prototype/Symbol.toStringTag/BigInt/return-typedarrayname.js:21: ReferenceError: BigInt64Array is not defined
-test/built-ins/TypedArray/prototype/at/BigInt/return-abrupt-from-this-out-of-bounds.js:52: Test262Error: implements TypedArray.prototype.at Expected SameValue(«undefined», «function») to be true
 test/built-ins/TypedArray/prototype/at/index-argument-tointeger.js:16: Test262Error: The value of `typeof TypedArray.prototype.at` is "function" Expected SameValue(«undefined», «function») to be true
 test/built-ins/TypedArray/prototype/at/index-non-numeric-argument-tointeger-invalid.js:16: Test262Error: The value of `typeof TypedArray.prototype.at` is "function" Expected SameValue(«undefined», «function») to be true
 test/built-ins/TypedArray/prototype/at/index-non-numeric-argument-tointeger.js:16: Test262Error: The value of `typeof TypedArray.prototype.at` is "function" Expected SameValue(«undefined», «function») to be true
 test/built-ins/TypedArray/prototype/at/length.js:16: Test262Error: The value of `typeof TypedArray.prototype.at` is "function" Expected SameValue(«undefined», «function») to be true
 test/built-ins/TypedArray/prototype/at/name.js:16: Test262Error: The value of `typeof TypedArray.prototype.at` is "function" Expected SameValue(«undefined», «function») to be true
 test/built-ins/TypedArray/prototype/at/prop-desc.js:15: Test262Error: The value of `typeof TypedArray.prototype.at` is "function" Expected SameValue(«undefined», «function») to be true
-test/built-ins/TypedArray/prototype/at/return-abrupt-from-this-out-of-bounds.js:52: Test262Error: implements TypedArray.prototype.at Expected SameValue(«undefined», «function») to be true
 test/built-ins/TypedArray/prototype/at/return-abrupt-from-this.js:17: Test262Error: The value of `typeof TypedArray.prototype.at` is "function" Expected SameValue(«undefined», «function») to be true
 test/built-ins/TypedArray/prototype/at/returns-item-relative-index.js:25: Test262Error: The value of `typeof TypedArray.prototype.at` is "function" Expected SameValue(«undefined», «function») to be true
 test/built-ins/TypedArray/prototype/at/returns-item.js:25: Test262Error: The value of `typeof TypedArray.prototype.at` is "function" Expected SameValue(«undefined», «function») to be true
@@ -939,17 +795,9 @@ test/built-ins/TypedArray/prototype/at/returns-undefined-for-out-of-range-index.
 test/built-ins/TypedArray/prototype/buffer/BigInt/detached-buffer.js:21: ReferenceError: BigInt64Array is not defined
 test/built-ins/TypedArray/prototype/buffer/BigInt/return-buffer.js:22: ReferenceError: BigInt64Array is not defined
 test/built-ins/TypedArray/prototype/byteLength/BigInt/detached-buffer.js:21: ReferenceError: BigInt64Array is not defined
-test/built-ins/TypedArray/prototype/byteLength/BigInt/resizable-array-buffer-auto.js:18: Test262Error: Expected SameValue(«undefined», «function») to be true
-test/built-ins/TypedArray/prototype/byteLength/BigInt/resizable-array-buffer-fixed.js:18: Test262Error: Expected SameValue(«undefined», «function») to be true
 test/built-ins/TypedArray/prototype/byteLength/BigInt/return-bytelength.js:24: ReferenceError: BigInt64Array is not defined
-test/built-ins/TypedArray/prototype/byteLength/resizable-array-buffer-auto.js:18: Test262Error: Expected SameValue(«undefined», «function») to be true
-test/built-ins/TypedArray/prototype/byteLength/resizable-array-buffer-fixed.js:18: Test262Error: Expected SameValue(«undefined», «function») to be true
 test/built-ins/TypedArray/prototype/byteOffset/BigInt/detached-buffer.js:22: ReferenceError: BigInt64Array is not defined
-test/built-ins/TypedArray/prototype/byteOffset/BigInt/resizable-array-buffer-auto.js:18: Test262Error: Expected SameValue(«undefined», «function») to be true
-test/built-ins/TypedArray/prototype/byteOffset/BigInt/resizable-array-buffer-fixed.js:18: Test262Error: Expected SameValue(«undefined», «function») to be true
 test/built-ins/TypedArray/prototype/byteOffset/BigInt/return-byteoffset.js:31: ReferenceError: BigInt64Array is not defined
-test/built-ins/TypedArray/prototype/byteOffset/resizable-array-buffer-auto.js:18: Test262Error: Expected SameValue(«undefined», «function») to be true
-test/built-ins/TypedArray/prototype/byteOffset/resizable-array-buffer-fixed.js:18: Test262Error: Expected SameValue(«undefined», «function») to be true
 test/built-ins/TypedArray/prototype/copyWithin/BigInt/coerced-values-end.js:32: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/copyWithin/BigInt/coerced-values-start.js:31: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/copyWithin/BigInt/coerced-values-target.js:31: SyntaxError: invalid number literal
@@ -971,15 +819,11 @@ test/built-ins/TypedArray/prototype/copyWithin/BigInt/return-abrupt-from-start-i
 test/built-ins/TypedArray/prototype/copyWithin/BigInt/return-abrupt-from-start.js:45: ReferenceError: BigInt64Array is not defined
 test/built-ins/TypedArray/prototype/copyWithin/BigInt/return-abrupt-from-target-is-symbol.js:35: ReferenceError: BigInt64Array is not defined
 test/built-ins/TypedArray/prototype/copyWithin/BigInt/return-abrupt-from-target.js:39: ReferenceError: BigInt64Array is not defined
-test/built-ins/TypedArray/prototype/copyWithin/BigInt/return-abrupt-from-this-out-of-bounds.js:52: Test262Error: implements ArrayBuffer.prototype.resize Expected SameValue(«undefined», «function») to be true
 test/built-ins/TypedArray/prototype/copyWithin/BigInt/return-this.js:32: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/copyWithin/BigInt/undefined-end.js:32: SyntaxError: invalid number literal
-test/built-ins/TypedArray/prototype/copyWithin/return-abrupt-from-this-out-of-bounds.js:52: Test262Error: implements ArrayBuffer.prototype.resize Expected SameValue(«undefined», «function») to be true
 test/built-ins/TypedArray/prototype/entries/BigInt/detached-buffer.js:27: ReferenceError: BigInt64Array is not defined
 test/built-ins/TypedArray/prototype/entries/BigInt/iter-prototype.js:20: SyntaxError: invalid number literal
-test/built-ins/TypedArray/prototype/entries/BigInt/return-abrupt-from-this-out-of-bounds.js:52: Test262Error: implements ArrayBuffer.prototype.resize Expected SameValue(«undefined», «function») to be true
 test/built-ins/TypedArray/prototype/entries/BigInt/return-itor.js:16: SyntaxError: invalid number literal
-test/built-ins/TypedArray/prototype/entries/return-abrupt-from-this-out-of-bounds.js:52: Test262Error: implements ArrayBuffer.prototype.resize Expected SameValue(«undefined», «function») to be true
 test/built-ins/TypedArray/prototype/every/BigInt/callbackfn-arguments-with-thisarg.js:29: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/every/BigInt/callbackfn-arguments-without-thisarg.js:29: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/every/BigInt/callbackfn-detachbuffer.js:41: ReferenceError: BigInt64Array is not defined
@@ -992,13 +836,10 @@ test/built-ins/TypedArray/prototype/every/BigInt/callbackfn-set-value-during-int
 test/built-ins/TypedArray/prototype/every/BigInt/callbackfn-this.js:59: ReferenceError: BigInt64Array is not defined
 test/built-ins/TypedArray/prototype/every/BigInt/detached-buffer.js:32: ReferenceError: BigInt64Array is not defined
 test/built-ins/TypedArray/prototype/every/BigInt/get-length-uses-internal-arraylength.js:34: SyntaxError: invalid number literal
-test/built-ins/TypedArray/prototype/every/BigInt/return-abrupt-from-this-out-of-bounds.js:52: Test262Error: implements ArrayBuffer.prototype.resize Expected SameValue(«undefined», «function») to be true
 test/built-ins/TypedArray/prototype/every/BigInt/returns-false-if-any-cb-returns-false.js:46: ReferenceError: BigInt64Array is not defined
 test/built-ins/TypedArray/prototype/every/BigInt/returns-true-if-every-cb-returns-true.js:46: ReferenceError: BigInt64Array is not defined
 test/built-ins/TypedArray/prototype/every/BigInt/values-are-not-cached.js:30: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/every/callbackfn-detachbuffer.js:28: Test262Error: Expected SameValue(«1», «2») to be true (Testing with Float64Array.)
-test/built-ins/TypedArray/prototype/every/callbackfn-resize.js:16: Test262Error: Expected SameValue(«undefined», «function») to be true
-test/built-ins/TypedArray/prototype/every/return-abrupt-from-this-out-of-bounds.js:52: Test262Error: implements ArrayBuffer.prototype.resize Expected SameValue(«undefined», «function») to be true
 test/built-ins/TypedArray/prototype/fill/BigInt/coerced-indexes.js:36: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/fill/BigInt/detached-buffer.js:34: ReferenceError: BigInt64Array is not defined
 test/built-ins/TypedArray/prototype/fill/BigInt/fill-values-conversion-once.js:21: SyntaxError: invalid number literal
@@ -1015,9 +856,7 @@ test/built-ins/TypedArray/prototype/fill/BigInt/return-abrupt-from-end.js:40: Sy
 test/built-ins/TypedArray/prototype/fill/BigInt/return-abrupt-from-set-value.js:51: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/fill/BigInt/return-abrupt-from-start-as-symbol.js:35: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/fill/BigInt/return-abrupt-from-start.js:39: SyntaxError: invalid number literal
-test/built-ins/TypedArray/prototype/fill/BigInt/return-abrupt-from-this-out-of-bounds.js:32: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/fill/BigInt/return-this.js:13: SyntaxError: invalid number literal
-test/built-ins/TypedArray/prototype/fill/return-abrupt-from-this-out-of-bounds.js:52: Test262Error: implements ArrayBuffer.prototype.resize Expected SameValue(«undefined», «function») to be true
 test/built-ins/TypedArray/prototype/filter/BigInt/arraylength-internal.js:39: ReferenceError: BigInt64Array is not defined
 test/built-ins/TypedArray/prototype/filter/BigInt/callbackfn-arguments-with-thisarg.js:20: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/filter/BigInt/callbackfn-arguments-without-thisarg.js:20: SyntaxError: invalid number literal
@@ -1035,7 +874,6 @@ test/built-ins/TypedArray/prototype/filter/BigInt/detached-buffer.js:32: Referen
 test/built-ins/TypedArray/prototype/filter/BigInt/result-does-not-share-buffer.js:19: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/filter/BigInt/result-empty-callbackfn-returns-false.js:36: ReferenceError: BigInt64Array is not defined
 test/built-ins/TypedArray/prototype/filter/BigInt/result-full-callbackfn-returns-true.js:20: SyntaxError: invalid number literal
-test/built-ins/TypedArray/prototype/filter/BigInt/return-abrupt-from-this-out-of-bounds.js:52: Test262Error: implements ArrayBuffer.prototype.resize Expected SameValue(«undefined», «function») to be true
 test/built-ins/TypedArray/prototype/filter/BigInt/speciesctor-get-ctor-abrupt.js:30: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/filter/BigInt/speciesctor-get-ctor-inherited.js:30: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/filter/BigInt/speciesctor-get-ctor-returns-throws.js:34: SyntaxError: invalid number literal
@@ -1053,8 +891,6 @@ test/built-ins/TypedArray/prototype/filter/BigInt/speciesctor-get-species.js:46:
 test/built-ins/TypedArray/prototype/filter/BigInt/values-are-not-cached.js:20: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/filter/BigInt/values-are-set.js:20: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/filter/callbackfn-detachbuffer.js:20: Test262Error: Expected SameValue(«1», «2») to be true (Testing with Float64Array.)
-test/built-ins/TypedArray/prototype/filter/callbackfn-resize.js:16: Test262Error: Expected SameValue(«undefined», «function») to be true
-test/built-ins/TypedArray/prototype/filter/return-abrupt-from-this-out-of-bounds.js:52: Test262Error: implements ArrayBuffer.prototype.resize Expected SameValue(«undefined», «function») to be true
 test/built-ins/TypedArray/prototype/find/BigInt/detached-buffer.js:32: ReferenceError: BigInt64Array is not defined
 test/built-ins/TypedArray/prototype/find/BigInt/get-length-ignores-length-prop.js:41: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/find/BigInt/predicate-call-changes-value.js:33: SyntaxError: invalid number literal
@@ -1065,11 +901,8 @@ test/built-ins/TypedArray/prototype/find/BigInt/predicate-is-not-callable-throws
 test/built-ins/TypedArray/prototype/find/BigInt/predicate-may-detach-buffer.js:57: ReferenceError: BigInt64Array is not defined
 test/built-ins/TypedArray/prototype/find/BigInt/predicate-not-called-on-empty-array.js:49: ReferenceError: BigInt64Array is not defined
 test/built-ins/TypedArray/prototype/find/BigInt/return-abrupt-from-predicate-call.js:40: ReferenceError: BigInt64Array is not defined
-test/built-ins/TypedArray/prototype/find/BigInt/return-abrupt-from-this-out-of-bounds.js:52: Test262Error: implements ArrayBuffer.prototype.resize Expected SameValue(«undefined», «function») to be true
 test/built-ins/TypedArray/prototype/find/BigInt/return-found-value-predicate-result-is-true.js:32: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/find/BigInt/return-undefined-if-predicate-returns-false-value.js:60: ReferenceError: BigInt64Array is not defined
-test/built-ins/TypedArray/prototype/find/callbackfn-resize.js:16: Test262Error: Expected SameValue(«undefined», «function») to be true
-test/built-ins/TypedArray/prototype/find/return-abrupt-from-this-out-of-bounds.js:52: Test262Error: implements ArrayBuffer.prototype.resize Expected SameValue(«undefined», «function») to be true
 test/built-ins/TypedArray/prototype/findIndex/BigInt/detached-buffer.js:32: ReferenceError: BigInt64Array is not defined
 test/built-ins/TypedArray/prototype/findIndex/BigInt/get-length-ignores-length-prop.js:39: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/findIndex/BigInt/predicate-call-changes-value.js:29: SyntaxError: invalid number literal
@@ -1080,11 +913,8 @@ test/built-ins/TypedArray/prototype/findIndex/BigInt/predicate-is-not-callable-t
 test/built-ins/TypedArray/prototype/findIndex/BigInt/predicate-may-detach-buffer.js:48: ReferenceError: BigInt64Array is not defined
 test/built-ins/TypedArray/prototype/findIndex/BigInt/predicate-not-called-on-empty-array.js:48: ReferenceError: BigInt64Array is not defined
 test/built-ins/TypedArray/prototype/findIndex/BigInt/return-abrupt-from-predicate-call.js:38: ReferenceError: BigInt64Array is not defined
-test/built-ins/TypedArray/prototype/findIndex/BigInt/return-abrupt-from-this-out-of-bounds.js:52: Test262Error: implements ArrayBuffer.prototype.resize Expected SameValue(«undefined», «function») to be true
 test/built-ins/TypedArray/prototype/findIndex/BigInt/return-index-predicate-result-is-true.js:31: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/findIndex/BigInt/return-negative-one-if-predicate-returns-false-value.js:30: SyntaxError: invalid number literal
-test/built-ins/TypedArray/prototype/findIndex/callbackfn-resize.js:16: Test262Error: Expected SameValue(«undefined», «function») to be true
-test/built-ins/TypedArray/prototype/findIndex/return-abrupt-from-this-out-of-bounds.js:52: Test262Error: implements ArrayBuffer.prototype.resize Expected SameValue(«undefined», «function») to be true
 test/built-ins/TypedArray/prototype/findLast/BigInt/detached-buffer.js:30: ReferenceError: BigInt64Array is not defined
 test/built-ins/TypedArray/prototype/findLast/BigInt/get-length-ignores-length-prop.js:30: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/findLast/BigInt/predicate-call-changes-value.js:21: SyntaxError: invalid number literal
@@ -1095,26 +925,8 @@ test/built-ins/TypedArray/prototype/findLast/BigInt/predicate-is-not-callable-th
 test/built-ins/TypedArray/prototype/findLast/BigInt/predicate-may-detach-buffer.js:39: ReferenceError: BigInt64Array is not defined
 test/built-ins/TypedArray/prototype/findLast/BigInt/predicate-not-called-on-empty-array.js:37: ReferenceError: BigInt64Array is not defined
 test/built-ins/TypedArray/prototype/findLast/BigInt/return-abrupt-from-predicate-call.js:28: ReferenceError: BigInt64Array is not defined
-test/built-ins/TypedArray/prototype/findLast/BigInt/return-abrupt-from-this-out-of-bounds.js:52: Test262Error: implements TypedArray.prototype.findLast Expected SameValue(«undefined», «function») to be true
 test/built-ins/TypedArray/prototype/findLast/BigInt/return-found-value-predicate-result-is-true.js:20: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/findLast/BigInt/return-undefined-if-predicate-returns-false-value.js:49: ReferenceError: BigInt64Array is not defined
-test/built-ins/TypedArray/prototype/findLast/callbackfn-resize.js:16: Test262Error: Expected SameValue(«undefined», «function») to be true
-test/built-ins/TypedArray/prototype/findLast/get-length-ignores-length-prop.js:39: TypeError: sample.findLast is not a function (Testing with Float64Array.)
-test/built-ins/TypedArray/prototype/findLast/invoked-as-func.js:21: Test262Error: Expected SameValue(«undefined», «function») to be true
-test/built-ins/TypedArray/prototype/findLast/invoked-as-method.js:21: Test262Error: Expected SameValue(«undefined», «function») to be true
-test/built-ins/TypedArray/prototype/findLast/length.js:26: TypeError: cannot read property 'length' of undefined
-test/built-ins/TypedArray/prototype/findLast/name.js:23: TypeError: cannot read property 'name' of undefined
-test/built-ins/TypedArray/prototype/findLast/predicate-call-changes-value.js:30: TypeError: sample.findLast is not a function (Testing with Float64Array.)
-test/built-ins/TypedArray/prototype/findLast/predicate-call-parameters.js:28: TypeError: sample.findLast is not a function (Testing with Float64Array.)
-test/built-ins/TypedArray/prototype/findLast/predicate-call-this-non-strict.js:27: TypeError: sample.findLast is not a function (Testing with Float64Array.)
-test/built-ins/TypedArray/prototype/findLast/predicate-call-this-strict.js:25: strict mode: TypeError: sample.findLast is not a function (Testing with Float64Array.)
-test/built-ins/TypedArray/prototype/findLast/predicate-may-detach-buffer.js:36: TypeError: sample.findLast is not a function (Testing with Float64Array.)
-test/built-ins/TypedArray/prototype/findLast/predicate-not-called-on-empty-array.js:25: TypeError: sample.findLast is not a function (Testing with Float64Array.)
-test/built-ins/TypedArray/prototype/findLast/prop-desc.js:15: Test262Error: obj should have an own property findLast
-test/built-ins/TypedArray/prototype/findLast/return-abrupt-from-predicate-call.js:22: Test262Error: Expected a Test262Error but got a TypeError (Testing with Float64Array.)
-test/built-ins/TypedArray/prototype/findLast/return-abrupt-from-this-out-of-bounds.js:52: Test262Error: implements TypedArray.prototype.findLast Expected SameValue(«undefined», «function») to be true
-test/built-ins/TypedArray/prototype/findLast/return-found-value-predicate-result-is-true.js:27: TypeError: sample.findLast is not a function (Testing with Float64Array.)
-test/built-ins/TypedArray/prototype/findLast/return-undefined-if-predicate-returns-false-value.js:27: TypeError: sample.findLast is not a function (Testing with Float64Array.)
 test/built-ins/TypedArray/prototype/findLastIndex/BigInt/detached-buffer.js:32: ReferenceError: BigInt64Array is not defined
 test/built-ins/TypedArray/prototype/findLastIndex/BigInt/get-length-ignores-length-prop.js:30: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/findLastIndex/BigInt/predicate-call-changes-value.js:20: SyntaxError: invalid number literal
@@ -1125,26 +937,8 @@ test/built-ins/TypedArray/prototype/findLastIndex/BigInt/predicate-is-not-callab
 test/built-ins/TypedArray/prototype/findLastIndex/BigInt/predicate-may-detach-buffer.js:37: ReferenceError: BigInt64Array is not defined
 test/built-ins/TypedArray/prototype/findLastIndex/BigInt/predicate-not-called-on-empty-array.js:39: ReferenceError: BigInt64Array is not defined
 test/built-ins/TypedArray/prototype/findLastIndex/BigInt/return-abrupt-from-predicate-call.js:29: ReferenceError: BigInt64Array is not defined
-test/built-ins/TypedArray/prototype/findLastIndex/BigInt/return-abrupt-from-this-out-of-bounds.js:52: Test262Error: implements TypedArray.prototype.findLastIndex Expected SameValue(«undefined», «function») to be true
 test/built-ins/TypedArray/prototype/findLastIndex/BigInt/return-index-predicate-result-is-true.js:22: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/findLastIndex/BigInt/return-negative-one-if-predicate-returns-false-value.js:22: SyntaxError: invalid number literal
-test/built-ins/TypedArray/prototype/findLastIndex/callbackfn-resize.js:16: Test262Error: Expected SameValue(«undefined», «function») to be true
-test/built-ins/TypedArray/prototype/findLastIndex/get-length-ignores-length-prop.js:40: TypeError: sample.findLastIndex is not a function (Testing with Float64Array.)
-test/built-ins/TypedArray/prototype/findLastIndex/invoked-as-func.js:23: Test262Error: Expected SameValue(«undefined», «function») to be true
-test/built-ins/TypedArray/prototype/findLastIndex/invoked-as-method.js:23: Test262Error: Expected SameValue(«undefined», «function») to be true
-test/built-ins/TypedArray/prototype/findLastIndex/length.js:26: TypeError: cannot read property 'length' of undefined
-test/built-ins/TypedArray/prototype/findLastIndex/name.js:23: TypeError: cannot read property 'name' of undefined
-test/built-ins/TypedArray/prototype/findLastIndex/predicate-call-changes-value.js:29: TypeError: sample.findLastIndex is not a function (Testing with Float64Array.)
-test/built-ins/TypedArray/prototype/findLastIndex/predicate-call-parameters.js:29: TypeError: sample.findLastIndex is not a function (Testing with Float64Array.)
-test/built-ins/TypedArray/prototype/findLastIndex/predicate-call-this-non-strict.js:29: TypeError: sample.findLastIndex is not a function (Testing with Float64Array.)
-test/built-ins/TypedArray/prototype/findLastIndex/predicate-call-this-strict.js:27: strict mode: TypeError: sample.findLastIndex is not a function (Testing with Float64Array.)
-test/built-ins/TypedArray/prototype/findLastIndex/predicate-may-detach-buffer.js:35: TypeError: sample.findLastIndex is not a function (Testing with Float64Array.)
-test/built-ins/TypedArray/prototype/findLastIndex/predicate-not-called-on-empty-array.js:29: TypeError: sample.findLastIndex is not a function (Testing with Float64Array.)
-test/built-ins/TypedArray/prototype/findLastIndex/prop-desc.js:15: Test262Error: obj should have an own property findLastIndex
-test/built-ins/TypedArray/prototype/findLastIndex/return-abrupt-from-predicate-call.js:21: Test262Error: Expected a Test262Error but got a TypeError (Testing with Float64Array.)
-test/built-ins/TypedArray/prototype/findLastIndex/return-abrupt-from-this-out-of-bounds.js:52: Test262Error: implements TypedArray.prototype.findLastIndex Expected SameValue(«undefined», «function») to be true
-test/built-ins/TypedArray/prototype/findLastIndex/return-index-predicate-result-is-true.js:28: TypeError: sample.findLastIndex is not a function (Testing with Float64Array.)
-test/built-ins/TypedArray/prototype/findLastIndex/return-negative-one-if-predicate-returns-false-value.js:28: TypeError: sample.findLastIndex is not a function (Testing with Float64Array.)
 test/built-ins/TypedArray/prototype/forEach/BigInt/arraylength-internal.js:46: ReferenceError: BigInt64Array is not defined
 test/built-ins/TypedArray/prototype/forEach/BigInt/callbackfn-arguments-with-thisarg.js:29: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/forEach/BigInt/callbackfn-arguments-without-thisarg.js:29: SyntaxError: invalid number literal
@@ -1157,12 +951,9 @@ test/built-ins/TypedArray/prototype/forEach/BigInt/callbackfn-returns-abrupt.js:
 test/built-ins/TypedArray/prototype/forEach/BigInt/callbackfn-set-value-during-interaction.js:20: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/forEach/BigInt/callbackfn-this.js:57: ReferenceError: BigInt64Array is not defined
 test/built-ins/TypedArray/prototype/forEach/BigInt/detached-buffer.js:32: ReferenceError: BigInt64Array is not defined
-test/built-ins/TypedArray/prototype/forEach/BigInt/return-abrupt-from-this-out-of-bounds.js:52: Test262Error: implements ArrayBuffer.prototype.resize Expected SameValue(«undefined», «function») to be true
 test/built-ins/TypedArray/prototype/forEach/BigInt/returns-undefined.js:33: ReferenceError: BigInt64Array is not defined
 test/built-ins/TypedArray/prototype/forEach/BigInt/values-are-not-cached.js:20: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/forEach/callbackfn-detachbuffer.js:28: Test262Error: Expected SameValue(«1», «2») to be true (Testing with Float64Array.)
-test/built-ins/TypedArray/prototype/forEach/callbackfn-resize.js:16: Test262Error: Expected SameValue(«undefined», «function») to be true
-test/built-ins/TypedArray/prototype/forEach/return-abrupt-from-this-out-of-bounds.js:52: Test262Error: implements ArrayBuffer.prototype.resize Expected SameValue(«undefined», «function») to be true
 test/built-ins/TypedArray/prototype/includes/BigInt/detached-buffer-during-fromIndex-returns-false-for-zero.js:45: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/includes/BigInt/detached-buffer-during-fromIndex-returns-true-for-undefined.js:47: ReferenceError: BigInt64Array is not defined
 test/built-ins/TypedArray/prototype/includes/BigInt/detached-buffer.js:26: SyntaxError: invalid number literal
@@ -1171,13 +962,11 @@ test/built-ins/TypedArray/prototype/includes/BigInt/fromIndex-infinity.js:33: Sy
 test/built-ins/TypedArray/prototype/includes/BigInt/fromIndex-minus-zero.js:30: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/includes/BigInt/get-length-uses-internal-arraylength.js:27: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/includes/BigInt/length-zero-returns-false.js:36: SyntaxError: invalid number literal
-test/built-ins/TypedArray/prototype/includes/BigInt/return-abrupt-from-this-out-of-bounds.js:32: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/includes/BigInt/return-abrupt-tointeger-fromindex-symbol.js:28: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/includes/BigInt/return-abrupt-tointeger-fromindex.js:32: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/includes/BigInt/search-found-returns-true.js:33: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/includes/BigInt/search-not-found-returns-false.js:35: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/includes/BigInt/tointeger-fromindex.js:41: SyntaxError: invalid number literal
-test/built-ins/TypedArray/prototype/includes/return-abrupt-from-this-out-of-bounds.js:52: Test262Error: implements ArrayBuffer.prototype.resize Expected SameValue(«undefined», «function») to be true
 test/built-ins/TypedArray/prototype/indexOf/BigInt/detached-buffer-during-fromIndex-returns-minus-one-for-undefined.js:49: ReferenceError: BigInt64Array is not defined
 test/built-ins/TypedArray/prototype/indexOf/BigInt/detached-buffer-during-fromIndex-returns-minus-one-for-zero.js:48: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/indexOf/BigInt/detached-buffer.js:26: SyntaxError: invalid number literal
@@ -1187,13 +976,11 @@ test/built-ins/TypedArray/prototype/indexOf/BigInt/fromIndex-minus-zero.js:27: S
 test/built-ins/TypedArray/prototype/indexOf/BigInt/get-length-uses-internal-arraylength.js:26: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/indexOf/BigInt/length-zero-returns-minus-one.js:32: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/indexOf/BigInt/no-arg.js:27: SyntaxError: invalid number literal
-test/built-ins/TypedArray/prototype/indexOf/BigInt/return-abrupt-from-this-out-of-bounds.js:32: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/indexOf/BigInt/return-abrupt-tointeger-fromindex-symbol.js:30: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/indexOf/BigInt/return-abrupt-tointeger-fromindex.js:34: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/indexOf/BigInt/search-found-returns-index.js:35: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/indexOf/BigInt/search-not-found-returns-minus-one.js:31: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/indexOf/BigInt/tointeger-fromindex.js:33: SyntaxError: invalid number literal
-test/built-ins/TypedArray/prototype/indexOf/return-abrupt-from-this-out-of-bounds.js:52: Test262Error: implements ArrayBuffer.prototype.resize Expected SameValue(«undefined», «function») to be true
 test/built-ins/TypedArray/prototype/join/BigInt/custom-separator-result-from-tostring-on-each-simple-value.js:33: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/join/BigInt/detached-buffer-during-fromIndex-returns-single-comma.js:33: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/join/BigInt/detached-buffer.js:33: ReferenceError: BigInt64Array is not defined
@@ -1202,13 +989,9 @@ test/built-ins/TypedArray/prototype/join/BigInt/get-length-uses-internal-arrayle
 test/built-ins/TypedArray/prototype/join/BigInt/result-from-tostring-on-each-simple-value.js:32: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/join/BigInt/return-abrupt-from-separator-symbol.js:32: ReferenceError: BigInt64Array is not defined
 test/built-ins/TypedArray/prototype/join/BigInt/return-abrupt-from-separator.js:36: ReferenceError: BigInt64Array is not defined
-test/built-ins/TypedArray/prototype/join/BigInt/return-abrupt-from-this-out-of-bounds.js:52: Test262Error: implements ArrayBuffer.prototype.resize Expected SameValue(«undefined», «function») to be true
-test/built-ins/TypedArray/prototype/join/return-abrupt-from-this-out-of-bounds.js:52: Test262Error: implements ArrayBuffer.prototype.resize Expected SameValue(«undefined», «function») to be true
 test/built-ins/TypedArray/prototype/keys/BigInt/detached-buffer.js:27: ReferenceError: BigInt64Array is not defined
 test/built-ins/TypedArray/prototype/keys/BigInt/iter-prototype.js:20: SyntaxError: invalid number literal
-test/built-ins/TypedArray/prototype/keys/BigInt/return-abrupt-from-this-out-of-bounds.js:52: Test262Error: implements ArrayBuffer.prototype.resize Expected SameValue(«undefined», «function») to be true
 test/built-ins/TypedArray/prototype/keys/BigInt/return-itor.js:15: SyntaxError: invalid number literal
-test/built-ins/TypedArray/prototype/keys/return-abrupt-from-this-out-of-bounds.js:52: Test262Error: implements ArrayBuffer.prototype.resize Expected SameValue(«undefined», «function») to be true
 test/built-ins/TypedArray/prototype/lastIndexOf/BigInt/detached-buffer-during-fromIndex-returns-minus-one-for-undefined.js:46: ReferenceError: BigInt64Array is not defined
 test/built-ins/TypedArray/prototype/lastIndexOf/BigInt/detached-buffer-during-fromIndex-returns-minus-one-for-zero.js:45: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/lastIndexOf/BigInt/detached-buffer.js:26: SyntaxError: invalid number literal
@@ -1217,19 +1000,13 @@ test/built-ins/TypedArray/prototype/lastIndexOf/BigInt/fromIndex-minus-zero.js:2
 test/built-ins/TypedArray/prototype/lastIndexOf/BigInt/get-length-uses-internal-arraylength.js:26: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/lastIndexOf/BigInt/length-zero-returns-minus-one.js:34: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/lastIndexOf/BigInt/no-arg.js:27: SyntaxError: invalid number literal
-test/built-ins/TypedArray/prototype/lastIndexOf/BigInt/return-abrupt-from-this-out-of-bounds.js:32: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/lastIndexOf/BigInt/return-abrupt-tointeger-fromindex-symbol.js:30: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/lastIndexOf/BigInt/return-abrupt-tointeger-fromindex.js:34: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/lastIndexOf/BigInt/search-found-returns-index.js:34: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/lastIndexOf/BigInt/search-not-found-returns-minus-one.js:31: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/lastIndexOf/BigInt/tointeger-fromindex.js:33: SyntaxError: invalid number literal
-test/built-ins/TypedArray/prototype/lastIndexOf/return-abrupt-from-this-out-of-bounds.js:52: Test262Error: implements ArrayBuffer.prototype.resize Expected SameValue(«undefined», «function») to be true
 test/built-ins/TypedArray/prototype/length/BigInt/detached-buffer.js:21: ReferenceError: BigInt64Array is not defined
-test/built-ins/TypedArray/prototype/length/BigInt/resizable-array-buffer-auto.js:18: Test262Error: Expected SameValue(«undefined», «function») to be true
-test/built-ins/TypedArray/prototype/length/BigInt/resizable-array-buffer-fixed.js:18: Test262Error: Expected SameValue(«undefined», «function») to be true
 test/built-ins/TypedArray/prototype/length/BigInt/return-length.js:28: ReferenceError: BigInt64Array is not defined
-test/built-ins/TypedArray/prototype/length/resizable-array-buffer-auto.js:18: Test262Error: Expected SameValue(«undefined», «function») to be true
-test/built-ins/TypedArray/prototype/length/resizable-array-buffer-fixed.js:18: Test262Error: Expected SameValue(«undefined», «function») to be true
 test/built-ins/TypedArray/prototype/map/BigInt/arraylength-internal.js:25: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/map/BigInt/callbackfn-arguments-with-thisarg.js:21: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/map/BigInt/callbackfn-arguments-without-thisarg.js:21: SyntaxError: invalid number literal
@@ -1244,7 +1021,6 @@ test/built-ins/TypedArray/prototype/map/BigInt/callbackfn-returns-abrupt.js:22: 
 test/built-ins/TypedArray/prototype/map/BigInt/callbackfn-set-value-during-interaction.js:15: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/map/BigInt/callbackfn-this.js:31: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/map/BigInt/detached-buffer.js:32: ReferenceError: BigInt64Array is not defined
-test/built-ins/TypedArray/prototype/map/BigInt/return-abrupt-from-this-out-of-bounds.js:32: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/map/BigInt/return-new-typedarray-from-empty-length.js:38: ReferenceError: BigInt64Array is not defined
 test/built-ins/TypedArray/prototype/map/BigInt/return-new-typedarray-from-positive-length.js:34: ReferenceError: BigInt64Array is not defined
 test/built-ins/TypedArray/prototype/map/BigInt/speciesctor-get-ctor-abrupt.js:30: SyntaxError: invalid number literal
@@ -1263,8 +1039,6 @@ test/built-ins/TypedArray/prototype/map/BigInt/speciesctor-get-species-use-defau
 test/built-ins/TypedArray/prototype/map/BigInt/speciesctor-get-species.js:43: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/map/BigInt/values-are-not-cached.js:15: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/map/callbackfn-detachbuffer.js:20: Test262Error: Expected SameValue(«1», «2») to be true (Testing with Float64Array.)
-test/built-ins/TypedArray/prototype/map/callbackfn-resize.js:16: Test262Error: Expected SameValue(«undefined», «function») to be true
-test/built-ins/TypedArray/prototype/map/return-abrupt-from-this-out-of-bounds.js:52: Test262Error: implements ArrayBuffer.prototype.resize Expected SameValue(«undefined», «function») to be true
 test/built-ins/TypedArray/prototype/reduce/BigInt/callbackfn-arguments-custom-accumulator.js:30: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/reduce/BigInt/callbackfn-arguments-default-accumulator.js:37: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/reduce/BigInt/callbackfn-detachbuffer.js:42: ReferenceError: BigInt64Array is not defined
@@ -1281,11 +1055,9 @@ test/built-ins/TypedArray/prototype/reduce/BigInt/empty-instance-with-no-initial
 test/built-ins/TypedArray/prototype/reduce/BigInt/get-length-uses-internal-arraylength.js:34: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/reduce/BigInt/result-is-last-callbackfn-return.js:41: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/reduce/BigInt/result-of-any-type.js:38: SyntaxError: invalid number literal
-test/built-ins/TypedArray/prototype/reduce/BigInt/return-abrupt-from-this-out-of-bounds.js:52: Test262Error: implements ArrayBuffer.prototype.resize Expected SameValue(«undefined», «function») to be true
 test/built-ins/TypedArray/prototype/reduce/BigInt/return-first-value-without-callbackfn.js:36: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/reduce/BigInt/values-are-not-cached.js:30: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/reduce/callbackfn-detachbuffer.js:29: Test262Error: Expected SameValue(«1», «2») to be true (Testing with Float64Array.)
-test/built-ins/TypedArray/prototype/reduce/return-abrupt-from-this-out-of-bounds.js:52: Test262Error: implements ArrayBuffer.prototype.resize Expected SameValue(«undefined», «function») to be true
 test/built-ins/TypedArray/prototype/reduceRight/BigInt/callbackfn-arguments-custom-accumulator.js:31: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/reduceRight/BigInt/callbackfn-arguments-default-accumulator.js:40: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/reduceRight/BigInt/callbackfn-detachbuffer.js:42: ReferenceError: BigInt64Array is not defined
@@ -1302,18 +1074,14 @@ test/built-ins/TypedArray/prototype/reduceRight/BigInt/empty-instance-with-no-in
 test/built-ins/TypedArray/prototype/reduceRight/BigInt/get-length-uses-internal-arraylength.js:34: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/reduceRight/BigInt/result-is-last-callbackfn-return.js:43: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/reduceRight/BigInt/result-of-any-type.js:40: SyntaxError: invalid number literal
-test/built-ins/TypedArray/prototype/reduceRight/BigInt/return-abrupt-from-this-out-of-bounds.js:52: Test262Error: implements ArrayBuffer.prototype.resize Expected SameValue(«undefined», «function») to be true
 test/built-ins/TypedArray/prototype/reduceRight/BigInt/return-first-value-without-callbackfn.js:37: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/reduceRight/BigInt/values-are-not-cached.js:31: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/reduceRight/callbackfn-detachbuffer.js:29: Test262Error: Expected SameValue(«1», «2») to be true (Testing with Float64Array.)
-test/built-ins/TypedArray/prototype/reduceRight/return-abrupt-from-this-out-of-bounds.js:52: Test262Error: implements ArrayBuffer.prototype.resize Expected SameValue(«undefined», «function») to be true
 test/built-ins/TypedArray/prototype/reverse/BigInt/detached-buffer.js:28: ReferenceError: BigInt64Array is not defined
 test/built-ins/TypedArray/prototype/reverse/BigInt/get-length-uses-internal-arraylength.js:34: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/reverse/BigInt/preserves-non-numeric-properties.js:35: ReferenceError: BigInt64Array is not defined
-test/built-ins/TypedArray/prototype/reverse/BigInt/return-abrupt-from-this-out-of-bounds.js:52: Test262Error: implements ArrayBuffer.prototype.resize Expected SameValue(«undefined», «function») to be true
 test/built-ins/TypedArray/prototype/reverse/BigInt/returns-original-object.js:39: ReferenceError: BigInt64Array is not defined
 test/built-ins/TypedArray/prototype/reverse/BigInt/reverts.js:28: SyntaxError: invalid number literal
-test/built-ins/TypedArray/prototype/reverse/return-abrupt-from-this-out-of-bounds.js:52: Test262Error: implements ArrayBuffer.prototype.resize Expected SameValue(«undefined», «function») to be true
 test/built-ins/TypedArray/prototype/set/BigInt/array-arg-negative-integer-offset-throws.js:25: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/set/BigInt/array-arg-offset-tointeger.js:24: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/set/BigInt/array-arg-primitive-toobject.js:30: SyntaxError: invalid number literal
@@ -1351,7 +1119,6 @@ test/built-ins/TypedArray/prototype/set/BigInt/typedarray-arg-set-values-diff-bu
 test/built-ins/TypedArray/prototype/set/BigInt/typedarray-arg-set-values-diff-buffer-other-type.js:31: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/set/BigInt/typedarray-arg-set-values-diff-buffer-same-type-sab.js:18: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/set/BigInt/typedarray-arg-set-values-diff-buffer-same-type.js:34: SyntaxError: invalid number literal
-test/built-ins/TypedArray/prototype/set/BigInt/typedarray-arg-set-values-same-buffer-same-type-resized.js:25: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/set/BigInt/typedarray-arg-set-values-same-buffer-same-type-sab.js:19: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/set/BigInt/typedarray-arg-set-values-same-buffer-same-type.js:36: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/set/BigInt/typedarray-arg-src-arraylength-internal.js:33: SyntaxError: invalid number literal
@@ -1360,13 +1127,10 @@ test/built-ins/TypedArray/prototype/set/BigInt/typedarray-arg-src-range-greather
 test/built-ins/TypedArray/prototype/set/BigInt/typedarray-arg-srcbuffer-detached-during-tointeger-offset-throws.js:39: ReferenceError: BigInt64Array is not defined
 test/built-ins/TypedArray/prototype/set/BigInt/typedarray-arg-target-arraylength-internal.js:34: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/set/BigInt/typedarray-arg-target-byteoffset-internal.js:31: SyntaxError: invalid number literal
-test/built-ins/TypedArray/prototype/set/BigInt/typedarray-arg-target-out-of-bounds.js:36: Test262Error: implements ArrayBuffer.prototype.resize Expected SameValue(«undefined», «function») to be true
 test/built-ins/TypedArray/prototype/set/BigInt/typedarray-arg-targetbuffer-detached-during-tointeger-offset-throws.js:39: ReferenceError: BigInt64Array is not defined
 test/built-ins/TypedArray/prototype/set/BigInt/undefined-tobigint.js:47: ReferenceError: BigInt64Array is not defined
 test/built-ins/TypedArray/prototype/set/array-arg-targetbuffer-detached-on-get-src-value-no-throw.js:30: TypeError: out-of-bound numeric index (Testing with Float64Array.)
 test/built-ins/TypedArray/prototype/set/src-typedarray-big-throws.js:27: SyntaxError: invalid number literal
-test/built-ins/TypedArray/prototype/set/typedarray-arg-set-values-same-buffer-same-type-resized.js:18: Test262Error: implements ArrayBuffer.prototype.resize Expected SameValue(«undefined», «function») to be true
-test/built-ins/TypedArray/prototype/set/typedarray-arg-target-out-of-bounds.js:36: Test262Error: implements ArrayBuffer.prototype.resize Expected SameValue(«undefined», «function») to be true
 test/built-ins/TypedArray/prototype/slice/BigInt/arraylength-internal.js:27: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/slice/BigInt/detached-buffer-custom-ctor-other-targettype.js:52: ReferenceError: BigInt64Array is not defined
 test/built-ins/TypedArray/prototype/slice/BigInt/detached-buffer-custom-ctor-same-targettype.js:51: ReferenceError: BigInt64Array is not defined
@@ -1385,7 +1149,6 @@ test/built-ins/TypedArray/prototype/slice/BigInt/return-abrupt-from-end-symbol.j
 test/built-ins/TypedArray/prototype/slice/BigInt/return-abrupt-from-end.js:39: ReferenceError: BigInt64Array is not defined
 test/built-ins/TypedArray/prototype/slice/BigInt/return-abrupt-from-start-symbol.js:24: ReferenceError: BigInt64Array is not defined
 test/built-ins/TypedArray/prototype/slice/BigInt/return-abrupt-from-start.js:38: ReferenceError: BigInt64Array is not defined
-test/built-ins/TypedArray/prototype/slice/BigInt/return-abrupt-from-this-out-of-bounds.js:52: Test262Error: implements ArrayBuffer.prototype.resize Expected SameValue(«undefined», «function») to be true
 test/built-ins/TypedArray/prototype/slice/BigInt/set-values-from-different-ctor-type.js:33: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/slice/BigInt/speciesctor-get-ctor-abrupt.js:30: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/slice/BigInt/speciesctor-get-ctor-inherited.js:30: SyntaxError: invalid number literal
@@ -1403,7 +1166,6 @@ test/built-ins/TypedArray/prototype/slice/BigInt/speciesctor-get-species-use-def
 test/built-ins/TypedArray/prototype/slice/BigInt/speciesctor-get-species.js:46: ReferenceError: BigInt64Array is not defined
 test/built-ins/TypedArray/prototype/slice/BigInt/tointeger-end.js:24: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/slice/BigInt/tointeger-start.js:23: SyntaxError: invalid number literal
-test/built-ins/TypedArray/prototype/slice/return-abrupt-from-this-out-of-bounds.js:52: Test262Error: implements ArrayBuffer.prototype.resize Expected SameValue(«undefined», «function») to be true
 test/built-ins/TypedArray/prototype/some/BigInt/callbackfn-arguments-with-thisarg.js:31: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/some/BigInt/callbackfn-arguments-without-thisarg.js:31: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/some/BigInt/callbackfn-detachbuffer.js:41: ReferenceError: BigInt64Array is not defined
@@ -1416,24 +1178,19 @@ test/built-ins/TypedArray/prototype/some/BigInt/callbackfn-set-value-during-inte
 test/built-ins/TypedArray/prototype/some/BigInt/callbackfn-this.js:57: ReferenceError: BigInt64Array is not defined
 test/built-ins/TypedArray/prototype/some/BigInt/detached-buffer.js:32: ReferenceError: BigInt64Array is not defined
 test/built-ins/TypedArray/prototype/some/BigInt/get-length-uses-internal-arraylength.js:34: SyntaxError: invalid number literal
-test/built-ins/TypedArray/prototype/some/BigInt/return-abrupt-from-this-out-of-bounds.js:52: Test262Error: implements ArrayBuffer.prototype.resize Expected SameValue(«undefined», «function») to be true
 test/built-ins/TypedArray/prototype/some/BigInt/returns-false-if-every-cb-returns-false.js:43: ReferenceError: BigInt64Array is not defined
 test/built-ins/TypedArray/prototype/some/BigInt/returns-true-if-any-cb-returns-true.js:59: ReferenceError: BigInt64Array is not defined
 test/built-ins/TypedArray/prototype/some/BigInt/values-are-not-cached.js:29: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/some/callbackfn-detachbuffer.js:28: Test262Error: Expected SameValue(«1», «2») to be true (Testing with Float64Array.)
-test/built-ins/TypedArray/prototype/some/callbackfn-resize.js:16: Test262Error: Expected SameValue(«undefined», «function») to be true
-test/built-ins/TypedArray/prototype/some/return-abrupt-from-this-out-of-bounds.js:52: Test262Error: implements ArrayBuffer.prototype.resize Expected SameValue(«undefined», «function») to be true
 test/built-ins/TypedArray/prototype/sort/BigInt/arraylength-internal.js:26: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/sort/BigInt/comparefn-call-throws.js:29: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/sort/BigInt/comparefn-calls.js:26: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/sort/BigInt/comparefn-is-undefined.js:17: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/sort/BigInt/comparefn-nonfunction-call-throws.js:22: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/sort/BigInt/detached-buffer.js:31: ReferenceError: BigInt64Array is not defined
-test/built-ins/TypedArray/prototype/sort/BigInt/return-abrupt-from-this-out-of-bounds.js:52: Test262Error: implements ArrayBuffer.prototype.resize Expected SameValue(«undefined», «function») to be true
 test/built-ins/TypedArray/prototype/sort/BigInt/return-same-instance.js:18: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/sort/BigInt/sortcompare-with-no-tostring.js:27: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/sort/BigInt/sorted-values.js:20: SyntaxError: invalid number literal
-test/built-ins/TypedArray/prototype/sort/return-abrupt-from-this-out-of-bounds.js:52: Test262Error: implements ArrayBuffer.prototype.resize Expected SameValue(«undefined», «function») to be true
 test/built-ins/TypedArray/prototype/sort/sort-tonumber.js:30: TypeError: ArrayBuffer is detached (Testing with Float64Array.)
 test/built-ins/TypedArray/prototype/sort/sorted-values.js:17: Test262Error: 0s (Testing with Float64Array.)
 test/built-ins/TypedArray/prototype/subarray/BigInt/detached-buffer.js:65: ReferenceError: BigInt64Array is not defined
@@ -1475,15 +1232,11 @@ test/built-ins/TypedArray/prototype/toLocaleString/BigInt/return-abrupt-from-fir
 test/built-ins/TypedArray/prototype/toLocaleString/BigInt/return-abrupt-from-nextelement-tolocalestring.js:39: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/toLocaleString/BigInt/return-abrupt-from-nextelement-tostring.js:49: SyntaxError: invalid number literal
 test/built-ins/TypedArray/prototype/toLocaleString/BigInt/return-abrupt-from-nextelement-valueof.js:50: SyntaxError: invalid number literal
-test/built-ins/TypedArray/prototype/toLocaleString/BigInt/return-abrupt-from-this-out-of-bounds.js:52: Test262Error: implements ArrayBuffer.prototype.resize Expected SameValue(«undefined», «function») to be true
 test/built-ins/TypedArray/prototype/toLocaleString/BigInt/return-result.js:37: SyntaxError: invalid number literal
-test/built-ins/TypedArray/prototype/toLocaleString/return-abrupt-from-this-out-of-bounds.js:52: Test262Error: implements ArrayBuffer.prototype.resize Expected SameValue(«undefined», «function») to be true
 test/built-ins/TypedArray/prototype/toString/BigInt/detached-buffer.js:32: ReferenceError: BigInt64Array is not defined
 test/built-ins/TypedArray/prototype/values/BigInt/detached-buffer.js:27: ReferenceError: BigInt64Array is not defined
 test/built-ins/TypedArray/prototype/values/BigInt/iter-prototype.js:20: SyntaxError: invalid number literal
-test/built-ins/TypedArray/prototype/values/BigInt/return-abrupt-from-this-out-of-bounds.js:52: Test262Error: implements ArrayBuffer.prototype.resize Expected SameValue(«undefined», «function») to be true
 test/built-ins/TypedArray/prototype/values/BigInt/return-itor.js:16: SyntaxError: invalid number literal
-test/built-ins/TypedArray/prototype/values/return-abrupt-from-this-out-of-bounds.js:52: Test262Error: implements ArrayBuffer.prototype.resize Expected SameValue(«undefined», «function») to be true
 test/built-ins/TypedArrayConstructors/BigInt64Array/BYTES_PER_ELEMENT.js:19: ReferenceError: BigInt64Array is not defined
 test/built-ins/TypedArrayConstructors/BigInt64Array/constructor.js:19: Test262Error: Expected SameValue(«undefined», «function») to be true
 test/built-ins/TypedArrayConstructors/BigInt64Array/is-a-constructor.js:22: ReferenceError: BigInt64Array is not defined
@@ -1751,14 +1504,10 @@ test/built-ins/TypedArrayConstructors/internals/HasProperty/BigInt/key-is-not-in
 test/built-ins/TypedArrayConstructors/internals/HasProperty/BigInt/key-is-not-numeric-index.js:29: ReferenceError: BigInt64Array is not defined
 test/built-ins/TypedArrayConstructors/internals/HasProperty/BigInt/key-is-symbol.js:28: ReferenceError: BigInt64Array is not defined
 test/built-ins/TypedArrayConstructors/internals/HasProperty/detached-buffer-realm.js:21: TypeError: $262.createRealm is not a function
-test/built-ins/TypedArrayConstructors/internals/HasProperty/resizable-array-buffer-auto.js:26: Test262Error: Expected SameValue(«undefined», «function») to be true
-test/built-ins/TypedArrayConstructors/internals/HasProperty/resizable-array-buffer-fixed.js:26: Test262Error: Expected SameValue(«undefined», «function») to be true
 test/built-ins/TypedArrayConstructors/internals/OwnPropertyKeys/BigInt/integer-indexes-and-string-and-symbol-keys-.js:27: SyntaxError: invalid number literal
 test/built-ins/TypedArrayConstructors/internals/OwnPropertyKeys/BigInt/integer-indexes-and-string-keys.js:24: SyntaxError: invalid number literal
 test/built-ins/TypedArrayConstructors/internals/OwnPropertyKeys/BigInt/integer-indexes.js:21: SyntaxError: invalid number literal
 test/built-ins/TypedArrayConstructors/internals/OwnPropertyKeys/BigInt/not-enumerable-keys.js:35: ReferenceError: BigInt64Array is not defined
-test/built-ins/TypedArrayConstructors/internals/OwnPropertyKeys/integer-indexes-resizable-array-buffer-auto.js:26: Test262Error: Expected SameValue(«undefined», «function») to be true
-test/built-ins/TypedArrayConstructors/internals/OwnPropertyKeys/integer-indexes-resizable-array-buffer-fixed.js:26: Test262Error: Expected SameValue(«undefined», «function») to be true
 test/built-ins/TypedArrayConstructors/internals/Set/BigInt/bigint-tobigint64.js:77: SyntaxError: invalid number literal
 test/built-ins/TypedArrayConstructors/internals/Set/BigInt/bigint-tobiguint64.js:79: SyntaxError: invalid number literal
 test/built-ins/TypedArrayConstructors/internals/Set/BigInt/boolean-tobigint.js:57: SyntaxError: invalid number literal

@@ -3229,4 +3229,11 @@ void trig_gc(JSMallocState *s, size_t size, bool is_outer = false);
 QJS_HIDE pid_t get_tid();
 #endif
 
+enum {
+  ArrayFind,
+  ArrayFindIndex,
+  ArrayFindLast,
+  ArrayFindLastIndex,
+};
+
 #endif  // SRC_INTERPRETER_QUICKJS_INCLUDE_QUICKJS_INNER_H_
