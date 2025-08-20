@@ -1,18 +1,15 @@
 name: harmony sdk release
 
 on:
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: 'release tag'
-        required: true
-        type: string
+  push:
+    tags:
+      - '*'
   
 jobs:
   harmony-release:
     runs-on: lynx-container
     container: 
-      image: ghcr.io/lynx-family/ubuntu24.04-harmony:lastest
+      image: ghcr.io/lynx-family/ubuntu24.04-harmony@sha256:8eb0ee8da7e8592669f0fcd41d0e1bc818b33a75e27943521f57af87d04db2fb
       credentials:
         username: lynx-family
         password: ${{ secrets.GITHUB_TOKEN }}
@@ -29,9 +26,15 @@ jobs:
           git-cliff --version
       - name: Download Source
         uses: actions/checkout@v4.2.2
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+      - name: Get latest tag
+        id: get-latest-tag
+        uses: ./.github/actions/get-latest-tag
       - name: Get Tag Information
         run: |-
-          version="${{ github.event.inputs.tag }}"
+          version=$(echo ${{ github.ref }} | awk -F "/" '{print $3}')
           echo "VERSION=$version" >> $GITHUB_OUTPUT;
         id: get_tag
       - name: Install deps
@@ -42,8 +45,9 @@ jobs:
       - name: Generate Change Log
         shell: bash
         run: |
+          COMMIT_ID=$(git rev-list -n 1 ${{ steps.get-latest-tag.outputs.latest-tag }})
           git-cliff --config harmony/primjs/cliff.toml \
-          --latest | sed 's/<!-- version -->/${{ steps.get_tag.outputs.VERSION }}/g' > harmony/primjs/CHANGELOG.md
+          $COMMIT_ID..HEAD | sed 's/<!-- version -->/${{ steps.get_tag.outputs.VERSION }}/g' > harmony/primjs/CHANGELOG.md
           echo "CHANGELOG.md generated successfully"
           cat harmony/primjs/CHANGELOG.md
       - name: Build & Publish
