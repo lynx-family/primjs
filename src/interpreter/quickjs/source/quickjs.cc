@@ -56186,9 +56186,8 @@ bool LEPUS_PushObjectCheckTid(LEPUSContext *ctx) {
 #endif
 }
 
-void UpdateOuterObjSize(LEPUSRuntime *rt, int size) {
+int64_t UpdateOuterObjSize(LEPUSRuntime *rt, int size) {
 #ifdef ENABLE_COMPATIBLE_MM
-  if (size == 0) return;
   if (rt->gc_enable) {
     JSMallocState *s = &rt->malloc_state;
     s->allocate_state.outer_heap_size += size;
@@ -56198,6 +56197,7 @@ void UpdateOuterObjSize(LEPUSRuntime *rt, int size) {
     }
   }
 #endif
+  return 0;
 }
 
 void LEPUS_SetGCObserver(LEPUSRuntime *rt, void *opaque) {

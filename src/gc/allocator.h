@@ -93,7 +93,7 @@ struct malloc_state {
   size_t footprint;
   size_t max_footprint;
   size_t footprint_limit;
-  size_t outer_heap_size;
+  int64_t outer_heap_size;
   size_t gc_info_threadhold;
   size_t gc_info_interval_size;
   flag_t mflags;
