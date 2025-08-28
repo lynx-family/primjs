@@ -2514,7 +2514,10 @@ napi_status napi_add_finalizer(napi_env env, napi_value js_object,
 
 napi_status napi_adjust_external_memory(napi_env env, int64_t change_in_bytes,
                                         int64_t* adjusted_value) {
-  *adjusted_value = UpdateOuterObjSize(env->ctx->rt, change_in_bytes);
+  // TODO: Determine if QJS needs or is able to do anything here
+  // For now, we can lie and say that we always adjusted more memory
+  *adjusted_value = change_in_bytes;
+
   return napi_clear_last_error(env);
 }
 

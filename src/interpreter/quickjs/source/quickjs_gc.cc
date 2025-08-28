@@ -29556,7 +29556,7 @@ static LEPUSValue js_typed_array_fill(LEPUSContext *ctx,
 
 static LEPUSValue js_typed_array_find(LEPUSContext *ctx,
                                       LEPUSValueConst this_val, int argc,
-                                      LEPUSValueConst *argv, int mode) {
+                                      LEPUSValueConst *argv, int findIndex) {
   HandleScope func_scope(ctx);
   LEPUSValueConst func, this_arg;
   LEPUSValueConst args[3];
@@ -29564,8 +29564,7 @@ static LEPUSValue js_typed_array_find(LEPUSContext *ctx,
   LEPUSValue val, index_val = LEPUS_UNDEFINED, res = LEPUS_UNDEFINED;
   func_scope.PushHandle(&index_val, HANDLE_TYPE_LEPUS_VALUE);
   func_scope.PushHandle(&res, HANDLE_TYPE_LEPUS_VALUE);
-  int len, k, end, dir;
-  bool find_index = mode == ArrayFindIndex || mode == ArrayFindLastIndex;
+  int len, k;
 
   val = LEPUS_UNDEFINED;
   func_scope.PushHandle(&val, HANDLE_TYPE_LEPUS_VALUE);
@@ -29579,17 +29578,8 @@ static LEPUSValue js_typed_array_find(LEPUSContext *ctx,
   this_arg = LEPUS_UNDEFINED;
   func_scope.PushHandle(&this_arg, HANDLE_TYPE_LEPUS_VALUE);
   if (argc > 1) this_arg = argv[1];
-  k = 0;
-  end = len;
-  dir = 1;
 
-  if (mode == ArrayFindLast || mode == ArrayFindLastIndex) {
-    k = len - 1;
-    dir = -1;
-    end = -1;
-  }
-
-  for (; k != end; k += dir) {
+  for (k = 0; k < len; k++) {
     index_val = LEPUS_NewInt32(ctx, k);
     val = JS_GetPropertyValue_GC(ctx, this_val, index_val);
     if (LEPUS_IsException(val)) goto exception;
@@ -29599,14 +29589,14 @@ static LEPUSValue js_typed_array_find(LEPUSContext *ctx,
     res = JS_Call_GC(ctx, func, this_arg, 3, args);
     if (LEPUS_IsException(res)) goto exception;
     if (JS_ToBoolFree_GC(ctx, res)) {
-      if (find_index) {
+      if (findIndex) {
         return index_val;
       } else {
         return val;
       }
     }
   }
-  if (find_index)
+  if (findIndex)
     return LEPUS_NewInt32(ctx, -1);
   else
     return LEPUS_UNDEFINED;
@@ -30377,11 +30367,8 @@ static const LEPUSCFunctionListEntry js_typed_array_base_proto_funcs[] = {
     LEPUS_CFUNC_MAGIC_DEF("reduceRight", 1, js_array_reduce_gc,
                           special_reduceRight | special_TA),
     LEPUS_CFUNC_DEF("fill", 1, js_typed_array_fill),
-    LEPUS_CFUNC_MAGIC_DEF("find", 1, js_typed_array_find, ArrayFind),
-    LEPUS_CFUNC_MAGIC_DEF("findIndex", 1, js_typed_array_find, ArrayFindIndex),
-    LEPUS_CFUNC_MAGIC_DEF("findLast", 1, js_typed_array_find, ArrayFindLast),
-    LEPUS_CFUNC_MAGIC_DEF("findLastIndex", 1, js_typed_array_find,
-                          ArrayFindLastIndex),
+    LEPUS_CFUNC_MAGIC_DEF("find", 1, js_typed_array_find, 0),
+    LEPUS_CFUNC_MAGIC_DEF("findIndex", 1, js_typed_array_find, 1),
     LEPUS_CFUNC_DEF("reverse", 0, js_typed_array_reverse),
     LEPUS_CFUNC_DEF("slice", 2, js_typed_array_slice),
     LEPUS_CFUNC_DEF("subarray", 2, js_typed_array_subarray),

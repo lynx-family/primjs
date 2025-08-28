@@ -52742,13 +52742,12 @@ QJS_STATIC LEPUSValue js_typed_array_fill(LEPUSContext *ctx,
 
 QJS_STATIC LEPUSValue js_typed_array_find(LEPUSContext *ctx,
                                           LEPUSValueConst this_val, int argc,
-                                          LEPUSValueConst *argv, int mode) {
+                                          LEPUSValueConst *argv,
+                                          int findIndex) {
   LEPUSValueConst func, this_arg;
   LEPUSValueConst args[3];
   LEPUSValue val, index_val, res;
-  int len, k, end;
-  int dir;
-  bool find_index = mode == ArrayFindIndex || mode == ArrayFindLastIndex;
+  int len, k;
 
   val = LEPUS_UNDEFINED;
   len = js_typed_array_get_length_internal(ctx, this_val);
@@ -52760,17 +52759,7 @@ QJS_STATIC LEPUSValue js_typed_array_find(LEPUSContext *ctx,
   this_arg = LEPUS_UNDEFINED;
   if (argc > 1) this_arg = argv[1];
 
-  k = 0;
-  dir = 1;
-  end = len;
-
-  if (mode == ArrayFindLast || mode == ArrayFindLastIndex) {
-    k = len - 1;
-    dir = -1;
-    end = -1;
-  }
-
-  for (; k != end; k += dir) {
+  for (k = 0; k < len; k++) {
     index_val = LEPUS_NewInt32(ctx, k);
     val = JS_GetPropertyValue(ctx, this_val, index_val);
     if (LEPUS_IsException(val)) goto exception;
@@ -52780,7 +52769,7 @@ QJS_STATIC LEPUSValue js_typed_array_find(LEPUSContext *ctx,
     res = JS_Call_RC(ctx, func, this_arg, 3, args);
     if (LEPUS_IsException(res)) goto exception;
     if (JS_ToBoolFree_RC(ctx, res)) {
-      if (find_index) {
+      if (findIndex) {
         LEPUS_FreeValue(ctx, val);
         return index_val;
       } else {
@@ -52789,7 +52778,7 @@ QJS_STATIC LEPUSValue js_typed_array_find(LEPUSContext *ctx,
     }
     LEPUS_FreeValue(ctx, val);
   }
-  if (find_index)
+  if (findIndex)
     return LEPUS_NewInt32(ctx, -1);
   else
     return LEPUS_UNDEFINED;
@@ -53555,11 +53544,8 @@ static const LEPUSCFunctionListEntry js_typed_array_base_proto_funcs[] = {
     LEPUS_CFUNC_MAGIC_DEF("reduceRight", 1, js_array_reduce,
                           special_reduceRight | special_TA),
     LEPUS_CFUNC_DEF("fill", 1, js_typed_array_fill),
-    LEPUS_CFUNC_MAGIC_DEF("find", 1, js_typed_array_find, ArrayFind),
-    LEPUS_CFUNC_MAGIC_DEF("findIndex", 1, js_typed_array_find, ArrayFindIndex),
-    LEPUS_CFUNC_MAGIC_DEF("findLast", 1, js_typed_array_find, ArrayFindLast),
-    LEPUS_CFUNC_MAGIC_DEF("findLastIndex", 1, js_typed_array_find,
-                          ArrayFindLastIndex),
+    LEPUS_CFUNC_MAGIC_DEF("find", 1, js_typed_array_find, 0),
+    LEPUS_CFUNC_MAGIC_DEF("findIndex", 1, js_typed_array_find, 1),
     LEPUS_CFUNC_DEF("reverse", 0, js_typed_array_reverse),
     LEPUS_CFUNC_DEF("slice", 2, js_typed_array_slice),
     LEPUS_CFUNC_DEF("subarray", 2, js_typed_array_subarray),
@@ -56186,8 +56172,9 @@ bool LEPUS_PushObjectCheckTid(LEPUSContext *ctx) {
 #endif
 }
 
-int64_t UpdateOuterObjSize(LEPUSRuntime *rt, int size) {
+void UpdateOuterObjSize(LEPUSRuntime *rt, int size) {
 #ifdef ENABLE_COMPATIBLE_MM
+  if (size == 0) return;
   if (rt->gc_enable) {
     JSMallocState *s = &rt->malloc_state;
     s->allocate_state.outer_heap_size += size;
@@ -56197,7 +56184,6 @@ int64_t UpdateOuterObjSize(LEPUSRuntime *rt, int size) {
     }
   }
 #endif
-  return 0;
 }
 
 void LEPUS_SetGCObserver(LEPUSRuntime *rt, void *opaque) {
