@@ -3225,6 +3225,8 @@ void get_caller_string(JSFunctionDef *s);
 
 void SetObjectCtxCheckStatus(LEPUSContext *ctx, bool enable);
 
+int64_t NapiAdjustExternalMemory(LEPUSRuntime *rt, int64_t size);
+
 void trig_gc(JSMallocState *s, size_t size, bool is_outer = false);
 
 QJS_HIDE pid_t get_tid();

@@ -1620,7 +1620,7 @@ void InitLynxTraceEnv(void *(*)(const char *), void (*)(void *));
 void SetObjectCtxCheckStatus(LEPUSContext *ctx, bool enable);
 bool LEPUS_PushObjectCheckTid(LEPUSContext *ctx);
 
-int64_t UpdateOuterObjSize(LEPUSRuntime *rt, int size);
+void UpdateOuterObjSize(LEPUSRuntime *rt, int size);
 
 void LEPUS_SetGCObserver(LEPUSRuntime *rt, void *opaque);
 void *LEPUS_GetGCObserver(LEPUSRuntime *rt);
