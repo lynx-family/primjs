@@ -61,6 +61,7 @@ declare_args() {
 
   enable_tracing_gc = false
   napi_src_dir = "//src/napi/"
+  use_virtual_stack = false
 }
 
 if (target_cpu != "arm64") {

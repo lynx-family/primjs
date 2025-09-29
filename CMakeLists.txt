@@ -28,9 +28,9 @@ option(CACHE_PROFILE "Enable cache profile" OFF)
 option(ENABLE_MEM "Enable memmor deteck" OFF)
 option(FORCE_GC "Enable force gc" OFF)
 option(ENABLE_ASAN "Enable address sanitizer" OFF)
-option(ENABLE_BIGNUM "Enable bignum" OFF)
 option(ENABLE_UNITTESTS "Enable build unittests" OFF)
 option(ENABLE_BUILD_AAR "Enable build aar" OFF)
+option(ENABLE_VIRTUAL_SP "Enable use virtual sp" OFF)
 
 set(CMAKE_COMMON_FLAGS
     "${CMAKE_COMMON_FLAGS} -Os -fPIC -ffunction-sections -fdata-sections \
@@ -70,6 +70,7 @@ else()
 endif()
 
 add_definitions(-DEMSCRIPTEN)
+set(PRIMJS_ROOT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 
 if(${ENABLE_MEM})
   add_definitions(-DDEBUG_MEMORY)
@@ -123,7 +124,7 @@ else()
 endif()
 
 # armeabi can't use fenv.h/fesetround()
-if(${PLATFORM_ABI} MATCHES " armeabi ")
+if(${PLATFORM_ABI} MATCHES "armeabi")
   add_definitions(-DLYNX_ARMEABI=0)
 endif()
 
@@ -131,6 +132,12 @@ if(ENABLE_UNITTESTS)
   add_definitions(-DQJS_UNITTEST)
   add_definitions(-DLYNX_SIMPLIFY)
   add_definitions(-DHEAPPROFILER_UNITTEST)
+endif()
+
+if(ENABLE_VIRTUAL_SP)
+  add_definitions(-DUSE_VIRTUAL_STACK=1)
+else()
+  add_definitions(-DUSE_VIRTUAL_STACK=0)
 endif()
 
 if(WIN32)
@@ -147,7 +154,9 @@ set(quickjs_sources
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gc/sweeper.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gc/thread_pool.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gc/collector.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/bignum.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/cutils.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/dtoa.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/libregexp.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/libunicode.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/primjs_monitor.cc
@@ -156,12 +165,6 @@ set(quickjs_sources
     ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/quickjs_version.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/quickjs-libc.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/quickjs.cc)
-
-if(ENABLE_BIGNUM)
-  set(quickjs_sources
-      ${quickjs_sources}
-      ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/libbf.cc)
-endif()
 
 if(${ENABLE_QUICKJS_DEBUGGER})
   add_definitions(-DENABLE_QUICKJS_DEBUGGER)

@@ -79,13 +79,14 @@ extern "C" {
 #endif
 
 #include "gc/trace-gc.h"
+#include "quickjs/include/bignum.h"
 #include "quickjs/include/quickjs-inner.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 #if defined(__aarch64__) && (defined(ANDROID) || defined(__ANDROID__)) && \
-    !defined(CONFIG_BIGNUM) && !DISABLE_NANBOX
+    !DISABLE_NANBOX
 int64_t HEAP_TAG_OUTER = 0;
 int64_t HEAP_TAG_INNER = 0;
 #endif
@@ -206,14 +207,10 @@ FILE *log_f = nullptr;
 
 /* number of typed array types */
 #define JS_TYPED_ARRAY_COUNT \
-  (JS_CLASS_FLOAT64_ARRAY - JS_CLASS_UINT8C_ARRAY + 1)
+  (JS_CLASS_BIG_UINT64_ARRAY - JS_CLASS_UINT8C_ARRAY + 1)
 /* Typed Arrays */
 static uint8_t const typed_array_size_log2[JS_TYPED_ARRAY_COUNT] = {
-    0, 0, 0, 1, 1, 2, 2,
-#ifdef CONFIG_BIGNUM
-    3, 3, /* BigInt64Array, BigUint64Array */
-#endif
-    2, 3};
+    0, 0, 0, 1, 1, 2, 2, 2, 3, 3, 3};
 
 #define typed_array_size_log2(classid) \
   (typed_array_size_log2[(classid)-JS_CLASS_UINT8C_ARRAY])
@@ -383,15 +380,6 @@ QJS_STATIC BOOL js_same_value(LEPUSContext *ctx, LEPUSValueConst op1,
 QJS_STATIC BOOL js_same_value_zero(LEPUSContext *ctx, LEPUSValueConst op1,
                                    LEPUSValueConst op2);
 QJS_STATIC LEPUSValue JS_ToObjectFree(LEPUSContext *ctx, LEPUSValue val);
-#ifdef CONFIG_BIGNUM
-static void js_float_env_finalizer(LEPUSRuntime *rt, LEPUSValue val);
-static LEPUSValue JS_NewBigFloat(LEPUSContext *ctx, bf_t *a);
-static LEPUSValue JS_NewBigInt2(LEPUSContext *ctx, bf_t *a, BOOL force_bigint);
-static LEPUSValue JS_NewBigInt(LEPUSContext *ctx, bf_t *a);
-static int JS_ToBigInt64Free(LEPUSContext *ctx, int64_t *pres, LEPUSValue val);
-static bf_t *JS_ToBigFloat(LEPUSContext *ctx, BOOL *pis_float, bf_t *buf,
-                           LEPUSValueConst val);
-#endif
 LEPUSValue LEPUS_ThrowOutOfMemory(LEPUSContext *ctx);
 QJS_STATIC LEPUSValue JS_ThrowTypeErrorRevokedProxy(LEPUSContext *ctx);
 QJS_STATIC LEPUSValue js_proxy_call(LEPUSContext *ctx, LEPUSValueConst func_obj,
@@ -596,13 +584,8 @@ static _Atomic LEPUSClassID js_class_id_alloc = JS_CLASS_INIT_COUNT;
   V(jsarray_slice)
 
 LEPUS_BOOL LEPUS_IsNumber(LEPUSValueConst v) {
-#ifdef CONFIG_BIGNUM
-  int tag = LEPUS_VALUE_GET_TAG(v);
-  return tag == LEPUS_TAG_INT || tag == LEPUS_TAG_BIG_INT ||
-         tag == LEPUS_TAG_BIG_FLOAT || LEPUS_TAG_IS_FLOAT64(tag);
-#else
-  return LEPUS_VALUE_IS_INT(v) || LEPUS_VALUE_IS_FLOAT64(v);
-#endif
+  auto tag = LEPUS_VALUE_GET_TAG(v);
+  return tag == LEPUS_TAG_INT || LEPUS_TAG_IS_FLOAT64(tag);
 }
 
 // <Primjs begin>
@@ -709,14 +692,6 @@ void *lepus_mallocz_rt(LEPUSRuntime *rt, size_t size, int alloc_tag = 0) {
   return memset(ptr, 0, size);
 }
 
-#ifdef CONFIG_BIGNUM
-/* called by libbf */
-static void *js_bf_realloc(void *opaque, void *ptr, size_t size) {
-  LEPUSRuntime *rt = reinterpret_cast<LEPUSRuntime *>(opaque);
-  return lepus_realloc_rt(rt, ptr, size);
-}
-#endif /* CONFIG_BIGNUM */
-
 /* Throw out of memory in case of error */
 void *lepus_malloc(LEPUSContext *ctx, size_t size, int alloc_tag = 0) {
   void *ptr;
@@ -806,8 +781,6 @@ QJS_STATIC inline void js_dbuf_init(LEPUSContext *ctx, DynBuf *s) {
   dbuf_init2(s, ctx->rt, (DynBufReallocFunc *)lepus_realloc_rt);
 }
 
-QJS_STATIC inline int is_digit(int c) { return c >= '0' && c <= '9'; }
-
 static JSClassShortDef const js_std_class_def[] = {
     {JS_ATOM_Object, NULL, NULL},                       /* JS_CLASS_OBJECT */
     {JS_ATOM_Array, js_array_finalizer, js_array_mark}, /* JS_CLASS_ARRAY */
@@ -856,26 +829,18 @@ static JSClassShortDef const js_std_class_def[] = {
      js_typed_array_mark}, /* JS_CLASS_INT32_ARRAY */
     {JS_ATOM_Uint32Array, js_typed_array_finalizer,
      js_typed_array_mark}, /* JS_CLASS_UINT32_ARRAY */
-#ifdef CONFIG_BIGNUM
-    {JS_ATOM_BigInt64Array, js_typed_array_finalizer,
-     js_typed_array_mark}, /* JS_CLASS_BIG_INT64_ARRAY */
-    {JS_ATOM_BigUint64Array, js_typed_array_finalizer,
-     js_typed_array_mark}, /* JS_CLASS_BIG_UINT64_ARRAY */
-#endif
     {JS_ATOM_Float32Array, js_typed_array_finalizer,
      js_typed_array_mark}, /* JS_CLASS_FLOAT32_ARRAY */
     {JS_ATOM_Float64Array, js_typed_array_finalizer,
      js_typed_array_mark}, /* JS_CLASS_FLOAT64_ARRAY */
+    {JS_ATOM_null, js_typed_array_finalizer,
+     js_typed_array_mark}, /* JS_CLASS_BIG_INT64_ARRAY */
+    {JS_ATOM_null, js_typed_array_finalizer,
+     js_typed_array_mark}, /* JS_CLASS_BIG_UINT64_ARRAY */
     {JS_ATOM_DataView, js_typed_array_finalizer,
      js_typed_array_mark}, /* JS_CLASS_DATAVIEW */
-#ifdef CONFIG_BIGNUM
-    {JS_ATOM_BigInt, js_object_data_finalizer,
-     js_object_data_mark}, /* JS_CLASS_BIG_INT */
-    {JS_ATOM_BigFloat, js_object_data_finalizer,
-     js_object_data_mark}, /* JS_CLASS_BIG_FLOAT */
-    {JS_ATOM_BigFloatEnv, js_float_env_finalizer,
-     NULL}, /* JS_CLASS_FLOAT_ENV */
-#endif
+    {JS_ATOM_null, js_object_data_finalizer,
+     js_object_data_mark},                            /* JS_CLASS_BIG_INT */
     {JS_ATOM_Map, js_map_finalizer, js_map_mark},     /* JS_CLASS_MAP */
     {JS_ATOM_Set, js_map_finalizer, js_map_mark},     /* JS_CLASS_SET */
     {JS_ATOM_WeakMap, js_map_finalizer, js_map_mark}, /* JS_CLASS_WEAKMAP */
@@ -906,6 +871,23 @@ int init_class_range(LEPUSRuntime *rt, JSClassShortDef const *tab, int start,
     cm->gc_mark = tab[i].gc_mark;
     if (JS_NewClass1(rt, class_id, cm, tab[i].class_name) < 0) return -1;
   }
+  return 0;
+}
+
+int init_bigint_name(LEPUSRuntime *rt) {
+  constexpr char bigint_class_name[] = "BigInt";
+  constexpr char bigint64_array_class_name[] = "BigInt64Array";
+  constexpr char biguint64_array_class_name[] = "BigUint64Array";
+
+  rt->class_array[JS_CLASS_BIG_INT].class_name =
+      __JS_NewAtomInit(rt, bigint_class_name, sizeof(bigint_class_name) - 1,
+                       JS_ATOM_TYPE_STRING, TRUE);
+  rt->class_array[JS_CLASS_BIG_INT64_ARRAY].class_name = __JS_NewAtomInit(
+      rt, bigint64_array_class_name, sizeof(bigint64_array_class_name) - 1,
+      JS_ATOM_TYPE_STRING, TRUE);
+  rt->class_array[JS_CLASS_BIG_UINT64_ARRAY].class_name = __JS_NewAtomInit(
+      rt, biguint64_array_class_name, sizeof(biguint64_array_class_name) - 1,
+      JS_ATOM_TYPE_STRING, TRUE);
   return 0;
 }
 
@@ -1007,7 +989,7 @@ LEPUSRuntime *LEPUS_NewRuntime2(const LEPUSMallocFunctions *mf, void *opaque,
 #endif
   rt->mf = *mf;
 #if defined(__aarch64__) && (defined(ANDROID) || defined(__ANDROID__)) && \
-    !defined(CONFIG_BIGNUM) && !DISABLE_NANBOX
+    !DISABLE_NANBOX
   HEAP_TAG_OUTER = (int64_t)rt & LEPUS_PTR_TAG;
   HEAP_TAG_INNER = HEAP_TAG_OUTER;
   LOGI("RC: HEAP_TAG_OUTER: %p, HEAP_TAG_INNER: %p", (void *)HEAP_TAG_OUTER,
@@ -1019,10 +1001,6 @@ LEPUSRuntime *LEPUS_NewRuntime2(const LEPUSMallocFunctions *mf, void *opaque,
   }
   rt->malloc_state = ms;
   rt->malloc_gc_threshold = 256 * 1024;
-
-#ifdef CONFIG_BIGNUM
-  bf_context_init(&rt->bf_ctx, js_bf_realloc, rt);
-#endif
 
   init_list_head(&rt->context_list);
   init_list_head(&rt->obj_list);
@@ -1044,6 +1022,7 @@ LEPUSRuntime *LEPUS_NewRuntime2(const LEPUSMallocFunctions *mf, void *opaque,
   if (init_class_range(rt, js_std_class_def, JS_CLASS_OBJECT,
                        countof(js_std_class_def)) < 0)
     goto fail;
+  init_bigint_name(rt);
   rt->class_array[JS_CLASS_ARGUMENTS].exotic = &js_arguments_exotic_methods;
   rt->class_array[JS_CLASS_STRING].exotic = &js_string_exotic_methods;
   rt->class_array[JS_CLASS_MODULE_NS].exotic = &js_module_ns_exotic_methods;
@@ -1096,7 +1075,7 @@ void JS_ResetRuntimeForEffect(LEPUSRuntime *rt, const LEPUSMallocFunctions *mf,
 #endif
   rt->mf = *mf;
 #if defined(__aarch64__) && (defined(ANDROID) || defined(__ANDROID__)) && \
-    !defined(CONFIG_BIGNUM) && !DISABLE_NANBOX
+    !DISABLE_NANBOX
   HEAP_TAG_OUTER = (int64_t)rt & LEPUS_PTR_TAG;
   HEAP_TAG_INNER = HEAP_TAG_OUTER;
   LOGI("EFFECT RC: HEAP_TAG_OUTER: %p, HEAP_TAG_INNER: %p",
@@ -1107,10 +1086,6 @@ void JS_ResetRuntimeForEffect(LEPUSRuntime *rt, const LEPUSMallocFunctions *mf,
     rt->mf.lepus_malloc_usable_size = js_malloc_usable_size_unknown;
   }
   rt->malloc_state = ms;
-
-#ifdef CONFIG_BIGNUM
-  bf_context_init(&rt->bf_ctx, js_bf_realloc, rt);
-#endif
 
   init_list_head(&rt->obj_list);
   // <Primjs begin>
@@ -1125,6 +1100,7 @@ void JS_ResetRuntimeForEffect(LEPUSRuntime *rt, const LEPUSMallocFunctions *mf,
   if (init_class_range(rt, js_std_class_def, JS_CLASS_OBJECT,
                        countof(js_std_class_def)) < 0)
     goto fail;
+  init_bigint_name(rt);
   rt->class_array[JS_CLASS_ARGUMENTS].exotic = &js_arguments_exotic_methods;
   rt->class_array[JS_CLASS_STRING].exotic = &js_string_exotic_methods;
   rt->class_array[JS_CLASS_MODULE_NS].exotic = &js_module_ns_exotic_methods;
@@ -1560,10 +1536,6 @@ void LEPUS_FreeRuntime(LEPUSRuntime *rt) {
   }
   lepus_free_rt(rt, rt->class_array);
 
-#ifdef CONFIG_BIGNUM
-  bf_context_end(&rt->bf_ctx);
-#endif
-
 #ifdef DUMP_LEAKS
   /* only the atoms defined in JS_InitAtoms() should be left */
   {
@@ -1719,7 +1691,7 @@ void LEPUS_FreeRuntime(LEPUSRuntime *rt) {
 #define realloc(p, s) realloc_is_forbidden(p, s)
 
 #if defined(EMSCRIPTEN)
-QJS_STATIC inline uintptr_t get_thread_stack_limit() {
+uintptr_t get_thread_stack_limit() {
 #if defined(_WIN32)
   MEMORY_BASIC_INFORMATION mem;
   VirtualQuery(&mem, &mem, sizeof mem);
@@ -1842,40 +1814,34 @@ LEPUSValue LEPUS_ThrowOutOfMemory(LEPUSContext *ctx) {
 
 // <Primjs begin>
 void LEPUS_SetVirtualStackSize(LEPUSContext *ctx, uint32_t stack_size) {
-  CallGCFunc(JS_SetVirtualStackSize_GC, ctx, stack_size);
-#ifdef OS_IOS
-  if (ctx->stack_pos != 0) {
-    return;
-  }
-  ctx->rt->stack_size = stack_size;
-  ctx->stack = static_cast<uint8_t *>(
-      lepus_realloc(ctx, ctx->stack, ctx->rt->stack_size));
-
-  if (ctx->stack == NULL) {
-    ctx->rt->stack_size = 0;
-  }
-#endif
+  return;
 }
+
+#ifdef USE_VIRTUAL_STACK
+void InitVirtualStack(LEPUSContext *ctx) {
+  size_t allocate_stack_size = minify_virtual_stack_size_enabled()
+                                   ? MINIFY_VIRTUAL_STACK_SIZE
+                                   : DEFAULT_VIRTUAL_STACK_SIZE;
+  ctx->stack_limit = static_cast<uint8_t *>(system_malloc(allocate_stack_size));
+  if (ctx->stack_limit == NULL) {
+    ctx->stack_limit =
+        static_cast<uint8_t *>(system_malloc(FALLBACK_VIRTUAL_STACK_SIZE));
+    if (ctx->stack_limit) {
+      ctx->rt->stack_size = FALLBACK_VIRTUAL_STACK_SIZE;
+    } else {
+      ctx->rt->stack_size = 0;
+    }
+  } else {
+    ctx->rt->stack_size = allocate_stack_size;
+  }
+  ctx->stack = ctx->stack_limit + ctx->rt->stack_size;
+  return;
+}
+#endif
 // <Primjs end>
-// <primjs begin>
-void PrimInit(LEPUSContext *ctx);
-// <primjs end>
+
 LEPUSContext *LEPUS_NewContextRaw(LEPUSRuntime *rt) {
   CallGCFunc(JS_NewContextRaw_GC, rt);
-#if defined(ENABLE_PRIMJS_TRACE) && PRINT_LOG_TO_FILE && \
-    (defined(ANDROID) || defined(__ANDROID__))
-  pthread_mutex_lock(&prim_init_mutex);
-  if (!log_f) {
-    chdir("/data/local/tmp/");
-    log_f = fopen("log.txt", "w");
-    if (!log_f) {
-      LOGE("open fail errno = %d reason = %s \n", errno, strerror(errno));
-      abort();
-    }
-    LOGI("\nlogging to /data/local/tmp/log.txt! ---------\n\n");
-  }
-  pthread_mutex_unlock(&prim_init_mutex);
-#endif
   LEPUSContext *ctx;
   int i;
 
@@ -1894,36 +1860,16 @@ LEPUSContext *LEPUS_NewContextRaw(LEPUSRuntime *rt) {
 #endif
 
   list_add_tail(&ctx->link, &rt->context_list);
-#ifdef CONFIG_BIGNUM
-  ctx->bf_ctx = &rt->bf_ctx;
-  ctx->fp_env.prec = 53;
-  ctx->fp_env.flags = bf_set_exp_bits(11) | BF_RNDN | BF_FLAG_SUBNORMAL;
-#endif
   for (i = 0; i < rt->class_count; i++) ctx->class_proto[i] = LEPUS_NULL;
   ctx->regexp_ctor = LEPUS_NULL;
   ctx->promise_ctor = LEPUS_NULL;
-  ctx->no_lepus_strict_mode = FALSE;
+  ctx->no_lepus_strict_mode = false;
   init_list_head(&ctx->loaded_modules);
   JS_AddIntrinsicBasicObjects(ctx);
-  // <Primjs begin>
-#ifdef OS_IOS
-  size_t allocate_stack_size = minify_virtual_stack_size_enabled()
-                                   ? MINIFY_VIRTUAL_STACK_SIZE
-                                   : DEFAULT_VIRTUAL_STACK_SIZE;
-  ctx->stack = static_cast<uint8_t *>(lepus_malloc(ctx, allocate_stack_size));
-  if (ctx->stack == NULL) {
-    ctx->stack =
-        static_cast<uint8_t *>(lepus_malloc(ctx, FALLBACK_VIRTUAL_STACK_SIZE));
-    if (ctx->stack) {
-      ctx->rt->stack_size = FALLBACK_VIRTUAL_STACK_SIZE;
-    } else {
-      ctx->rt->stack_size = 0;
-    }
-  } else {
-    ctx->rt->stack_size = allocate_stack_size;
-  }
+// <Primjs begin>
+#ifdef USE_VIRTUAL_STACK
+  InitVirtualStack(ctx);
 #endif
-  // ctx->stack_pos = 0;
   ctx->next_function_id = 1;   // for lepusNG sourcemap, need to start from 1
   ctx->debuginfo_outside = 2;  // 2: uninitialize, 1: true, 0: false
   ctx->lynx_target_sdk_version = nullptr;
@@ -1940,28 +1886,12 @@ LEPUSContext *LEPUS_NewContextRaw(LEPUSRuntime *rt) {
   ctx->fg_ctx->ref_count = 1;
   ctx->fg_ctx->ctx = ctx;
   // <Primjs end>
-
-  // <primjs begin>
-#ifdef ENABLE_PRIMJS_SNAPSHOT
-  if (ctx->rt->use_primjs) {
-    PRIM_LOG("Use snapshot!\n");
-  } else {
-    PRIM_LOG("Use raw Quickjs!\n");
-  }
-#else
-  PRIM_LOG("Use raw Quickjs!\n");
-#endif
-#if defined(ENABLE_PRIMJS_SNAPSHOT)
-  pthread_mutex_lock(&prim_init_mutex);
-  PrimInit(ctx);
-  pthread_mutex_unlock(&prim_init_mutex);
-#endif
-  // <primjs end>
   return ctx;
 }
 
 QJS_STATIC void JS_AddIntrinsicWeakRef(LEPUSContext *ctx);
 QJS_STATIC void JS_AddIntrinsicFinalizationRegistry(LEPUSContext *ctx);
+QJS_STATIC void JS_AddIntrinsicBigInt(LEPUSContext *ctx);
 
 LEPUSContext *LEPUS_NewContext(LEPUSRuntime *rt) {
   CallGCFunc(JS_NewContext_GC, rt);
@@ -1984,6 +1914,7 @@ LEPUSContext *LEPUS_NewContext(LEPUSRuntime *rt) {
   LEPUS_AddIntrinsicPromise(ctx);
   JS_AddIntrinsicWeakRef(ctx);
   JS_AddIntrinsicFinalizationRegistry(ctx);
+  JS_AddIntrinsicBigInt(ctx);
 
   return ctx;
 }
@@ -2081,9 +2012,9 @@ void LEPUS_FreeContext(LEPUSContext *ctx) {
   LEPUS_FreeValue(ctx, ctx->regexp_ctor);
   LEPUS_FreeValue(ctx, ctx->function_ctor);
   LEPUS_FreeValue(ctx, ctx->function_proto);
-  // <Primjs begin>
-#ifdef OS_IOS
-  lepus_free(ctx, ctx->stack);
+// <Primjs begin>
+#ifdef USE_VIRTUAL_STACK
+  system_free(ctx->stack_limit);
 #endif
   // <Primjs end>
 
@@ -2136,37 +2067,17 @@ QJS_STATIC inline BOOL is_strict_mode(LEPUSContext *ctx) {
   return (sf && (sf->js_mode & JS_MODE_STRICT));
 }
 
-#ifdef CONFIG_BIGNUM
-static inline BOOL is_bignum_mode(LEPUSContext *ctx) {
-  LEPUSStackFrame *sf = ctx->rt->current_stack_frame;
-  return (sf && (sf->js_mode & JS_MODE_BIGINT));
-}
-#endif
-
 LEPUSValue LEPUS_NewInt64(LEPUSContext *ctx, int64_t v) {
   CallGCFunc(JS_NewInt64_GC, ctx, v);
   if (v == (int32_t)v) {
     return LEPUS_NewInt32(ctx, v);
   } else {
-#ifdef CONFIG_BIGNUM
-    if (is_bignum_mode(ctx)) {
-      bf_t a_s, *a = &a_s;
-      bf_init(ctx->bf_ctx, a);
-      bf_set_si(a, v);
-      return JS_NewBigInt(ctx, a);
-    } else
-#endif
-    {
-      return __JS_NewFloat64(ctx, (double)v);
-    }
+    return __JS_NewFloat64(ctx, (double)v);
   }
 }
 
 QJS_STATIC force_inline LEPUSValue JS_NewUint32(LEPUSContext *ctx,
                                                 uint32_t val) {
-#ifdef CONFIG_BIGNUM
-  return LEPUS_NewInt64(ctx, val);
-#else
   LEPUSValue v;
   if (val <= 0x7fffffff) {
     v = LEPUS_MKVAL(LEPUS_TAG_INT, static_cast<int32_t>(val));
@@ -2174,7 +2085,6 @@ QJS_STATIC force_inline LEPUSValue JS_NewUint32(LEPUSContext *ctx,
     v = __JS_NewFloat64(ctx, val);
   }
   return v;
-#endif
 }
 
 /* JSAtom support */
@@ -2427,10 +2337,6 @@ QJS_STATIC int JS_ResizeAtomHash(LEPUSRuntime *rt, int new_hash_size) {
   return 0;
 }
 
-QJS_STATIC JSAtom __JS_NewAtomInit_NOGC(LEPUSRuntime *rt, const char *str,
-                                        int len, int atom_type, int is_const);
-QJS_STATIC JSAtom __JS_NewAtomInit(LEPUSRuntime *rt, const char *str, int len,
-                                   int atom_type, int is_const);
 int JS_InitAtoms(LEPUSRuntime *rt) {
   int i, len, atom_type;
   const char *p;
@@ -2697,7 +2603,8 @@ done:
   if (str && !rt->gc_enable) js_free_string(rt, str);
   return i;
 }
-QJS_STATIC JSAtom __attribute__((always_inline)) __attribute__((unused))
+
+JSAtom __attribute__((always_inline)) __attribute__((unused))
 __JS_NewAtomInit_NOGC(LEPUSRuntime *rt, const char *str, int len, int atom_type,
                       int is_const) {
   JSString *p;
@@ -2810,34 +2717,6 @@ JSAtom JS_NewAtomStr(LEPUSContext *ctx, JSString *p) {
   /* XXX: should generate an exception */
   return __JS_NewAtom(rt, p, JS_ATOM_TYPE_STRING);
 }
-
-#ifdef OS_IOS
-static BOOL js_check_virtual_sp_overflow(LEPUSContext *ctx, size_t size) {
-  if (ctx->stack_pos + size > ctx->rt->stack_size) {
-    return TRUE;
-  }
-  return FALSE;
-}
-
-static BOOL js_check_virtual_outofmemory(LEPUSContext *ctx, size_t size) {
-  if (ctx->stack == NULL) {
-    return TRUE;
-  }
-  return FALSE;
-}
-
-static LEPUSValue *js_get_virtual_sp(LEPUSContext *ctx) {
-  return (LEPUSValue *)(ctx->stack + ctx->stack_pos);
-}
-
-static void js_push_virtual_sp(LEPUSContext *ctx, size_t size) {
-  ctx->stack_pos += size;
-}
-
-static void js_pop_virtual_sp(LEPUSContext *ctx, size_t size) {
-  ctx->stack_pos -= size;
-}
-#endif
 
 JSAtom LEPUS_NewAtomLen(LEPUSContext *ctx, const char *str, size_t len) {
   LEPUSValue val;
@@ -3334,8 +3213,7 @@ int LEPUS_NewClass(LEPUSRuntime *rt, LEPUSClassID class_id,
   return ret;
 }
 
-QJS_STATIC LEPUSValue js_new_string8(LEPUSContext *ctx, const uint8_t *buf,
-                                     int len) {
+LEPUSValue js_new_string8_len(LEPUSContext *ctx, const char *buf, int32_t len) {
   JSString *str;
 
   if (len <= 0) {
@@ -4153,6 +4031,7 @@ void JS_FreeSeparableString(LEPUSRuntime *rt, LEPUSValue val) {
 
 LEPUSValue JS_GetSeparableStringContentNotDup(LEPUSContext *ctx,
                                               LEPUSValue val) {
+  CallGCFunc(JS_GetSeparableStringContentNotDup_GC, ctx, val);
   assert(JS_IsSeparableString(val));
   auto *separable_string = JS_GetSeparableString(val);
 
@@ -4638,7 +4517,7 @@ QJS_HIDE LEPUSValue JS_NewObjectFromShape(LEPUSContext *ctx, JSShape *sh,
       p->prop[0].u.value = LEPUS_UNDEFINED;
       break;
     case JS_CLASS_ARGUMENTS:
-    case JS_CLASS_UINT8C_ARRAY ... JS_CLASS_FLOAT64_ARRAY:
+    case JS_CLASS_UINT8C_ARRAY ... JS_CLASS_BIG_UINT64_ARRAY:
       p->is_exotic = 1;
       p->fast_array = 1;
       p->u.array.u.ptr = NULL;
@@ -4653,10 +4532,7 @@ QJS_HIDE LEPUSValue JS_NewObjectFromShape(LEPUSContext *ctx, JSShape *sh,
     case JS_CLASS_BOOLEAN:
     case JS_CLASS_SYMBOL:
     case JS_CLASS_DATE:
-#ifdef CONFIG_BIGNUM
     case JS_CLASS_BIG_INT:
-    case JS_CLASS_BIG_FLOAT:
-#endif
       p->u.object_data = LEPUS_UNDEFINED;
       goto set_exotic;
     case JS_CLASS_REGEXP:
@@ -4719,10 +4595,7 @@ static LEPUSValue JS_GetObjectData(LEPUSContext *ctx, LEPUSValueConst obj)
         case JS_CLASS_BOOLEAN:
         case JS_CLASS_SYMBOL:
         case JS_CLASS_DATE:
-#ifdef CONFIG_BIGNUM
         case JS_CLASS_BIG_INT:
-        case JS_CLASS_BIG_FLOAT:
-#endif
             return LEPUS_DupValue(ctx, p->u.object_data);
         }
     }
@@ -4742,10 +4615,7 @@ QJS_STATIC int JS_SetObjectData(LEPUSContext *ctx, LEPUSValueConst obj,
       case JS_CLASS_BOOLEAN:
       case JS_CLASS_SYMBOL:
       case JS_CLASS_DATE:
-#ifdef CONFIG_BIGNUM
       case JS_CLASS_BIG_INT:
-      case JS_CLASS_BIG_FLOAT:
-#endif
         if (!ctx->gc_enable) {
           LEPUS_FreeValue(ctx, p->u.object_data);
         }
@@ -4984,23 +4854,20 @@ QJS_STATIC LEPUSValue js_c_function_data_call(LEPUSContext *ctx,
   int i;
 
   // <Primjs begin>
-#ifdef OS_IOS
+#ifdef USE_VIRTUAL_STACK
   size_t arg_size = 0;
   LEPUSValue ret;
 #endif
   /* XXX: could add the function on the stack for debug */
   if (unlikely(argc < s->length)) {
-#ifdef OS_IOS
+#ifdef USE_VIRTUAL_STACK
     arg_size = sizeof(arg_buf[0]) * s->length;
-    if (js_check_virtual_outofmemory(ctx, arg_size)) {
-      return LEPUS_ThrowOutOfMemory(ctx);
-    }
+
     if (js_check_virtual_sp_overflow(ctx, arg_size)) {
       return JS_ThrowStackOverflow(ctx);
     }
 
-    arg_buf = js_get_virtual_sp(ctx);
-    js_push_virtual_sp(ctx, arg_size);
+    arg_buf = js_get_virtual_sp(ctx, arg_size);
 #elif !defined(OS_WIN)
     arg_buf = static_cast<LEPUSValue *>(alloca(sizeof(arg_buf[0]) * s->length));
 #else
@@ -5012,7 +4879,7 @@ QJS_STATIC LEPUSValue js_c_function_data_call(LEPUSContext *ctx,
   } else {
     arg_buf = argv;
   }
-#ifdef OS_IOS
+#ifdef USE_VIRTUAL_STACK
   ret = s->func(ctx, this_val, argc, arg_buf, s->magic, s->data);
   js_pop_virtual_sp(ctx, arg_size);
   return ret;
@@ -5385,22 +5252,12 @@ void __JS_FreeValueRT(LEPUSRuntime *rt, LEPUSValue v) {
     case LEPUS_TAG_MODULE:
       abort(); /* never freed here */
       break;
-#ifdef CONFIG_BIGNUM
-    case LEPUS_TAG_BIG_INT:
-    case LEPUS_TAG_BIG_FLOAT: {
-      JSBigFloat *bf = reinterpret_cast<JSBigFloat *>(LEPUS_VALUE_GET_PTR(v));
-      bf_delete(&bf->num);
-      lepus_free_rt(rt, bf);
+    case LEPUS_TAG_BIG_INT: {
+      JSBigInt *p = reinterpret_cast<JSBigInt *>(LEPUS_VALUE_GET_PTR(v));
+      lepus_free_rt(rt, p);
     } break;
-#else
 #ifdef ENABLE_LEPUSNG
     // <Primjs begin>
-    case LEPUS_TAG_BIG_FLOAT:
-    case LEPUS_TAG_BIG_INT: {
-      JSBigFloat *bf = static_cast<JSBigFloat *>(LEPUS_VALUE_GET_PTR(v));
-      lepus_free_rt(rt, bf);
-      break;
-    }
     case LEPUS_TAG_LEPUS_REF: {
       if (rt->js_callbacks_.free_value) {
         if (rt->in_gc_sweep) {
@@ -5413,14 +5270,12 @@ void __JS_FreeValueRT(LEPUSRuntime *rt, LEPUSValue v) {
     }
     // <Primjs end>
 #endif
-#endif
     case LEPUS_TAG_SYMBOL: {
       JSAtomStruct *p = static_cast<JSAtomStruct *>(LEPUS_VALUE_GET_PTR(v));
       JS_FreeAtomStruct(rt, p);
     } break;
     default:
-#if defined(__aarch64__) && !defined(OS_WIN) && !defined(CONFIG_BIGNUM) && \
-    !DISABLE_NANBOX
+#if defined(__aarch64__) && !defined(OS_WIN) && !DISABLE_NANBOX
       printf("__JS_FreeValue: unknown tag=%p\n", (void *)tag);
 #else
       printf("__JS_FreeValue: unknown tag=%" PRId64 "\n", tag);
@@ -6161,12 +6016,9 @@ QJS_STATIC void compute_value_size(LEPUSValueConst val,
       compute_bytecode_size(
           static_cast<LEPUSFunctionBytecode *>(LEPUS_VALUE_GET_PTR(val)), hp);
       break;
-#ifdef CONFIG_BIGNUM
     case LEPUS_TAG_BIG_INT:
-    case LEPUS_TAG_BIG_FLOAT:
-      /* should track JSBigFloat usage */
+      /* should track JSBigInt usage */
       break;
-#endif
   }
 }
 
@@ -6289,10 +6141,6 @@ void LEPUS_ComputeMemoryUsage(LEPUSRuntime *rt, LEPUSMemoryUsage *s) {
       case JS_CLASS_BOOLEAN: /* u.object_data */
       case JS_CLASS_SYMBOL:  /* u.object_data */
       case JS_CLASS_DATE:    /* u.object_data */
-#ifdef CONFIG_BIGNUM
-      case JS_CLASS_BIG_INT:   /* u.object_data */
-      case JS_CLASS_BIG_FLOAT: /* u.object_data */
-#endif
         compute_value_size(p->u.object_data, hp);
         break;
       case JS_CLASS_C_FUNCTION: /* u.cfunc */
@@ -6369,24 +6217,19 @@ void LEPUS_ComputeMemoryUsage(LEPUSRuntime *rt, LEPUSMemoryUsage *s) {
           }
         }
       } break;
-      case JS_CLASS_GENERATOR:    /* u.generator_data */
-      case JS_CLASS_UINT8C_ARRAY: /* u.typed_array / u.array */
-      case JS_CLASS_INT8_ARRAY:   /* u.typed_array / u.array */
-      case JS_CLASS_UINT8_ARRAY:  /* u.typed_array / u.array */
-      case JS_CLASS_INT16_ARRAY:  /* u.typed_array / u.array */
-      case JS_CLASS_UINT16_ARRAY: /* u.typed_array / u.array */
-      case JS_CLASS_INT32_ARRAY:  /* u.typed_array / u.array */
-      case JS_CLASS_UINT32_ARRAY: /* u.typed_array / u.array */
-#ifdef CONFIG_BIGNUM
-      case JS_CLASS_BIG_INT64_ARRAY:  /* u.typed_array / u.array */
-      case JS_CLASS_BIG_UINT64_ARRAY: /* u.typed_array / u.array */
-#endif
-      case JS_CLASS_FLOAT32_ARRAY: /* u.typed_array / u.array */
-      case JS_CLASS_FLOAT64_ARRAY: /* u.typed_array / u.array */
-      case JS_CLASS_DATAVIEW:      /* u.typed_array */
-#ifdef CONFIG_BIGNUM
-      case JS_CLASS_FLOAT_ENV: /* u.float_env */
-#endif
+      case JS_CLASS_GENERATOR:                /* u.generator_data */
+      case JS_CLASS_UINT8C_ARRAY:             /* u.typed_array / u.array */
+      case JS_CLASS_INT8_ARRAY:               /* u.typed_array / u.array */
+      case JS_CLASS_UINT8_ARRAY:              /* u.typed_array / u.array */
+      case JS_CLASS_INT16_ARRAY:              /* u.typed_array / u.array */
+      case JS_CLASS_UINT16_ARRAY:             /* u.typed_array / u.array */
+      case JS_CLASS_INT32_ARRAY:              /* u.typed_array / u.array */
+      case JS_CLASS_UINT32_ARRAY:             /* u.typed_array / u.array */
+      case JS_CLASS_BIG_INT64_ARRAY:          /* u.typed_array / u.array */
+      case JS_CLASS_BIG_UINT64_ARRAY:         /* u.typed_array / u.array */
+      case JS_CLASS_FLOAT32_ARRAY:            /* u.typed_array / u.array */
+      case JS_CLASS_FLOAT64_ARRAY:            /* u.typed_array / u.array */
+      case JS_CLASS_DATAVIEW:                 /* u.typed_array */
       case JS_CLASS_MAP:                      /* u.map_state */
       case JS_CLASS_SET:                      /* u.map_state */
       case JS_CLASS_WEAKMAP:                  /* u.map_state */
@@ -6466,9 +6309,6 @@ void LEPUS_DumpMemoryUsage(FILE *fp, const LEPUSMemoryUsage *s,
   }
   fprintf(fp,
           "QuickJS memory usage -- "
-#ifdef CONFIG_BIGNUM
-          "BigNum "
-#endif
           " %d-bit, malloc limit: %" PRId64 "\n\n",
           (int)sizeof(void *) * 8, (int64_t)(ssize_t)s->malloc_limit);
 #if 1
@@ -7248,29 +7088,13 @@ static LEPUSValueConst JS_GetPrototype_RC(LEPUSContext *ctx,
   LEPUSObject *p;
 
   switch (LEPUS_VALUE_GET_NORM_TAG(val)) {
-#ifdef CONFIG_BIGNUM
     case LEPUS_TAG_BIG_INT:
       val = ctx->class_proto[JS_CLASS_BIG_INT];
       break;
     case LEPUS_TAG_INT:
-      if (is_bignum_mode(ctx)) {
-        val = ctx->class_proto[JS_CLASS_BIG_INT];
-      } else {
-        val = ctx->class_proto[JS_CLASS_NUMBER];
-      }
-      break;
     case LEPUS_TAG_FLOAT64:
       val = ctx->class_proto[JS_CLASS_NUMBER];
       break;
-    case LEPUS_TAG_BIG_FLOAT:
-      val = ctx->class_proto[JS_CLASS_BIG_FLOAT];
-      break;
-#else
-    case LEPUS_TAG_INT:
-    case LEPUS_TAG_FLOAT64:
-      val = ctx->class_proto[JS_CLASS_NUMBER];
-      break;
-#endif
     case LEPUS_TAG_BOOL:
       val = ctx->class_proto[JS_CLASS_BOOLEAN];
       break;
@@ -7525,12 +7349,6 @@ LEPUSValue JS_GetPropertyInternalImpl(LEPUSContext *ctx, LEPUSValueConst obj,
           }
         }
       } break;
-      // <Primjs begin>
-#ifdef ENABLE_LEPUSNG
-      case LEPUS_TAG_BIG_INT:
-        return LEPUS_UNDEFINED;
-#endif
-        // <Primjs end>
       default:
         break;
     }
@@ -7581,11 +7399,11 @@ LEPUSValue JS_GetPropertyInternalImpl(LEPUSContext *ctx, LEPUSValueConst obj,
             return LEPUS_GetPropertyUint32(
                 ctx, LEPUS_MKPTR(LEPUS_TAG_OBJECT, p), idx);
           } else if (p->class_id >= JS_CLASS_UINT8C_ARRAY &&
-                     p->class_id <= JS_CLASS_FLOAT64_ARRAY) {
+                     p->class_id <= JS_CLASS_BIG_UINT64_ARRAY) {
             goto typed_array_oob;
           }
         } else if (p->class_id >= JS_CLASS_UINT8C_ARRAY &&
-                   p->class_id <= JS_CLASS_FLOAT64_ARRAY) {
+                   p->class_id <= JS_CLASS_BIG_UINT64_ARRAY) {
           int ret;
           ret = JS_AtomIsNumericIndex(ctx, prop);
           if (ret != 0) {
@@ -7891,7 +7709,7 @@ JS_GetOwnPropertyNamesInternal(LEPUSContext *ctx, LEPUSPropertyEnum **ptab,
          typed array is detached */
       if ((flags & (LEPUS_GPN_SET_ENUM | LEPUS_GPN_ENUM_ONLY)) &&
           (p->class_id >= JS_CLASS_UINT8C_ARRAY &&
-           p->class_id <= JS_CLASS_FLOAT64_ARRAY) &&
+           p->class_id <= JS_CLASS_BIG_UINT64_ARRAY) &&
           typed_array_is_detached(ctx, p) &&
           typed_array_get_length(ctx, p) != 0) {
         JS_ThrowTypeErrorDetachedArrayBuffer(ctx);
@@ -8107,10 +7925,8 @@ retry:
         idx = __JS_AtomToUInt32(prop);
         if (idx < p->u.array.count) {
           if (desc) {
-            desc->flags = LEPUS_PROP_WRITABLE | LEPUS_PROP_ENUMERABLE;
-            if (p->class_id == JS_CLASS_ARRAY ||
-                p->class_id == JS_CLASS_ARGUMENTS)
-              desc->flags |= LEPUS_PROP_CONFIGURABLE;
+            desc->flags = LEPUS_PROP_WRITABLE | LEPUS_PROP_ENUMERABLE |
+                          LEPUS_PROP_CONFIGURABLE;
             desc->getter = LEPUS_UNDEFINED;
             desc->setter = LEPUS_UNDEFINED;
             desc->value = LEPUS_GetPropertyUint32(
@@ -8207,7 +8023,7 @@ int LEPUS_HasProperty(LEPUSContext *ctx, LEPUSValueConst obj, JSAtom prop) {
     ret = JS_GetOwnPropertyInternal(ctx, NULL, p, prop);
     if (ret != 0) return ret;
     if (p->class_id >= JS_CLASS_UINT8C_ARRAY &&
-        p->class_id <= JS_CLASS_FLOAT64_ARRAY) {
+        p->class_id <= JS_CLASS_BIG_UINT64_ARRAY) {
       ret = JS_AtomIsNumericIndex(ctx, prop);
       if (ret != 0) {
         if (ret < 0) return -1;
@@ -8287,14 +8103,12 @@ LEPUSValue JS_GetPropertyValue(LEPUSContext *ctx, LEPUSValueConst this_obj,
       case JS_CLASS_UINT32_ARRAY:
         if (unlikely(idx >= p->u.array.count)) goto slow_path;
         return JS_NewUint32(ctx, p->u.array.u.uint32_ptr[idx]);
-#ifdef CONFIG_BIGNUM
       case JS_CLASS_BIG_INT64_ARRAY:
         if (unlikely(idx >= p->u.array.count)) goto slow_path;
         return LEPUS_NewBigInt64(ctx, p->u.array.u.int64_ptr[idx]);
       case JS_CLASS_BIG_UINT64_ARRAY:
         if (unlikely(idx >= p->u.array.count)) goto slow_path;
         return LEPUS_NewBigUint64(ctx, p->u.array.u.uint64_ptr[idx]);
-#endif
       case JS_CLASS_FLOAT32_ARRAY:
         if (unlikely(idx >= p->u.array.count)) goto slow_path;
         return __JS_NewFloat64(ctx, p->u.array.u.float_ptr[idx]);
@@ -8569,11 +8383,7 @@ int set_array_length(LEPUSContext *ctx, LEPUSObject *p, JSProperty *prop,
       }
       p->u.array.count = len;
     }
-#ifdef CONFIG_BIGNUM
-    set_value(ctx, &prop->u.value, JS_NewUint32(ctx, len));
-#else
     prop->u.value = JS_NewUint32(ctx, len);
-#endif
   } else {
     /* Note: length is always a uint32 because the object is an
        array */
@@ -8755,6 +8565,18 @@ int JS_SetPropertyGeneric(LEPUSContext *ctx, LEPUSObject *p, JSAtom prop,
                                LEPUS_UNDEFINED, LEPUS_PROP_HAS_VALUE);
     LEPUS_FreeValue(ctx, val);
     return ret;
+  } else if (p->class_id == JS_CLASS_BIG_INT64_ARRAY ||
+             p->class_id == JS_CLASS_BIG_UINT64_ARRAY) {
+    ret = JS_AtomIsNumericIndex(ctx, prop);
+    if (ret != 0) {
+      if (ret < 0) {
+        LEPUS_FreeValue(ctx, val);
+        return -1;
+      }
+      int64_t v;
+      if (JS_ToBigInt64Free(ctx, &v, val)) return -1;
+      return TRUE;
+    }
   }
 
   ret = JS_CreateProperty(ctx, p, prop, val, LEPUS_UNDEFINED, LEPUS_UNDEFINED,
@@ -8916,11 +8738,11 @@ retry:
             else
               break;
           } else if (p1->class_id >= JS_CLASS_UINT8C_ARRAY &&
-                     p1->class_id <= JS_CLASS_FLOAT64_ARRAY) {
+                     p1->class_id <= JS_CLASS_BIG_UINT64_ARRAY) {
             goto typed_array_oob;
           }
         } else if (p1->class_id >= JS_CLASS_UINT8C_ARRAY &&
-                   p1->class_id <= JS_CLASS_FLOAT64_ARRAY) {
+                   p1->class_id <= JS_CLASS_BIG_UINT64_ARRAY) {
           ret = JS_AtomIsNumericIndex(ctx, prop);
           if (ret != 0) {
             if (ret < 0) {
@@ -8928,10 +8750,20 @@ retry:
               return -1;
             }
           typed_array_oob:
-            val = JS_ToNumberFree(ctx, val);
-            LEPUS_FreeValue(ctx, val);
-            if (LEPUS_IsException(val)) return -1;
-            return FALSE;
+            if (p == p1) {
+              if (p1->class_id == JS_CLASS_BIG_UINT64_ARRAY ||
+                  p1->class_id == JS_CLASS_BIG_INT64_ARRAY) {
+                int64_t v;
+                if (JS_ToBigInt64Free(ctx, &v, val)) return -1;
+              } else {
+                val = JS_ToNumberFree(ctx, val);
+                LEPUS_FreeValue(ctx, val);
+                if (LEPUS_IsException(val)) return -1;
+              }
+            } else {
+              LEPUS_FreeValue(ctx, val);
+            }
+            return TRUE;
           }
         }
       } else {
@@ -9116,7 +8948,6 @@ int JS_SetPropertyValue(LEPUSContext *ctx, LEPUSValueConst this_obj,
         if (unlikely(idx >= (uint32_t)p->u.array.count)) goto ta_out_of_bound;
         p->u.array.u.uint32_ptr[idx] = v;
         break;
-#ifdef CONFIG_BIGNUM
       case JS_CLASS_BIG_INT64_ARRAY:
       case JS_CLASS_BIG_UINT64_ARRAY:
         /* XXX: need specific conversion function */
@@ -9127,7 +8958,6 @@ int JS_SetPropertyValue(LEPUSContext *ctx, LEPUSValueConst this_obj,
           p->u.array.u.uint64_ptr[idx] = v;
         }
         break;
-#endif
       case JS_CLASS_FLOAT32_ARRAY:
         if (JS_ToFloat64Free(ctx, &d, val)) return -1;
         if (unlikely(idx >= (uint32_t)p->u.array.count)) goto ta_out_of_bound;
@@ -9262,7 +9092,7 @@ QJS_STATIC int JS_CreateProperty(LEPUSContext *ctx, LEPUSObject *p, JSAtom prop,
         }
       }
     } else if (p->class_id >= JS_CLASS_UINT8C_ARRAY &&
-               p->class_id <= JS_CLASS_FLOAT64_ARRAY) {
+               p->class_id <= JS_CLASS_BIG_UINT64_ARRAY) {
       ret = JS_AtomIsNumericIndex(ctx, prop);
       if (ret != 0) {
         if (ret < 0) return -1;
@@ -9605,7 +9435,7 @@ redo_prop_update:
         }
       }
     } else if (p->class_id >= JS_CLASS_UINT8C_ARRAY &&
-               p->class_id <= JS_CLASS_FLOAT64_ARRAY) {
+               p->class_id <= JS_CLASS_BIG_UINT64_ARRAY) {
       LEPUSValue num;
       int ret;
 
@@ -9634,15 +9464,17 @@ redo_prop_update:
       }
       idx = __JS_AtomToUInt32(prop);
       /* if the typed array is detached, p->u.array.count = 0 */
-      if (idx >= typed_array_get_length(ctx, p)) {
+      if (idx >= p->u.array.count) {
       typed_array_oob:
         return JS_ThrowTypeErrorOrFalse(ctx, flags,
                                         "out-of-bound index in typed array");
       }
       prop_flags =
-          get_prop_flags(flags, LEPUS_PROP_ENUMERABLE | LEPUS_PROP_WRITABLE);
+          get_prop_flags(flags, LEPUS_PROP_ENUMERABLE | LEPUS_PROP_WRITABLE |
+                                    LEPUS_PROP_CONFIGURABLE);
       if (flags & (LEPUS_PROP_HAS_GET | LEPUS_PROP_HAS_SET) ||
-          prop_flags != (LEPUS_PROP_ENUMERABLE | LEPUS_PROP_WRITABLE)) {
+          prop_flags != (LEPUS_PROP_ENUMERABLE | LEPUS_PROP_WRITABLE |
+                         LEPUS_PROP_CONFIGURABLE)) {
         return JS_ThrowTypeErrorOrFalse(ctx, flags, "invalid descriptor flags");
       }
       if (flags & LEPUS_PROP_HAS_VALUE) {
@@ -10276,11 +10108,6 @@ static LEPUSValue JS_ToPrimitiveFree_RC(LEPUSContext *ctx, LEPUSValue val,
         case HINT_NONE:
           atom = JS_ATOM_default;
           break;
-#ifdef CONFIG_BIGNUM
-        case HINT_INTEGER:
-          atom = JS_ATOM_integer;
-          break;
-#endif
       }
       arg = LEPUS_AtomToString(ctx, atom);
       ret = JS_CallFree(ctx, method, val, 1, (LEPUSValueConst *)&arg);
@@ -10351,26 +10178,23 @@ static int JS_ToBoolFree_RC(LEPUSContext *ctx, LEPUSValue val) {
       LEPUS_FreeValue(ctx, val);
       return ret;
     }
-#ifdef CONFIG_BIGNUM
-    case LEPUS_TAG_BIG_INT:
-    case LEPUS_TAG_BIG_FLOAT: {
-      JSBigFloat *p = static_cast<JSBigFloat *>(LEPUS_VALUE_GET_PTR(val));
-      BOOL ret;
-      ret = p->num.expn != BF_EXP_ZERO && p->num.expn != BF_EXP_NAN;
-      LEPUS_FreeValue(ctx, val);
-      return ret;
-    }
-#endif
-// <Primjs begin>
-#ifdef ENABLE_LEPUSNG
     case LEPUS_TAG_BIG_INT: {
-      JSBigFloat *p = static_cast<JSBigFloat *>(LEPUS_VALUE_GET_PTR(val));
-      BOOL ret = p->num == 0 ? FALSE : TRUE;
+      JSBigInt *p = static_cast<JSBigInt *>(LEPUS_VALUE_GET_PTR(val));
+      BOOL ret;
+      int32_t i;
+      ret = FALSE;
+      /* fail safe: we assume it is not necessarily
+         normalized. Beginning from the MSB ensures that the
+         test is fast. */
+      for (i = p->len - 1; i >= 0; --i) {
+        if (p->tab[i] != 0) {
+          ret = TRUE;
+          break;
+        }
+      }
       LEPUS_FreeValue(ctx, val);
       return ret;
     }
-#endif
-      // <Primjs end>
     default:
       if (LEPUS_TAG_IS_FLOAT64(tag)) {
         double d = LEPUS_VALUE_GET_FLOAT64(val);
@@ -10411,255 +10235,21 @@ int skip_spaces(const char *pc) {
   return p - p_start;
 }
 
-#ifdef CONFIG_BIGNUM
-
-/* force big int type if integer result */
-#define BF_ATOF_BIG_INT (1 << 30)
-/* return LEPUS_EXCEPTION if invalid syntax. Otherwise return NaN */
-#define BF_ATOF_THROW (1 << 29)
-#define BF_ATOF_FLOAT64 (1 << 28)
-
-static LEPUSValue js_atof(LEPUSContext *ctx, const char *p, const char **pp,
-                          int radix, int flags) {
-  bf_t a_s, *a = &a_s;
-  int res;
-  slimb_t prec;
-  LEPUSValue val;
-
-  bf_init(ctx->bf_ctx, a);
-  if (flags & BF_ATOF_FLOAT64) {
-    prec = 53;
-    flags |= bf_set_exp_bits(11) | BF_RNDN | BF_FLAG_SUBNORMAL;
-  } else {
-    /* use the current precision */
-    prec = ctx->fp_env.prec;
-    flags |= ctx->fp_env.flags;
-  }
-  p += skip_spaces(p);
-  res = bf_atof(a, p, &p, radix, prec, flags);
-  if ((flags & BF_ATOF_THROW) && bf_is_nan(a)) {
-    bf_delete(a);
-    return LEPUS_EXCEPTION;
-  }
-  if (res & BF_ATOF_ST_INTEGER) {
-    val = JS_NewBigInt2(ctx, a, (flags & BF_ATOF_BIG_INT) != 0);
-  } else if (flags & BF_ATOF_FLOAT64) {
-    double d;
-    bf_get_float64(a, &d, BF_RNDN);
-    bf_delete(a);
-    /* return int or float64 */
-    val = LEPUS_NewFloat64(ctx, d);
-  } else {
-    val = JS_NewBigFloat(ctx, a);
-  }
-  if (pp) *pp = p;
-  return val;
-}
-
-#else
-
-QJS_STATIC inline int to_digit(int c) {
-  if (c >= '0' && c <= '9')
-    return c - '0';
-  else if (c >= 'A' && c <= 'Z')
-    return c - 'A' + 10;
-  else if (c >= 'a' && c <= 'z')
-    return c - 'a' + 10;
-  else
-    return 36;
-}
-
-#define ATOD_INT_ONLY (1 << 0)
-/* return LEPUS_EXCEPTION if invalid syntax. Otherwise return NaN */
-#define ATOD_THROW (1 << 1)
-/* accept Oo and Ob prefixes in addition to 0x prefix if radix = 0 */
-#define ATOD_ACCEPT_BIN_OCT (1 << 2)
-/* if set return NaN if empty number string */
-#define ATOD_NAN_IF_EMPTY (1 << 3)
-/* accept O prefix as octal if radix == 0 and properly formed (Annex B) */
-#define ATOD_ACCEPT_LEGACY_OCTAL (1 << 4)
-/* accept _ between digits as a digit separator */
-#define ATOD_ACCEPT_UNDERSCORES (1 << 5)
-
-/* radix = 0 accepts prefixes. radix = 16 also
-   accepts 0x prefix. radix must be 0 or between 2 and 36 */
-LEPUSValue js_atod(LEPUSContext *ctx, const char *str, const char **pp,
-                   int radix, int flags) {
-  const char *p;
-  const char *p_start;
-  int is_neg, c, sep, has_sign = 0;
-  double d;
-
-  /* optional separator between digits */
-  sep = (flags & ATOD_ACCEPT_UNDERSCORES) ? '_' : 256;
-
-  p = str + skip_spaces(str);
-  p_start = p;
-  is_neg = 0;
-  if (p[0] == '+') {
-    p++;
-    p_start++;
-    has_sign = 1;
-    if (!(flags & ATOD_INT_ONLY)) goto no_radix_prefix;
-  } else if (p[0] == '-') {
-    is_neg = 1;
-    p++;
-    p_start++;
-    has_sign = 1;
-    if (!(flags & ATOD_INT_ONLY)) goto no_radix_prefix;
-  }
-  if (p[0] == '0') {
-    if ((p[1] == 'x' || p[1] == 'X') && (radix == 0 || radix == 16)) {
-      p += 2;
-      radix = 16;
-    } else if ((p[1] == 'o' || p[1] == 'O') && radix == 0 &&
-               (flags & ATOD_ACCEPT_BIN_OCT)) {
-      p += 2;
-      radix = 8;
-    } else if ((p[1] == 'b' || p[1] == 'B') && radix == 0 &&
-               (flags & ATOD_ACCEPT_BIN_OCT)) {
-      p += 2;
-      radix = 2;
-    } else if ((p[1] >= '0' && p[1] <= '9') && radix == 0 &&
-               (flags & ATOD_ACCEPT_LEGACY_OCTAL)) {
-      int i;
-      sep = 256;
-      for (i = 1; (p[i] >= '0' && p[i] <= '7'); i++) continue;
-      if (p[i] == '8' || p[i] == '9') goto no_prefix;
-      p += 1;
-      radix = 8;
-    } else {
-      goto no_prefix;
-    }
-    /* there must be a digit after the prefix */
-    if (to_digit((uint8_t)*p) >= radix) goto fail;
-  no_prefix:;
-  } else {
-  no_radix_prefix:
-    if (!(flags & ATOD_INT_ONLY) && strstart(p, "Infinity", &p)) {
-      d = 1.0 / 0.0;
-      goto done;
-    }
-  }
-  if (radix == 0) radix = 10;
-  if ((flags & ATOD_INT_ONLY) || radix != 10) {
-    uint64_t n_max, n;
-    int int_exp;
-
-    /* skip leading zeros */
-    while (*p == '0') p++;
-    n = 0;
-    if (radix == 10)
-      n_max = ((uint64_t)-1 - 9) / 10; /* most common case */
-    else
-      n_max = ((uint64_t)-1 - (radix - 1)) / radix;
-    /* XXX: could be more precise */
-    int_exp = 0;
-    while (*p != '\0') {
-      if (*p == sep && to_digit(p[1]) < radix) p++;
-      c = to_digit((uint8_t)*p);
-      if (c >= radix) break;
-      if (n <= n_max) {
-        n = n * radix + c;
-      } else {
-        int_exp++;
-      }
-      p++;
-    }
-    d = n;
-    if (int_exp != 0) {
-      d *= pow(radix, int_exp);
-    }
-  } else {
-    p_start = p;
-    while (is_digit((uint8_t)*p) ||
-           (*p == sep && (p != p_start + 1 || p[-1] != '0') &&
-            is_digit((uint8_t)p[1]))) {
-      p++;
-    }
-    if (*p == '.' && (p > p_start || is_digit((uint8_t)p[1]))) {
-      p++;
-      if (*p == sep) goto fail;
-      while (is_digit((uint8_t)*p) || (*p == sep && is_digit((uint8_t)p[1])))
-        p++;
-    }
-    if (p > p_start && (*p == 'e' || *p == 'E')) {
-      const char *p1 = p + 1;
-      if (*p1 == '+') {
-        p1++;
-      } else if (*p1 == '-') {
-        p1++;
-      }
-      if (is_digit((uint8_t)*p1)) {
-        p = p1 + 1;
-        while (is_digit((uint8_t)*p) || (*p == sep && is_digit((uint8_t)p[1])))
-          p++;
-      }
-    }
-    if (*p == '\0' && sep != '_') {
-      d = strtod(p_start, NULL);
-    } else {
-      char buf1[64], *buf;
-      int i, j, len;
-      BOOL buf_allocated;
-
-      buf = buf1;
-      buf_allocated = FALSE;
-      len = p - p_start;
-      if (len >= sizeof(buf1)) {
-        buf = static_cast<char *>(
-            lepus_malloc(ctx, len + 1, ALLOC_TAG_WITHOUT_PTR));
-        if (!buf) return LEPUS_EXCEPTION;
-        buf_allocated = TRUE;
-      }
-      for (i = j = 0; i < len; i++) {
-        if (p_start[i] != '_') buf[j++] = p_start[i];
-      }
-      buf[j] = '\0';
-      d = strtod(buf, NULL);
-      if (buf_allocated && !ctx->gc_enable) lepus_free(ctx, buf);
-    }
-  }
-done:
-  if (is_neg) d = -d;
-  if (p == p_start && (flags & ATOD_NAN_IF_EMPTY || has_sign)) {
-    d = LEPUS_FLOAT64_NAN;
-  }
-  if (pp) *pp = p;
-  return LEPUS_NewFloat64(ctx, d);
-fail:
-  if (pp) *pp = p;
-  if (flags & ATOD_THROW)
-    return LEPUS_EXCEPTION;
-  else
-    return LEPUS_NAN;
-}
-#endif
-
-typedef enum JSToNumberHintEnum {
-  TON_FLAG_NUMBER,
-  TON_FLAG_INTEGER,
-  TON_FLAG_NUMERIC,
-} JSToNumberHintEnum;
-
 QJS_STATIC LEPUSValue JS_ToNumberHintFree(LEPUSContext *ctx, LEPUSValue val,
                                           JSToNumberHintEnum flag) {
   int64_t tag;
   LEPUSValue ret;
-  int hint;
 
 redo:
   tag = LEPUS_VALUE_GET_NORM_TAG(val);
   switch (tag) {
-#ifdef CONFIG_BIGNUM
     case LEPUS_TAG_BIG_INT:
-      if (flag == TON_FLAG_NUMBER && !is_bignum_mode(ctx)) {
+      if (flag != TON_FLAG_NUMERIC) {
         LEPUS_FreeValue(ctx, val);
         return LEPUS_ThrowTypeError(ctx, "cannot convert bigint to number");
       }
-      /* fall thru */
-    case LEPUS_TAG_BIG_FLOAT:
-#endif
+      ret = val;
+      break;
     case LEPUS_TAG_FLOAT64:
     case LEPUS_TAG_INT:
     case LEPUS_TAG_EXCEPTION:
@@ -10675,46 +10265,39 @@ redo:
       ret = LEPUS_NAN;
       break;
     case LEPUS_TAG_OBJECT:
-#ifdef CONFIG_BIGNUM
-      hint = flag == TON_FLAG_INTEGER ? HINT_INTEGER : HINT_NUMBER;
-#else
-      hint = HINT_NUMBER;
-#endif
-      val = JS_ToPrimitiveFree_RC(ctx, val, hint);
+      val = JS_ToPrimitiveFree_RC(ctx, val, HINT_NUMBER);
       if (LEPUS_IsException(val)) return LEPUS_EXCEPTION;
       goto redo;
+    case LEPUS_TAG_SEPARABLE_STRING: {
+      auto content = JS_GetSeparableStringContent(ctx, val);
+      LEPUS_FreeValue(ctx, val);
+      val = content;
+      goto redo;
+    }
     case LEPUS_TAG_STRING: {
       const char *str;
       const char *p;
+      size_t len;
 
-      str = JS_ToCStringLen2_RC(ctx, NULL, val, 0);
+      str = JS_ToCStringLen2_RC(ctx, &len, val, 0);
       LEPUS_FreeValue(ctx, val);
       if (!str) return LEPUS_EXCEPTION;
-#ifdef CONFIG_BIGNUM
-      {
-        int flags;
-        flags = BF_ATOF_BIN_OCT | BF_ATOF_NO_PREFIX_AFTER_SIGN |
-                BF_ATOF_JS_QUIRKS | BF_ATOF_FLOAT64;
-        if (is_bignum_mode(ctx))
-          flags |= BF_ATOF_INT_PREC_INF;
-        else
-          flags |= BF_ATOF_ONLY_DEC_FLOAT;
-        ret = js_atof(ctx, str, &p, 0, flags);
-      }
-#else
-      ret = js_atod(ctx, str, &p, 0, ATOD_ACCEPT_BIN_OCT);
-#endif
+      p = str;
       p += skip_spaces(p);
-      if (*p != '\0') {
-        LEPUS_FreeValue(ctx, ret);
-        ret = LEPUS_NAN;
+      if ((p - str) == len) {
+        ret = LEPUS_NewInt32(ctx, 0);
+      } else {
+        int flags = ATOD_ACCEPT_BIN_OCT;
+        ret = js_atof(ctx, p, &p, 0, flags);
+        if (!LEPUS_IsException(ret)) {
+          p += skip_spaces(p);
+          if ((p - str) != len) {
+            LEPUS_FreeValue(ctx, ret);
+            ret = LEPUS_NAN;
+          }
+        }
       }
       LEPUS_FreeCString(ctx, str);
-    } break;
-    case LEPUS_TAG_SEPARABLE_STRING: {
-      auto content = JS_GetSeparableStringContent(ctx, val);
-      ret = JS_ToNumberHintFree(ctx, content, flag);
-      LEPUS_FreeValue(ctx, val);
     } break;
     case LEPUS_TAG_SYMBOL:
       LEPUS_FreeValue(ctx, val);
@@ -10731,7 +10314,6 @@ QJS_STATIC LEPUSValue JS_ToNumberFree(LEPUSContext *ctx, LEPUSValue val) {
   return JS_ToNumberHintFree(ctx, val, TON_FLAG_NUMBER);
 }
 
-#ifdef CONFIG_BIGNUM
 static LEPUSValue JS_ToNumericFree(LEPUSContext *ctx, LEPUSValue val) {
   return JS_ToNumberHintFree(ctx, val, TON_FLAG_NUMERIC);
 }
@@ -10739,7 +10321,6 @@ static LEPUSValue JS_ToNumericFree(LEPUSContext *ctx, LEPUSValue val) {
 static LEPUSValue JS_ToNumeric(LEPUSContext *ctx, LEPUSValueConst val) {
   return JS_ToNumericFree(ctx, LEPUS_DupValue(ctx, val));
 }
-#endif
 
 QJS_STATIC __exception int __JS_ToFloat64Free(LEPUSContext *ctx, double *pres,
                                               LEPUSValue val) {
@@ -10747,10 +10328,7 @@ QJS_STATIC __exception int __JS_ToFloat64Free(LEPUSContext *ctx, double *pres,
   int64_t tag;
 
   val = JS_ToNumberFree(ctx, val);
-  if (LEPUS_IsException(val)) {
-    *pres = LEPUS_FLOAT64_NAN;
-    return -1;
-  }
+  if (LEPUS_IsException(val)) goto fail;
   tag = LEPUS_VALUE_GET_NORM_TAG(val);
   switch (tag) {
     case LEPUS_TAG_INT:
@@ -10759,22 +10337,14 @@ QJS_STATIC __exception int __JS_ToFloat64Free(LEPUSContext *ctx, double *pres,
     case LEPUS_TAG_FLOAT64:
       d = LEPUS_VALUE_GET_FLOAT64(val);
       break;
-#ifdef CONFIG_BIGNUM
-    case LEPUS_TAG_BIG_INT:
-    case LEPUS_TAG_BIG_FLOAT: {
-      JSBigFloat *p = static_cast<JSBigFloat *>(LEPUS_VALUE_GET_PTR(val));
-      /* XXX: there can be a double rounding issue with some
-         primitives (such as JS_ToUint8ClampFree()), but it is
-         not critical to fix it. */
-      bf_get_float64(&p->num, &d, BF_RNDN);
-      LEPUS_FreeValue(ctx, val);
-    } break;
-#endif
     default:
       abort();
   }
   *pres = d;
   return 0;
+fail:
+  *pres = LEPUS_FLOAT64_NAN;
+  return -1;
 }
 
 QJS_STATIC inline int JS_ToFloat64Free(LEPUSContext *ctx, double *pres,
@@ -10834,36 +10404,7 @@ redo:
         ret = LEPUS_NewFloat64(ctx, d);
       }
     } break;
-#ifdef CONFIG_BIGNUM
-    case LEPUS_TAG_BIG_INT:
-      if (!is_bignum_mode(ctx)) goto to_number;
-      ret = val;
-      break;
-    case LEPUS_TAG_BIG_FLOAT: {
-      bf_t a_s, *a, r_s, *r = &r_s;
-      BOOL is_float, is_nan;
-
-      a = JS_ToBigFloat(ctx, &is_float, &a_s, val);
-      if (!bf_is_finite(a)) {
-        is_nan = bf_is_nan(a);
-        if (is_nan)
-          ret = LEPUS_NewInt32(ctx, 0);
-        else
-          ret = LEPUS_DupValue(ctx, val);
-      } else {
-        bf_init(ctx->bf_ctx, r);
-        bf_set(r, a);
-        bf_rint(r, BF_PREC_INF, BF_RNDZ);
-        ret = JS_NewBigInt(ctx, r);
-      }
-      if (a == &a_s) bf_delete(a);
-      LEPUS_FreeValue(ctx, val);
-    } break;
-#endif
     default:
-#ifdef CONFIG_BIGNUM
-    to_number:
-#endif
       val = JS_ToNumberFree(ctx, val);
       if (LEPUS_IsException(val)) return val;
       goto redo;
@@ -10905,17 +10446,6 @@ redo:
           ret = (int)d;
       }
     } break;
-#ifdef CONFIG_BIGNUM
-    case LEPUS_TAG_BIG_FLOAT:
-    to_bf: {
-      JSBigFloat *p = static_cast<JSBigFloat *>(LEPUS_VALUE_GET_PTR(val));
-      bf_get_int32(&ret, &p->num, 0);
-      LEPUS_FreeValue(ctx, val);
-    } break;
-    case LEPUS_TAG_BIG_INT:
-      if (is_bignum_mode(ctx)) goto to_bf;
-        /* fall thru */
-#endif
     default:
       val = JS_ToNumberFree(ctx, val);
       if (LEPUS_IsException(val)) {
@@ -10982,18 +10512,6 @@ redo:
       }
     }
       return 0;
-#ifdef CONFIG_BIGNUM
-    case LEPUS_TAG_BIG_FLOAT:
-    to_bf: {
-      JSBigFloat *p = static_cast<JSBigFloat *>(LEPUS_VALUE_GET_PTR(val));
-      bf_get_int64(pres, &p->num, 0);
-      LEPUS_FreeValue(ctx, val);
-    }
-      return 0;
-    case LEPUS_TAG_BIG_INT:
-      if (is_bignum_mode(ctx)) goto to_bf;
-        /* fall thru */
-#endif
     default:
       val = JS_ToNumberFree(ctx, val);
       if (LEPUS_IsException(val)) {
@@ -11065,27 +10583,6 @@ redo:
         ret = 0; /* also handles NaN and +inf */
       }
     } break;
-#ifdef CONFIG_BIGNUM
-    case LEPUS_TAG_BIG_FLOAT:
-    to_bf: {
-      JSBigFloat *p = static_cast<JSBigFloat *>(LEPUS_VALUE_GET_PTR(val));
-      bf_get_int64(&ret, &p->num, BF_GET_INT_MOD);
-      LEPUS_FreeValue(ctx, val);
-    } break;
-    case LEPUS_TAG_BIG_INT:
-      if (is_bignum_mode(ctx)) goto to_bf;
-        /* fall thru */
-#else
-#ifdef ENABLE_LEPUSNG
-    // <Primjs change>
-    case LEPUS_TAG_BIG_INT: {
-      JSBigFloat *p = static_cast<JSBigFloat *>(LEPUS_VALUE_GET_PTR(val));
-      ret = p->num;
-      LEPUS_FreeValue(ctx, val);
-      break;
-    }
-#endif
-#endif
     default:
       val = JS_ToNumberFree(ctx, val);
       if (LEPUS_IsException(val)) {
@@ -11100,7 +10597,7 @@ redo:
 
 // <Primjs begin>
 void LEPUS_SetNoStrictMode(LEPUSContext *ctx) {
-  ctx->no_lepus_strict_mode = TRUE;
+  ctx->no_lepus_strict_mode = true;
 }
 // <Primjs end>
 
@@ -11151,17 +10648,6 @@ redo:
         ret = 0; /* also handles NaN and +inf */
       }
     } break;
-#ifdef CONFIG_BIGNUM
-    case LEPUS_TAG_BIG_FLOAT:
-    to_bf: {
-      JSBigFloat *p = static_cast<JSBigFloat *>(LEPUS_VALUE_GET_PTR(val));
-      bf_get_int32(&ret, &p->num, BF_GET_INT_MOD);
-      LEPUS_FreeValue(ctx, val);
-    } break;
-    case LEPUS_TAG_BIG_INT:
-      if (is_bignum_mode(ctx)) goto to_bf;
-        /* fall thru */
-#endif
     default:
       val = JS_ToNumberFree(ctx, val);
       if (LEPUS_IsException(val)) {
@@ -11203,9 +10689,6 @@ redo:
     case LEPUS_TAG_NULL:
     case LEPUS_TAG_UNDEFINED:
       res = 0;
-#ifdef CONFIG_BIGNUM
-    int_clamp:
-#endif
       res = max_int(0, min_int(255, res));
       break;
     case LEPUS_TAG_FLOAT64: {
@@ -11221,30 +10704,7 @@ redo:
           res = lrint(d);
       }
     } break;
-#ifdef CONFIG_BIGNUM
-    case LEPUS_TAG_BIG_INT: {
-      JSBigFloat *p = static_cast<JSBigFloat *>(LEPUS_VALUE_GET_PTR(val));
-      if (!is_bignum_mode(ctx)) goto to_number;
-      bf_get_int32(&res, &p->num, 0);
-      LEPUS_FreeValue(ctx, val);
-    }
-      goto int_clamp;
-    case LEPUS_TAG_BIG_FLOAT: {
-      JSBigFloat *p = static_cast<JSBigFloat *>(LEPUS_VALUE_GET_PTR(val));
-      bf_t r_s, *r = &r_s;
-      bf_init(ctx->bf_ctx, r);
-      bf_set(r, &p->num);
-      bf_rint(r, BF_PREC_INF, BF_RNDN);
-      bf_get_int32(&res, r, 0);
-      bf_delete(r);
-      LEPUS_FreeValue(ctx, val);
-    }
-      goto int_clamp;
-#endif
     default:
-#ifdef CONFIG_BIGNUM
-    to_number:
-#endif
       val = JS_ToNumberFree(ctx, val);
       if (LEPUS_IsException(val)) {
         *pres = 0;
@@ -11280,21 +10740,6 @@ QJS_STATIC __exception int JS_ToArrayLengthFree(LEPUSContext *ctx,
       v = 0;
       len = v;
     } break;
-#ifdef CONFIG_BIGNUM
-    case LEPUS_TAG_BIG_INT:
-    case LEPUS_TAG_BIG_FLOAT: {
-      JSBigFloat *p = static_cast<JSBigFloat *>(LEPUS_VALUE_GET_PTR(val));
-      bf_t a;
-      BOOL res;
-      bf_get_int32((int32_t *)&len, &p->num, BF_GET_INT_MOD);
-      bf_init(ctx->bf_ctx, &a);
-      bf_set_ui(&a, len);
-      res = bf_cmp_eq(&a, &p->num);
-      bf_delete(&a);
-      LEPUS_FreeValue(ctx, val);
-      if (!res) goto fail;
-    } break;
-#endif
     default:
       if (LEPUS_TAG_IS_FLOAT64(tag)) {
         double d;
@@ -11380,352 +10825,15 @@ QJS_STATIC BOOL JS_NumberIsNegativeOrMinusZero(LEPUSContext *ctx,
       u.d = LEPUS_VALUE_GET_FLOAT64(val);
       return (u.u64 >> 63);
     }
-#ifdef CONFIG_BIGNUM
     case LEPUS_TAG_BIG_INT: {
-      JSBigFloat *p = static_cast<JSBigFloat *>(LEPUS_VALUE_GET_PTR(val));
-      /* Note: integer zeros are not necessarily positive */
-      return p->num.sign && !bf_is_zero(&p->num);
+      JSBigInt *p = LEPUS_VALUE_GET_BIGINT(val);
+      return js_bigint_sign(p);
     }
-    case LEPUS_TAG_BIG_FLOAT: {
-      JSBigFloat *p = static_cast<JSBigFloat *>(LEPUS_VALUE_GET_PTR(val));
-      return p->num.sign;
-    } break;
-#endif
+
     default:
       return FALSE;
   }
 }
-
-#ifdef CONFIG_BIGNUM
-static inline char *js_ftoa1(LEPUSContext *ctx, LEPUSValueConst val1, int radix,
-                             limb_t prec, bf_flags_t flags) {
-  LEPUSValue val;
-  bf_t a_s, *a;
-  BOOL is_float;
-  char *str;
-  int saved_sign;
-
-  val = JS_ToNumeric(ctx, val1);
-  if (LEPUS_IsException(val)) return nullptr;
-  HandleScope func_scope(ctx, &val, HANDLE_TYPE_LEPUS_VALUE);
-  a = JS_ToBigFloat(ctx, &is_float, &a_s, val);
-  saved_sign = a->sign;
-  if (a->expn == BF_EXP_ZERO) a->sign = 0;
-  flags |= BF_FTOA_JS_QUIRKS;
-  if ((flags & BF_FTOA_FORMAT_MASK) == BF_FTOA_FORMAT_FREE_MIN) {
-    /* Note: for floating point numbers with a radix which is not
-       a power of two, the current precision is used to compute
-       the number of digits. For integers, the full precision is
-       always returned. */
-    if (is_float || (flags & BF_FTOA_FORCE_EXP)) {
-      if ((radix & (radix - 1)) != 0) {
-        bf_t r_s, *r = &r_s;
-        int prec, flags1;
-        /* must round first */
-        if (LEPUS_VALUE_GET_TAG(val) == LEPUS_TAG_BIG_FLOAT) {
-          prec = ctx->fp_env.prec;
-          flags1 =
-              ctx->fp_env.flags &
-              (BF_FLAG_SUBNORMAL | (BF_EXP_BITS_MASK << BF_EXP_BITS_SHIFT));
-        } else {
-          prec = 53;
-          flags1 = bf_set_exp_bits(11) | BF_FLAG_SUBNORMAL;
-        }
-        bf_init(ctx->bf_ctx, r);
-        bf_set(r, a);
-        bf_round(r, prec, flags1 | BF_RNDN);
-        bf_ftoa(&str, r, radix, prec, flags1 | flags);
-        bf_delete(r);
-      } else {
-        bf_ftoa(&str, a, radix, BF_PREC_INF, flags);
-      }
-    } else {
-      bf_ftoa(&str, a, radix, 0,
-              BF_RNDZ | BF_FTOA_FORMAT_FRAC | BF_FTOA_JS_QUIRKS);
-    }
-  } else {
-    bf_ftoa(&str, a, radix, prec, flags);
-  }
-  a->sign = saved_sign;
-  if (a == &a_s) bf_delete(a);
-  if (!ctx->gc_enable) LEPUS_FreeValue(ctx, val);
-  return str;
-}
-
-static LEPUSValue js_ftoa(LEPUSContext *ctx, LEPUSValueConst val1, int radix,
-                          limb_t prec, bf_flags_t flags) {
-  char *str = js_ftoa1(ctx, val1, radix, prec, flags);
-  if (!str) return LEPUS_EXCEPTION;
-  LEPUSValue ret = LEPUS_NewString(ctx, str);
-  bf_realloc(ctx->bf_ctx, str, 0);
-  return ret;
-}
-
-#else /* !CONFIG_BIGNUM */
-
-/* 2 <= base <= 36 */
-QJS_STATIC char *i64toa(char *buf_end, int64_t n, unsigned int base) {
-  char *q = buf_end;
-  int digit, is_neg;
-
-  is_neg = 0;
-  if (n < 0) {
-    is_neg = 1;
-    n = -n;
-  }
-  *--q = '\0';
-  do {
-    digit = (uint64_t)n % base;
-    n = (uint64_t)n / base;
-    if (digit < 10)
-      digit += '0';
-    else
-      digit += 'a' - 10;
-    *--q = digit;
-  } while (n != 0);
-  if (is_neg) *--q = '-';
-  return q;
-}
-
-/* buf1 contains the printf result */
-QJS_STATIC void js_ecvt1(double d, int n_digits, int *decpt, int *sign,
-                         char *buf, int rounding_mode, char *buf1,
-                         int buf1_size) {
-  if (rounding_mode != FE_TONEAREST) {
-#ifndef LYNX_ARMEABI
-    fesetround(rounding_mode);
-#endif
-  }
-  snprintf(buf1, buf1_size, "%+.*e", n_digits - 1, d);
-  if (rounding_mode != FE_TONEAREST) {
-#ifndef LYNX_ARMEABI
-    fesetround(FE_TONEAREST);
-#endif
-  }
-  *sign = (buf1[0] == '-');
-  /* mantissa */
-  buf[0] = buf1[1];
-  if (n_digits > 1) memcpy(buf + 1, buf1 + 3, n_digits - 1);
-  buf[n_digits] = '\0';
-  /* exponent */
-  *decpt = atoi(buf1 + n_digits + 2 + (n_digits > 1)) + 1;
-}
-
-/* maximum buffer size for js_dtoa */
-#define JS_DTOA_BUF_SIZE 128
-
-/* needed because ecvt usually limits the number of digits to
-   17. Return the number of digits. */
-QJS_STATIC int js_ecvt(double d, int n_digits, int *decpt, int *sign, char *buf,
-                       BOOL is_fixed) {
-  int rounding_mode;
-  char buf_tmp[JS_DTOA_BUF_SIZE];
-
-  if (!is_fixed) {
-    unsigned int n_digits_min, n_digits_max;
-    /* find the minimum amount of digits (XXX: inefficient but simple) */
-    n_digits_min = 1;
-    n_digits_max = 17;
-    while (n_digits_min < n_digits_max) {
-      n_digits = (n_digits_min + n_digits_max) / 2;
-      js_ecvt1(d, n_digits, decpt, sign, buf, FE_TONEAREST, buf_tmp,
-               sizeof(buf_tmp));
-      if (strtod(buf_tmp, NULL) == d) {
-        /* no need to keep the trailing zeros */
-        while (n_digits >= 2 && buf[n_digits - 1] == '0') n_digits--;
-        n_digits_max = n_digits;
-      } else {
-        n_digits_min = n_digits + 1;
-      }
-    }
-    n_digits = n_digits_max;
-    rounding_mode = FE_TONEAREST;
-  } else {
-    rounding_mode = FE_TONEAREST;
-#ifdef CONFIG_PRINTF_RNDN
-    {
-      char buf1[JS_DTOA_BUF_SIZE], buf2[JS_DTOA_BUF_SIZE];
-      int decpt1, sign1, decpt2, sign2;
-      /* The LEPUS rounding is specified as round to nearest ties away
-         from zero (RNDNA), but in printf the "ties" case is not
-         specified (for example it is RNDN for glibc, RNDNA for
-         Windows), so we must round manually. */
-      js_ecvt1(d, n_digits + 1, &decpt1, &sign1, buf1, FE_TONEAREST, buf_tmp,
-               sizeof(buf_tmp));
-      /* XXX: could use 2 digits to reduce the average running time */
-      if (buf1[n_digits] == '5') {
-        js_ecvt1(d, n_digits + 1, &decpt1, &sign1, buf1, FE_DOWNWARD, buf_tmp,
-                 sizeof(buf_tmp));
-        js_ecvt1(d, n_digits + 1, &decpt2, &sign2, buf2, FE_UPWARD, buf_tmp,
-                 sizeof(buf_tmp));
-        if (memcmp(buf1, buf2, n_digits + 1) == 0 && decpt1 == decpt2) {
-          /* exact result: round away from zero */
-          if (sign1)
-            rounding_mode = FE_DOWNWARD;
-          else
-            rounding_mode = FE_UPWARD;
-        }
-      }
-    }
-#endif /* CONFIG_PRINTF_RNDN */
-  }
-  js_ecvt1(d, n_digits, decpt, sign, buf, rounding_mode, buf_tmp,
-           sizeof(buf_tmp));
-  return n_digits;
-}
-
-QJS_STATIC int js_fcvt1(char *buf, int buf_size, double d, int n_digits,
-                        int rounding_mode) {
-  int n;
-  if (rounding_mode != FE_TONEAREST) {
-#ifndef LYNX_ARMEABI
-    fesetround(rounding_mode);
-#endif
-  }
-  n = snprintf(buf, buf_size, "%.*f", n_digits, d);
-  if (rounding_mode != FE_TONEAREST) {
-#ifndef LYNX_ARMEABI
-    fesetround(FE_TONEAREST);
-#endif
-  }
-  assert(n < buf_size);
-  return n;
-}
-
-QJS_STATIC void js_fcvt(char *buf, int buf_size, double d, int n_digits) {
-  int rounding_mode;
-  rounding_mode = FE_TONEAREST;
-#ifdef CONFIG_PRINTF_RNDN
-  {
-    int n1, n2;
-    char buf1[JS_DTOA_BUF_SIZE];
-    char buf2[JS_DTOA_BUF_SIZE];
-
-    /* The LEPUS rounding is specified as round to nearest ties away from
-       zero (RNDNA), but in printf the "ties" case is not specified
-       (for example it is RNDN for glibc, RNDNA for Windows), so we
-       must round manually. */
-    n1 = js_fcvt1(buf1, sizeof(buf1), d, n_digits + 1, FE_TONEAREST);
-    rounding_mode = FE_TONEAREST;
-    /* XXX: could use 2 digits to reduce the average running time */
-    if (buf1[n1 - 1] == '5') {
-      n1 = js_fcvt1(buf1, sizeof(buf1), d, n_digits + 1, FE_DOWNWARD);
-      n2 = js_fcvt1(buf2, sizeof(buf2), d, n_digits + 1, FE_UPWARD);
-      if (n1 == n2 && memcmp(buf1, buf2, n1) == 0) {
-        /* exact result: round away from zero */
-        if (buf1[0] == '-')
-          rounding_mode = FE_DOWNWARD;
-        else
-          rounding_mode = FE_UPWARD;
-      }
-    }
-  }
-#endif /* CONFIG_PRINTF_RNDN */
-  js_fcvt1(buf, buf_size, d, n_digits, rounding_mode);
-}
-
-/* radix != 10 is only supported with flags = JS_DTOA_VAR_FORMAT */
-/* use as many digits as necessary */
-#define JS_DTOA_VAR_FORMAT (0 << 0)
-/* use n_digits significant digits (1 <= n_digits <= 101) */
-#define JS_DTOA_FIXED_FORMAT (1 << 0)
-/* force fractional format: [-]dd.dd with n_digits fractional digits */
-#define JS_DTOA_FRAC_FORMAT (2 << 0)
-/* force exponential notation either in fixed or variable format */
-#define JS_DTOA_FORCE_EXP (1 << 2)
-
-/* XXX: slow and maybe not fully correct
-   XXX: radix != 10 is only supported for small integers
-*/
-void js_dtoa1(char *buf, double d, int radix, int n_digits, int flags) {
-  char *q;
-
-  if (!isfinite(d)) {
-    if (isnan(d)) {
-      strcpy(buf, "NaN");
-    } else {
-      q = buf;
-      if (d < 0) *q++ = '-';
-      strcpy(q, "Infinity");
-    }
-  } else if (flags == JS_DTOA_VAR_FORMAT) {
-    int64_t i64;
-    char buf1[70], *ptr;
-    i64 = (int64_t)d;
-    if (d != i64 || i64 > MAX_SAFE_INTEGER || i64 < -MAX_SAFE_INTEGER)
-      goto generic_conv;
-    /* fast path for integers */
-    ptr = i64toa(buf1 + sizeof(buf1), i64, radix);
-    strcpy(buf, ptr);
-  } else {
-    if (d == 0.0) d = 0.0; /* convert -0 to 0 */
-    if (flags == JS_DTOA_FRAC_FORMAT) {
-      js_fcvt(buf, JS_DTOA_BUF_SIZE, d, n_digits);
-    } else {
-      char buf1[JS_DTOA_BUF_SIZE];
-      int sign, decpt, k, n, i, p, n_max;
-      BOOL is_fixed;
-    generic_conv:
-      is_fixed = ((flags & 3) == JS_DTOA_FIXED_FORMAT);
-      if (is_fixed) {
-        n_max = n_digits;
-      } else {
-        n_max = 21;
-      }
-      /* the number has k digits (k >= 1) */
-      k = js_ecvt(d, n_digits, &decpt, &sign, buf1, is_fixed);
-      n = decpt; /* d=10^(n-k)*(buf1) i.e. d= < x.yyyy 10^(n-1) */
-      q = buf;
-      if (sign) *q++ = '-';
-      if (flags & JS_DTOA_FORCE_EXP) goto force_exp;
-      if (n >= 1 && n <= n_max) {
-        if (k <= n) {
-          memcpy(q, buf1, k);
-          q += k;
-          for (i = 0; i < (n - k); i++) *q++ = '0';
-          *q = '\0';
-        } else {
-          /* k > n */
-          memcpy(q, buf1, n);
-          q += n;
-          *q++ = '.';
-          for (i = 0; i < (k - n); i++) *q++ = buf1[n + i];
-          *q = '\0';
-        }
-      } else if (n >= -5 && n <= 0) {
-        *q++ = '0';
-        *q++ = '.';
-        for (i = 0; i < -n; i++) *q++ = '0';
-        memcpy(q, buf1, k);
-        q += k;
-        *q = '\0';
-      } else {
-      force_exp:
-        /* exponential notation */
-        *q++ = buf1[0];
-        if (k > 1) {
-          *q++ = '.';
-          for (i = 1; i < k; i++) *q++ = buf1[i];
-        }
-        *q++ = 'e';
-        p = n - 1;
-        if (p >= 0) *q++ = '+';
-        char pbuf[16];
-        snprintf(pbuf, sizeof(pbuf), "%d", p);
-        strcpy(q, pbuf);
-      }
-    }
-  }
-}
-
-QJS_STATIC LEPUSValue js_dtoa(LEPUSContext *ctx, double d, int radix,
-                              int n_digits, int flags) {
-  char buf[JS_DTOA_BUF_SIZE];
-  js_dtoa1(buf, d, radix, n_digits, flags);
-  return LEPUS_NewString(ctx, buf);
-}
-
-#endif /* !CONFIG_BIGNUM */
 
 QJS_STATIC LEPUSValue JS_ToStringInternal(LEPUSContext *ctx,
                                           LEPUSValueConst val,
@@ -11770,16 +10878,11 @@ QJS_STATIC LEPUSValue JS_ToStringInternal(LEPUSContext *ctx,
       } else {
         return LEPUS_ThrowTypeError(ctx, "cannot convert symbol to string");
       }
-#ifdef CONFIG_BIGNUM
     case LEPUS_TAG_FLOAT64:
-    case LEPUS_TAG_BIG_FLOAT:
+      return js_dtoa2(ctx, LEPUS_VALUE_GET_FLOAT64(val), 10, 0,
+                      JS_DTOA_FORMAT_FREE);
     case LEPUS_TAG_BIG_INT:
-      return js_ftoa(ctx, val, 10, 0, BF_RNDN | BF_FTOA_FORMAT_FREE_MIN);
-#else
-    case LEPUS_TAG_FLOAT64:
-      return js_dtoa(ctx, LEPUS_VALUE_GET_FLOAT64(val), 10, 0,
-                     JS_DTOA_VAR_FORMAT);
-#endif
+      return js_bigint_to_string(ctx, val);
 #ifdef ENABLE_LEPUSNG
       // <Primjs begin>
     case LEPUS_TAG_LEPUS_REF:
@@ -11789,6 +10892,7 @@ QJS_STATIC LEPUSValue JS_ToStringInternal(LEPUSContext *ctx,
       // <Primjs end>
 #endif
     default:
+      fprintf(stdout, "tag is %" PRId64 "\n", tag);
       str = "[unsupported type]";
     new_string:
       return LEPUS_NewString(ctx, str);
@@ -11946,7 +11050,7 @@ static __attribute__((unused)) void JS_DumpObject(LEPUSRuntime *rt,
         case JS_CLASS_ARGUMENTS:
           JS_DumpValueShortNoPrint(rt, p->u.array.u.values[i], dump_buf);
           break;
-        case JS_CLASS_UINT8C_ARRAY ... JS_CLASS_FLOAT64_ARRAY: {
+        case JS_CLASS_UINT8C_ARRAY ... JS_CLASS_BIG_UINT64_ARRAY: {
           int size = 1 << typed_array_size_log2(p->class_id);
           const uint8_t *b = p->u.array.u.uint8_ptr + i * size;
           while (size-- > 0) write("%02X", *b++);
@@ -12046,23 +11150,9 @@ static __attribute__((unused)) void JS_DumpValueShortNoPrint(
     case LEPUS_TAG_FLOAT64:
       write("%.14g", LEPUS_VALUE_GET_FLOAT64(val));
       break;
-#ifdef CONFIG_BIGNUM
     case LEPUS_TAG_BIG_INT: {
-      JSBigFloat *p = (JSBigFloat *)LEPUS_VALUE_GET_PTR(val);
-      char *str;
-      bf_ftoa(&str, &p->num, 10, 0, BF_RNDZ | BF_FTOA_FORMAT_FRAC);
-      write("%sn", str);
-      bf_realloc(&rt->bf_ctx, str, 0);
+      write("BigInt");
     } break;
-    case LEPUS_TAG_BIG_FLOAT: {
-      JSBigFloat *p = (JSBigFloat *)LEPUS_VALUE_GET_PTR(val);
-      char *str;
-      bf_ftoa(&str, &p->num, 16, BF_PREC_INF,
-              BF_RNDZ | BF_FTOA_FORMAT_FREE | BF_FTOA_ADD_PREFIX);
-      write("%sl", str);
-      bf_realloc(&rt->bf_ctx, str, 0);
-    } break;
-#endif
     case LEPUS_TAG_SEPARABLE_STRING: {
       write("[SeparableString(%p)]", LEPUS_VALUE_GET_PTR(val));
     } break;
@@ -12103,8 +11193,7 @@ static __attribute__((unused)) void JS_DumpValueShortNoPrint(
       break;
     }
     default:
-#if defined(__aarch64__) && !defined(OS_WIN) && !defined(CONFIG_BIGNUM) && \
-    !DISABLE_NANBOX
+#if defined(__aarch64__) && !defined(OS_WIN) && !DISABLE_NANBOX
       write("[unknown tag %p]", (void *)tag);
 #else
       write("[unknown tag %" PRId64 "]", tag);
@@ -12152,593 +11241,190 @@ int LEPUS_IsArray(LEPUSContext *ctx, LEPUSValueConst val) {
   }
 }
 
-QJS_STATIC double js_pow(double a, double b) {
-  if (unlikely(!isfinite(b)) && fabs(a) == 1) {
-    /* not compatible with IEEE 754 */
-    return LEPUS_FLOAT64_NAN;
-  } else {
-    return pow(a, b);
-  }
-}
-
-#ifdef CONFIG_BIGNUM
-
-LEPUSValue LEPUS_NewBigInt64(LEPUSContext *ctx, int64_t v) {
-  BOOL is_bignum = is_bignum_mode(ctx);
-  if (is_bignum && v == (int32_t)v) {
-    return LEPUS_NewInt32(ctx, v);
-  } else {
-    bf_t a_s, *a = &a_s;
-    bf_init(ctx->bf_ctx, a);
-    bf_set_si(a, v);
-    return JS_NewBigInt2(ctx, a, TRUE);
-  }
-}
-
-LEPUSValue LEPUS_NewBigUint64(LEPUSContext *ctx, uint64_t v) {
-  CallGCFunc(JS_NewBigUint64_GC, ctx, v);
-  BOOL is_bignum = is_bignum_mode(ctx);
-  if (is_bignum && v == (int32_t)v) {
-    return LEPUS_NewInt32(ctx, v);
-  } else {
-    bf_t a_s, *a = &a_s;
-    bf_init(ctx->bf_ctx, a);
-    bf_set_ui(a, v);
-    return JS_NewBigInt2(ctx, a, TRUE);
-  }
-}
-
-/* if the returned bigfloat is allocated it is equal to
-   'buf'. Otherwise it is a pointer to the bigfloat in 'val'. */
-static bf_t *JS_ToBigFloat(LEPUSContext *ctx, BOOL *pis_float, bf_t *buf,
-                           LEPUSValueConst val) {
-  int32_t tag;
-  bf_t *r;
-  BOOL is_float;
-  JSBigFloat *p;
-
-  tag = LEPUS_VALUE_GET_NORM_TAG(val);
-  switch (tag) {
-    case LEPUS_TAG_INT:
-    case LEPUS_TAG_BOOL:
-    case LEPUS_TAG_NULL:
-      r = buf;
-      bf_init(ctx->bf_ctx, r);
-      bf_set_si(r, LEPUS_VALUE_GET_INT(val));
-      is_float = FALSE;
-      break;
-    case LEPUS_TAG_FLOAT64:
-      r = buf;
-      bf_init(ctx->bf_ctx, r);
-      bf_set_float64(r, LEPUS_VALUE_GET_FLOAT64(val));
-      is_float = TRUE;
-      break;
-    case LEPUS_TAG_BIG_INT:
-      is_float = FALSE;
-      goto get_ptr;
-    case LEPUS_TAG_BIG_FLOAT:
-      is_float = TRUE;
-    get_ptr:
-      p = static_cast<JSBigFloat *>(LEPUS_VALUE_GET_PTR(val));
-      r = &p->num;
-      break;
-    case LEPUS_TAG_UNDEFINED:
-    default:
-      r = buf;
-      bf_init(ctx->bf_ctx, r);
-      bf_set_nan(r);
-      is_float = TRUE;
-      break;
-  }
-  *pis_float = is_float;
-  return r;
-}
-
 /* return NaN if bad bigint literal */
-static LEPUSValue JS_StringToBigInt(LEPUSContext *ctx, LEPUSValue val) {
-  const char *str;
-  const char *p;
-  int flags, err;
+LEPUSValue JS_StringToBigInt(LEPUSContext *ctx, LEPUSValue val) {
+  const char *str, *p;
+  size_t len;
+  int flags;
 
-  str = JS_ToCStringLen2_RC(ctx, NULL, val, 0);
-  LEPUS_FreeValue(ctx, val);
+  str = LEPUS_ToCStringLen2(ctx, &len, val, 0);
+  if (!ctx->gc_enable) LEPUS_FreeValue(ctx, val);
   if (!str) return LEPUS_EXCEPTION;
-  flags = BF_ATOF_BIN_OCT | BF_ATOF_NO_PREFIX_AFTER_SIGN | BF_ATOF_JS_QUIRKS |
-          BF_ATOF_INT_ONLY | BF_ATOF_INT_PREC_INF;
-  if (!is_bignum_mode(ctx)) flags |= BF_ATOF_BIG_INT;
-  val = js_atof(ctx, str, &p, 0, flags);
+  p = str;
   p += skip_spaces(p);
-  err = (*p != '\0');
-  LEPUS_FreeCString(ctx, str);
-  if (err) {
-    LEPUS_FreeValue(ctx, val);
-    val = LEPUS_NAN;
+  if ((p - str) == len) {
+    val = LEPUS_NewBigInt64(ctx, 0);
+  } else {
+    flags = ATOD_INT_ONLY | ATOD_ACCEPT_BIN_OCT | ATOD_TYPE_BIG_INT;
+    val = js_atof(ctx, p, &p, 0, flags);
+    p += skip_spaces(p);
+    if (!LEPUS_IsException(val)) {
+      if ((p - str) != len) {
+        if (!ctx->gc_enable) LEPUS_FreeValue(ctx, val);
+        val = LEPUS_NAN;
+      }
+    }
   }
+  if (!ctx->gc_enable) LEPUS_FreeCString(ctx, str);
   return val;
 }
 
-static LEPUSValue JS_StringToBigIntErr(LEPUSContext *ctx, LEPUSValue val) {
+LEPUSValue JS_StringToBigIntErr(LEPUSContext *ctx, LEPUSValue val) {
   val = JS_StringToBigInt(ctx, val);
-  if (LEPUS_VALUE_GET_TAG(val) != LEPUS_TAG_BIG_INT) {
-    LEPUS_FreeValue(ctx, val);
+  if (LEPUS_VALUE_IS_NAN(val))
     return LEPUS_ThrowSyntaxError(ctx, "invalid bigint literal");
-  }
   return val;
 }
 
 /* if the returned bigfloat is allocated it is equal to
    'buf'. Otherwise it is a pointer to the bigfloat in 'val'. */
-static bf_t *JS_ToBigIntFree(LEPUSContext *ctx, bf_t *buf, LEPUSValue val) {
-  int32_t tag;
-  bf_t *r;
-  JSBigFloat *p;
+LEPUSValue JS_ToBigIntFree(LEPUSContext *ctx, LEPUSValue val) {
+  int64_t tag;
 
 redo:
   tag = LEPUS_VALUE_GET_NORM_TAG(val);
   switch (tag) {
+    case LEPUS_TAG_BIG_INT:
+      break;
     case LEPUS_TAG_INT:
     case LEPUS_TAG_NULL:
     case LEPUS_TAG_UNDEFINED:
-      if (!is_bignum_mode(ctx)) goto fail;
-      /* fall tru */
+    case LEPUS_TAG_FLOAT64:
+      goto fail;
     case LEPUS_TAG_BOOL:
-      r = buf;
-      bf_init(ctx->bf_ctx, r);
-      bf_set_si(r, LEPUS_VALUE_GET_INT(val));
-      break;
-    case LEPUS_TAG_FLOAT64: {
-      double d = LEPUS_VALUE_GET_FLOAT64(val);
-      if (!is_bignum_mode(ctx)) goto fail;
-      if (!isfinite(d)) goto fail;
-      r = buf;
-      bf_init(ctx->bf_ctx, r);
-      d = trunc(d);
-      bf_set_float64(r, d);
-    } break;
-    case LEPUS_TAG_BIG_INT:
-      p = static_cast<JSBigFloat *>(LEPUS_VALUE_GET_PTR(val));
-      r = &p->num;
-      break;
-    case LEPUS_TAG_BIG_FLOAT:
-      if (!is_bignum_mode(ctx)) goto fail;
-      p = static_cast<JSBigFloat *>(LEPUS_VALUE_GET_PTR(val));
-      if (!bf_is_finite(&p->num)) goto fail;
-      r = buf;
-      bf_init(ctx->bf_ctx, r);
-      bf_set(r, &p->num);
-      bf_rint(r, BF_PREC_INF, BF_RNDZ);
-      LEPUS_FreeValue(ctx, val);
+      val = LEPUS_NewBigInt64(ctx, LEPUS_VALUE_GET_BOOL(val));
       break;
     case LEPUS_TAG_STRING:
     case LEPUS_TAG_SEPARABLE_STRING:
       val = JS_StringToBigIntErr(ctx, val);
-      if (LEPUS_IsException(val)) return NULL;
+      if (LEPUS_IsException(val)) return val;
       goto redo;
     case LEPUS_TAG_OBJECT:
-      val = JS_ToPrimitiveFree_RC(
-          ctx, val, is_bignum_mode(ctx) ? HINT_INTEGER : HINT_NUMBER);
-      if (LEPUS_IsException(val)) return NULL;
+      val = JS_ToPrimitiveFree(ctx, val, HINT_NUMBER);
+      if (LEPUS_IsException(val)) return val;
       goto redo;
     default:
     fail:
-      LEPUS_FreeValue(ctx, val);
-      LEPUS_ThrowTypeError(ctx, "cannot convert to bigint");
-      return NULL;
+      if (!ctx->gc_enable) LEPUS_FreeValue(ctx, val);
+      return LEPUS_ThrowTypeError(ctx, "cannot convert to bigint");
   }
-  return r;
+  return val;
 }
 
-static bf_t *JS_ToBigInt(LEPUSContext *ctx, bf_t *buf, LEPUSValueConst val) {
-  return JS_ToBigIntFree(ctx, buf, LEPUS_DupValue(ctx, val));
+static LEPUSValue JS_ToBigInt(LEPUSContext *ctx, LEPUSValueConst val) {
+  return JS_ToBigIntFree(ctx, LEPUS_DupValue(ctx, val));
 }
 
-static __attribute__((unused)) LEPUSValue JS_ToBigIntValueFree(
-    LEPUSContext *ctx, LEPUSValue val) {
-  if (LEPUS_VALUE_GET_TAG(val) == LEPUS_TAG_BIG_INT) {
-    return val;
-  } else {
-    bf_t a_s, *a;
-    a = JS_ToBigIntFree(ctx, &a_s, val);
-    if (!a) return LEPUS_EXCEPTION;
-    return JS_NewBigInt2(ctx, a, TRUE);
-  }
-}
-
-/* free the bf_t allocated by JS_ToBigInt */
-static void JS_FreeBigInt(LEPUSContext *ctx, bf_t *a, bf_t *buf) {
-  if (a == buf) {
-    bf_delete(a);
-  } else {
-    JSBigFloat *p = (JSBigFloat *)((uint8_t *)a - offsetof(JSBigFloat, num));
-    LEPUS_FreeValue(ctx, LEPUS_MKPTR(LEPUS_TAG_BIG_FLOAT, p));
-  }
-}
-
-/* XXX: merge with JS_ToInt64Free with a specific flag */
-static int JS_ToBigInt64Free(LEPUSContext *ctx, int64_t *pres, LEPUSValue val) {
-  bf_t a_s, *a;
-
-  a = JS_ToBigIntFree(ctx, &a_s, val);
-  if (!a) {
+int JS_ToBigInt64Free(LEPUSContext *ctx, int64_t *pres, LEPUSValue val) {
+  uint64_t res;
+  val = JS_ToBigIntFree(ctx, val);
+  if (LEPUS_IsException(val)) {
     *pres = 0;
     return -1;
   }
-  bf_get_int64(pres, a, BF_GET_INT_MOD);
-  JS_FreeBigInt(ctx, a, &a_s);
+
+  JSBigInt *p = (JSBigInt *)LEPUS_VALUE_GET_PTR(val);
+  /* return the value mod 2 ^ 64 */
+  res = p->tab[0];
+#if JS_LIMB_BITS == 32
+  if (p->len >= 2) res |= (uint64_t)p->tab[1] << 32;
+#endif
+  if (!ctx->gc_enable) LEPUS_FreeValue(ctx, val);
+  *pres = res;
   return 0;
 }
 
 int LEPUS_ToBigInt64(LEPUSContext *ctx, int64_t *pres, LEPUSValueConst val) {
-  CallGCFunc(JS_ToBigInt64_GC, ctx, pres, val);
   return JS_ToBigInt64Free(ctx, pres, LEPUS_DupValue(ctx, val));
 }
 
-static JSBigFloat *js_new_bf(LEPUSContext *ctx) {
-  JSBigFloat *p;
-  p = static_cast<JSBigFloat *>(
-      lepus_mallocz(ctx, sizeof(*p), ALLOC_TAG_JSBigFloat));
-  if (!p) return NULL;
-  if (!ctx->rt->gc_enable) p->header.ref_count = 1;
-  bf_init(ctx->bf_ctx, &p->num);
-  return p;
-}
-
-/* WARNING: 'a' is freed */
-static LEPUSValue JS_NewBigFloat(LEPUSContext *ctx, bf_t *a) {
-  LEPUSValue ret;
-  JSBigFloat *p;
-
-  p = js_new_bf(ctx);
-  p->num = *a;
-  ret = LEPUS_MKPTR(LEPUS_TAG_BIG_FLOAT, p);
-  return ret;
-}
-
-/* WARNING: 'a' is freed */
-static LEPUSValue JS_NewBigInt2(LEPUSContext *ctx, bf_t *a, BOOL force_bigint) {
-  LEPUSValue ret;
-  JSBigFloat *p;
-  int32_t v;
-
-  if (!force_bigint && bf_get_int32(&v, a, 0) == 0) {
-    /* can fit in an int32 */
-    ret = LEPUS_NewInt32(ctx, v);
-    bf_delete(a);
-  } else {
-    p = js_new_bf(ctx);
-    p->num = *a;
-    /* normalize the zero representation */
-    if (bf_is_zero(&p->num)) p->num.sign = 0;
-    ret = LEPUS_MKPTR(LEPUS_TAG_BIG_INT, p);
-  }
-  return ret;
-}
-
-static LEPUSValue JS_NewBigInt(LEPUSContext *ctx, bf_t *a) {
-  return JS_NewBigInt2(ctx, a, FALSE);
-}
-
-/* return < 0 if exception, 0 if overloading method, 1 if overloading
-   operator called */
-static __exception int js_call_binary_op_fallback(LEPUSContext *ctx,
-                                                  LEPUSValue *pret,
-                                                  LEPUSValueConst op1,
-                                                  LEPUSValueConst op2,
-                                                  OPCodeEnum op) {
-  JSAtom op_name;
-  LEPUSValue method, ret, c1, c2;
-  BOOL bool_result, swap_op;
-  LEPUSValueConst args[2];
-
-  bool_result = FALSE;
-  swap_op = FALSE;
-  c1 = LEPUS_UNDEFINED;
-  c2 = LEPUS_UNDEFINED;
-  switch (op) {
-    case OP_add:
-      op_name = JS_ATOM_Symbol_operatorAdd;
-      break;
-    case OP_sub:
-      op_name = JS_ATOM_Symbol_operatorSub;
-      break;
-    case OP_mul:
-      op_name = JS_ATOM_Symbol_operatorMul;
-      break;
-    case OP_div:
-    case OP_math_div:
-      op_name = JS_ATOM_Symbol_operatorDiv;
-      break;
-    case OP_mod:
-      op_name = JS_ATOM_Symbol_operatorMod;
-      break;
-    case OP_pow:
-    case OP_math_pow:
-      op_name = JS_ATOM_Symbol_operatorPow;
-      break;
-    case OP_math_mod:
-      op_name = JS_ATOM_Symbol_operatorMathMod;
-      break;
-    case OP_shl:
-      op_name = JS_ATOM_Symbol_operatorShl;
-      break;
-    case OP_sar:
-      op_name = JS_ATOM_Symbol_operatorShr;
-      break;
-    case OP_and:
-      op_name = JS_ATOM_Symbol_operatorAnd;
-      break;
-    case OP_or:
-      op_name = JS_ATOM_Symbol_operatorOr;
-      break;
-    case OP_xor:
-      op_name = JS_ATOM_Symbol_operatorXor;
-      break;
-    case OP_lt:
-      op_name = JS_ATOM_Symbol_operatorCmpLT;
-      bool_result = TRUE;
-      break;
-    case OP_lte:
-      op_name = JS_ATOM_Symbol_operatorCmpLE;
-      bool_result = TRUE;
-      break;
-    case OP_gt:
-      op_name = JS_ATOM_Symbol_operatorCmpLT;
-      bool_result = TRUE;
-      swap_op = TRUE;
-      break;
-    case OP_gte:
-      op_name = JS_ATOM_Symbol_operatorCmpLE;
-      bool_result = TRUE;
-      swap_op = TRUE;
-      break;
-    case OP_eq:
-    case OP_neq:
-      op_name = JS_ATOM_Symbol_operatorCmpEQ;
-      bool_result = TRUE;
-      break;
-    default:
-      goto fail;
-  }
-  c1 = JS_GetPropertyInternal_RC(ctx, op1, JS_ATOM_constructor, op1, 0);
-  if (LEPUS_IsException(c1)) goto exception;
-  c2 = JS_GetPropertyInternal_RC(ctx, op2, JS_ATOM_constructor, op2, 0);
-  if (LEPUS_IsException(c2)) goto exception;
-  if (LEPUS_VALUE_IS_NOT_OBJECT(c1) || LEPUS_VALUE_IS_NOT_OBJECT(c2)) goto fail;
-  if (LEPUS_VALUE_GET_OBJ(c1) == LEPUS_VALUE_GET_OBJ(c2)) {
-    /* if same constructor, there is no ambiguity */
-    method = JS_GetPropertyInternal_RC(ctx, c1, op_name, c1, 0);
-  } else {
-    LEPUSValue val;
-    int order1, order2;
-
-    /* different constructors: we use a user-defined ordering */
-    val =
-        JS_GetPropertyInternal_RC(ctx, c1, JS_ATOM_Symbol_operatorOrder, c1, 0);
-    if (LEPUS_IsException(val)) goto exception;
-    if (LEPUS_IsUndefined(val)) goto undef_order;
-    if (JS_ToInt32Free(ctx, &order1, val)) goto exception;
-    val =
-        JS_GetPropertyInternal_RC(ctx, c2, JS_ATOM_Symbol_operatorOrder, c2, 0);
-    if (LEPUS_IsException(val)) goto exception;
-    if (LEPUS_IsUndefined(val)) {
-    undef_order:
-      LEPUS_FreeValue(ctx, c1);
-      LEPUS_FreeValue(ctx, c2);
-      *pret = LEPUS_UNDEFINED;
-      return 0;
-    }
-    if (JS_ToInt32Free(ctx, &order2, val)) goto exception;
-    /* ambiguous priority: error */
-    if (order1 == order2) {
-      LEPUS_ThrowTypeError(ctx,
-                           "operator_order is identical in both constructors");
-      goto exception;
-    }
-    if (order1 > order2) {
-      val = c1;
-    } else {
-      val = c2;
-    }
-    method = JS_GetPropertyInternal_RC(ctx, val, op_name, val, 0);
-  }
-  LEPUS_FreeValue(ctx, c1);
-  LEPUS_FreeValue(ctx, c2);
-  c1 = LEPUS_UNDEFINED;
-  c2 = LEPUS_UNDEFINED;
-  if (LEPUS_IsException(method)) goto exception;
-  if (LEPUS_IsUndefined(method) || LEPUS_IsNull(method)) {
-    *pret = LEPUS_UNDEFINED;
-    return 0;
-  }
-  if (swap_op) {
-    args[0] = op2;
-    args[1] = op1;
-  } else {
-    args[0] = op1;
-    args[1] = op2;
-  }
-  ret = JS_CallFree(ctx, method, LEPUS_UNDEFINED, 2, args);
-  if (LEPUS_IsException(ret)) goto exception;
-  if (bool_result) {
-    BOOL res = JS_ToBoolFree_RC(ctx, ret);
-    if (op == OP_neq) res ^= 1;
-    ret = LEPUS_NewBool(ctx, res);
-  }
-  *pret = ret;
-  return 1;
-fail:
-  LEPUS_ThrowTypeError(ctx, "invalid types for binary operator");
-exception:
-  LEPUS_FreeValue(ctx, c1);
-  LEPUS_FreeValue(ctx, c2);
-  *pret = LEPUS_UNDEFINED;
-  return -1;
-}
-
-static LEPUSValue throw_bf_exception(LEPUSContext *ctx, int status) {
-  const char *str;
-  if (status & BF_ST_DIVIDE_ZERO) {
-    str = "division by zero";
-  } else if (status & BF_ST_INVALID_OP) {
-    str = "invalid operation";
-  } else {
-    str = "integer overflow";
-  }
-  return LEPUS_ThrowRangeError(ctx, "%s", str);
-}
-
-static no_inline __exception int js_unary_arith_slow(LEPUSContext *ctx,
-                                                     LEPUSValue *sp,
-                                                     OPCodeEnum op) {
-  LEPUSValue op1, val, method;
-  bf_t a_s, r_s, *r = &r_s, *a;
-  BOOL is_float, is_legacy;
-  JSAtom op_name;
-  int ret, v;
-  int32_t tag;
+no_inline __exception int js_unary_arith_slow(LEPUSContext *ctx, LEPUSValue *sp,
+                                              OPCodeEnum op) {
+  LEPUSValue op1;
+  int v;
+  int64_t tag;
+  JSBigIntBuf buf1;
+  JSBigInt *p1;
 
   op1 = sp[-1];
   /* fast path for float64 */
   if (LEPUS_TAG_IS_FLOAT64(LEPUS_VALUE_GET_TAG(op1))) goto handle_float64;
-  if (LEPUS_IsObject(op1)) {
-    switch (op) {
-      case OP_plus:
-        op_name = JS_ATOM_Symbol_operatorPlus;
-        break;
-      case OP_neg:
-        op_name = JS_ATOM_Symbol_operatorNeg;
-        break;
-      case OP_inc:
-        op_name = JS_ATOM_Symbol_operatorInc;
-        break;
-      case OP_dec:
-        op_name = JS_ATOM_Symbol_operatorDec;
-        break;
-      default:
-        abort();
-    }
-    method = JS_GetPropertyInternal_RC(ctx, op1, op_name, op1, 0);
-    if (LEPUS_IsException(method)) return -1;
-    if (LEPUS_IsUndefined(method) || LEPUS_IsNull(method)) goto to_number;
-    val = JS_CallFree(ctx, method, op1, 0, NULL);
-    if (LEPUS_IsException(val)) return -1;
-    LEPUS_FreeValue(ctx, op1);
-    sp[-1] = val;
-  } else {
-  to_number:
-    op1 = JS_ToNumericFree(ctx, op1);
-    if (LEPUS_IsException(op1)) goto exception;
-    is_legacy = is_bignum_mode(ctx) ^ 1;
-    tag = LEPUS_VALUE_GET_TAG(op1);
-    switch (tag) {
-      case LEPUS_TAG_INT: {
-        int64_t v64;
-        v64 = LEPUS_VALUE_GET_INT(op1);
-        switch (op) {
-          case OP_inc:
-          case OP_dec:
-            v = 2 * (op - OP_dec) - 1;
-            v64 += v;
-            break;
-          case OP_plus:
-            break;
-          case OP_neg:
-            if (v64 == 0 && is_legacy) {
-              sp[-1] = __JS_NewFloat64(ctx, -0.0);
-              return 0;
-            } else {
-              v64 = -v64;
-            }
-            break;
-          default:
-            abort();
-        }
-        sp[-1] = LEPUS_NewInt64(ctx, v64);
-      } break;
-      case LEPUS_TAG_BIG_INT:
-        if (is_legacy && op == OP_plus) {
+  op1 = JS_ToNumericFree(ctx, op1);
+  if (LEPUS_IsException(op1)) goto exception;
+  tag = LEPUS_VALUE_GET_TAG(op1);
+  switch (tag) {
+    case LEPUS_TAG_INT: {
+      int64_t v64;
+      v64 = LEPUS_VALUE_GET_INT(op1);
+      switch (op) {
+        case OP_inc:
+        case OP_dec:
+          v = 2 * (op - OP_dec) - 1;
+          v64 += v;
+          break;
+        case OP_plus:
+          break;
+        case OP_neg:
+          if (v64 == 0) {
+            sp[-1] = __JS_NewFloat64(ctx, -0.0);
+            return 0;
+          } else {
+            v64 = -v64;
+          }
+          break;
+        default:
+          abort();
+      }
+      sp[-1] = LEPUS_NewInt64(ctx, v64);
+    } break;
+    case LEPUS_TAG_BIG_INT: {
+      JSBigInt *r;
+      p1 = (JSBigInt *)LEPUS_VALUE_GET_PTR(op1);
+      switch (op) {
+        case OP_plus:
           LEPUS_ThrowTypeError(ctx, "bigint argument with unary +");
           LEPUS_FreeValue(ctx, op1);
           goto exception;
-        }
-        a = JS_ToBigFloat(ctx, &is_float, &a_s, op1);
-        bf_init(ctx->bf_ctx, r);
-        ret = 0;
-        switch (op) {
-          case OP_inc:
-          case OP_dec:
-            v = 2 * (op - OP_dec) - 1;
-            ret = bf_add_si(r, a, v, BF_PREC_INF, BF_RNDZ) & BF_ST_OVERFLOW;
-            break;
-          case OP_plus:
-            bf_set(r, a);
-            break;
-          case OP_neg:
-            bf_set(r, a);
-            bf_neg(r);
-            break;
-          default:
-            abort();
-        }
-        if (a == &a_s) bf_delete(a);
-        LEPUS_FreeValue(ctx, op1);
-        if (unlikely(ret)) {
-          bf_delete(r);
-          throw_bf_exception(ctx, ret);
-          goto exception;
-        }
-        sp[-1] = JS_NewBigInt2(ctx, r, is_legacy);
-        break;
-      case LEPUS_TAG_BIG_FLOAT:
-        a = JS_ToBigFloat(ctx, &is_float, &a_s, op1);
-        bf_init(ctx->bf_ctx, r);
-        ret = 0;
-        switch (op) {
-          case OP_inc:
-          case OP_dec:
-            v = 2 * (op - OP_dec) - 1;
-            bf_add_si(r, a, v, ctx->fp_env.prec, ctx->fp_env.flags);
-            break;
-          case OP_plus:
-            bf_set(r, a);
-            break;
-          case OP_neg:
-            bf_set(r, a);
-            bf_neg(r);
-            break;
-          default:
-            abort();
-        }
-        if (a == &a_s) bf_delete(a);
-        LEPUS_FreeValue(ctx, op1);
-        if (unlikely(ret)) {
-          bf_delete(r);
-          throw_bf_exception(ctx, ret);
-          goto exception;
-        }
-        sp[-1] = JS_NewBigFloat(ctx, r);
-        break;
-      default:
-      handle_float64: {
-        double d;
-        d = LEPUS_VALUE_GET_FLOAT64(op1);
-        switch (op) {
-          case OP_inc:
-          case OP_dec:
-            v = 2 * (op - OP_dec) - 1;
-            d += v;
-            break;
-          case OP_plus:
-            break;
-          case OP_neg:
-            d = -d;
-            break;
-          default:
-            abort();
-        }
-        sp[-1] = __JS_NewFloat64(ctx, d);
-      } break;
-    }
+        case OP_inc:
+        case OP_dec: {
+          JSBigIntBuf buf2;
+          JSBigInt *p2;
+          p2 = js_bigint_set_si(&buf2, 2 * (op - OP_dec) - 1);
+          r = js_bigint_add(ctx, p1, p2, 0);
+        } break;
+        case OP_neg:
+          r = js_bigint_neg(ctx, p1);
+          break;
+        case OP_not:
+          r = js_bigint_not(ctx, p1);
+          break;
+        default:
+          abort();
+      }
+      LEPUS_FreeValue(ctx, op1);
+      if (!r) goto exception;
+      sp[-1] = JS_CompactBigInt(ctx, r);
+    } break;
+    default:
+    handle_float64: {
+      double d;
+      d = LEPUS_VALUE_GET_FLOAT64(op1);
+      switch (op) {
+        case OP_inc:
+        case OP_dec:
+          v = 2 * (op - OP_dec) - 1;
+          d += v;
+          break;
+        case OP_plus:
+          break;
+        case OP_neg:
+          d = -d;
+          break;
+        default:
+          abort();
+      }
+      sp[-1] = __JS_NewFloat64(ctx, d);
+    } break;
   }
   return 0;
 exception:
@@ -12764,45 +11450,23 @@ __exception int js_post_inc_slow(LEPUSContext *ctx, LEPUSValue *sp,
 }
 
 static no_inline int js_not_slow(LEPUSContext *ctx, LEPUSValue *sp) {
-  LEPUSValue op1, method, val;
-  bf_t a_s, r_s, *r = &r_s, *a;
-  int ret;
-  BOOL is_legacy;
+  LEPUSValue op1;
 
   op1 = sp[-1];
-  if (LEPUS_IsObject(op1)) {
-    method =
-        JS_GetPropertyInternal_RC(ctx, op1, JS_ATOM_Symbol_operatorNot, op1, 0);
-    if (LEPUS_IsException(method)) return -1;
-    if (LEPUS_IsUndefined(method) || LEPUS_IsNull(method)) goto to_number;
-    val = JS_CallFree(ctx, method, op1, 0, NULL);
-    if (LEPUS_IsException(val)) return -1;
+  op1 = JS_ToNumericFree(ctx, op1);
+  if (LEPUS_IsException(op1)) {
+    goto exception;
+  }
+  if (LEPUS_VALUE_GET_TAG(op1) == LEPUS_TAG_BIG_INT) {
+    JSBigInt *r;
+    r = js_bigint_not(ctx, (const JSBigInt *)LEPUS_VALUE_GET_PTR(op1));
     LEPUS_FreeValue(ctx, op1);
-    sp[-1] = val;
+    if (!r) goto exception;
+    sp[-1] = JS_CompactBigInt(ctx, r);
   } else {
-    if (LEPUS_IsString(op1)) {
-    to_number:
-      op1 = JS_ToNumberHintFree(ctx, op1, TON_FLAG_INTEGER);
-      if (LEPUS_IsException(op1)) goto exception;
-    }
-    is_legacy = is_bignum_mode(ctx) ^ 1;
-    if (!is_legacy || LEPUS_VALUE_GET_TAG(op1) == LEPUS_TAG_BIG_INT) {
-      a = JS_ToBigIntFree(ctx, &a_s, op1);
-      bf_init(ctx->bf_ctx, r);
-      ret = bf_add_si(r, a, 1, BF_PREC_INF, BF_RNDZ) & BF_ST_OVERFLOW;
-      bf_neg(r);
-      JS_FreeBigInt(ctx, a, &a_s);
-      if (unlikely(ret)) {
-        bf_delete(r);
-        throw_bf_exception(ctx, ret);
-        goto exception;
-      }
-      sp[-1] = JS_NewBigInt2(ctx, r, is_legacy);
-    } else {
-      int32_t v1;
-      if (unlikely(JS_ToInt32Free(ctx, &v1, op1))) goto exception;
-      sp[-1] = LEPUS_NewInt32(ctx, ~v1);
-    }
+    int32_t v1;
+    if (unlikely(JS_ToInt32Free(ctx, &v1, op1))) goto exception;
+    sp[-1] = LEPUS_NewInt32(ctx, ~v1);
   }
   return 0;
 exception:
@@ -12813,10 +11477,8 @@ exception:
 static no_inline __exception int js_binary_arith_slow(LEPUSContext *ctx,
                                                       LEPUSValue *sp,
                                                       OPCodeEnum op) {
-  LEPUSValue op1, op2, res;
-  BOOL is_float, is_legacy;
-  uint32_t tag1, tag2;
-  int ret, rnd_mode;
+  LEPUSValue op1, op2;
+  int64_t tag1, tag2;
   double d1, d2;
 
   op1 = sp[-2];
@@ -12829,25 +11491,6 @@ static no_inline __exception int js_binary_arith_slow(LEPUSContext *ctx,
     d2 = LEPUS_VALUE_GET_FLOAT64(op2);
     goto handle_float64;
   }
-
-  /* try to call an overloaded operator */
-  if ((tag1 == LEPUS_TAG_OBJECT &&
-       (tag2 != LEPUS_TAG_NULL && tag2 != LEPUS_TAG_UNDEFINED)) ||
-      (tag2 == LEPUS_TAG_OBJECT &&
-       (tag1 != LEPUS_TAG_NULL && tag1 != LEPUS_TAG_UNDEFINED))) {
-    ret = js_call_binary_op_fallback(ctx, &res, op1, op2, op);
-    if (ret != 0) {
-      LEPUS_FreeValue(ctx, op1);
-      LEPUS_FreeValue(ctx, op2);
-      if (ret < 0) {
-        goto exception;
-      } else {
-        sp[-2] = res;
-        return 0;
-      }
-    }
-  }
-
   op1 = JS_ToNumericFree(ctx, op1);
   if (LEPUS_IsException(op1)) {
     LEPUS_FreeValue(ctx, op2);
@@ -12861,15 +11504,6 @@ static no_inline __exception int js_binary_arith_slow(LEPUSContext *ctx,
   tag1 = LEPUS_VALUE_GET_NORM_TAG(op1);
   tag2 = LEPUS_VALUE_GET_NORM_TAG(op2);
 
-  is_legacy = is_bignum_mode(ctx) ^ 1;
-  if (is_legacy && (tag1 == LEPUS_TAG_BIG_INT || tag2 == LEPUS_TAG_BIG_INT) &&
-      tag1 != tag2) {
-    LEPUS_FreeValue(ctx, op1);
-    LEPUS_FreeValue(ctx, op2);
-    LEPUS_ThrowTypeError(ctx, "both operands must be bigint");
-    goto exception;
-  }
-
   if (tag1 == LEPUS_TAG_INT && tag2 == LEPUS_TAG_INT) {
     int32_t v1, v2;
     int64_t v;
@@ -12881,164 +11515,70 @@ static no_inline __exception int js_binary_arith_slow(LEPUSContext *ctx,
         break;
       case OP_mul:
         v = (int64_t)v1 * (int64_t)v2;
-        if (is_legacy && v == 0 && (v1 | v2) < 0) {
+        if (v == 0 && (v1 | v2) < 0) {
           sp[-2] = __JS_NewFloat64(ctx, -0.0);
           return 0;
         }
         break;
-      case OP_math_div:
-        goto op_fallback2;
       case OP_div:
-        sp[-2] = __JS_NewFloat64(ctx, (double)v1 / (double)v2);
+        sp[-2] = LEPUS_NewFloat64(ctx, (double)v1 / (double)v2);
         return 0;
-      case OP_math_mod:
-        if (unlikely(v2 == 0)) {
-          throw_bf_exception(ctx, BF_ST_DIVIDE_ZERO);
-          goto exception;
-        }
-        v = (int64_t)v1 % (int64_t)v2;
-        if (v < 0) {
-          if (v2 < 0)
-            v -= v2;
-          else
-            v += v2;
-        }
-        break;
       case OP_mod:
-        if (is_legacy && (v1 < 0 || v2 <= 0)) {
+        if (v1 < 0 || v2 <= 0) {
           sp[-2] = LEPUS_NewFloat64(ctx, fmod(v1, v2));
           return 0;
         } else {
-          if (unlikely(v2 == 0)) {
-            throw_bf_exception(ctx, BF_ST_DIVIDE_ZERO);
-            goto exception;
-          }
           v = (int64_t)v1 % (int64_t)v2;
         }
         break;
       case OP_pow:
-      case OP_math_pow:
-        if (is_legacy) {
-          sp[-2] = LEPUS_NewFloat64(ctx, js_pow(v1, v2));
-          return 0;
-        } else {
-          goto handle_bigint;
-        }
-        break;
+        sp[-2] = LEPUS_NewFloat64(ctx, js_pow(v1, v2));
+        return 0;
       default:
         abort();
     }
     sp[-2] = LEPUS_NewInt64(ctx, v);
-  } else if ((tag1 == LEPUS_TAG_BIG_INT &&
-              (tag2 == LEPUS_TAG_INT || tag2 == LEPUS_TAG_BIG_INT)) ||
-             (tag2 == LEPUS_TAG_BIG_INT && tag1 == LEPUS_TAG_INT)) {
-    /* big int result */
-    bf_t a_s, b_s, r_s, *r, *a, *b;
-  handle_bigint:
-    a = JS_ToBigFloat(ctx, &is_float, &a_s, op1);
-    b = JS_ToBigFloat(ctx, &is_float, &b_s, op2);
-    r = &r_s;
-    bf_init(ctx->bf_ctx, r);
-    ret = 0;
+  } else if (tag1 == LEPUS_TAG_BIG_INT && tag2 == LEPUS_TAG_BIG_INT) {
+    JSBigInt *p1, *p2, *r;
+    JSBigIntBuf buf1, buf2;
+    /* bigint result */
+
+    p1 = (JSBigInt *)LEPUS_VALUE_GET_PTR(op1);
+    p2 = (JSBigInt *)LEPUS_VALUE_GET_PTR(op2);
     switch (op) {
+      case OP_add:
+        r = js_bigint_add(ctx, p1, p2, 0);
+        break;
       case OP_sub:
-        ret = bf_sub(r, a, b, BF_PREC_INF, BF_RNDZ) & BF_ST_OVERFLOW;
+        r = js_bigint_add(ctx, p1, p2, 1);
         break;
       case OP_mul:
-        ret = bf_mul(r, a, b, BF_PREC_INF, BF_RNDZ) & BF_ST_OVERFLOW;
+        r = js_bigint_mul(ctx, p1, p2);
         break;
-      case OP_math_div:
-        goto op_fallback;
       case OP_div:
-        if (is_legacy) {
-          bf_t rem_s, *rem = &rem_s;
-          bf_init(ctx->bf_ctx, rem);
-          ret = bf_divrem(r, rem, a, b, BF_PREC_INF, BF_RNDZ, BF_RNDZ) &
-                BF_ST_INVALID_OP;
-          bf_delete(rem);
-        } else {
-          bf_div(r, a, b, 53,
-                 bf_set_exp_bits(11) | BF_RNDN | BF_FLAG_SUBNORMAL);
-          goto float64_result;
-        }
+        r = js_bigint_divrem(ctx, p1, p2, FALSE);
         break;
-      case OP_math_mod:
-        /* Euclidian remainder */
-        rnd_mode = BF_DIVREM_EUCLIDIAN;
-        goto do_int_mod;
       case OP_mod:
-        rnd_mode = BF_RNDZ;
-      do_int_mod: {
-        bf_t q_s, *q = &q_s;
-        bf_init(ctx->bf_ctx, q);
-        ret = bf_divrem(q, r, a, b, BF_PREC_INF, BF_RNDZ, rnd_mode) &
-              BF_ST_INVALID_OP;
-        bf_delete(q);
-      } break;
+        r = js_bigint_divrem(ctx, p1, p2, TRUE);
+        break;
       case OP_pow:
-      case OP_math_pow:
-        if (b->sign) {
-          if (is_legacy) {
-            ret = BF_ST_INVALID_OP;
-          } else if (op == OP_math_pow) {
-          op_fallback:
-            bf_delete(r);
-            if (a == &a_s) bf_delete(a);
-            if (b == &b_s) bf_delete(b);
-          op_fallback2:
-            ret = js_call_binary_op_fallback(ctx, &res, op1, op2, op);
-            LEPUS_FreeValue(ctx, op1);
-            LEPUS_FreeValue(ctx, op2);
-            if (ret < 0) {
-              goto exception;
-            } else if (ret == 0) {
-              LEPUS_ThrowTypeError(
-                  ctx, "operator must be defined for exact division or power");
-              goto exception;
-            }
-            sp[-2] = res;
-            return 0;
-          } else {
-            double dr;
-            bf_pow(r, a, b, 53,
-                   bf_set_exp_bits(11) | BF_RNDN | BF_FLAG_SUBNORMAL);
-          float64_result:
-            bf_get_float64(r, &dr, BF_RNDN);
-            bf_delete(r);
-            if (a == &a_s) bf_delete(a);
-            if (b == &b_s) bf_delete(b);
-            LEPUS_FreeValue(ctx, op1);
-            LEPUS_FreeValue(ctx, op2);
-            sp[-2] = __JS_NewFloat64(ctx, dr);
-            return 0;
-          }
-        } else {
-          ret = bf_pow(r, a, b, BF_PREC_INF, BF_RNDZ | BF_POW_JS_QUICKS) &
-                BF_ST_OVERFLOW;
-        }
+        r = js_bigint_pow(ctx, p1, p2);
         break;
       default:
         abort();
     }
-    if (a == &a_s) bf_delete(a);
-    if (b == &b_s) bf_delete(b);
     LEPUS_FreeValue(ctx, op1);
     LEPUS_FreeValue(ctx, op2);
-    if (unlikely(ret)) {
-      bf_delete(r);
-      throw_bf_exception(ctx, ret);
-      goto exception;
-    }
-    sp[-2] = JS_NewBigInt2(ctx, r, is_legacy);
-  } else if ((tag1 == LEPUS_TAG_FLOAT64 &&
-              (tag2 == LEPUS_TAG_FLOAT64 || tag2 == LEPUS_TAG_INT ||
-               tag2 == LEPUS_TAG_BIG_INT)) ||
-             (tag2 == LEPUS_TAG_FLOAT64 &&
-              (tag1 == LEPUS_TAG_INT || tag1 == LEPUS_TAG_BIG_INT))) {
+    if (!r) goto exception;
+    sp[-2] = JS_CompactBigInt(ctx, r);
+  } else {
     double dr;
     /* float64 result */
-    JS_ToFloat64Free(ctx, &d1, op1);
-    JS_ToFloat64Free(ctx, &d2, op2);
+    if (JS_ToFloat64Free(ctx, &d1, op1)) {
+      LEPUS_FreeValue(ctx, op2);
+      goto exception;
+    }
+    if (JS_ToFloat64Free(ctx, &d2, op2)) goto exception;
   handle_float64:
     switch (op) {
       case OP_sub:
@@ -13048,89 +11588,18 @@ static no_inline __exception int js_binary_arith_slow(LEPUSContext *ctx,
         dr = d1 * d2;
         break;
       case OP_div:
-      case OP_math_div:
         dr = d1 / d2;
         break;
       case OP_mod:
         dr = fmod(d1, d2);
         break;
-      case OP_math_mod:
-        if (d1 >= 0 && d2 >= 0) {
-          dr = fmod(d1, d2);
-        } else {
-          /* XXX: slow */
-          bf_t a, b, r, q;
-          bf_init(ctx->bf_ctx, &a);
-          bf_init(ctx->bf_ctx, &b);
-          bf_init(ctx->bf_ctx, &r);
-          bf_set_float64(&a, d1);
-          bf_set_float64(&b, d2);
-          bf_divrem(&q, &r, &a, &b, 53,
-                    bf_set_exp_bits(11) | BF_RNDN | BF_FLAG_SUBNORMAL,
-                    BF_DIVREM_EUCLIDIAN);
-          bf_get_float64(&q, &dr, BF_RNDN);
-          bf_delete(&a);
-          bf_delete(&b);
-          bf_delete(&q);
-          bf_delete(&r);
-        }
-        break;
       case OP_pow:
-      case OP_math_pow:
         dr = js_pow(d1, d2);
         break;
       default:
         abort();
     }
     sp[-2] = __JS_NewFloat64(ctx, dr);
-  } else {
-    bf_t a_s, b_s, r_s, *r, *a, *b;
-    /* big float result */
-    a = JS_ToBigFloat(ctx, &is_float, &a_s, op1);
-    b = JS_ToBigFloat(ctx, &is_float, &b_s, op2);
-    r = &r_s;
-    bf_init(ctx->bf_ctx, r);
-    ret = 0;
-    switch (op) {
-      case OP_sub:
-        bf_sub(r, a, b, ctx->fp_env.prec, ctx->fp_env.flags);
-        break;
-      case OP_mul:
-        bf_mul(r, a, b, ctx->fp_env.prec, ctx->fp_env.flags);
-        break;
-      case OP_math_div:
-      case OP_div:
-        bf_div(r, a, b, ctx->fp_env.prec, ctx->fp_env.flags);
-        break;
-      case OP_math_mod:
-        /* Euclidian remainder */
-        rnd_mode = BF_DIVREM_EUCLIDIAN;
-        goto do_mod;
-      case OP_mod:
-        rnd_mode = BF_RNDZ;
-      do_mod: {
-        bf_t q_s, *q = &q_s;
-        bf_init(ctx->bf_ctx, q);
-        bf_divrem(q, r, a, b, ctx->fp_env.prec, ctx->fp_env.flags, rnd_mode);
-        bf_delete(q);
-      } break;
-      case OP_pow:
-      case OP_math_pow:
-        bf_pow(r, a, b, ctx->fp_env.prec, ctx->fp_env.flags | BF_POW_JS_QUICKS);
-        break;
-      default:
-        abort();
-    }
-    if (a == &a_s) bf_delete(a);
-    if (b == &b_s) bf_delete(b);
-    LEPUS_FreeValue(ctx, op1);
-    LEPUS_FreeValue(ctx, op2);
-    if (unlikely(ret)) {
-      bf_delete(r);
-      throw_bf_exception(ctx, ret);
-      goto exception;
-    }
-    sp[-2] = JS_NewBigFloat(ctx, r);
   }
   return 0;
 exception:
@@ -13141,10 +11610,8 @@ exception:
 
 static no_inline __exception int js_add_slow(LEPUSContext *ctx,
                                              LEPUSValue *sp) {
-  LEPUSValue op1, op2, res;
-  uint32_t tag1, tag2;
-  BOOL is_float, is_legacy;
-  int ret;
+  LEPUSValue op1, op2;
+  int64_t tag1, tag2;
 
   op1 = sp[-2];
   op2 = sp[-1];
@@ -13161,31 +11628,13 @@ static no_inline __exception int js_add_slow(LEPUSContext *ctx,
   }
 
   if (tag1 == LEPUS_TAG_OBJECT || tag2 == LEPUS_TAG_OBJECT) {
-    /* try to call an overloaded operator */
-    if ((tag1 == LEPUS_TAG_OBJECT &&
-         (tag2 != LEPUS_TAG_NULL && tag2 != LEPUS_TAG_UNDEFINED)) ||
-        (tag2 == LEPUS_TAG_OBJECT &&
-         (tag1 != LEPUS_TAG_NULL && tag1 != LEPUS_TAG_UNDEFINED))) {
-      ret = js_call_binary_op_fallback(ctx, &res, op1, op2, OP_add);
-      if (ret != 0) {
-        LEPUS_FreeValue(ctx, op1);
-        LEPUS_FreeValue(ctx, op2);
-        if (ret < 0) {
-          goto exception;
-        } else {
-          sp[-2] = res;
-          return 0;
-        }
-      }
-    }
-
-    op1 = JS_ToPrimitiveFree_RC(ctx, op1, HINT_NONE);
+    op1 = JS_ToPrimitiveFree(ctx, op1, HINT_NONE);
     if (LEPUS_IsException(op1)) {
       LEPUS_FreeValue(ctx, op2);
       goto exception;
     }
 
-    op2 = JS_ToPrimitiveFree_RC(ctx, op2, HINT_NONE);
+    op2 = JS_ToPrimitiveFree(ctx, op2, HINT_NONE);
     if (LEPUS_IsException(op2)) {
       LEPUS_FreeValue(ctx, op1);
       goto exception;
@@ -13194,7 +11643,7 @@ static no_inline __exception int js_add_slow(LEPUSContext *ctx,
     tag2 = LEPUS_VALUE_GET_NORM_TAG(op2);
   }
 
-  if (LEPUS_IsString(op1) || LEPUS_IsString(op2)) {
+  if (tag_is_string(tag1) || tag_is_string(tag2)) {
     sp[-2] = JS_ConcatString(ctx, op1, op2);
     if (LEPUS_IsException(sp[-2])) goto exception;
     return 0;
@@ -13213,15 +11662,6 @@ static no_inline __exception int js_add_slow(LEPUSContext *ctx,
   tag1 = LEPUS_VALUE_GET_NORM_TAG(op1);
   tag2 = LEPUS_VALUE_GET_NORM_TAG(op2);
 
-  is_legacy = is_bignum_mode(ctx) ^ 1;
-  if (is_legacy && (tag1 == LEPUS_TAG_BIG_INT || tag2 == LEPUS_TAG_BIG_INT) &&
-      tag1 != tag2) {
-    LEPUS_FreeValue(ctx, op1);
-    LEPUS_FreeValue(ctx, op2);
-    LEPUS_ThrowTypeError(ctx, "both operands must be bigint");
-    goto exception;
-  }
-
   if (tag1 == LEPUS_TAG_INT && tag2 == LEPUS_TAG_INT) {
     int32_t v1, v2;
     int64_t v;
@@ -13229,55 +11669,26 @@ static no_inline __exception int js_add_slow(LEPUSContext *ctx,
     v2 = LEPUS_VALUE_GET_INT(op2);
     v = (int64_t)v1 + (int64_t)v2;
     sp[-2] = LEPUS_NewInt64(ctx, v);
-  } else if ((tag1 == LEPUS_TAG_BIG_INT &&
-              (tag2 == LEPUS_TAG_INT || tag2 == LEPUS_TAG_BIG_INT)) ||
-             (tag2 == LEPUS_TAG_BIG_INT && tag1 == LEPUS_TAG_INT)) {
-    bf_t a_s, b_s, r_s, *r, *a, *b;
-    /* big int result */
-    a = JS_ToBigFloat(ctx, &is_float, &a_s, op1);
-    b = JS_ToBigFloat(ctx, &is_float, &b_s, op2);
-    r = &r_s;
-    bf_init(ctx->bf_ctx, r);
-    ret = bf_add(r, a, b, BF_PREC_INF, BF_RNDZ) & BF_ST_OVERFLOW;
-    if (a == &a_s) bf_delete(a);
-    if (b == &b_s) bf_delete(b);
+  } else if (tag1 == LEPUS_TAG_BIG_INT && tag2 == LEPUS_TAG_BIG_INT) {
+    JSBigInt *p1, *p2, *r;
+    JSBigIntBuf buf1, buf2;
+    /* bigint result */
+    p1 = (JSBigInt *)LEPUS_VALUE_GET_PTR(op1);
+    p2 = (JSBigInt *)LEPUS_VALUE_GET_PTR(op2);
+    r = js_bigint_add(ctx, p1, p2, 0);
     LEPUS_FreeValue(ctx, op1);
     LEPUS_FreeValue(ctx, op2);
-    if (unlikely(ret)) {
-      bf_delete(r);
-      throw_bf_exception(ctx, ret);
-      goto exception;
-    }
-    sp[-2] = JS_NewBigInt2(ctx, r, is_legacy);
-  } else if ((tag1 == LEPUS_TAG_FLOAT64 &&
-              (tag2 == LEPUS_TAG_FLOAT64 || tag2 == LEPUS_TAG_INT ||
-               tag2 == LEPUS_TAG_BIG_INT)) ||
-             (tag2 == LEPUS_TAG_FLOAT64 &&
-              (tag1 == LEPUS_TAG_INT || tag1 == LEPUS_TAG_BIG_INT))) {
+    if (!r) goto exception;
+    sp[-2] = JS_CompactBigInt(ctx, r);
+  } else {
     double d1, d2;
     /* float64 result */
-    JS_ToFloat64Free(ctx, &d1, op1);
-    JS_ToFloat64Free(ctx, &d2, op2);
-    sp[-2] = __JS_NewFloat64(ctx, d1 + d2);
-  } else {
-    bf_t a_s, b_s, r_s, *r, *a, *b;
-    /* big float result */
-    a = JS_ToBigFloat(ctx, &is_float, &a_s, op1);
-    b = JS_ToBigFloat(ctx, &is_float, &b_s, op2);
-
-    r = &r_s;
-    bf_init(ctx->bf_ctx, r);
-    bf_add(r, a, b, ctx->fp_env.prec, ctx->fp_env.flags);
-    if (a == &a_s) bf_delete(a);
-    if (b == &b_s) bf_delete(b);
-    LEPUS_FreeValue(ctx, op1);
-    LEPUS_FreeValue(ctx, op2);
-    if (unlikely(ret)) {
-      bf_delete(r);
-      throw_bf_exception(ctx, ret);
+    if (JS_ToFloat64Free(ctx, &d1, op1)) {
+      LEPUS_FreeValue(ctx, op2);
       goto exception;
     }
-    sp[-2] = JS_NewBigFloat(ctx, r);
+    if (JS_ToFloat64Free(ctx, &d2, op2)) goto exception;
+    sp[-2] = __JS_NewFloat64(ctx, d1 + d2);
   }
   return 0;
 exception:
@@ -13289,134 +11700,87 @@ exception:
 static no_inline __exception int js_binary_logic_slow(LEPUSContext *ctx,
                                                       LEPUSValue *sp,
                                                       OPCodeEnum op) {
-  LEPUSValue op1, op2, res;
-  bf_t a_s, b_s, r_s, *r, *a, *b;
-  int ret;
-  uint32_t tag1, tag2;
-  BOOL is_legacy;
+  LEPUSValue op1, op2;
+  int64_t tag1, tag2;
+  uint32_t v1, v2, r;
 
   op1 = sp[-2];
   op2 = sp[-1];
   tag1 = LEPUS_VALUE_GET_NORM_TAG(op1);
   tag2 = LEPUS_VALUE_GET_NORM_TAG(op2);
 
-  /* try to call an overloaded operator */
-  if ((tag1 == LEPUS_TAG_OBJECT &&
-       (tag2 != LEPUS_TAG_NULL && tag2 != LEPUS_TAG_UNDEFINED)) ||
-      (tag2 == LEPUS_TAG_OBJECT &&
-       (tag1 != LEPUS_TAG_NULL && tag1 != LEPUS_TAG_UNDEFINED))) {
-    ret = js_call_binary_op_fallback(ctx, &res, op1, op2, op);
-    if (ret != 0) {
-      LEPUS_FreeValue(ctx, op1);
-      LEPUS_FreeValue(ctx, op2);
-      if (ret < 0) {
-        goto exception;
-      } else {
-        sp[-2] = res;
-        return 0;
-      }
-    }
-  }
-
-  op1 = JS_ToNumberHintFree(ctx, op1, TON_FLAG_INTEGER);
+  op1 = JS_ToNumericFree(ctx, op1);
   if (LEPUS_IsException(op1)) {
     LEPUS_FreeValue(ctx, op2);
     goto exception;
   }
-  op2 = JS_ToNumberHintFree(ctx, op2, TON_FLAG_INTEGER);
+  op2 = JS_ToNumericFree(ctx, op2);
   if (LEPUS_IsException(op2)) {
     LEPUS_FreeValue(ctx, op1);
     goto exception;
   }
 
-  is_legacy = is_bignum_mode(ctx) ^ 1;
-  if (is_legacy) {
-    uint32_t v1, v2, r;
-
-    tag1 = LEPUS_VALUE_GET_TAG(op1);
-    tag2 = LEPUS_VALUE_GET_TAG(op2);
-    if (tag1 == LEPUS_TAG_BIG_INT || tag2 == LEPUS_TAG_BIG_INT) {
-      if (tag1 != tag2) {
-        LEPUS_FreeValue(ctx, op1);
-        LEPUS_FreeValue(ctx, op2);
-        LEPUS_ThrowTypeError(ctx, "both operands must be bigint");
-        goto exception;
-      }
-    } else {
-      if (unlikely(JS_ToInt32Free(ctx, (int32_t *)&v1, op1))) {
-        LEPUS_FreeValue(ctx, op2);
-        goto exception;
-      }
-      if (unlikely(JS_ToInt32Free(ctx, (int32_t *)&v2, op2))) goto exception;
-      switch (op) {
-        case OP_shl:
-          r = v1 << (v2 & 0x1f);
-          break;
-        case OP_sar:
-          r = (int)v1 >> (v2 & 0x1f);
-          break;
-        case OP_and:
-          r = v1 & v2;
-          break;
-        case OP_or:
-          r = v1 | v2;
-          break;
-        case OP_xor:
-          r = v1 ^ v2;
-          break;
-        default:
-          abort();
-      }
-      sp[-2] = LEPUS_NewInt32(ctx, r);
-      return 0;
+  tag1 = LEPUS_VALUE_GET_TAG(op1);
+  tag2 = LEPUS_VALUE_GET_TAG(op2);
+  if (tag1 == LEPUS_TAG_BIG_INT && tag2 == LEPUS_TAG_BIG_INT) {
+    JSBigInt *p1, *p2, *r;
+    JSBigIntBuf buf1, buf2;
+    p1 = (JSBigInt *)LEPUS_VALUE_GET_PTR(op1);
+    p2 = (JSBigInt *)LEPUS_VALUE_GET_PTR(op2);
+    switch (op) {
+      case OP_and:
+      case OP_or:
+      case OP_xor:
+        r = js_bigint_logic(ctx, p1, p2, op);
+        break;
+      case OP_shl:
+      case OP_sar: {
+        js_slimb_t shift;
+        shift = js_bigint_get_si_sat(p2);
+        if (shift > INT32_MAX)
+          shift = INT32_MAX;
+        else if (shift < -INT32_MAX)
+          shift = -INT32_MAX;
+        if (op == OP_sar) shift = -shift;
+        if (shift >= 0)
+          r = js_bigint_shl(ctx, p1, shift);
+        else
+          r = js_bigint_shr(ctx, p1, -shift);
+      } break;
+      default:
+        abort();
     }
+    LEPUS_FreeValue(ctx, op1);
+    LEPUS_FreeValue(ctx, op2);
+    if (!r) goto exception;
+    sp[-2] = JS_CompactBigInt(ctx, r);
+  } else {
+    if (unlikely(JS_ToInt32Free(ctx, (int32_t *)&v1, op1))) {
+      LEPUS_FreeValue(ctx, op2);
+      goto exception;
+    }
+    if (unlikely(JS_ToInt32Free(ctx, (int32_t *)&v2, op2))) goto exception;
+    switch (op) {
+      case OP_shl:
+        r = v1 << (v2 & 0x1f);
+        break;
+      case OP_sar:
+        r = (int)v1 >> (v2 & 0x1f);
+        break;
+      case OP_and:
+        r = v1 & v2;
+        break;
+      case OP_or:
+        r = v1 | v2;
+        break;
+      case OP_xor:
+        r = v1 ^ v2;
+        break;
+      default:
+        abort();
+    }
+    sp[-2] = LEPUS_NewInt32(ctx, r);
   }
-
-  a = JS_ToBigIntFree(ctx, &a_s, op1);
-  b = JS_ToBigIntFree(ctx, &b_s, op2);
-
-  r = &r_s;
-  bf_init(ctx->bf_ctx, r);
-  ret = 0;
-  switch (op) {
-    case OP_shl:
-    case OP_sar: {
-      slimb_t v2;
-#if LIMB_BITS == 32
-      bf_get_int32(&v2, b, 0);
-      if (v2 == INT32_MIN) v2 = INT32_MIN + 1;
-#else
-      bf_get_int64(&v2, b, 0);
-      if (v2 == INT64_MIN) v2 = INT64_MIN + 1;
-#endif
-      if (op == OP_sar) v2 = -v2;
-      bf_set(r, a);
-      ret = bf_mul_2exp(r, v2, BF_PREC_INF, BF_RNDZ);
-      if (v2 < 0) {
-        ret |= bf_rint(r, BF_PREC_INF, BF_RNDD);
-      }
-      ret &= BF_ST_OVERFLOW;
-    } break;
-    case OP_and:
-      bf_logic_and(r, a, b);
-      break;
-    case OP_or:
-      bf_logic_or(r, a, b);
-      break;
-    case OP_xor:
-      bf_logic_xor(r, a, b);
-      break;
-    default:
-      abort();
-  }
-  JS_FreeBigInt(ctx, a, &a_s);
-  JS_FreeBigInt(ctx, b, &b_s);
-  if (unlikely(ret)) {
-    bf_delete(r);
-    throw_bf_exception(ctx, ret);
-    goto exception;
-  }
-  sp[-2] = JS_NewBigInt2(ctx, r, is_legacy);
   return 0;
 exception:
   sp[-2] = LEPUS_UNDEFINED;
@@ -13426,31 +11790,12 @@ exception:
 
 static no_inline int js_relational_slow(LEPUSContext *ctx, LEPUSValue *sp,
                                         OPCodeEnum op) {
-  LEPUSValue op1, op2, ret;
+  LEPUSValue op1, op2;
   int res;
-  uint32_t tag1, tag2;
+  int64_t tag1, tag2;
 
   op1 = sp[-2];
   op2 = sp[-1];
-  tag1 = LEPUS_VALUE_GET_NORM_TAG(op1);
-  tag2 = LEPUS_VALUE_GET_NORM_TAG(op2);
-  /* try to call an overloaded operator */
-  if ((tag1 == LEPUS_TAG_OBJECT &&
-       (tag2 != LEPUS_TAG_NULL && tag2 != LEPUS_TAG_UNDEFINED)) ||
-      (tag2 == LEPUS_TAG_OBJECT &&
-       (tag1 != LEPUS_TAG_NULL && tag1 != LEPUS_TAG_UNDEFINED))) {
-    res = js_call_binary_op_fallback(ctx, &ret, op1, op2, op);
-    if (res != 0) {
-      LEPUS_FreeValue(ctx, op1);
-      LEPUS_FreeValue(ctx, op2);
-      if (res < 0) {
-        goto exception;
-      } else {
-        sp[-2] = ret;
-        return 0;
-      }
-    }
-  }
   op1 = JS_ToPrimitiveFree_RC(ctx, op1, HINT_NUMBER);
   if (LEPUS_IsException(op1)) {
     LEPUS_FreeValue(ctx, op2);
@@ -13499,48 +11844,20 @@ static no_inline int js_relational_slow(LEPUSContext *ctx, LEPUSValue *sp,
     }
     LEPUS_FreeValue(ctx, op1);
     LEPUS_FreeValue(ctx, op2);
-  } else if ((tag1 <= LEPUS_TAG_NULL || tag1 == LEPUS_TAG_FLOAT64) &&
-             (tag2 <= LEPUS_TAG_NULL || tag2 == LEPUS_TAG_FLOAT64)) {
-    /* can use floating point comparison */
-    double d1, d2;
-    if (tag1 == LEPUS_TAG_FLOAT64) {
-      d1 = LEPUS_VALUE_GET_FLOAT64(op1);
-    } else {
-      d1 = LEPUS_VALUE_GET_INT(op1);
-    }
-    if (tag2 == LEPUS_TAG_FLOAT64) {
-      d2 = LEPUS_VALUE_GET_FLOAT64(op2);
-    } else {
-      d2 = LEPUS_VALUE_GET_INT(op2);
-    }
-    switch (op) {
-      case OP_lt:
-        res = (d1 < d2); /* if NaN return false */
-        break;
-      case OP_lte:
-        res = (d1 <= d2); /* if NaN return false */
-        break;
-      case OP_gt:
-        res = (d1 > d2); /* if NaN return false */
-        break;
-      default:
-      case OP_gte:
-        res = (d1 >= d2); /* if NaN return false */
-        break;
-    }
+  } else if ((tag1 == LEPUS_TAG_NULL || tag1 == LEPUS_TAG_BOOL ||
+              tag1 == LEPUS_TAG_INT || tag1 == LEPUS_TAG_FLOAT64) &&
+             (tag2 == LEPUS_TAG_NULL || tag2 == LEPUS_TAG_BOOL ||
+              tag2 == LEPUS_TAG_INT || tag2 == LEPUS_TAG_FLOAT64)) {
+    goto float64_compare;
   } else {
-    bf_t a_s, b_s, *a, *b;
-    BOOL is_float;
-
-    if (((tag1 == LEPUS_TAG_BIG_INT && tag2 == LEPUS_TAG_STRING) ||
-         (tag2 == LEPUS_TAG_BIG_INT && tag1 == LEPUS_TAG_STRING)) &&
-        !is_bignum_mode(ctx)) {
-      if (tag1 == LEPUS_TAG_STRING) {
+    if ((((tag1 == LEPUS_TAG_BIG_INT) && tag_is_string(tag2)) ||
+         ((tag2 == LEPUS_TAG_BIG_INT) && tag_is_string(tag1)))) {
+      if (tag_is_string(tag1)) {
         op1 = JS_StringToBigInt(ctx, op1);
         if (LEPUS_VALUE_GET_TAG(op1) != LEPUS_TAG_BIG_INT)
           goto invalid_bigint_string;
       }
-      if (tag2 == LEPUS_TAG_STRING) {
+      if (tag_is_string(tag2)) {
         op2 = JS_StringToBigInt(ctx, op2);
         if (LEPUS_VALUE_GET_TAG(op2) != LEPUS_TAG_BIG_INT) {
         invalid_bigint_string:
@@ -13563,28 +11880,50 @@ static no_inline int js_relational_slow(LEPUSContext *ctx, LEPUSValue *sp,
       }
     }
 
-    a = JS_ToBigFloat(ctx, &is_float, &a_s, op1);
-    b = JS_ToBigFloat(ctx, &is_float, &b_s, op2);
+    tag1 = LEPUS_VALUE_GET_NORM_TAG(op1);
+    tag2 = LEPUS_VALUE_GET_NORM_TAG(op2);
 
-    switch (op) {
-      case OP_lt:
-        res = bf_cmp_lt(a, b); /* if NaN return false */
-        break;
-      case OP_lte:
-        res = bf_cmp_le(a, b); /* if NaN return false */
-        break;
-      case OP_gt:
-        res = bf_cmp_lt(b, a); /* if NaN return false */
-        break;
-      default:
-      case OP_gte:
-        res = bf_cmp_le(b, a); /* if NaN return false */
-        break;
+    if (tag1 == LEPUS_TAG_BIG_INT || tag2 == LEPUS_TAG_BIG_INT) {
+      res = js_compare_bigint(ctx, op, op1, op2);
+    } else {
+      double d1, d2;
+
+    float64_compare:
+      /* can use floating point comparison */
+      if (tag1 == LEPUS_TAG_FLOAT64) {
+        d1 = LEPUS_VALUE_GET_FLOAT64(op1);
+      } else if (tag1 == LEPUS_TAG_INT) {
+        d1 = LEPUS_VALUE_GET_INT(op1);
+      } else if (tag1 == LEPUS_TAG_BOOL) {
+        d1 = LEPUS_VALUE_GET_BOOL(op1) ? 1 : 0;
+      } else {
+        d1 = 0;
+      }
+      if (tag2 == LEPUS_TAG_FLOAT64) {
+        d2 = LEPUS_VALUE_GET_FLOAT64(op2);
+      } else if (tag2 == LEPUS_TAG_INT) {
+        d2 = LEPUS_VALUE_GET_INT(op2);
+      } else if (tag2 == LEPUS_TAG_BOOL) {
+        d2 = LEPUS_VALUE_GET_BOOL(op2) ? 1 : 0;
+      } else {
+        d2 = 0;
+      }
+      switch (op) {
+        case OP_lt:
+          res = (d1 < d2); /* if NaN return false */
+          break;
+        case OP_lte:
+          res = (d1 <= d2); /* if NaN return false */
+          break;
+        case OP_gt:
+          res = (d1 > d2); /* if NaN return false */
+          break;
+        default:
+        case OP_gte:
+          res = (d1 >= d2); /* if NaN return false */
+          break;
+      }
     }
-    if (a == &a_s) bf_delete(a);
-    if (b == &b_s) bf_delete(b);
-    LEPUS_FreeValue(ctx, op1);
-    LEPUS_FreeValue(ctx, op2);
   }
 done:
   sp[-2] = LEPUS_NewBool(ctx, res);
@@ -13595,16 +11934,11 @@ exception:
   return -1;
 }
 
-static BOOL tag_is_number(uint32_t tag) {
-  return (tag == LEPUS_TAG_INT || tag == LEPUS_TAG_BIG_INT ||
-          tag == LEPUS_TAG_FLOAT64 || tag == LEPUS_TAG_BIG_FLOAT);
-}
-
 static no_inline __exception int js_eq_slow(LEPUSContext *ctx, LEPUSValue *sp,
                                             BOOL is_neq) {
-  LEPUSValue op1, op2, ret;
+  LEPUSValue op1, op2;
   int res;
-  uint32_t tag1, tag2;
+  int64_t tag1, tag2;
 
   op1 = sp[-2];
   op2 = sp[-1];
@@ -13631,46 +11965,25 @@ redo:
       }
       res = (d1 == d2);
     } else {
-      bf_t a_s, b_s, *a, *b;
-      BOOL is_float;
-      a = JS_ToBigFloat(ctx, &is_float, &a_s, op1);
-      b = JS_ToBigFloat(ctx, &is_float, &b_s, op2);
-      res = bf_cmp_eq(a, b);
-      if (a == &a_s) bf_delete(a);
-      if (b == &b_s) bf_delete(b);
-      LEPUS_FreeValue(ctx, op1);
-      LEPUS_FreeValue(ctx, op2);
+      res = js_compare_bigint(ctx, OP_eq, op1, op2);
     }
-  } else if (tag1 == tag2 || (LEPUS_IsString(op1) && LEPUS_IsString(op2))) {
-    if (tag1 == LEPUS_TAG_OBJECT) {
-      /* try the fallback operator */
-      res = js_call_binary_op_fallback(ctx, &ret, op1, op2,
-                                       is_neq ? OP_neq : OP_eq);
-      if (res != 0) {
-        LEPUS_FreeValue(ctx, op1);
-        LEPUS_FreeValue(ctx, op2);
-        if (res < 0) {
-          goto exception;
-        } else {
-          sp[-2] = ret;
-          return 0;
-        }
-      }
-    }
+  } else if (tag1 == tag2) {
     res = js_strict_eq2(ctx, op1, op2, JS_EQ_STRICT);
   } else if ((tag1 == LEPUS_TAG_NULL && tag2 == LEPUS_TAG_UNDEFINED) ||
              (tag2 == LEPUS_TAG_NULL && tag1 == LEPUS_TAG_UNDEFINED)) {
     res = TRUE;
-  } else if ((LEPUS_IsString(op1) && tag_is_number(tag2)) ||
-             (LEPUS_IsString(op2) && tag_is_number(tag1))) {
-    if ((tag1 == LEPUS_TAG_BIG_INT || tag2 == LEPUS_TAG_BIG_INT) &&
-        !is_bignum_mode(ctx)) {
-      if (LEPUS_IsString(op1)) {
+  } else if (tag_is_string(tag1) && tag_is_string(tag2)) {
+    /* needed when comparing strings and ropes */
+    res = js_strict_eq2(ctx, op1, op2, JS_EQ_STRICT);
+  } else if ((tag_is_string(tag1) && tag_is_number(tag2)) ||
+             (tag_is_string(tag2) && tag_is_number(tag1))) {
+    if (tag1 == LEPUS_TAG_BIG_INT || tag2 == LEPUS_TAG_BIG_INT) {
+      if (tag_is_string(tag1)) {
         op1 = JS_StringToBigInt(ctx, op1);
         if (LEPUS_VALUE_GET_TAG(op1) != LEPUS_TAG_BIG_INT)
           goto invalid_bigint_string;
       }
-      if (LEPUS_IsString(op2)) {
+      if (tag_is_string(tag2)) {
         op2 = JS_StringToBigInt(ctx, op2);
         if (LEPUS_VALUE_GET_TAG(op2) != LEPUS_TAG_BIG_INT) {
         invalid_bigint_string:
@@ -13692,50 +12005,34 @@ redo:
         goto exception;
       }
     }
-    res = js_strict_eq(ctx, op1, op2);
+    res = js_strict_eq2(ctx, op1, op2, JS_EQ_STRICT);
   } else if (tag1 == LEPUS_TAG_BOOL) {
-    op1 = LEPUS_NewInt32(ctx, LEPUS_VALUE_GET_INT(op1));
+    op1 = LEPUS_NewInt32(ctx, LEPUS_VALUE_GET_BOOL(op1));
     goto redo;
   } else if (tag2 == LEPUS_TAG_BOOL) {
-    op2 = LEPUS_NewInt32(ctx, LEPUS_VALUE_GET_INT(op2));
+    op2 = LEPUS_NewInt32(ctx, LEPUS_VALUE_GET_BOOL(op2));
     goto redo;
   } else if ((tag1 == LEPUS_TAG_OBJECT &&
-              (tag_is_number(tag2) || tag2 == LEPUS_TAG_STRING ||
-               tag2 == LEPUS_TAG_SYMBOL ||
-               tag2 == LEPUS_TAG_SEPARABLE_STRING)) ||
+              (tag_is_number(tag2) || tag_is_string(tag2) ||
+               tag2 == LEPUS_TAG_SYMBOL)) ||
              (tag2 == LEPUS_TAG_OBJECT &&
-              (tag_is_number(tag1) || tag1 == LEPUS_TAG_STRING ||
-               tag1 == LEPUS_TAG_SYMBOL ||
-               tag1 == LEPUS_TAG_SEPARABLE_STRING))) {
-    /* try the fallback operator */
-    res = js_call_binary_op_fallback(ctx, &ret, op1, op2,
-                                     is_neq ? OP_neq : OP_eq);
-    if (res != 0) {
-      LEPUS_FreeValue(ctx, op1);
-      LEPUS_FreeValue(ctx, op2);
-      if (res < 0) {
-        goto exception;
-      } else {
-        sp[-2] = ret;
-        return 0;
-      }
-    }
-
-    op1 = JS_ToPrimitiveFree_RC(ctx, op1, HINT_NONE);
+              (tag_is_number(tag1) || tag_is_string(tag1) ||
+               tag1 == LEPUS_TAG_SYMBOL))) {
+    op1 = JS_ToPrimitiveFree(ctx, op1, HINT_NONE);
     if (LEPUS_IsException(op1)) {
       LEPUS_FreeValue(ctx, op2);
       goto exception;
     }
-    op2 = JS_ToPrimitiveFree_RC(ctx, op2, HINT_NONE);
+    op2 = JS_ToPrimitiveFree(ctx, op2, HINT_NONE);
     if (LEPUS_IsException(op2)) {
       LEPUS_FreeValue(ctx, op1);
       goto exception;
     }
     goto redo;
   } else {
+    res = FALSE;
     LEPUS_FreeValue(ctx, op1);
     LEPUS_FreeValue(ctx, op2);
-    res = FALSE;
   }
 done:
   sp[-2] = LEPUS_NewBool(ctx, res ^ is_neq);
@@ -13762,9 +12059,8 @@ static no_inline int js_shr_slow(LEPUSContext *ctx, LEPUSValue *sp) {
     LEPUS_FreeValue(ctx, op1);
     goto exception;
   }
-  /* XXX: could forbid >>> in bignum mode */
-  if (!is_bignum_mode(ctx) && (LEPUS_VALUE_GET_TAG(op1) == LEPUS_TAG_BIG_INT ||
-                               LEPUS_VALUE_GET_TAG(op2) == LEPUS_TAG_BIG_INT)) {
+  if (LEPUS_VALUE_GET_TAG(op1) == LEPUS_TAG_BIG_INT ||
+      LEPUS_VALUE_GET_TAG(op2) == LEPUS_TAG_BIG_INT) {
     LEPUS_ThrowTypeError(ctx, "bigint operands are forbidden for >>>");
     LEPUS_FreeValue(ctx, op1);
     LEPUS_FreeValue(ctx, op2);
@@ -13782,421 +12078,8 @@ exception:
   return -1;
 }
 
-static double bf_mul_pow10_to_float64(LEPUSContext *ctx, const bf_t *a,
-                                      int64_t exponent) {
-  bf_t r_s, *r = &r_s;
-  double d;
-  /* always convert to Float64 */
-  bf_init(ctx->bf_ctx, r);
-  bf_mul_pow_radix(r, a, 10, exponent, 53,
-                   bf_set_exp_bits(11) | BF_RNDN | BF_FLAG_SUBNORMAL);
-  bf_get_float64(r, &d, BF_RNDN);
-  bf_delete(r);
-  return d;
-}
-
-static no_inline int js_mul_pow10(LEPUSContext *ctx, LEPUSValue *sp) {
-  bf_t a_s, *a, r_s, *r = &r_s;
-  BOOL is_float;
-  LEPUSValue op1, op2;
-  slimb_t e;
-  int ret;
-
-  op1 = sp[-2];
-  op2 = sp[-1];
-  a = JS_ToBigFloat(ctx, &is_float, &a_s, op1);
-  if (!a) return -1;
-#if LIMB_BITS == 32
-  ret = LEPUS_ToInt32(ctx, &e, op2);
-#else
-  ret = LEPUS_ToInt64(ctx, &e, op2);
-#endif
-  if (ret) {
-    if (a == &a_s) bf_delete(a);
-    return -1;
-  }
-
-  bf_init(ctx->bf_ctx, r);
-  bf_mul_pow_radix(r, a, 10, e, ctx->fp_env.prec, ctx->fp_env.flags);
-  if (a == &a_s) bf_delete(a);
-  LEPUS_FreeValue(ctx, op1);
-  LEPUS_FreeValue(ctx, op2);
-  sp[-2] = JS_NewBigFloat(ctx, r);
-  return 0;
-}
-
-#else /* !CONFIG_BIGNUM */
-
-QJS_STATIC no_inline __exception int js_unary_arith_slow(LEPUSContext *ctx,
-                                                         LEPUSValue *sp,
-                                                         OPCodeEnum op) {
-  LEPUSValue op1;
-  double d;
-
-  op1 = sp[-1];
-  if (unlikely(JS_ToFloat64Free(ctx, &d, op1))) {
-    sp[-1] = LEPUS_UNDEFINED;
-    return -1;
-  }
-  switch (op) {
-    case OP_inc:
-      d++;
-      break;
-    case OP_dec:
-      d--;
-      break;
-    case OP_plus:
-      break;
-    case OP_neg:
-      d = -d;
-      break;
-    default:
-      abort();
-  }
-  sp[-1] = LEPUS_NewFloat64(ctx, d);
-  return 0;
-}
-
-/* specific case necessary for correct return value semantics */
-__exception int js_post_inc_slow(LEPUSContext *ctx, LEPUSValue *sp,
-                                 OPCodeEnum op) {
-  LEPUSValue op1;
-  double d, r;
-
-  op1 = sp[-1];
-  if (unlikely(JS_ToFloat64Free(ctx, &d, op1))) {
-    sp[-1] = LEPUS_UNDEFINED;
-    return -1;
-  }
-  r = d + 2 * (op - OP_post_dec) - 1;
-  sp[0] = LEPUS_NewFloat64(ctx, r);
-  sp[-1] = LEPUS_NewFloat64(ctx, d);
-  return 0;
-}
-
-QJS_STATIC no_inline __exception int js_binary_arith_slow(LEPUSContext *ctx,
-                                                          LEPUSValue *sp,
-                                                          OPCodeEnum op) {
-  LEPUSValue op1, op2;
-  double d1, d2, r;
-
-  op1 = sp[-2];
-  op2 = sp[-1];
-  if (unlikely(JS_ToFloat64Free(ctx, &d1, op1))) {
-    LEPUS_FreeValue(ctx, op2);
-    goto exception;
-  }
-  if (unlikely(JS_ToFloat64Free(ctx, &d2, op2))) {
-    goto exception;
-  }
-  switch (op) {
-    case OP_sub:
-      r = d1 - d2;
-      break;
-    case OP_mul:
-      r = d1 * d2;
-      break;
-    case OP_div:
-      r = d1 / d2;
-      break;
-    case OP_mod:
-      r = fmod(d1, d2);
-      break;
-    case OP_pow:
-      r = js_pow(d1, d2);
-      break;
-    default:
-      abort();
-  }
-  sp[-2] = LEPUS_NewFloat64(ctx, r);
-  return 0;
-exception:
-  sp[-2] = LEPUS_UNDEFINED;
-  sp[-1] = LEPUS_UNDEFINED;
-  return -1;
-}
-
-QJS_STATIC no_inline __exception int js_add_slow(LEPUSContext *ctx,
-                                                 LEPUSValue *sp) {
-  LEPUSValue op1, op2;
-
-  op1 = sp[-2];
-  op2 = sp[-1];
-  if ((LEPUS_VALUE_IS_INT(op1) || LEPUS_VALUE_IS_FLOAT64(op1)) &&
-      (LEPUS_VALUE_IS_INT(op2) || LEPUS_VALUE_IS_FLOAT64(op2))) {
-    goto add_numbers;
-  } else {
-    op1 = JS_ToPrimitiveFree_RC(ctx, op1, HINT_NONE);
-    if (LEPUS_IsException(op1)) {
-      LEPUS_FreeValue(ctx, op2);
-      goto exception;
-    }
-    op2 = JS_ToPrimitiveFree_RC(ctx, op2, HINT_NONE);
-    if (LEPUS_IsException(op2)) {
-      LEPUS_FreeValue(ctx, op1);
-      goto exception;
-    }
-    if (LEPUS_IsString(op1) || LEPUS_IsString(op2)) {
-      sp[-2] = JS_ConcatString(ctx, op1, op2);
-      if (LEPUS_IsException(sp[-2])) goto exception;
-    } else {
-      double d1, d2;
-    add_numbers:
-      if (JS_ToFloat64Free(ctx, &d1, op1)) {
-        LEPUS_FreeValue(ctx, op2);
-        goto exception;
-      }
-      if (JS_ToFloat64Free(ctx, &d2, op2)) goto exception;
-      sp[-2] = LEPUS_NewFloat64(ctx, d1 + d2);
-    }
-  }
-  return 0;
-exception:
-  sp[-2] = LEPUS_UNDEFINED;
-  sp[-1] = LEPUS_UNDEFINED;
-  return -1;
-}
-
-QJS_STATIC no_inline __exception int js_binary_logic_slow(LEPUSContext *ctx,
-                                                          LEPUSValue *sp,
-                                                          OPCodeEnum op) {
-  LEPUSValue op1, op2;
-  uint32_t v1, v2, r;
-
-  op1 = sp[-2];
-  op2 = sp[-1];
-  if (unlikely(JS_ToInt32Free(ctx, (int32_t *)&v1, op1))) {
-    LEPUS_FreeValue(ctx, op2);
-    goto exception;
-  }
-  if (unlikely(JS_ToInt32Free(ctx, (int32_t *)&v2, op2))) goto exception;
-  switch (op) {
-    case OP_shl:
-      r = v1 << (v2 & 0x1f);
-      break;
-    case OP_sar:
-      r = (int)v1 >> (v2 & 0x1f);
-      break;
-    case OP_and:
-      r = v1 & v2;
-      break;
-    case OP_or:
-      r = v1 | v2;
-      break;
-    case OP_xor:
-      r = v1 ^ v2;
-      break;
-    default:
-      abort();
-  }
-  sp[-2] = LEPUS_NewInt32(ctx, r);
-  return 0;
-exception:
-  sp[-2] = LEPUS_UNDEFINED;
-  sp[-1] = LEPUS_UNDEFINED;
-  return -1;
-}
-
-QJS_STATIC no_inline int js_not_slow(LEPUSContext *ctx, LEPUSValue *sp) {
-  int32_t v1;
-
-  if (unlikely(JS_ToInt32Free(ctx, &v1, sp[-1]))) {
-    sp[-1] = LEPUS_UNDEFINED;
-    return -1;
-  }
-  sp[-1] = LEPUS_NewInt32(ctx, ~v1);
-  return 0;
-}
-
-QJS_STATIC no_inline int js_relational_slow(LEPUSContext *ctx, LEPUSValue *sp,
-                                            OPCodeEnum op) {
-  LEPUSValue op1, op2;
-  int res;
-
-  op1 = sp[-2];
-  op2 = sp[-1];
-  op1 = JS_ToPrimitiveFree_RC(ctx, op1, HINT_NUMBER);
-  if (LEPUS_IsException(op1)) {
-    LEPUS_FreeValue(ctx, op2);
-    goto exception;
-  }
-  op2 = JS_ToPrimitiveFree_RC(ctx, op2, HINT_NUMBER);
-  if (LEPUS_IsException(op2)) {
-    LEPUS_FreeValue(ctx, op1);
-    goto exception;
-  }
-
-  if (JS_IsSeparableString(op1)) {
-    auto tmp = JS_GetSeparableStringContent(ctx, op1);
-    LEPUS_FreeValue(ctx, op1);
-    op1 = tmp;
-  }
-
-  if (JS_IsSeparableString(op2)) {
-    auto tmp = JS_GetSeparableStringContent(ctx, op2);
-    LEPUS_FreeValue(ctx, op2);
-    op2 = tmp;
-  }
-
-  if (LEPUS_VALUE_IS_STRING(op1) && LEPUS_VALUE_IS_STRING(op2)) {
-    JSString *p1, *p2;
-    p1 = LEPUS_VALUE_GET_STRING(op1);
-    p2 = LEPUS_VALUE_GET_STRING(op2);
-    res = js_string_compare(ctx, p1, p2);
-    LEPUS_FreeValue(ctx, op1);
-    LEPUS_FreeValue(ctx, op2);
-    switch (op) {
-      case OP_lt:
-        res = (res < 0);
-        break;
-      case OP_lte:
-        res = (res <= 0);
-        break;
-      case OP_gt:
-        res = (res > 0);
-        break;
-      default:
-      case OP_gte:
-        res = (res >= 0);
-        break;
-    }
-  } else {
-    double d1, d2;
-    if (JS_ToFloat64Free(ctx, &d1, op1)) {
-      LEPUS_FreeValue(ctx, op2);
-      goto exception;
-    }
-    if (JS_ToFloat64Free(ctx, &d2, op2)) goto exception;
-    switch (op) {
-      case OP_lt:
-        res = (d1 < d2); /* if NaN return false */
-        break;
-      case OP_lte:
-        res = (d1 <= d2); /* if NaN return false */
-        break;
-      case OP_gt:
-        res = (d1 > d2); /* if NaN return false */
-        break;
-      default:
-      case OP_gte:
-        res = (d1 >= d2); /* if NaN return false */
-        break;
-    }
-  }
-  sp[-2] = LEPUS_NewBool(ctx, res);
-  return 0;
-exception:
-  sp[-2] = LEPUS_UNDEFINED;
-  sp[-1] = LEPUS_UNDEFINED;
-  return -1;
-}
-
-QJS_STATIC no_inline __exception int js_eq_slow(LEPUSContext *ctx,
-                                                LEPUSValue *sp, BOOL is_neq) {
-  LEPUSValue op1, op2;
-  int64_t tag1, tag2;
-  BOOL res;
-
-  op1 = sp[-2];
-  op2 = sp[-1];
-redo:
-  tag1 = LEPUS_VALUE_GET_NORM_TAG(op1);
-  tag2 = LEPUS_VALUE_GET_NORM_TAG(op2);
-  if (tag1 == tag2 || (tag1 == LEPUS_TAG_INT && tag2 == LEPUS_TAG_FLOAT64) ||
-      (tag2 == LEPUS_TAG_INT && tag1 == LEPUS_TAG_FLOAT64) ||
-      (LEPUS_IsString(op1) && LEPUS_IsString(op2))) {
-    res = js_strict_eq(ctx, op1, op2);
-  } else if ((tag1 == LEPUS_TAG_NULL && tag2 == LEPUS_TAG_UNDEFINED) ||
-             (tag2 == LEPUS_TAG_NULL && tag1 == LEPUS_TAG_UNDEFINED)) {
-    res = TRUE;
-  } else if ((LEPUS_IsString(op1) &&
-              (tag2 == LEPUS_TAG_INT || tag2 == LEPUS_TAG_FLOAT64)) ||
-             (LEPUS_IsString(op2) &&
-              (tag1 == LEPUS_TAG_INT || tag1 == LEPUS_TAG_FLOAT64))) {
-    double d1;
-    double d2;
-    if (JS_ToFloat64Free(ctx, &d1, op1)) {
-      LEPUS_FreeValue(ctx, op2);
-      goto exception;
-    }
-    if (JS_ToFloat64Free(ctx, &d2, op2)) goto exception;
-    res = (d1 == d2);
-  } else if (tag1 == LEPUS_TAG_BOOL) {
-    op1 = LEPUS_NewInt32(ctx, LEPUS_VALUE_GET_BOOL(op1));
-    goto redo;
-  } else if (tag2 == LEPUS_TAG_BOOL) {
-    op2 = LEPUS_NewInt32(ctx, LEPUS_VALUE_GET_BOOL(op2));
-    goto redo;
-  } else if (tag1 == LEPUS_TAG_OBJECT &&
-             (tag2 == LEPUS_TAG_INT || tag2 == LEPUS_TAG_FLOAT64 ||
-              tag2 == LEPUS_TAG_STRING || tag2 == LEPUS_TAG_SYMBOL ||
-              tag2 == LEPUS_TAG_SEPARABLE_STRING)) {
-    op1 = JS_ToPrimitiveFree_RC(ctx, op1, HINT_NONE);
-    if (LEPUS_IsException(op1)) {
-      LEPUS_FreeValue(ctx, op2);
-      goto exception;
-    }
-    goto redo;
-  } else if (tag2 == LEPUS_TAG_OBJECT &&
-             (tag1 == LEPUS_TAG_INT || tag1 == LEPUS_TAG_FLOAT64 ||
-              tag1 == LEPUS_TAG_STRING || tag1 == LEPUS_TAG_SEPARABLE_STRING ||
-              tag1 == LEPUS_TAG_SYMBOL)) {
-    op2 = JS_ToPrimitiveFree_RC(ctx, op2, HINT_NONE);
-    if (LEPUS_IsException(op2)) {
-      LEPUS_FreeValue(ctx, op1);
-      goto exception;
-    }
-    goto redo;
-  } else {
-    LEPUS_FreeValue(ctx, op1);
-    LEPUS_FreeValue(ctx, op2);
-    res = FALSE;
-  }
-  sp[-2] = LEPUS_NewBool(ctx, res ^ is_neq);
-  return 0;
-exception:
-  sp[-2] = LEPUS_UNDEFINED;
-  sp[-1] = LEPUS_UNDEFINED;
-  return -1;
-}
-
-QJS_STATIC no_inline int js_shr_slow(LEPUSContext *ctx, LEPUSValue *sp) {
-  LEPUSValue op1, op2;
-  uint32_t v1, v2, r;
-
-  op1 = sp[-2];
-  op2 = sp[-1];
-  if (unlikely(JS_ToUint32Free(ctx, &v1, op1))) {
-    LEPUS_FreeValue(ctx, op2);
-    goto exception;
-  }
-  if (unlikely(JS_ToUint32Free(ctx, &v2, op2))) goto exception;
-  r = v1 >> (v2 & 0x1f);
-  sp[-2] = JS_NewUint32(ctx, r);
-  return 0;
-exception:
-  sp[-2] = LEPUS_UNDEFINED;
-  sp[-1] = LEPUS_UNDEFINED;
-  return -1;
-}
-
 // <Primjs begin>
 #ifdef ENABLE_LEPUSNG
-QJS_STATIC JSBigFloat *js_new_bf(LEPUSContext *ctx) {
-  JSBigFloat *p;
-  p = static_cast<JSBigFloat *>(lepus_mallocz(ctx, sizeof(*p)));
-  if (!p) return NULL;
-  p->header.ref_count = 1;
-  return p;
-}
-
-LEPUSValue LEPUS_NewBigUint64(LEPUSContext *ctx, uint64_t v) {
-  CallGCFunc(JS_NewBigUint64_GC, ctx, v);
-  JSBigFloat *p = js_new_bf(ctx);
-  p->num = v;
-  return LEPUS_MKPTR(LEPUS_TAG_BIG_INT, p);
-}
-
 LEPUSValue LEPUS_NewLepusWrap(LEPUSContext *ctx, void *p, int tag) {
 #ifdef ENABLE_COMPATIBLE_MM
   if (ctx->gc_enable) AddLepusRefCount(ctx);
@@ -14295,8 +12178,6 @@ void *LEPUS_GetStringCache_GC(LEPUSValue val) { return nullptr; }
 
 #endif
 // <Primjs end>
-
-#endif /* !CONFIG_BIGNUM */
 
 /* XXX: Should take LEPUSValueConst arguments */
 QJS_STATIC BOOL js_strict_eq2(LEPUSContext *ctx, LEPUSValue op1, LEPUSValue op2,
@@ -14402,22 +12283,9 @@ QJS_STATIC BOOL js_strict_eq2(LEPUSContext *ctx, LEPUSValue op1, LEPUSValue op2,
         d2 = LEPUS_VALUE_GET_INT(op2);
         goto number_test;
       } else if (tag2 == LEPUS_TAG_FLOAT64) {
-#ifdef CONFIG_BIGNUM
-        if (is_bignum_mode(ctx)) {
-          res = FALSE;
-        } else
-#endif
-        {
-          d2 = LEPUS_VALUE_GET_FLOAT64(op2);
-          goto number_test;
-        }
-      } else
-#ifdef CONFIG_BIGNUM
-          if (tag2 == LEPUS_TAG_BIG_INT && is_bignum_mode(ctx)) {
-        goto bigint_test;
-      } else
-#endif
-      {
+        d2 = LEPUS_VALUE_GET_FLOAT64(op2);
+        goto number_test;
+      } else {
         res = FALSE;
       }
       break;
@@ -14425,11 +12293,7 @@ QJS_STATIC BOOL js_strict_eq2(LEPUSContext *ctx, LEPUSValue op1, LEPUSValue op2,
       d1 = LEPUS_VALUE_GET_FLOAT64(op1);
       if (tag2 == LEPUS_TAG_FLOAT64) {
         d2 = LEPUS_VALUE_GET_FLOAT64(op2);
-      } else if (tag2 == LEPUS_TAG_INT
-#ifdef CONFIG_BIGNUM
-                 && !is_bignum_mode(ctx)
-#endif
-      ) {
+      } else if (tag2 == LEPUS_TAG_INT) {
         d2 = LEPUS_VALUE_GET_INT(op2);
       } else {
         res = FALSE;
@@ -14452,65 +12316,19 @@ QJS_STATIC BOOL js_strict_eq2(LEPUSContext *ctx, LEPUSValue op1, LEPUSValue op2,
         res = (d1 == d2); /* if NaN return false and +0 == -0 */
       }
       goto done_no_free;
-#ifdef CONFIG_BIGNUM
     case LEPUS_TAG_BIG_INT: {
-      bf_t a_s, *a, b_s, *b;
-      BOOL is_float;
-      if (tag1 == tag2) {
-        /* OK */
-      } else if (tag2 == LEPUS_TAG_INT && is_bignum_mode(ctx)) {
-        /* OK */
-      } else {
+      JSBigIntBuf buf1, buf2;
+      JSBigInt *p1, *p2;
+
+      if (tag2 != LEPUS_TAG_BIG_INT) {
         res = FALSE;
         break;
       }
-    bigint_test:
-      a = JS_ToBigFloat(ctx, &is_float, &a_s, op1);
-      b = JS_ToBigFloat(ctx, &is_float, &b_s, op2);
-      res = bf_cmp_eq(a, b);
-      if (a == &a_s) bf_delete(a);
-      if (b == &b_s) bf_delete(a);
+
+      p1 = LEPUS_VALUE_GET_BIGINT(op1);
+      p2 = LEPUS_VALUE_GET_BIGINT(op2);
+      res = (js_bigint_cmp(ctx, p1, p2) == 0);
     } break;
-    case LEPUS_TAG_BIG_FLOAT: {
-      JSBigFloat *p1, *p2;
-      const bf_t *a, *b;
-      if (tag1 != tag2) {
-        res = FALSE;
-        break;
-      }
-      p1 = static_cast<JSBigFloat *>(LEPUS_VALUE_GET_PTR(op1));
-      p2 = static_cast<JSBigFloat *>(LEPUS_VALUE_GET_PTR(op2));
-      a = &p1->num;
-      b = &p2->num;
-      if (unlikely(eq_mode >= JS_EQ_SAME_VALUE)) {
-        if (eq_mode == JS_EQ_SAME_VALUE_ZERO && a->expn == BF_EXP_ZERO &&
-            b->expn == BF_EXP_ZERO) {
-          res = TRUE;
-        } else {
-          res = (bf_cmp_full(a, b) == 0);
-        }
-      } else {
-        res = bf_cmp_eq(a, b);
-      }
-    } break;
-#endif
-// <Primjs begin>
-#ifdef ENABLE_LEPUSNG
-    case LEPUS_TAG_BIG_INT: {
-      JSBigFloat *p1 = static_cast<JSBigFloat *>(LEPUS_VALUE_GET_PTR(op1));
-      if (tag2 == LEPUS_TAG_BIG_INT) {
-        JSBigFloat *p2 = static_cast<JSBigFloat *>(LEPUS_VALUE_GET_PTR(op2));
-        if (p2->num == p1->num) {
-          res = TRUE;
-        } else {
-          res = FALSE;
-        }
-      } else {
-        res = FALSE;
-      }
-    } break;
-#endif
-      // <Primjs end>
     default:
       res = FALSE;
       break;
@@ -14633,34 +12451,13 @@ __exception int js_operator_typeof(LEPUSContext *ctx, LEPUSValue op1) {
       break;
 #endif
       // <Primjs end>
-
-#ifdef CONFIG_BIGNUM
-    case LEPUS_TAG_INT:
-      if (is_bignum_mode(ctx))
-        atom = JS_ATOM_bigint;
-      else
-        atom = JS_ATOM_number;
-      break;
     case LEPUS_TAG_BIG_INT:
-      atom = JS_ATOM_bigint;
+      atom = LEPUS_NewAtom(ctx, "bigint");
       break;
+    case LEPUS_TAG_INT:
     case LEPUS_TAG_FLOAT64:
       atom = JS_ATOM_number;
       break;
-    case LEPUS_TAG_BIG_FLOAT:
-      atom = JS_ATOM_bigfloat;
-      break;
-#else
-    case LEPUS_TAG_INT:
-    case LEPUS_TAG_FLOAT64:
-// <Primjs begin>
-#ifdef ENABLE_LEPUSNG
-    case LEPUS_TAG_BIG_INT:
-#endif
-      // <Primjs end>
-      atom = JS_ATOM_number;
-      break;
-#endif
     case LEPUS_TAG_UNDEFINED:
       atom = JS_ATOM_undefined;
       break;
@@ -15825,35 +13622,23 @@ QJS_STATIC LEPUSValue js_call_c_function(LEPUSContext *ctx,
   sf->prev_frame = prev_sf;
   sf->cur_func = (LEPUSValue)func_obj;
   rt->current_stack_frame = sf;
-#ifdef CONFIG_BIGNUM
-  /* we only propagate the bignum mode as some runtime functions
-     test it */
-  if (prev_sf)
-    sf->js_mode = prev_sf->js_mode & JS_MODE_BIGINT;
-  else
-    sf->js_mode = 0;
-#else
   sf->js_mode = 0;
-#endif
   sf->arg_count = argc;
   arg_buf = argv;
 
   // <Primjs begin>
-#ifdef OS_IOS
+#ifdef USE_VIRTUAL_STACK
   size_t alloca_size = 0;
 #endif
   if (unlikely(argc < arg_count)) {
     /* ensure that at least argc_count arguments are readable */
-#ifdef OS_IOS
+#ifdef USE_VIRTUAL_STACK
     alloca_size = sizeof(arg_buf[0]) * arg_count;
-    if (js_check_virtual_outofmemory(ctx, alloca_size)) {
-      return LEPUS_ThrowOutOfMemory(ctx);
-    }
+
     if (js_check_virtual_sp_overflow(ctx, alloca_size)) {
       return JS_ThrowStackOverflow(ctx);
     }
-    arg_buf = js_get_virtual_sp(ctx);
-    js_push_virtual_sp(ctx, alloca_size);
+    arg_buf = js_get_virtual_sp(ctx, alloca_size);
 #elif !defined(OS_WIN)
     arg_buf = static_cast<LEPUSValue *>(alloca(sizeof(arg_buf[0]) * arg_count));
 #else
@@ -15949,7 +13734,7 @@ QJS_STATIC LEPUSValue js_call_c_function(LEPUSContext *ctx,
 
   rt->current_stack_frame = sf->prev_frame;
   // <Primjs add>
-#ifdef OS_IOS
+#ifdef USE_VIRTUAL_STACK
   js_pop_virtual_sp(ctx, alloca_size);
 #endif
   return ret_val;
@@ -15971,18 +13756,15 @@ QJS_STATIC LEPUSValue js_call_bound_function(LEPUSContext *ctx,
     return JS_ThrowStackOverflow(ctx);
   // <Primjs begin>
   LEPUSValue ret;
-#ifdef OS_IOS
+#ifdef USE_VIRTUAL_STACK
   size_t alloca_size = sizeof(LEPUSValue) * arg_count;
-  if (js_check_virtual_outofmemory(ctx, alloca_size)) {
-    return LEPUS_ThrowOutOfMemory(ctx);
-  }
+
   if (js_check_virtual_sp_overflow(ctx, alloca_size)) {
     return JS_ThrowStackOverflow(ctx);
   }
   // arg_buf = alloca(sizeof(LEPUSValue) * arg_count);
   // allocat stack size
-  arg_buf = js_get_virtual_sp(ctx);
-  js_push_virtual_sp(ctx, alloca_size);
+  arg_buf = js_get_virtual_sp(ctx, alloca_size);
 #elif !defined(OS_WIN)
   arg_buf = static_cast<LEPUSValue *>(alloca(sizeof(LEPUSValue) * arg_count));
 #else
@@ -16005,7 +13787,7 @@ QJS_STATIC LEPUSValue js_call_bound_function(LEPUSContext *ctx,
   } else {
     ret = JS_Call_RC(ctx, bf->func_obj, bf->this_val, arg_count, arg_buf);
   }
-#ifdef OS_IOS
+#ifdef USE_VIRTUAL_STACK
   js_pop_virtual_sp(ctx, alloca_size);
 #endif
   return ret;
@@ -16147,7 +13929,7 @@ QJS_STATIC LEPUSValue JS_CallInternal(LEPUSContext *caller_ctx,
 #define BREAK SWITCH(pc)
 #endif
   // <Primjs begin>
-#ifdef OS_IOS
+#ifdef USE_VIRTUAL_STACK
   BOOL need_free_local_buf = 0;
   // <Primjs end>
 #endif
@@ -16211,17 +13993,14 @@ QJS_STATIC LEPUSValue JS_CallInternal(LEPUSContext *caller_ctx,
   var_refs = p->u.func.var_refs;
 
   // <Primjs begin>
-#ifdef OS_IOS
+#ifdef USE_VIRTUAL_STACK
   need_free_local_buf = 1;
-  if (js_check_virtual_outofmemory(caller_ctx, alloca_size)) {
-    return LEPUS_ThrowOutOfMemory(caller_ctx);
-  }
+
   if (js_check_virtual_sp_overflow(caller_ctx, alloca_size)) {
     return JS_ThrowStackOverflow(caller_ctx);
   }
 
-  local_buf = js_get_virtual_sp(caller_ctx);
-  js_push_virtual_sp(caller_ctx, alloca_size);
+  local_buf = js_get_virtual_sp(caller_ctx, alloca_size);
 #elif !defined(OS_WIN)
   local_buf = static_cast<LEPUSValue *>(alloca(alloca_size));
 #else
@@ -17874,10 +15653,6 @@ restart:
           v1 = LEPUS_VALUE_GET_INT(op1);
           v2 = LEPUS_VALUE_GET_INT(op2);
           r = (int64_t)v1 * v2;
-#ifdef CONFIG_BIGNUM
-          if (unlikely((int)r != r) || (r == 0 && !is_bignum_mode(ctx)))
-            goto binary_arith_slow;
-#else
           if (unlikely((int)r != r)) {
             d = (double)r;
             goto mul_fp_res;
@@ -17887,14 +15662,11 @@ restart:
             d = -0.0;
             goto mul_fp_res;
           }
-#endif
           sp[-2] = LEPUS_NewInt32(ctx, r);
           sp--;
         } else if (LEPUS_VALUE_IS_BOTH_FLOAT(op1, op2)) {
           d = LEPUS_VALUE_GET_FLOAT64(op1) * LEPUS_VALUE_GET_FLOAT64(op2);
-#ifndef CONFIG_BIGNUM
         mul_fp_res:
-#endif
           sp[-2] = __JS_NewFloat64(ctx, d);
           sp--;
         } else {
@@ -17902,9 +15674,6 @@ restart:
         }
       }
       BREAK;
-#ifdef CONFIG_BIGNUM
-      CASE(OP_math_div) : CASE(OP_div) : goto binary_arith_slow;
-#else
       CASE(OP_div) : {
         LEPUSValue op1, op2;
         op1 = sp[-2];
@@ -17920,14 +15689,7 @@ restart:
         }
       }
       BREAK;
-#endif
-      CASE(OP_mod)
-          :
-#ifdef CONFIG_BIGNUM
-            CASE(OP_math_mod)
-          :
-#endif
-      {
+      CASE(OP_mod) : {
         LEPUSValue op1, op2;
         op1 = sp[-2];
         op2 = sp[-1];
@@ -17946,15 +15708,9 @@ restart:
         }
       }
       BREAK;
-      CASE(OP_pow)
-          :
-#ifdef CONFIG_BIGNUM
-            CASE(OP_math_pow)
-          :
-#endif
-            binary_arith_slow
-          : if (js_binary_arith_slow(
-                    ctx, sp, static_cast<OPCodeEnum>(opcode))) goto exception;
+      CASE(OP_pow) : binary_arith_slow : sf->cur_pc = pc;
+      if (js_binary_arith_slow(ctx, sp, static_cast<OPCodeEnum>(opcode)))
+        goto exception;
       sp--;
       BREAK;
 
@@ -17976,10 +15732,6 @@ restart:
         op1 = sp[-1];
         if (LEPUS_VALUE_IS_INT(op1)) {
           val = LEPUS_VALUE_GET_INT(op1);
-#ifdef CONFIG_BIGNUM
-          if (unlikely(val == INT32_MIN) || (val == 0 && !is_bignum_mode(ctx)))
-            goto slow_neg;
-#else
           /* Note: -0 cannot be expressed as integer */
           if (unlikely(val == 0)) {
             d = -0.0;
@@ -17989,18 +15741,13 @@ restart:
             d = -(double)val;
             goto neg_fp_res;
           }
-#endif
           sp[-1] = LEPUS_NewInt32(ctx, -val);
         } else if (LEPUS_VALUE_IS_FLOAT64(op1)) {
           d = -LEPUS_VALUE_GET_FLOAT64(op1);
-#ifndef CONFIG_BIGNUM
         neg_fp_res:
-#endif
           sp[-1] = __JS_NewFloat64(ctx, d);
         } else {
-#ifdef CONFIG_BIGNUM
-        slow_neg:
-#endif
+          sf->cur_pc = pc;
           if (js_unary_arith_slow(ctx, sp, static_cast<OPCodeEnum>(opcode)))
             goto exception;
         }
@@ -18105,26 +15852,11 @@ restart:
           uint32_t v1, v2;
           v1 = LEPUS_VALUE_GET_INT(op1);
           v2 = LEPUS_VALUE_GET_INT(op2);
-#ifdef CONFIG_BIGNUM
-          {
-            int64_t r;
-            if (is_bignum_mode(ctx)) {
-              if (v2 > 0x1f) goto shl_slow;
-              r = (int64_t)v1 << v2;
-              if ((int)r != r) goto shl_slow;
-            } else {
-              v2 &= 0x1f;
-            }
-          }
-#else
           v2 &= 0x1f;
-#endif
           sp[-2] = LEPUS_NewInt32(ctx, v1 << v2);
           sp--;
         } else {
-#ifdef CONFIG_BIGNUM
-        shl_slow:
-#endif
+          sf->cur_pc = pc;
           if (js_binary_logic_slow(ctx, sp, static_cast<OPCodeEnum>(opcode)))
             goto exception;
           sp--;
@@ -18138,11 +15870,11 @@ restart:
         if (likely(LEPUS_VALUE_IS_BOTH_INT(op1, op2))) {
           uint32_t v2;
           v2 = LEPUS_VALUE_GET_INT(op2);
-          /* v1 >>> v2 retains its LEPUS semantics if CONFIG_BIGNUM */
           v2 &= 0x1f;
           sp[-2] = JS_NewUint32(ctx, (uint32_t)LEPUS_VALUE_GET_INT(op1) >> v2);
           sp--;
         } else {
+          sf->cur_pc = pc;
           if (js_shr_slow(ctx, sp)) goto exception;
           sp--;
         }
@@ -18155,22 +15887,11 @@ restart:
         if (likely(LEPUS_VALUE_IS_BOTH_INT(op1, op2))) {
           uint32_t v2;
           v2 = LEPUS_VALUE_GET_INT(op2);
-#ifdef CONFIG_BIGNUM
-          if (unlikely(v2 > 0x1f)) {
-            if (is_bignum_mode(ctx))
-              goto sar_slow;
-            else
-              v2 &= 0x1f;
-          }
-#else
           v2 &= 0x1f;
-#endif
           sp[-2] = LEPUS_NewInt32(ctx, (int)LEPUS_VALUE_GET_INT(op1) >> v2);
           sp--;
         } else {
-#ifdef CONFIG_BIGNUM
-        sar_slow:
-#endif
+          sf->cur_pc = pc;
           if (js_binary_logic_slow(ctx, sp, static_cast<OPCodeEnum>(opcode)))
             goto exception;
           sp--;
@@ -18252,11 +15973,6 @@ restart:
       OP_CMP(OP_strict_eq, ==, js_strict_eq_slow(ctx, sp, 0));
       OP_CMP(OP_strict_neq, !=, js_strict_eq_slow(ctx, sp, 1));
 
-#ifdef CONFIG_BIGNUM
-      CASE(OP_mul_pow10) : if (js_mul_pow10(ctx, sp)) goto exception;
-      sp--;
-      BREAK;
-#endif
       CASE(OP_in) : if (js_operator_in(ctx, sp)) goto exception;
       sp--;
       BREAK;
@@ -18509,7 +16225,7 @@ exception:
       LEPUS_FreeValue(ctx, *pval);
     }
   }
-#ifdef OS_IOS
+#ifdef USE_VIRTUAL_STACK
   if (need_free_local_buf) js_pop_virtual_sp(ctx, alloca_size);
 #endif
   rt->current_stack_frame = sf->prev_frame;
@@ -19598,11 +17314,9 @@ const JSOpCode opcode_info[OP_COUNT + (OP_TEMP_END - OP_TEMP_START)] = {
 
 QJS_STATIC void free_token(JSParseState *s, JSToken *token) {
   switch (token->val) {
-#ifdef CONFIG_BIGNUM
     case TOK_NUMBER:
       LEPUS_FreeValue(s->ctx, token->u.num.val);
       break;
-#endif
     case TOK_STRING:
     case TOK_TEMPLATE:
       LEPUS_FreeValue(s->ctx, token->u.str.str);
@@ -20393,108 +18107,27 @@ redo:
       goto parse_number;
     case '1' ... '9':
       /* number */
-    parse_number:
-#ifdef CONFIG_BIGNUM
-    {
-      const uint8_t *p1;
-      int flags;
-      slimb_t exponent;
-      LEPUSValue val;
-
-      s->token.val = TOK_NUMBER;
-      s->token.u.num.val = LEPUS_UNDEFINED;
-      s->token.u.num.exponent = 0;
-      if (!s->cur_func) {
-        /* JSON: use current float precision */
-        flags = BF_ATOF_THROW;
-        if (is_bignum_mode(s->ctx))
-          flags |= BF_ATOF_INT_PREC_INF;
-        else
-          flags |= BF_ATOF_FLOAT64;
-        val = js_atof(s->ctx, (const char *)p, (const char **)&p, 10, flags);
-        if (LEPUS_IsException(val)) goto bad_number;
-      } else {
-        bf_t r_s, *r = &r_s;
-        BOOL bigint_mode, is_bigint, is_bigfloat;
-        int res;
-
-        bigint_mode = (s->cur_func->js_mode & JS_MODE_BIGINT) != 0;
-        flags = BF_ATOF_BIN_OCT | BF_ATOF_LEGACY_OCTAL |
-                BF_ATOF_UNDERSCORE_SEP | BF_ATOF_INT_PREC_INF | BF_RNDZ;
-        if (!bigint_mode) flags |= BF_ATOF_ONLY_DEC_FLOAT;
-        p += skip_spaces((char *)p);
-        bf_init(s->ctx->bf_ctx, r);
-        res = bf_atof2(r, &exponent, (const char *)p, (const char **)&p, 0,
-                       BF_PREC_INF, flags);
-        if (bf_is_nan(r)) {
-          bf_delete(r);
-          goto bad_number;
-        }
-        is_bigint = FALSE;
-        is_bigfloat = FALSE;
-        if (*p == 'n') {
-          if (!(res & BF_ATOF_ST_INTEGER) || (res & BF_ATOF_ST_LEGACY_OCTAL)) {
-            bf_delete(r);
-            goto bad_number;
-          }
-          p++;
-          is_bigint = TRUE;
-        } else if (*p == 'l') {
-          p++;
-          is_bigfloat = TRUE;
-        }
-        if ((res & BF_ATOF_ST_INTEGER) && !is_bigfloat &&
-            (bigint_mode || is_bigint)) {
-          /* in bigint mode: small integer or bigint
-             in legacy mode: always a bigint */
-          val = JS_NewBigInt2(s->ctx, r, bigint_mode ^ 1);
-        } else {
-          /* `n` suffix is implied in math mode */
-          if (s->cur_func->js_mode & JS_MODE_MATH) is_bigfloat = TRUE;
-          if (is_bigfloat) {
-            /* infinite precision */
-            val = JS_NewBigFloat(s->ctx, r);
-            s->token.u.num.exponent = exponent;
-          } else {
-            double d;
-            d = bf_mul_pow10_to_float64(s->ctx, r, exponent);
-            bf_delete(r);
-            val = LEPUS_NewFloat64(s->ctx, d);
-          }
-        }
-      }
-      s->token.u.num.val = val;
-      if (lre_js_is_ident_next(unicode_from_utf8(p, UTF8_CHAR_LEN_MAX, &p1))) {
-      bad_number:
-        js_parse_error(s, "invalid number literal");
-        goto fail;
-      }
-    }
-#else
-    {
+    parse_number: {
       LEPUSValue ret;
       const uint8_t *p1;
-      int flags, radix;
-      if (!s->cur_func) {
-        flags = ATOD_THROW;
-        radix = 10;
-      } else {
-        flags = ATOD_ACCEPT_BIN_OCT | ATOD_THROW | ATOD_ACCEPT_LEGACY_OCTAL |
-                ATOD_ACCEPT_UNDERSCORES;
-        radix = 0;
-      }
-      ret = js_atod(s->ctx, (const char *)p, (const char **)&p, radix, flags);
-      /* reject `10instanceof Number` */
-      if (LEPUS_IsException(ret) ||
+      int flags;
+
+      flags = ATOD_ACCEPT_BIN_OCT | ATOD_ACCEPT_LEGACY_OCTAL |
+              ATOD_ACCEPT_UNDERSCORES | ATOD_ACCEPT_SUFFIX;
+      ret = js_atof(s->ctx, (const char *)p, (const char **)&p, 0, flags);
+      if (LEPUS_IsException(ret)) goto fail;
+      if (LEPUS_VALUE_IS_NAN(ret) ||
           lre_js_is_ident_next(unicode_from_utf8(p, UTF8_CHAR_LEN_MAX, &p1))) {
+#ifdef ENABLE_COMPATIBLE_MM
+        if (!s->ctx->gc_enable)
+#endif
+          LEPUS_FreeValue(s->ctx, ret);
         js_parse_error(s, "invalid number literal");
         goto fail;
       }
       s->token.val = TOK_NUMBER;
       s->token.u.num.val = ret;
-    }
-#endif
-    break;
+    } break;
     case '*':
       if (p[1] == '=') {
         p += 2;
@@ -20632,33 +18265,6 @@ redo:
         goto def_token;
       }
       break;
-#ifdef CONFIG_BIGNUM
-      /* in math mode, '^' is the power operator. '^^' is always the
-         xor operator and '**' is always the power operator */
-    case '^':
-      if (p[1] == '=') {
-        p += 2;
-        if (s->cur_func && (s->cur_func->js_mode & JS_MODE_MATH))
-          s->token.val = TOK_MATH_POW_ASSIGN;
-        else
-          s->token.val = TOK_XOR_ASSIGN;
-      } else if (p[1] == '^') {
-        if (p[2] == '=') {
-          p += 3;
-          s->token.val = TOK_XOR_ASSIGN;
-        } else {
-          p += 2;
-          s->token.val = '^';
-        }
-      } else {
-        p++;
-        if (s->cur_func && (s->cur_func->js_mode & JS_MODE_MATH))
-          s->token.val = TOK_MATH_POW;
-        else
-          s->token.val = '^';
-      }
-      break;
-#else
     case '^':
       if (p[1] == '=') {
         p += 2;
@@ -20667,7 +18273,6 @@ redo:
         goto def_token;
       }
       break;
-#endif
     case '|':
       if (p[1] == '=') {
         p += 2;
@@ -21653,19 +19258,7 @@ QJS_STATIC int __exception js_parse_property_name(JSParseState *s,
   } else if (s->token.val == TOK_NUMBER) {
     LEPUSValue val;
     val = s->token.u.num.val;
-#ifdef CONFIG_BIGNUM
-    if (LEPUS_VALUE_GET_TAG(val) == LEPUS_TAG_BIG_FLOAT) {
-      JSBigFloat *p = static_cast<JSBigFloat *>(LEPUS_VALUE_GET_PTR(val));
-      double d;
-      d = bf_mul_pow10_to_float64(s->ctx, &p->num, s->token.u.num.exponent);
-      val = __JS_NewFloat64(s->ctx, d);
-      name = js_value_to_atom(s->ctx, val);
-      LEPUS_FreeValue(s->ctx, val);
-    } else
-#endif
-    {
-      name = js_value_to_atom(s->ctx, val);
-    }
+    name = js_value_to_atom(s->ctx, val);
     if (name == JS_ATOM_NULL) goto fail;
     if (next_token(s)) goto fail1;
   } else if (s->token.val == '[') {
@@ -23542,33 +21135,7 @@ QJS_STATIC __exception int js_parse_postfix_expr(JSParseState *s,
       if (LEPUS_VALUE_IS_INT(val)) {
         emit_op(s, OP_push_i32);
         emit_u32(s, LEPUS_VALUE_GET_INT(val));
-      } else
-#ifdef CONFIG_BIGNUM
-          if (LEPUS_VALUE_GET_TAG(val) == LEPUS_TAG_BIG_FLOAT) {
-        bf_t r_s, *r = &r_s;
-        slimb_t e;
-        int ret;
-
-        /* need a runtime conversion */
-        /* XXX: could add a cache and/or do it once at
-           the start of the function */
-        if (emit_push_const(s, val, 0) < 0) return -1;
-        e = s->token.u.num.exponent;
-        if (e == (int32_t)e) {
-          emit_op(s, OP_push_i32);
-          emit_u32(s, e);
-        } else {
-          bf_init(s->ctx->bf_ctx, r);
-          bf_set_si(r, e);
-          val = JS_NewBigInt(s->ctx, r);
-          ret = emit_push_const(s, val, 0);
-          LEPUS_FreeValue(s->ctx, val);
-          if (ret < 0) return -1;
-        }
-        emit_op(s, OP_mul_pow10);
-      } else
-#endif
-      {
+      } else {
         if (emit_push_const(s, val, 0) < 0) return -1;
       }
     }
@@ -24279,28 +21846,6 @@ QJS_STATIC __exception int js_parse_unary(JSParseState *s, int parse_flags) {
       break;
   }
   if (parse_flags & (PF_POW_ALLOWED | PF_POW_FORBIDDEN)) {
-#ifdef CONFIG_BIGNUM
-    if (s->token.val == TOK_POW || s->token.val == TOK_MATH_POW) {
-      /* Extended exponentiation syntax rules: we extend the ES7
-         grammar in order to have more intuitive semantics:
-         -2**2 evaluates to -4. */
-      if (!(s->cur_func->js_mode & JS_MODE_MATH)) {
-        if ((parse_flags & PF_POW_FORBIDDEN) < 0) {
-          LEPUS_ThrowSyntaxError(
-              s->ctx,
-              "unparenthesized unary expression can't appear "
-              "on the left-hand side of '**'");
-          return -1;
-        }
-      }
-      if (next_token(s)) return -1;
-      if (js_parse_unary(s, PF_POW_ALLOWED)) return -1;
-      if (s->cur_func->js_mode & JS_MODE_MATH)
-        emit_op(s, OP_math_pow);
-      else
-        emit_op(s, OP_pow);
-    }
-#else
     if (s->token.val == TOK_POW) {
       /* Strict ES7 exponentiation syntax rules: To solve
          conficting semantics between different implementations
@@ -24318,7 +21863,6 @@ QJS_STATIC __exception int js_parse_unary(JSParseState *s, int parse_flags) {
       if (js_parse_unary(s, PF_POW_ALLOWED)) return -1;
       emit_op(s, OP_pow);
     }
-#endif
   }
   return 0;
 }
@@ -24341,20 +21885,10 @@ QJS_STATIC __exception int js_parse_expr_binary(JSParseState *s, int level,
             opcode = OP_mul;
             break;
           case '/':
-#ifdef CONFIG_BIGNUM
-            if (s->cur_func->js_mode & JS_MODE_MATH)
-              opcode = OP_math_div;
-            else
-#endif
-              opcode = OP_div;
+            opcode = OP_div;
             break;
           case '%':
-#ifdef CONFIG_BIGNUM
-            if (s->cur_func->js_mode & JS_MODE_MATH)
-              opcode = OP_math_mod;
-            else
-#endif
-              opcode = OP_mod;
+            opcode = OP_mod;
             break;
           default:
             return 0;
@@ -24708,23 +22242,9 @@ __exception int js_parse_assign_expr(JSParseState *s, int parse_flags) {
     } else {
       static const uint8_t assign_opcodes[] = {
           OP_mul, OP_div, OP_mod, OP_add, OP_sub, OP_shl,
-          OP_sar, OP_shr, OP_and, OP_xor, OP_or,
-#ifdef CONFIG_BIGNUM
-          OP_pow,
-#endif
-          OP_pow,
+          OP_sar, OP_shr, OP_and, OP_xor, OP_or,  OP_pow,
       };
       op = assign_opcodes[op - TOK_MUL_ASSIGN];
-#ifdef CONFIG_BIGNUM
-      if (s->cur_func->js_mode & JS_MODE_MATH) {
-        if (op == OP_div)
-          op = OP_math_div;
-        else if (op == OP_mod)
-          op = OP_math_mod;
-        else if (op == OP_pow)
-          op = OP_math_pow;
-      }
-#endif
       emit_op(s, op);
     }
     put_lvalue(s, opcode, scope, name, label, PUT_LVALUE_KEEP_TOP, FALSE);
@@ -27982,9 +25502,6 @@ static __attribute__((unused)) void js_dump_function_bytecode(
   if (b->js_mode) {
     printf("  mode:");
     if (b->js_mode & JS_MODE_STRICT) printf(" strict");
-#ifdef CONFIG_BIGNUM
-    if (b->js_mode & JS_MODE_MATH) printf(" math");
-#endif
     printf("\n");
   }
   if (b->arg_count && b->vardefs) {
@@ -31801,13 +29318,6 @@ __exception int js_parse_directives(JSParseState *s) {
       s->cur_func->js_mode |= JS_MODE_STRIP;
     }
 #endif
-#ifdef CONFIG_BIGNUM
-    else if (!strcmp(str, "use bigint")) {
-      s->cur_func->js_mode |= JS_MODE_BIGINT;
-    } else if (!strcmp(str, "use math")) {
-      s->cur_func->js_mode |= JS_MODE_BIGINT | JS_MODE_MATH;
-    }
-#endif
   }
   return js_parse_seek_token(s, &pos);
 }
@@ -32805,11 +30315,7 @@ typedef enum BCTagEnum {
 #endif
 } BCTagEnum;
 
-#ifdef CONFIG_BIGNUM
-#define BC_BASE_VERSION 2
-#else
 #define BC_BASE_VERSION 1
-#endif
 #define BC_BE_VERSION 0x40
 #ifdef WORDS_BIGENDIAN
 #define BC_VERSION (BC_BASE_VERSION | BC_BE_VERSION)
@@ -33377,6 +30883,49 @@ static int JS_WriteModule(BCWriterState *s, LEPUSValueConst obj) {
 fail:
   return -1;
 }
+
+QJS_STATIC int32_t JS_WriteBigInt(BCWriterState *s, LEPUSValueConst obj) {
+  JSBigIntBuf buf;
+  JSBigInt *p;
+  uint32_t len, i;
+  js_limb_t v, b;
+  int shift;
+
+  bc_put_u8(s, BC_TAG_BIG_INT);
+  p = LEPUS_VALUE_GET_BIGINT(obj);
+  if (p->len == 1 && p->tab[0] == 0) {
+    /* zero case */
+    len = 0;
+  } else {
+    /* compute the length of the two's complement representation
+       in bytes */
+    len = p->len * (JS_LIMB_BITS / 8);
+    v = p->tab[p->len - 1];
+    shift = JS_LIMB_BITS - 8;
+    while (shift > 0) {
+      b = (v >> shift) & 0xff;
+      if (b != 0x00 && b != 0xff) break;
+      if ((b & 1) != ((v >> (shift - 1)) & 1)) break;
+      shift -= 8;
+      len--;
+    }
+  }
+  bc_put_leb128(s, len);
+  if (len > 0) {
+    for (i = 0; i < (len / (JS_LIMB_BITS / 8)); i++) {
+#if JS_LIMB_BITS == 32
+      bc_put_u32(s, p->tab[i]);
+#else
+      bc_put_u64(s, p->tab[i]);
+#endif
+    }
+    for (i = 0; i < len % (JS_LIMB_BITS / 8); i++) {
+      bc_put_u8(s, (p->tab[p->len - 1] >> (i * 8)) & 0xff);
+    }
+  }
+  return 0;
+}
+
 __exception QJS_STATIC int JS_WriteObjectRec(BCWriterState *s,
                                              LEPUSValueConst obj) {
   int64_t tag = LEPUS_VALUE_GET_NORM_TAG(obj);
@@ -33445,7 +30994,7 @@ __exception QJS_STATIC int JS_WriteObjectRec(BCWriterState *s,
           bc_put_u8(s, BC_TAG_DATE);
           ret = JS_WriteObjectRec(s, p->u.object_data);
           break;
-        case JS_CLASS_UINT8C_ARRAY ... JS_CLASS_FLOAT64_ARRAY:
+        case JS_CLASS_UINT8C_ARRAY ... JS_CLASS_BIG_UINT64_ARRAY:
           ret = JS_WriteTypedArray(s, obj);
           break;
         case JS_CLASS_DATAVIEW:
@@ -33463,10 +31012,7 @@ __exception QJS_STATIC int JS_WriteObjectRec(BCWriterState *s,
         case JS_CLASS_NUMBER:
         case JS_CLASS_STRING:
         case JS_CLASS_BOOLEAN:
-#ifdef CONFIG_BIGNUM
         case JS_CLASS_BIG_INT:
-        case JS_CLASS_BIG_FLOAT:
-#endif
           bc_put_u8(s, BC_TAG_OBJECT_VALUE);
           ret = JS_WriteObjectRec(s, p->u.object_data);
           break;
@@ -33479,80 +31025,13 @@ __exception QJS_STATIC int JS_WriteObjectRec(BCWriterState *s,
       p->tmp_mark = 0;
       if (ret) goto fail;
     } break;
-#ifdef CONFIG_BIGNUM
     case LEPUS_TAG_BIG_INT:
-    case LEPUS_TAG_BIG_FLOAT: {
-      int32_t e;
-      JSBigFloat *bf = static_cast<JSBigFloat *>(LEPUS_VALUE_GET_PTR(obj));
-      bf_t *a = &bf->num;
-      size_t len, i, n1, j;
-      limb_t v;
-
-      bc_put_u8(s,
-                tag == LEPUS_TAG_BIG_INT ? BC_TAG_BIG_INT : BC_TAG_BIG_FLOAT);
-      if (a->len != 0) {
-        i = 0;
-        while (i < a->len && a->tab[i] == 0) i++;
-        assert(i < a->len);
-        v = a->tab[i];
-        n1 = sizeof(limb_t);
-        while ((v & 0xff) == 0) {
-          n1--;
-          v >>= 8;
-        }
-        i++;
-        len = (a->len - i) * sizeof(limb_t) + n1;
-        if (len > INT32_MAX) {
-          LEPUS_ThrowInternalError(s->ctx, "bignum is too large");
-          goto fail;
-        }
-        /* XXX: it would be slightly more efficient to put the
-           sign in the MSB of the mantissa */
-        bc_put_leb128(s, len * 2 + a->sign);
-        /* always saved in byte based little endian representation */
-        for (j = 0; j < n1; j++) {
-          dbuf_putc(&s->dbuf, v >> (j * 8));
-        }
-        for (; i < a->len; i++) {
-          limb_t v = a->tab[i];
-#if LIMB_BITS == 32
-#ifdef WORDS_BIGENDIAN
-          v = bswap32(v);
-#endif
-          dbuf_put_u32(&s->dbuf, v);
-#else
-#ifdef WORDS_BIGENDIAN
-          v = bswap64(v);
-#endif
-          dbuf_put_u64(&s->dbuf, v);
-#endif
-        }
-#if LIMB_BITS != 32
-        if (a->expn <= INT32_MIN || a->expn >= (INT32_MAX - 1)) {
-          LEPUS_ThrowInternalError(s->ctx, "bignum exponent is too large");
-          goto fail;
-        }
-#endif
-        bc_put_sleb128(s, a->expn);
-      } else {
-        bc_put_leb128(s, a->sign); /* length + sign */
-        if (tag == LEPUS_TAG_BIG_FLOAT) {
-          /* special numbers */
-          if (a->expn == BF_EXP_ZERO) {
-            e = 0;
-          } else if (a->expn == BF_EXP_INF) {
-            e = 1;
-          } else {
-            e = 2;
-          }
-          bc_put_u8(s, e);
-        }
+      if (JS_WriteBigInt(s, obj)) {
+        goto fail;
       }
-    } break;
-#endif
+      break;
     default:
-#if defined(__aarch64__) && !defined(OS_WIN) && !defined(CONFIG_BIGNUM) && \
-    !DISABLE_NANBOX
+#if defined(__aarch64__) && !defined(OS_WIN) && !DISABLE_NANBOX
       LEPUS_ThrowInternalError(s->ctx, "unsupported tag (%p)", (void *)tag);
 #else
       LEPUS_ThrowInternalError(s->ctx, "unsupported tag (%" PRId64 ")", tag);
@@ -34558,6 +32037,47 @@ fail:
 }
 #endif  // ENABLE_BUILTIN_SERIALIZE
 
+QJS_STATIC LEPUSValue JS_ReadBigInt(BCReaderState *s) {
+  LEPUSValue obj = LEPUS_UNDEFINED;
+  uint32_t len, i, n;
+  JSBigInt *p;
+  js_limb_t v;
+  uint8_t v8;
+
+  if (bc_get_leb128(s, &len)) goto fail;
+  bc_read_trace(s, "len=%" PRId64 "\n", (int64_t)len);
+  p = js_bigint_new(s->ctx, (len - 1) / (JS_LIMB_BITS / 8) + 1);
+  if (!p) goto fail;
+  for (i = 0; i < len / (JS_LIMB_BITS / 8); i++) {
+#if JS_LIMB_BITS == 32
+    if (bc_get_u32(s, &v)) goto fail;
+#else
+    if (bc_get_u64(s, &v)) goto fail;
+#endif
+    p->tab[i] = v;
+  }
+  n = len % (JS_LIMB_BITS / 8);
+  if (n != 0) {
+    int shift;
+    v = 0;
+    for (i = 0; i < n; i++) {
+      if (bc_get_u8(s, &v8)) goto fail;
+      v |= (js_limb_t)v8 << (i * 8);
+    }
+    shift = JS_LIMB_BITS - n * 8;
+    /* extend the sign */
+    if (shift != 0) {
+      v = (js_slimb_t)(v << shift) >> shift;
+    }
+    p->tab[p->len - 1] = v;
+  }
+  bc_read_trace(s, "}\n");
+  return JS_CompactBigInt(s->ctx, p);
+fail:
+  if (!s->ctx->gc_enable) LEPUS_FreeValue(s->ctx, obj);
+  return LEPUS_EXCEPTION;
+}
+
 LEPUSValue JS_ReadObjectRec(BCReaderState *s) {
   LEPUSContext *ctx = s->ctx;
   uint8_t tag;
@@ -34637,92 +32157,14 @@ LEPUSValue JS_ReadObjectRec(BCReaderState *s) {
       obj = JS_ReadMap(s);
       break;
 #endif
-#ifdef CONFIG_BIGNUM
     case BC_TAG_BIG_INT:
-    case BC_TAG_BIG_FLOAT: {
-      uint8_t sign, v8;
-      int32_t e;
-      uint32_t len;
-      limb_t l, i, n;
-      JSBigFloat *p;
-      bf_t *a;
-
-      bc_read_trace(s, "%s {\n", bc_tag_str[tag]);
-
-      if (bc_get_leb128(s, &len)) goto fail;
-      sign = len & 1;
-      len >>= 1;
-      p = js_new_bf(s->ctx);
-      if (!p) goto fail;
-      if (tag == BC_TAG_BIG_INT)
-        obj = LEPUS_MKPTR(LEPUS_TAG_BIG_INT, p);
-      else
-        obj = LEPUS_MKPTR(LEPUS_TAG_BIG_FLOAT, p);
-      l = (len + sizeof(limb_t) - 1) / sizeof(limb_t);
-      a = &p->num;
-      bf_resize(a, l);
-      a->sign = sign;
-      if (len == 0) {
-        if (tag == BC_TAG_BIG_INT) {
-          a->expn = BF_EXP_ZERO;
-        } else {
-          if (bc_get_u8(s, &v8)) goto fail;
-          switch (v8) {
-            case 0:
-              a->expn = BF_EXP_ZERO;
-              break;
-            case 1:
-              a->expn = BF_EXP_INF;
-              break;
-            default:
-            case 2:
-              a->expn = BF_EXP_NAN;
-              break;
-          }
-        }
-      } else {
-        n = len & (sizeof(limb_t) - 1);
-        if (n != 0) {
-          limb_t v;
-          v = 0;
-          for (i = 0; i < n; i++) {
-            if (bc_get_u8(s, &v8)) goto fail;
-            v |= (limb_t)v8 << ((sizeof(limb_t) - n + i) * 8);
-          }
-          a->tab[0] = v;
-          i = 1;
-        } else {
-          i = 0;
-        }
-        for (; i < l; i++) {
-          limb_t v;
-#if LIMB_BITS == 32
-          if (bc_get_u32(s, &v)) goto fail;
-#ifdef WORDS_BIGENDIAN
-          v = bswap32(v);
-#endif
-#else
-          if (bc_get_u64(s, &v)) goto fail;
-#ifdef WORDS_BIGENDIAN
-          v = bswap64(v);
-#endif
-#endif
-          a->tab[i] = v;
-        }
-        if (bc_get_sleb128(s, &e)) goto fail;
-        a->expn = e;
-      }
-      bc_read_trace(s, "}\n");
-    } break;
-#endif
+      obj = JS_ReadBigInt(s);
+      break;
     default:
       return LEPUS_ThrowSyntaxError(ctx, "invalid tag (tag=%d pos=%u)", tag,
                                     (unsigned int)(s->ptr - s->buf_start));
   }
   return obj;
-#ifdef CONFIG_BIGNUM
-fail:
-#endif
   if (!ctx->gc_enable) LEPUS_FreeValue(ctx, obj);
   return LEPUS_EXCEPTION;
 }
@@ -35132,45 +32574,13 @@ QJS_STATIC LEPUSValue js_global_isNaN(LEPUSContext *ctx,
   return LEPUS_NewBool(ctx, isnan(d));
 }
 
-#ifdef CONFIG_BIGNUM
-static BOOL js_number_is_finite(LEPUSContext *ctx, LEPUSValueConst val) {
-  BOOL res;
-  int32_t tag;
-
-  tag = LEPUS_VALUE_GET_NORM_TAG(val);
-  switch (tag) {
-    case LEPUS_TAG_FLOAT64:
-      res = isfinite(LEPUS_VALUE_GET_FLOAT64(val));
-      break;
-    case LEPUS_TAG_BIG_FLOAT: {
-      JSBigFloat *p = static_cast<JSBigFloat *>(LEPUS_VALUE_GET_PTR(val));
-      res = bf_is_finite(&p->num);
-    } break;
-    default:
-      res = TRUE;
-      break;
-  }
-  return res;
-}
-#endif
-
 QJS_STATIC LEPUSValue js_global_isFinite(LEPUSContext *ctx,
                                          LEPUSValueConst this_val, int argc,
                                          LEPUSValueConst *argv) {
   BOOL res;
-#ifdef CONFIG_BIGNUM
-  LEPUSValue val;
-
-  val = JS_ToNumber(ctx, argv[0]);
-  if (LEPUS_IsException(val)) return val;
-  res = js_number_is_finite(ctx, val);
-  LEPUS_FreeValue(ctx, val);
-#else
   double d;
   if (unlikely(LEPUS_ToFloat64(ctx, &d, argv[0]))) return LEPUS_EXCEPTION;
-  res = isfinite(d);
-#endif
-  return LEPUS_NewBool(ctx, res);
+  return LEPUS_NewBool(ctx, isfinite(d));
 }
 
 /* Object class */
@@ -35188,28 +32598,13 @@ LEPUSValue LEPUS_ToObject(LEPUSContext *ctx, LEPUSValueConst val) {
     case LEPUS_TAG_OBJECT:
     case LEPUS_TAG_EXCEPTION:
       return LEPUS_DupValue(ctx, val);
-#ifdef CONFIG_BIGNUM
-    case LEPUS_TAG_INT:
-      if (is_bignum_mode(ctx))
-        obj = LEPUS_NewObjectClass(ctx, JS_CLASS_BIG_INT);
-      else
-        obj = LEPUS_NewObjectClass(ctx, JS_CLASS_NUMBER);
-      goto set_value;
     case LEPUS_TAG_BIG_INT:
       obj = LEPUS_NewObjectClass(ctx, JS_CLASS_BIG_INT);
       goto set_value;
-    case LEPUS_TAG_FLOAT64:
-      obj = LEPUS_NewObjectClass(ctx, JS_CLASS_NUMBER);
-      goto set_value;
-    case LEPUS_TAG_BIG_FLOAT:
-      obj = LEPUS_NewObjectClass(ctx, JS_CLASS_BIG_FLOAT);
-      goto set_value;
-#else
     case LEPUS_TAG_INT:
     case LEPUS_TAG_FLOAT64:
       obj = LEPUS_NewObjectClass(ctx, JS_CLASS_NUMBER);
       goto set_value;
-#endif
     case LEPUS_TAG_STRING:
       /* XXX: should call the string constructor */
       {
@@ -37480,8 +34875,14 @@ QJS_STATIC LEPUSValue js_array_every(LEPUSContext *ctx,
   n = 0;
 
   for (k = 0; k < len; k++) {
-    present = JS_TryGetPropertyInt64(ctx, obj, k, &val);
-    if (present < 0) goto exception;
+    if (special & special_TA) {
+      val = JS_GetPropertyInt64(ctx, obj, k);
+      if (LEPUS_IsException(val)) goto exception;
+      present = TRUE;
+    } else {
+      present = JS_TryGetPropertyInt64(ctx, obj, k, &val);
+      if (present < 0) goto exception;
+    }
     if (present) {
       index_val = LEPUS_NewInt64(ctx, k);
       if (LEPUS_IsException(index_val)) goto exception;
@@ -37596,15 +34997,27 @@ LEPUSValue js_array_reduce(LEPUSContext *ctx, LEPUSValueConst this_val,
       }
       k1 = (special & special_reduceRight) ? len - k - 1 : k;
       k++;
-      present = JS_TryGetPropertyInt64(ctx, obj, k1, &acc);
-      if (present < 0) goto exception;
-      if (present) break;
+      if (special & special_TA) {
+        acc = JS_GetPropertyInt64(ctx, obj, k1);
+        if (LEPUS_IsException(acc)) goto exception;
+        break;
+      } else {
+        present = JS_TryGetPropertyInt64(ctx, obj, k1, &acc);
+        if (present < 0) goto exception;
+        if (present) break;
+      }
     }
   }
   for (; k < len; k++) {
     k1 = (special & special_reduceRight) ? len - k - 1 : k;
-    present = JS_TryGetPropertyInt64(ctx, obj, k1, &val);
-    if (present < 0) goto exception;
+    if (special & special_TA) {
+      val = JS_GetPropertyInt64(ctx, obj, k1);
+      if (LEPUS_IsException(val)) goto exception;
+      present = TRUE;
+    } else {
+      present = JS_TryGetPropertyInt64(ctx, obj, k1, &val);
+      if (present < 0) goto exception;
+    }
     if (present) {
       index_val = LEPUS_NewInt64(ctx, k1);
       if (LEPUS_IsException(index_val)) goto exception;
@@ -38546,7 +35959,7 @@ QJS_STATIC LEPUSValue js_array_iterator_next(LEPUSContext *ctx,
 
     p = LEPUS_VALUE_GET_OBJ(it->obj);
     if (p->class_id >= JS_CLASS_UINT8C_ARRAY &&
-        p->class_id <= JS_CLASS_FLOAT64_ARRAY) {
+        p->class_id <= JS_CLASS_BIG_UINT64_ARRAY) {
       if (typed_array_is_detached(ctx, p)) {
         JS_ThrowTypeErrorDetachedArrayBuffer(ctx);
         goto fail1;
@@ -38658,49 +36071,29 @@ QJS_STATIC LEPUSValue js_number_constructor(LEPUSContext *ctx,
                                             LEPUSValueConst new_target,
                                             int argc, LEPUSValueConst *argv) {
   LEPUSValue val, obj;
-#ifdef CONFIG_BIGNUM
   if (argc == 0) {
-    if (is_bignum_mode(ctx))
-      val = __JS_NewFloat64(ctx, 0);
-    else
-      val = LEPUS_NewInt32(ctx, 0);
+    val = LEPUS_NewInt32(ctx, 0);
   } else {
     val = JS_ToNumeric(ctx, argv[0]);
     if (LEPUS_IsException(val)) return val;
     switch (LEPUS_VALUE_GET_TAG(val)) {
-      case LEPUS_TAG_BIG_INT:
-      case LEPUS_TAG_BIG_FLOAT: {
-        JSBigFloat *p = static_cast<JSBigFloat *>(LEPUS_VALUE_GET_PTR(val));
+      case LEPUS_TAG_BIG_INT: {
+        JSBigInt *p = LEPUS_VALUE_GET_BIGINT(val);
         double d;
-        bf_get_float64(&p->num, &d, BF_RNDN);
+        d = js_bigint_to_float64(ctx, p);
         LEPUS_FreeValue(ctx, val);
-        val = __JS_NewFloat64(ctx, d);
+        val = LEPUS_NewFloat64(ctx, d);
       } break;
-      case LEPUS_TAG_INT:
-        if (is_bignum_mode(ctx)) {
-          /* always return a number in bignum mode */
-          val = __JS_NewFloat64(ctx, LEPUS_VALUE_GET_INT(val));
-        }
-        break;
       default:
         break;
     }
   }
-#else
-  if (argc == 0) {
-    val = LEPUS_NewInt32(ctx, 0);
-  } else {
-    val = JS_ToNumber(ctx, argv[0]);
-    if (LEPUS_IsException(val)) return val;
-  }
-#endif
   if (!LEPUS_IsUndefined(new_target)) {
     obj = js_create_from_ctor(ctx, new_target, JS_CLASS_NUMBER);
     if (!LEPUS_IsException(obj)) JS_SetObjectData(ctx, obj, val);
     return obj;
-  } else {
-    return val;
   }
+  return val;
 }
 
 #if 0
@@ -38796,198 +36189,51 @@ QJS_STATIC LEPUSValue js_number_valueOf(LEPUSContext *ctx,
   return js_thisNumberValue(ctx, this_val);
 }
 
+static int32_t js_get_radix(LEPUSContext *ctx, LEPUSValueConst val) {
+  int32_t radix;
+  if (JS_ToInt32Sat(ctx, &radix, val)) return -1;
+  if (radix < 2 || radix > 36) {
+    LEPUS_ThrowRangeError(ctx, "radix must be between 2 and 36");
+    return -1;
+  }
+  return radix;
+}
+
 QJS_STATIC LEPUSValue js_number_toString(LEPUSContext *ctx,
                                          LEPUSValueConst this_val, int argc,
                                          LEPUSValueConst *argv, int magic) {
   LEPUSValue val;
-  int base;
+  int base, flags;
+  double d;
 
   val = js_thisNumberValue(ctx, this_val);
   if (LEPUS_IsException(val)) return val;
   if (magic || LEPUS_IsUndefined(argv[0])) {
     base = 10;
   } else {
-    if (JS_ToInt32Sat(ctx, &base, argv[0])) goto fail;
-    if (base < 2 || base > 36) {
-      LEPUS_ThrowRangeError(ctx, "radix must be between 2 and 36");
-      goto fail;
-    }
+    base = js_get_radix(ctx, argv[0]);
+    if (base < 0) goto fail;
   }
-#ifdef CONFIG_BIGNUM
-  {
-    LEPUSValue ret =
-        js_ftoa(ctx, val, base, 0, BF_RNDN | BF_FTOA_FORMAT_FREE_MIN);
-    LEPUS_FreeValue(ctx, val);
-    return ret;
+  if (LEPUS_VALUE_GET_TAG(val) == LEPUS_TAG_INT) {
+    char buf1[70];
+    int32_t len;
+    len = i64toa_radix(buf1, LEPUS_VALUE_GET_INT(val), base);
+    return js_new_string8(ctx, buf1, len);
   }
-#else
-  {
-    double d;
-    if (JS_ToFloat64Free(ctx, &d, val)) return LEPUS_EXCEPTION;
-    return js_dtoa(ctx, d, base, 0, JS_DTOA_VAR_FORMAT);
-  }
-#endif
+  if (JS_ToFloat64Free(ctx, &d, val)) return LEPUS_EXCEPTION;
+  flags = JS_DTOA_FORMAT_FREE;
+  if (base != 10) flags |= JS_DTOA_EXP_DISABLED;
+  return js_dtoa2(ctx, d, base, 0, flags);
 fail:
   LEPUS_FreeValue(ctx, val);
   return LEPUS_EXCEPTION;
 }
-
-#ifdef CONFIG_BIGNUM
-
-static LEPUSValue js_thisBigFloatValue(LEPUSContext *ctx,
-                                       LEPUSValueConst this_val);
-
-static int64_t js_number_get_prec_max(LEPUSContext *ctx, int magic) {
-  if (magic)
-    return BF_PREC_MAX;
-  else
-    return 100;
-}
-
-static int get_rnd_mode(LEPUSContext *ctx, LEPUSValueConst val) {
-  int rnd_mode;
-  if (JS_ToInt32Sat(ctx, &rnd_mode, val)) return -1;
-  if (rnd_mode < BF_RNDN || rnd_mode > BF_RNDF) {
-    LEPUS_ThrowRangeError(ctx, "invalid rounding mode");
-    return -1;
-  }
-  return rnd_mode;
-}
-
-static LEPUSValue js_number_toFixed(LEPUSContext *ctx, LEPUSValueConst this_val,
-                                    int argc, LEPUSValueConst *argv,
-                                    int magic) {
-  LEPUSValue val, ret;
-  int64_t f;
-  int res, rnd_mode;
-  bf_t a_s, *a, b;
-  BOOL is_float;
-
-  if (magic)
-    val = js_thisBigFloatValue(ctx, this_val);
-  else
-    val = js_thisNumberValue(ctx, this_val);
-  if (LEPUS_IsException(val)) return val;
-  if (JS_ToInt64Sat(ctx, &f, argv[0])) goto fail;
-  if (f < 0 || f > js_number_get_prec_max(ctx, magic)) {
-    LEPUS_ThrowRangeError(ctx, "invalid number of digits");
-    goto fail;
-  }
-  rnd_mode = BF_RNDNA;
-  if (magic && argc > 1) {
-    rnd_mode = get_rnd_mode(ctx, argv[1]);
-    if (rnd_mode < 0) goto fail;
-  }
-
-  a = JS_ToBigFloat(ctx, &is_float, &a_s, val);
-  if (!a) goto fail;
-  bf_init(ctx->bf_ctx, &b);
-  bf_set_float64(&b, 1e21);
-  res = bf_cmpu(a, &b);
-  bf_delete(&b);
-  if (a == &a_s) bf_delete(a);
-  if (res >= 0) {
-    ret = JS_ToString_RC(ctx, val);
-  } else {
-    ret = js_ftoa(ctx, val, 10, f, rnd_mode | BF_FTOA_FORMAT_FRAC);
-  }
-  LEPUS_FreeValue(ctx, val);
-  return ret;
-fail:
-  LEPUS_FreeValue(ctx, val);
-  return LEPUS_EXCEPTION;
-}
-
-static LEPUSValue js_number_toExponential(LEPUSContext *ctx,
-                                          LEPUSValueConst this_val, int argc,
-                                          LEPUSValueConst *argv, int magic) {
-  LEPUSValue val, ret;
-  int64_t f;
-  int rnd_mode;
-
-  if (magic)
-    val = js_thisBigFloatValue(ctx, this_val);
-  else
-    val = js_thisNumberValue(ctx, this_val);
-  if (LEPUS_IsException(val)) return val;
-  if (JS_ToInt64Sat(ctx, &f, argv[0])) goto fail;
-  if (!js_number_is_finite(ctx, val)) {
-    ret = JS_ToString_RC(ctx, val);
-  } else if (LEPUS_IsUndefined(argv[0])) {
-    ret = js_ftoa(ctx, val, 10, 0,
-                  BF_RNDN | BF_FTOA_FORMAT_FREE_MIN | BF_FTOA_FORCE_EXP);
-  } else {
-    if (f < 0 || f > js_number_get_prec_max(ctx, magic)) {
-      LEPUS_ThrowRangeError(ctx, "invalid number of digits");
-      goto fail;
-    }
-    rnd_mode = BF_RNDNA;
-    if (magic && argc > 1) {
-      rnd_mode = get_rnd_mode(ctx, argv[1]);
-      if (rnd_mode < 0) goto fail;
-    }
-    ret = js_ftoa(ctx, val, 10, f + 1,
-                  rnd_mode | BF_FTOA_FORMAT_FIXED | BF_FTOA_FORCE_EXP);
-  }
-  LEPUS_FreeValue(ctx, val);
-  return ret;
-fail:
-  LEPUS_FreeValue(ctx, val);
-  return LEPUS_EXCEPTION;
-}
-
-static LEPUSValue js_number_toPrecision(LEPUSContext *ctx,
-                                        LEPUSValueConst this_val, int argc,
-                                        LEPUSValueConst *argv, int magic) {
-  LEPUSValue val, ret;
-  int64_t p;
-  int rnd_mode;
-
-  if (magic)
-    val = js_thisBigFloatValue(ctx, this_val);
-  else
-    val = js_thisNumberValue(ctx, this_val);
-  if (LEPUS_IsException(val)) return val;
-  if (LEPUS_IsUndefined(argv[0])) goto to_string;
-  if (JS_ToInt64Sat(ctx, &p, argv[0])) goto fail;
-  if (!js_number_is_finite(ctx, val)) {
-  to_string:
-    ret = JS_ToString_RC(ctx, this_val);
-  } else {
-    if (p < 1 || p > js_number_get_prec_max(ctx, magic)) {
-      LEPUS_ThrowRangeError(ctx, "invalid number of digits");
-      goto fail;
-    }
-    rnd_mode = BF_RNDNA;
-    if (magic && argc > 1) {
-      rnd_mode = get_rnd_mode(ctx, argv[1]);
-      if (rnd_mode < 0) goto fail;
-    }
-    ret = js_ftoa(ctx, val, 10, p, rnd_mode | BF_FTOA_FORMAT_FIXED);
-  }
-  LEPUS_FreeValue(ctx, val);
-  return ret;
-fail:
-  LEPUS_FreeValue(ctx, val);
-  return LEPUS_EXCEPTION;
-}
-
-static const LEPUSCFunctionListEntry js_number_proto_funcs[] = {
-    LEPUS_CFUNC_MAGIC_DEF("toExponential", 1, js_number_toExponential, 0),
-    LEPUS_CFUNC_MAGIC_DEF("toFixed", 1, js_number_toFixed, 0),
-    LEPUS_CFUNC_MAGIC_DEF("toPrecision", 1, js_number_toPrecision, 0),
-    LEPUS_CFUNC_MAGIC_DEF("toString", 1, js_number_toString, 0),
-    LEPUS_CFUNC_MAGIC_DEF("toLocaleString", 0, js_number_toString, 1),
-    LEPUS_CFUNC_DEF("valueOf", 0, js_number_valueOf),
-};
-
-#else /* !CONFIG_BIGNUM */
 
 QJS_STATIC LEPUSValue js_number_toFixed(LEPUSContext *ctx,
                                         LEPUSValueConst this_val, int argc,
                                         LEPUSValueConst *argv) {
   LEPUSValue val;
-  int f;
+  int f, flags;
   double d;
 
   val = js_thisNumberValue(ctx, this_val);
@@ -38997,10 +36243,11 @@ QJS_STATIC LEPUSValue js_number_toFixed(LEPUSContext *ctx,
   if (f < 0 || f > 100)
     return LEPUS_ThrowRangeError(ctx, "invalid number of digits");
   if (fabs(d) >= 1e21) {
-    return JS_ToStringFree(ctx, __JS_NewFloat64(ctx, d));
+    flags = JS_DTOA_FORMAT_FREE;
   } else {
-    return js_dtoa(ctx, d, 10, f, JS_DTOA_FRAC_FORMAT);
+    flags = JS_DTOA_FORMAT_FRAC;
   }
+  return js_dtoa2(ctx, d, 10, f, flags);
 }
 
 QJS_STATIC LEPUSValue js_number_toExponential(LEPUSContext *ctx,
@@ -39024,9 +36271,9 @@ QJS_STATIC LEPUSValue js_number_toExponential(LEPUSContext *ctx,
     if (f < 0 || f > 100)
       return LEPUS_ThrowRangeError(ctx, "invalid number of digits");
     f++;
-    flags = JS_DTOA_FIXED_FORMAT;
+    flags = JS_DTOA_FORMAT_FIXED;
   }
-  return js_dtoa(ctx, d, 10, f, flags | JS_DTOA_FORCE_EXP);
+  return js_dtoa2(ctx, d, 10, f, flags | JS_DTOA_EXP_ENABLED);
 }
 
 QJS_STATIC LEPUSValue js_number_toPrecision(LEPUSContext *ctx,
@@ -39047,7 +36294,7 @@ QJS_STATIC LEPUSValue js_number_toPrecision(LEPUSContext *ctx,
   }
   if (p < 1 || p > 100)
     return LEPUS_ThrowRangeError(ctx, "invalid number of digits");
-  return js_dtoa(ctx, d, 10, p, JS_DTOA_FIXED_FORMAT);
+  return js_dtoa2(ctx, d, 10, p, JS_DTOA_FORMAT_FIXED);
 }
 
 static const LEPUSCFunctionListEntry js_number_proto_funcs[] = {
@@ -39059,12 +36306,10 @@ static const LEPUSCFunctionListEntry js_number_proto_funcs[] = {
     LEPUS_CFUNC_DEF("valueOf", 0, js_number_valueOf),
 };
 
-#endif /* !CONFIG_BIGNUM */
-
 QJS_STATIC LEPUSValue js_parseInt(LEPUSContext *ctx, LEPUSValueConst this_val,
                                   int argc, LEPUSValueConst *argv) {
-  const char *str;
-  int radix;
+  const char *str, *p;
+  int radix, flags;
   LEPUSValue ret;
 
   str = JS_ToCStringLen2_RC(ctx, NULL, argv[0], 0);
@@ -39076,14 +36321,10 @@ QJS_STATIC LEPUSValue js_parseInt(LEPUSContext *ctx, LEPUSValueConst this_val,
   if (radix != 0 && (radix < 2 || radix > 36)) {
     ret = LEPUS_NAN;
   } else {
-#ifdef CONFIG_BIGNUM
-    int flags;
-    flags = BF_ATOF_INT_ONLY | BF_ATOF_NAN_IF_EMPTY | BF_ATOF_FLOAT64;
-    if (is_bignum_mode(ctx)) flags |= BF_ATOF_INT_PREC_INF;
-    ret = js_atof(ctx, str, NULL, radix, flags);
-#else
-    ret = js_atod(ctx, str, NULL, radix, ATOD_INT_ONLY | ATOD_NAN_IF_EMPTY);
-#endif
+    p = str;
+    p += skip_spaces(p);
+    flags = ATOD_INT_ONLY | ATOD_ACCEPT_PREFIX_AFTER_SIGN;
+    ret = js_atof(ctx, p, nullptr, radix, flags);
   }
   LEPUS_FreeCString(ctx, str);
   return ret;
@@ -39091,17 +36332,14 @@ QJS_STATIC LEPUSValue js_parseInt(LEPUSContext *ctx, LEPUSValueConst this_val,
 
 QJS_STATIC LEPUSValue js_parseFloat(LEPUSContext *ctx, LEPUSValueConst this_val,
                                     int argc, LEPUSValueConst *argv) {
-  const char *str;
+  const char *str, *p;
   LEPUSValue ret;
 
   str = JS_ToCStringLen2_RC(ctx, NULL, argv[0], 0);
   if (!str) return LEPUS_EXCEPTION;
-#ifdef CONFIG_BIGNUM
-  ret = js_atof(ctx, str, NULL, 10,
-                BF_ATOF_JS_QUIRKS | BF_ATOF_NAN_IF_EMPTY | BF_ATOF_FLOAT64);
-#else
-  ret = js_atod(ctx, str, NULL, 10, ATOD_NAN_IF_EMPTY);
-#endif
+  p = str;
+  p += skip_spaces(p);
+  ret = js_atof(ctx, p, nullptr, 10, 0);
   LEPUS_FreeCString(ctx, str);
   return ret;
 }
@@ -39512,7 +36750,7 @@ QJS_STATIC LEPUSValue js_string_charAt(LEPUSContext *ctx,
     return LEPUS_EXCEPTION;
   }
   if (idx < 0 || idx >= p->len) {
-    ret = js_new_string8(ctx, NULL, 0);
+    ret = js_new_string8_len(ctx, nullptr, 0);
   } else {
     if (p->is_wide_char)
       c = p->u.str16[idx];
@@ -40728,8 +37966,6 @@ QJS_STATIC double js_fmax(double a, double b) {
   }
 }
 
-#ifdef CONFIG_BIGNUM
-
 enum {
   MATH_OP_ABS,
   MATH_OP_FLOOR,
@@ -40758,166 +37994,13 @@ enum {
   MATH_OP_DIV,
 };
 
-static LEPUSValue js_math_fop(LEPUSContext *ctx, LEPUSValueConst this_val,
-                              int argc, LEPUSValueConst *argv, int magic) {
-  bf_t a_s, *a, r_s, *r = &r_s;
-  BOOL is_float;
-  JSFloatEnv *fe;
-  int rnd_mode;
-  LEPUSValue op1;
-
-  op1 = JS_ToNumber(ctx, argv[0]);
-  if (LEPUS_IsException(op1)) return op1;
-  a = JS_ToBigFloat(ctx, &is_float, &a_s, op1);
-  fe = &ctx->fp_env;
-  if (argc > 1) {
-    fe = static_cast<JSFloatEnv *>(
-        LEPUS_GetOpaque2(ctx, argv[1], JS_CLASS_FLOAT_ENV));
-    if (!fe) {
-      if (a == &a_s) bf_delete(a);
-      LEPUS_FreeValue(ctx, op1);
-      return LEPUS_EXCEPTION;
-    }
-  }
-
-  bf_init(ctx->bf_ctx, r);
-  switch (magic) {
-    case MATH_OP_ABS:
-      bf_set(r, a);
-      r->sign = 0;
-      break;
-    case MATH_OP_FLOOR:
-      rnd_mode = BF_RNDD;
-      goto rint;
-    case MATH_OP_CEIL:
-      rnd_mode = BF_RNDU;
-      goto rint;
-    case MATH_OP_ROUND:
-      rnd_mode = BF_RNDNU;
-      goto rint;
-    case MATH_OP_TRUNC:
-      rnd_mode = BF_RNDZ;
-    rint:
-      bf_set(r, a);
-      fe->status |= bf_rint(r, fe->prec, (fe->flags & ~BF_RND_MASK) | rnd_mode);
-      break;
-    case MATH_OP_SQRT:
-      fe->status |= bf_sqrt(r, a, fe->prec, fe->flags);
-      break;
-    case MATH_OP_FPROUND:
-      bf_set(r, a);
-      fe->status |= bf_round(r, fe->prec, fe->flags);
-      break;
-    case MATH_OP_ACOS:
-      fe->status |= bf_acos(r, a, fe->prec, fe->flags);
-      break;
-    case MATH_OP_ASIN:
-      fe->status |= bf_asin(r, a, fe->prec, fe->flags);
-      break;
-    case MATH_OP_ATAN:
-      fe->status |= bf_atan(r, a, fe->prec, fe->flags);
-      break;
-    case MATH_OP_COS:
-      fe->status |= bf_cos(r, a, fe->prec, fe->flags);
-      break;
-    case MATH_OP_EXP:
-      fe->status |= bf_exp(r, a, fe->prec, fe->flags);
-      break;
-    case MATH_OP_LOG:
-      fe->status |= bf_log(r, a, fe->prec, fe->flags);
-      break;
-    case MATH_OP_SIN:
-      fe->status |= bf_sin(r, a, fe->prec, fe->flags);
-      break;
-    case MATH_OP_TAN:
-      fe->status |= bf_tan(r, a, fe->prec, fe->flags);
-      break;
-    case MATH_OP_SIGN:
-      if (bf_is_nan(a) || bf_is_zero(a)) {
-        bf_set(r, a);
-      } else {
-        bf_set_si(r, 1 - 2 * a->sign);
-      }
-      break;
-    default:
-      abort();
-  }
-  if (a == &a_s) bf_delete(a);
-  LEPUS_FreeValue(ctx, op1);
-  return JS_NewBigFloat(ctx, r);
-}
-
-static LEPUSValue js_math_fop2(LEPUSContext *ctx, LEPUSValueConst this_val,
-                               int argc, LEPUSValueConst *argv, int magic) {
-  bf_t a_s, *a, b_s, *b, r_s, *r = &r_s;
-  BOOL is_float;
-  JSFloatEnv *fe;
-  LEPUSValue op1, op2;
-
-  op1 = JS_ToNumber(ctx, argv[0]);
-  if (LEPUS_IsException(op1)) return op1;
-  op2 = JS_ToNumber(ctx, argv[1]);
-  if (LEPUS_IsException(op2)) {
-    LEPUS_FreeValue(ctx, op1);
-    return op2;
-  }
-  a = JS_ToBigFloat(ctx, &is_float, &a_s, op1);
-  b = JS_ToBigFloat(ctx, &is_float, &b_s, op2);
-  fe = &ctx->fp_env;
-  if (argc > 2) {
-    fe = static_cast<JSFloatEnv *>(
-        LEPUS_GetOpaque2(ctx, (argv[2]), JS_CLASS_FLOAT_ENV));
-    if (!fe) {
-      if (a == &a_s) bf_delete(a);
-      if (b == &b_s) bf_delete(b);
-      LEPUS_FreeValue(ctx, op1);
-      LEPUS_FreeValue(ctx, op2);
-      return LEPUS_EXCEPTION;
-    }
-  }
-
-  bf_init(ctx->bf_ctx, r);
-  switch (magic) {
-    case MATH_OP_ATAN2:
-      fe->status |= bf_atan2(r, a, b, fe->prec, fe->flags);
-      break;
-    case MATH_OP_POW:
-      fe->status |= bf_pow(r, a, b, fe->prec, fe->flags | BF_POW_JS_QUICKS);
-      break;
-    case MATH_OP_FMOD:
-      fe->status |= bf_fmod(r, a, b, fe->prec, fe->flags);
-      break;
-    case MATH_OP_REM:
-      fe->status |= bf_remainder(r, a, b, fe->prec, fe->flags);
-      break;
-    case MATH_OP_ADD:
-      fe->status |= bf_add(r, a, b, fe->prec, fe->flags);
-      break;
-    case MATH_OP_SUB:
-      fe->status |= bf_sub(r, a, b, fe->prec, fe->flags);
-      break;
-    case MATH_OP_MUL:
-      fe->status |= bf_mul(r, a, b, fe->prec, fe->flags);
-      break;
-    case MATH_OP_DIV:
-      fe->status |= bf_div(r, a, b, fe->prec, fe->flags);
-      break;
-    default:
-      abort();
-  }
-  if (a == &a_s) bf_delete(a);
-  if (b == &b_s) bf_delete(b);
-  LEPUS_FreeValue(ctx, op1);
-  LEPUS_FreeValue(ctx, op2);
-  return JS_NewBigFloat(ctx, r);
-}
-
 static LEPUSValue js_math_min_max(LEPUSContext *ctx, LEPUSValueConst this_val,
-                                  int argc, LEPUSValueConst *argv, int magic) {
+                                  int argc, LEPUSValueConst *argv,
+                                  int32_t magic) {
   BOOL is_max = magic;
-  LEPUSValue val, ret;
+  double r, a;
   int i;
-  uint32_t tag;
+  int64_t tag;
 
   if (unlikely(argc == 0)) {
     return __JS_NewFloat64(ctx, is_max ? -1.0 / 0.0 : 1.0 / 0.0);
@@ -40929,148 +38012,6 @@ static LEPUSValue js_math_min_max(LEPUSContext *ctx, LEPUSValueConst this_val,
     for (i = 1; i < argc; i++) {
       tag = LEPUS_VALUE_GET_TAG(argv[i]);
       if (tag != LEPUS_TAG_INT) {
-        ret = LEPUS_NewInt32(ctx, r1);
-        goto generic_case;
-      }
-      a1 = LEPUS_VALUE_GET_INT(argv[i]);
-      if (is_max)
-        r1 = max_int(r1, a1);
-      else
-        r1 = min_int(r1, a1);
-    }
-    ret = LEPUS_NewInt32(ctx, r1);
-  } else {
-    ret = JS_ToNumber(ctx, argv[0]);
-    if (LEPUS_IsException(ret)) return ret;
-    i = 1;
-  generic_case:
-    for (; i < argc; i++) {
-      val = JS_ToNumber(ctx, argv[i]);
-      if (LEPUS_IsException(val)) {
-        LEPUS_FreeValue(ctx, ret);
-        return val;
-      }
-      if (LEPUS_TAG_IS_FLOAT64(LEPUS_VALUE_GET_TAG(ret)) &&
-          LEPUS_TAG_IS_FLOAT64(LEPUS_VALUE_GET_TAG(val))) {
-        double r, a;
-        r = LEPUS_VALUE_GET_FLOAT64(ret);
-        a = LEPUS_VALUE_GET_FLOAT64(val);
-        if (!isnan(r)) {
-          if (isnan(a)) {
-            r = a;
-          } else {
-            if (is_max)
-              r = js_fmax(r, a);
-            else
-              r = js_fmin(r, a);
-          }
-          ret = __JS_NewFloat64(ctx, r);
-        }
-      } else {
-        bf_t a_s, *a, r_s, *r;
-        BOOL is_float;
-        int res;
-
-        r = JS_ToBigFloat(ctx, &is_float, &r_s, ret);
-        if (!bf_is_nan(r)) {
-          a = JS_ToBigFloat(ctx, &is_float, &a_s, val);
-          res = bf_cmp_full(a, r);
-          if (is_max) res = -res;
-          if (bf_is_nan(a) || res < 0) {
-            LEPUS_FreeValue(ctx, ret);
-            ret = LEPUS_DupValue(ctx, val);
-          }
-          if (a == &a_s) bf_delete(a);
-        }
-        if (r == &r_s) bf_delete(r);
-      }
-    }
-  }
-  return ret;
-}
-
-static LEPUSValue js_math_abs(LEPUSContext *ctx, LEPUSValueConst this_val,
-                              int argc, LEPUSValueConst *argv) {
-  LEPUSValue val;
-  int32_t tag;
-
-  val = JS_ToNumeric(ctx, argv[0]);
-  tag = LEPUS_VALUE_GET_NORM_TAG(val);
-  switch (tag) {
-    case LEPUS_TAG_INT:
-      if (LEPUS_VALUE_GET_INT(val) < 0)
-        val = LEPUS_NewInt64(ctx, -(int64_t)LEPUS_VALUE_GET_INT(val));
-      break;
-    case LEPUS_TAG_FLOAT64:
-      val = __JS_NewFloat64(ctx, fabs(LEPUS_VALUE_GET_FLOAT64(val)));
-      break;
-    case LEPUS_TAG_BIG_FLOAT:
-    case LEPUS_TAG_BIG_INT: {
-      JSBigFloat *p = static_cast<JSBigFloat *>(LEPUS_VALUE_GET_PTR(val));
-      bf_t r_s, *r = &r_s;
-      bf_init(ctx->bf_ctx, r);
-      bf_set(r, &p->num);
-      r->sign = 0;
-      LEPUS_FreeValue(ctx, val);
-      if (tag == LEPUS_TAG_BIG_FLOAT)
-        val = JS_NewBigFloat(ctx, r);
-      else
-        val = JS_NewBigInt2(ctx, r, TRUE);
-    } break;
-    default:
-      break;
-  }
-  return val;
-}
-
-#if 0
-/* XXX: should give exact rounding */
-/* XXX: correct NaN/Infinity handling */
-static LEPUSValue js_math_hypot(LEPUSContext *ctx, LEPUSValueConst this_val,
-                             int argc, LEPUSValueConst *argv)
-{
-    bf_t a_s, *a, r_s, *r = &r_s, r2_s, *r2 = &r2_s;
-    LEPUSValue val;
-    int i;
-    BOOL is_float;
-
-    bf_init(ctx->bf_ctx, r);
-    bf_set_si(r, 0);
-    for(i = 0; i < argc; i++) {
-        val = JS_ToNumber(ctx, argv[i]);
-        if (LEPUS_IsException(val)) {
-            bf_delete(r);
-            return val;
-        }
-        a = JS_ToBigFloat(ctx, &is_float, &a_s, val);
-        bf_add(r, r, a, ctx->fp_env.prec, ctx->fp_env.flags);
-        if (a == &a_s)
-            bf_delete(a);
-    }
-    bf_init(ctx->bf_ctx, r2);
-    bf_sqrt(r2, r, ctx->fp_env.prec, ctx->fp_env.flags);
-    bf_delete(r);
-    return JS_NewBigFloat(ctx, r2);
-}
-#endif
-
-#else
-
-QJS_STATIC LEPUSValue js_math_min_max(LEPUSContext *ctx,
-                                      LEPUSValueConst this_val, int argc,
-                                      LEPUSValueConst *argv, int magic) {
-  BOOL is_max = magic;
-  double r, a;
-  int i;
-
-  if (unlikely(argc == 0)) {
-    return __JS_NewFloat64(ctx, is_max ? -1.0 / 0.0 : 1.0 / 0.0);
-  }
-
-  if (LEPUS_VALUE_IS_INT(argv[0])) {
-    int a1, r1 = LEPUS_VALUE_GET_INT(argv[0]);
-    for (i = 1; i < argc; i++) {
-      if (!LEPUS_VALUE_IS_INT(argv[i])) {
         r = r1;
         goto generic_case;
       }
@@ -41103,7 +38044,36 @@ QJS_STATIC LEPUSValue js_math_min_max(LEPUSContext *ctx,
   }
 }
 
-#endif /* !CONFIG_BIGNUM */
+#if 0
+/* XXX: should give exact rounding */
+/* XXX: correct NaN/Infinity handling */
+static LEPUSValue js_math_hypot(LEPUSContext *ctx, LEPUSValueConst this_val,
+                             int argc, LEPUSValueConst *argv)
+{
+    bf_t a_s, *a, r_s, *r = &r_s, r2_s, *r2 = &r2_s;
+    LEPUSValue val;
+    int i;
+    BOOL is_float;
+
+    bf_init(ctx->bf_ctx, r);
+    bf_set_si(r, 0);
+    for(i = 0; i < argc; i++) {
+        val = JS_ToNumber(ctx, argv[i]);
+        if (LEPUS_IsException(val)) {
+            bf_delete(r);
+            return val;
+        }
+        a = JS_ToBigFloat(ctx, &is_float, &a_s, val);
+        bf_add(r, r, a, ctx->fp_env.prec, ctx->fp_env.flags);
+        if (a == &a_s)
+            bf_delete(a);
+    }
+    bf_init(ctx->bf_ctx, r2);
+    bf_sqrt(r2, r, ctx->fp_env.prec, ctx->fp_env.flags);
+    bf_delete(r);
+    return JS_NewBigFloat(ctx, r2);
+}
+#endif
 
 QJS_STATIC double js_math_sign(double a) {
   if (isnan(a) || a == 0.0) return a;
@@ -41217,11 +38187,7 @@ LEPUSValue js_math_random(LEPUSContext *ctx, LEPUSValueConst this_val, int argc,
 static const LEPUSCFunctionListEntry js_math_funcs[] = {
     LEPUS_CFUNC_MAGIC_DEF("min", 2, js_math_min_max, 0),
     LEPUS_CFUNC_MAGIC_DEF("max", 2, js_math_min_max, 1),
-#ifdef CONFIG_BIGNUM
-    LEPUS_CFUNC_DEF("abs", 1, js_math_abs),
-#else
     LEPUS_CFUNC_SPECIAL_DEF("abs", 1, f_f, fabs),
-#endif
     LEPUS_CFUNC_SPECIAL_DEF("floor", 1, f_f, floor),
     LEPUS_CFUNC_SPECIAL_DEF("ceil", 1, f_f, ceil),
     LEPUS_CFUNC_SPECIAL_DEF("round", 1, f_f, js_math_round),
@@ -43430,41 +40396,12 @@ static force_inline bool read_null(const uint8_t **ptr, json_val *val) {
 QJS_STATIC inline void js_json_get_number(JSParseState *s, bool is_neg,
                                           json_val *json_val) {
   LEPUSContext *ctx = s->ctx;
-#ifdef CONFIG_BIGNUM
-  LEPUSValue val = ctx->gc_enable ? s->token.u.num.val
-                                  : LEPUS_DupValue(ctx, s->token.u.num.val);
-  if (is_neg) {
-    switch (LEPUS_VALUE_GET_NORM_TAG(val)) {
-      case LEPUS_TAG_BIG_INT:
-      case LEPUS_TAG_BIG_FLOAT: {
-        JSBigFloat *p;
-        p = static_cast<JSBigFloat *>(LEPUS_VALUE_GET_PTR(val));
-        bf_neg(&p->num);
-      } break;
-      case LEPUS_TAG_FLOAT64: {
-        double d;
-        d = LEPUS_VALUE_GET_FLOAT64(val);
-        val = __JS_NewFloat64(ctx, -d);
-      } break;
-      default:
-      case LEPUS_TAG_INT: {
-        int v;
-        v = LEPUS_VALUE_GET_INT(val);
-        if (v == 0 && !is_bignum_mode(s->ctx))
-          val = __JS_NewFloat64(ctx, -0.0);
-        else
-          val = LEPUS_NewInt64(ctx, -(int64_t)v);
-      } break;
-    }
-  }
-#else
   LEPUSValue val = s->token.u.num.val;
   if (is_neg) {
     double d;
     LEPUS_ToFloat64(ctx, &d, val); /* no exception possible */
     val = LEPUS_NewFloat64(ctx, -d);
   }
-#endif
   json_val->uni.num = val;
   json_val->tag = JSON_TYPE_NUM;
 }
@@ -44053,40 +40990,12 @@ QJS_STATIC LEPUSValue json_parse_value(JSParseState *s) {
       }
       is_neg = 1;
     number:
-#ifdef CONFIG_BIGNUM
-      val = LEPUS_DupValue(ctx, s->token.u.num.val);
-      if (is_neg) {
-        switch (LEPUS_VALUE_GET_NORM_TAG(val)) {
-          case LEPUS_TAG_BIG_INT:
-          case LEPUS_TAG_BIG_FLOAT: {
-            JSBigFloat *p;
-            p = static_cast<JSBigFloat *>(LEPUS_VALUE_GET_PTR(val));
-            bf_neg(&p->num);
-          } break;
-          case LEPUS_TAG_FLOAT64: {
-            double d;
-            d = LEPUS_VALUE_GET_FLOAT64(val);
-            val = __JS_NewFloat64(ctx, -d);
-          } break;
-          default:
-          case LEPUS_TAG_INT: {
-            int v;
-            v = LEPUS_VALUE_GET_INT(val);
-            if (v == 0 && !is_bignum_mode(s->ctx))
-              val = __JS_NewFloat64(ctx, -0.0);
-            else
-              val = LEPUS_NewInt64(ctx, -(int64_t)v);
-          } break;
-        }
-      }
-#else
       val = s->token.u.num.val;
       if (is_neg) {
         double d;
         LEPUS_ToFloat64(ctx, &d, val); /* no exception possible */
         val = LEPUS_NewFloat64(ctx, -d);
       }
-#endif
       if (next_token(s)) goto fail;
       break;
     case TOK_FALSE:
@@ -44298,10 +41207,6 @@ QJS_STATIC LEPUSValue JS_ToQuotedStringFree(LEPUSContext *ctx, LEPUSValue val) {
   return r;
 }
 
-#ifdef CONFIG_BIGNUM
-static inline BOOL JS_IsBigInt(LEPUSContext *ctx, LEPUSValueConst v);
-#endif
-
 QJS_STATIC LEPUSValue js_json_check(LEPUSContext *ctx,
                                     JSONStringifyContext *jsc,
                                     LEPUSValueConst holder, LEPUSValue val,
@@ -44309,10 +41214,7 @@ QJS_STATIC LEPUSValue js_json_check(LEPUSContext *ctx,
   LEPUSValue v;
   LEPUSValueConst args[2];
 
-  if (LEPUS_IsObject(val)
-#ifdef CONFIG_BIGNUM
-      || JS_IsBigInt(ctx, val) /* XXX: probably useless */
-#endif
+  if (LEPUS_IsObject(val) || JS_IsBigInt(ctx, val) /* XXX: probably useless */
   ) {
     LEPUSValue f = JS_GetPropertyInternal_RC(ctx, val, JS_ATOM_toJSON, val, 0);
     if (LEPUS_IsException(f)) goto exception;
@@ -44341,14 +41243,9 @@ QJS_STATIC LEPUSValue js_json_check(LEPUSContext *ctx,
     case LEPUS_TAG_STRING:
     case LEPUS_TAG_INT:
     case LEPUS_TAG_FLOAT64:
-#ifdef CONFIG_BIGNUM
-    case LEPUS_TAG_BIG_FLOAT:
-#endif
     case LEPUS_TAG_BOOL:
     case LEPUS_TAG_NULL:
-#ifdef CONFIG_BIGNUM
     case LEPUS_TAG_BIG_INT:
-#endif
     case LEPUS_TAG_EXCEPTION:
     case LEPUS_TAG_SEPARABLE_STRING:
     case LEPUS_TAG_LEPUS_REF:
@@ -44595,17 +41492,10 @@ static int make_json_val(LEPUSContext *ctx, LEPUSValue obj,
         }
         LEPUS_FreeValue(ctx, obj);
         return 0;
-      }
-#ifdef CONFIG_BIGNUM
-      else if (cl == JS_CLASS_BIG_FLOAT) {
-        obj = JS_ToNumberFree(ctx, obj);
-        return make_json_val(ctx, obj, jsc, val_hdr, val, alc_len, str_arr, ts,
-                             cs);
       } else if (cl == JS_CLASS_BIG_INT) {
-        LEPUS_ThrowTypeError(ctx, "bigint are forbidden in JSON.stringify");
+        LEPUS_ThrowTypeError(ctx, "Do not know how to serialize a BigInt");
         goto exception;
       }
-#endif
 #ifdef ENABLE_LEPUSNG
     do_object_stringify:
 #endif
@@ -44735,18 +41625,11 @@ static int make_json_val(LEPUSContext *ctx, LEPUSValue obj,
         goto process_int;
       }
       goto process_float;
-#ifdef CONFIG_BIGNUM
-    case LEPUS_TAG_BIG_FLOAT:
-#endif
     process_float:
       val_incr();
       val->tag = JSON_TYPE_NUM | JSON_SUBTYPE_REAL;
-#ifdef CONFIG_BIGNUM
-      val->uni.bigf = obj;
-#else
       val->uni.f64 = d;
       LEPUS_FreeValue(ctx, obj);
-#endif
       return 0;
     case LEPUS_TAG_INT: {
     process_int:
@@ -44758,11 +41641,9 @@ static int make_json_val(LEPUSContext *ctx, LEPUSValue obj,
       val->uni.i64 = num;
       return 0;
     }
-#ifdef CONFIG_BIGNUM
     case LEPUS_TAG_BIG_INT:
       LEPUS_ThrowTypeError(ctx, "bigint are forbidden in JSON.stringify");
       goto exception;
-#endif
     case LEPUS_TAG_BOOL: {
       val_incr();
       if (LEPUS_ToBool(ctx, obj)) {
@@ -44834,20 +41715,9 @@ static force_inline uint32_t byte_load_3(const void *src) {
 
 static uint8_t *write_number(LEPUSContext *ctx, uint8_t *cur, json_val *val) {
   if (val->tag & JSON_SUBTYPE_REAL) {
-#ifdef CONFIG_BIGNUM
-    size_t len = 0;
-    LEPUSValue raw = val->uni.bigf;
-    char *str = js_ftoa1(ctx, raw, 10, 0, BF_RNDN | BF_FTOA_FORMAT_FREE_MIN);
-    LEPUS_FreeValue(ctx, raw);
-    len = strlen(str);
-    memcpy(cur, str, len);
-    bf_realloc(ctx->bf_ctx, str, 0);
-    cur += len;
-#else
     double raw = val->uni.f64;
-    js_dtoa1((char *)cur, raw, 10, 0, JS_DTOA_VAR_FORMAT);
-    cur += strlen((char *)cur);
-#endif
+    JSDTOATempMem dtoa_mem;
+    cur += js_dtoa((char *)cur, raw, 10, 0, JS_DTOA_FORMAT_FREE, &dtoa_mem);
     return cur;
   } else {
     snprintf((char *)cur, 32, "%d", (int)(val->uni.i64));
@@ -45510,14 +42380,6 @@ QJS_STATIC int js_json_to_str(LEPUSContext *ctx, JSONStringifyContext *jsc,
         LEPUS_FreeValue(ctx, val);
         return ret;
       }
-#ifdef CONFIG_BIGNUM
-      else if (cl == JS_CLASS_BIG_FLOAT) {
-        return string_buffer_concat_value_free(jsc->b, val);
-      } else if (cl == JS_CLASS_BIG_INT) {
-        LEPUS_ThrowTypeError(ctx, "bigint are forbidden in JSON.stringify");
-        goto exception;
-      }
-#endif
 #ifdef ENABLE_LEPUSNG
     do_object_stringify:
 #endif
@@ -45625,17 +42487,13 @@ QJS_STATIC int js_json_to_str(LEPUSContext *ctx, JSONStringifyContext *jsc,
       }
       return string_buffer_concat_value_free(jsc->b, val);
     case LEPUS_TAG_INT:
-#ifdef CONFIG_BIGNUM
-    case LEPUS_TAG_BIG_FLOAT:
-#endif
+
     case LEPUS_TAG_BOOL:
     case LEPUS_TAG_NULL:
       return string_buffer_concat_value_free(jsc->b, val);
-#ifdef CONFIG_BIGNUM
     case LEPUS_TAG_BIG_INT:
       LEPUS_ThrowTypeError(ctx, "bigint are forbidden in JSON.stringify");
       goto exception;
-#endif
     default:
       LEPUS_FreeValue(ctx, val);
       return 0;
@@ -47314,7 +44172,7 @@ void LEPUS_FreeRefCountedWeakRef(LEPUSRuntime *rt,
 #endif
 
 /* XXX: better hash ? */
-QJS_STATIC uint32_t map_hash_key(LEPUSContext *ctx, LEPUSValueConst key) {
+uint32_t map_hash_key(LEPUSContext *ctx, LEPUSValueConst key) {
   int64_t tag = LEPUS_VALUE_GET_NORM_TAG(key);
   uint32_t h;
   double d;
@@ -47326,17 +44184,16 @@ QJS_STATIC uint32_t map_hash_key(LEPUSContext *ctx, LEPUSValueConst key) {
       break;
     case LEPUS_TAG_SEPARABLE_STRING:
       key = JS_GetSeparableStringContentNotDup(ctx, key);
-      tag = LEPUS_TAG_STRING;
     case LEPUS_TAG_STRING:
       h = hash_string(LEPUS_VALUE_GET_STRING(key), 0);
-      break;
+      return h ^ LEPUS_TAG_STRING;
     case LEPUS_TAG_OBJECT:
     case LEPUS_TAG_LEPUS_CPOINTER:
     case LEPUS_TAG_SYMBOL:
       h = (uintptr_t)LEPUS_VALUE_GET_PTR(key) * 3163;
       break;
     case LEPUS_TAG_INT:
-      d = LEPUS_VALUE_GET_INT(key) * 3163;
+      d = LEPUS_VALUE_GET_INT(key);
       goto hash_float64;
     case LEPUS_TAG_FLOAT64:
       d = LEPUS_VALUE_GET_FLOAT64(key);
@@ -47345,9 +44202,18 @@ QJS_STATIC uint32_t map_hash_key(LEPUSContext *ctx, LEPUSValueConst key) {
     hash_float64:
       u.d = d;
       h = (u.u32[0] ^ u.u32[1]) * 3163;
-      break;
+      return h ^ LEPUS_TAG_FLOAT64;
+    case LEPUS_TAG_BIG_INT: {
+      JSBigInt *p = LEPUS_VALUE_GET_BIGINT(key);
+      int32_t i = 0;
+      h = 1;
+      for (i = p->len - 1; i >= 0; i--) {
+        h = h * 263 + p->tab[i];
+      }
+      h *= 3163;
+    } break;
     default:
-      h = 0; /* XXX: bignum support */
+      h = 0;
       break;
   }
   h ^= tag;
@@ -50649,9 +47515,7 @@ QJS_STATIC LEPUSValue js_date_Symbol_toPrimitive(LEPUSContext *ctx,
   }
   switch (hint) {
     case JS_ATOM_number:
-#ifdef CONFIG_BIGNUM
     case JS_ATOM_integer:
-#endif
       hint_num = HINT_NUMBER;
       break;
     case JS_ATOM_string:
@@ -50834,100 +47698,78 @@ void LEPUS_AddIntrinsicEval(LEPUSContext *ctx) {
 #endif
 }
 
-#ifdef CONFIG_BIGNUM
+/* BigInt */
 
 static LEPUSValue JS_ToBigIntCtorFree(LEPUSContext *ctx, LEPUSValue val) {
-  int32_t tag;
-  BOOL is_legacy;
-  int ret;
+  int64_t tag;
 
-  is_legacy = is_bignum_mode(ctx) ^ 1;
 redo:
   tag = LEPUS_VALUE_GET_NORM_TAG(val);
   switch (tag) {
-    case LEPUS_TAG_INT:
     case LEPUS_TAG_BOOL:
-      if (is_legacy) {
-        bf_t r_s, *r = &r_s;
-        bf_init(ctx->bf_ctx, r);
-        bf_set_si(r, LEPUS_VALUE_GET_INT(val));
-        val = JS_NewBigInt2(ctx, r, TRUE);
-      } else {
-        val = LEPUS_NewInt32(ctx, LEPUS_VALUE_GET_INT(val));
-      }
+      val = LEPUS_NewBigInt64(ctx, LEPUS_VALUE_GET_BOOL(val));
+      break;
+    case LEPUS_TAG_INT:
+      val = LEPUS_NewBigInt64(ctx, LEPUS_VALUE_GET_INT(val));
       break;
     case LEPUS_TAG_BIG_INT:
       break;
-    case LEPUS_TAG_FLOAT64:
-    case LEPUS_TAG_BIG_FLOAT: {
-      bf_t *a, a_s, r_s, *r = &r_s;
-      BOOL is_float;
-      a = JS_ToBigFloat(ctx, &is_float, &a_s, val);
-      bf_init(ctx->bf_ctx, r);
-      if (!bf_is_finite(a)) {
-        LEPUS_FreeValue(ctx, val);
-        val = LEPUS_ThrowRangeError(ctx,
-                                    "cannot convert NaN or Infinity to bigint");
-      } else {
-        bf_set(r, a);
-        ret = bf_rint(r, BF_PREC_INF, BF_RNDZ);
-        LEPUS_FreeValue(ctx, val);
-        if (is_legacy && (ret & BF_ST_INEXACT)) {
-          bf_delete(r);
+    case LEPUS_TAG_FLOAT64: {
+      double d = LEPUS_VALUE_GET_FLOAT64(val);
+      JSBigInt *r;
+      int res;
+      r = js_bigint_from_float64(ctx, &res, d);
+      if (!r) {
+        if (res == 0) {
+          val = LEPUS_EXCEPTION;
+        } else if (res == 1) {
           val = LEPUS_ThrowRangeError(
-              ctx, "cannot convert to bigint: not an integer");
+              ctx, "cannot convert to BigInt: not an integer");
         } else {
-          val = JS_NewBigInt2(ctx, r, is_legacy);
+          val = LEPUS_ThrowRangeError(
+              ctx, "cannot convert NaN or Infinity to BigInt");
         }
+      } else {
+        val = JS_CompactBigInt(ctx, r);
       }
-      if (a == &a_s) bf_delete(a);
     } break;
     case LEPUS_TAG_STRING:
     case LEPUS_TAG_SEPARABLE_STRING:
       val = JS_StringToBigIntErr(ctx, val);
-      if (LEPUS_IsException(val)) break;
-      goto redo;
+      break;
     case LEPUS_TAG_OBJECT:
-      val = JS_ToPrimitiveFree_RC(ctx, val,
-                                  is_legacy ? HINT_NUMBER : HINT_INTEGER);
+      val = JS_ToPrimitiveFree(ctx, val, HINT_NUMBER);
       if (LEPUS_IsException(val)) break;
       goto redo;
     case LEPUS_TAG_NULL:
     case LEPUS_TAG_UNDEFINED:
     default:
       LEPUS_FreeValue(ctx, val);
-      return LEPUS_ThrowTypeError(ctx, "cannot convert to bigint");
+      return LEPUS_ThrowTypeError(ctx, "cannot convert to BigInt");
   }
   return val;
 }
 
 static LEPUSValue js_bigint_constructor(LEPUSContext *ctx,
-                                        LEPUSValueConst this_val, int argc,
+                                        LEPUSValueConst new_target, int argc,
                                         LEPUSValueConst *argv) {
+  if (!LEPUS_IsUndefined(new_target))
+    return LEPUS_ThrowTypeError(ctx, "not a constructor");
   return JS_ToBigIntCtorFree(ctx, LEPUS_DupValue(ctx, argv[0]));
-}
-
-static inline BOOL JS_IsBigInt(LEPUSContext *ctx, LEPUSValueConst v) {
-  int tag = LEPUS_VALUE_GET_TAG(v);
-  if (tag == LEPUS_TAG_BIG_INT) return TRUE;
-  if (is_bignum_mode(ctx))
-    return tag == LEPUS_TAG_INT;
-  else
-    return FALSE;
 }
 
 static LEPUSValue js_thisBigIntValue(LEPUSContext *ctx,
                                      LEPUSValueConst this_val) {
   if (JS_IsBigInt(ctx, this_val)) return LEPUS_DupValue(ctx, this_val);
 
-  if (LEPUS_VALUE_IS_OBJECT(this_val)) {
+  if (LEPUS_VALUE_GET_TAG(this_val) == LEPUS_TAG_OBJECT) {
     LEPUSObject *p = LEPUS_VALUE_GET_OBJ(this_val);
     if (p->class_id == JS_CLASS_BIG_INT) {
       if (JS_IsBigInt(ctx, p->u.object_data))
         return LEPUS_DupValue(ctx, p->u.object_data);
     }
   }
-  return LEPUS_ThrowTypeError(ctx, "not a bigint");
+  return LEPUS_ThrowTypeError(ctx, "not a BigInt");
 }
 
 static LEPUSValue js_bigint_toString(LEPUSContext *ctx,
@@ -50942,13 +47784,10 @@ static LEPUSValue js_bigint_toString(LEPUSContext *ctx,
   if (argc == 0 || LEPUS_IsUndefined(argv[0])) {
     base = 10;
   } else {
-    if (JS_ToInt32Sat(ctx, &base, argv[0])) goto fail;
-    if (base < 2 || base > 36) {
-      LEPUS_ThrowRangeError(ctx, "radix must be between 2 and 36");
-      goto fail;
-    }
+    base = js_get_radix(ctx, argv[0]);
+    if (base < 0) goto fail;
   }
-  ret = js_ftoa(ctx, val, base, 0, BF_RNDN | BF_FTOA_FORMAT_FREE_MIN);
+  ret = js_bigint_to_string1(ctx, val, base);
   LEPUS_FreeValue(ctx, val);
   return ret;
 fail:
@@ -50961,149 +47800,52 @@ static LEPUSValue js_bigint_valueOf(LEPUSContext *ctx, LEPUSValueConst this_val,
   return js_thisBigIntValue(ctx, this_val);
 }
 
-static LEPUSValue js_integer_div(LEPUSContext *ctx, LEPUSValueConst this_val,
-                                 int argc, LEPUSValueConst *argv, int magic) {
-  bf_t a_s, b_s, *a, *b, r_s, *r = &r_s, q_s, *q = &q_s;
-  int status;
-
-  b = NULL;
-  a = JS_ToBigInt(ctx, &a_s, argv[0]);
-  if (!a) return LEPUS_EXCEPTION;
-  b = JS_ToBigInt(ctx, &b_s, argv[1]);
-  if (!b) {
-    JS_FreeBigInt(ctx, a, &a_s);
-    return LEPUS_EXCEPTION;
-  }
-  bf_init(ctx->bf_ctx, q);
-  bf_init(ctx->bf_ctx, r);
-  status = bf_divrem(q, r, a, b, BF_PREC_INF, BF_RNDZ, magic & 0xf);
-  JS_FreeBigInt(ctx, a, &a_s);
-  JS_FreeBigInt(ctx, b, &b_s);
-  if (unlikely(status)) {
-    bf_delete(q);
-    bf_delete(r);
-    throw_bf_exception(ctx, status);
-    return LEPUS_EXCEPTION;
-  }
-  if (magic & 0x10) {
-    LEPUSValue ret;
-    /* XXX: handle exceptions */
-    ret = LEPUS_NewArray(ctx);
-    LEPUS_SetPropertyUint32(ctx, ret, 0, JS_NewBigInt(ctx, q));
-    LEPUS_SetPropertyUint32(ctx, ret, 1, JS_NewBigInt(ctx, r));
-    return ret;
-  } else {
-    bf_delete(r);
-    return JS_NewBigInt(ctx, q);
-  }
-}
-
-static LEPUSValue js_integer_sqrt(LEPUSContext *ctx, LEPUSValueConst this_val,
-                                  int argc, LEPUSValueConst *argv, int magic) {
-  bf_t a_s, *a, r_s, *r = &r_s, rem_s, *rem = &rem_s;
-  int status;
-
-  a = JS_ToBigInt(ctx, &a_s, argv[0]);
-  if (!a) return LEPUS_EXCEPTION;
-  bf_init(ctx->bf_ctx, r);
-  bf_init(ctx->bf_ctx, rem);
-  status = bf_sqrtrem(r, rem, a);
-  JS_FreeBigInt(ctx, a, &a_s);
-  if (unlikely(status & ~BF_ST_INEXACT)) {
-    bf_delete(r);
-    bf_delete(rem);
-    return throw_bf_exception(ctx, status);
-  }
-  if (magic) {
-    LEPUSValue ret;
-    /* XXX: handle exceptions */
-    ret = LEPUS_NewArray(ctx);
-    LEPUS_SetPropertyUint32(ctx, ret, 0, JS_NewBigInt(ctx, r));
-    LEPUS_SetPropertyUint32(ctx, ret, 1, JS_NewBigInt(ctx, rem));
-    return ret;
-  } else {
-    bf_delete(rem);
-    return JS_NewBigInt(ctx, r);
-  }
-}
-
-static LEPUSValue js_integer_op1(LEPUSContext *ctx, LEPUSValueConst this_val,
-                                 int argc, LEPUSValueConst *argv, int magic) {
-  bf_t a_s, *a;
-  int64_t res;
-
-  a = JS_ToBigInt(ctx, &a_s, argv[0]);
-  if (!a) return LEPUS_EXCEPTION;
-  switch (magic) {
-    case 0: /* floorLog2 */
-      if (a->sign || a->expn <= 0) {
-        res = -1;
-      } else {
-        res = a->expn - 1;
-      }
-      break;
-    case 1: /* ctz */
-      if (bf_is_zero(a)) {
-        res = -1;
-      } else {
-        res = bf_get_exp_min(a);
-      }
-      break;
-    default:
-      abort();
-  }
-  JS_FreeBigInt(ctx, a, &a_s);
-  return LEPUS_NewInt64(ctx, res);
-}
-
-static LEPUSValue js_integer_asUintN(LEPUSContext *ctx,
-                                     LEPUSValueConst this_val, int argc,
-                                     LEPUSValueConst *argv, int asIntN) {
+static LEPUSValue js_bigint_asUintN(LEPUSContext *ctx, LEPUSValueConst this_val,
+                                    int argc, LEPUSValueConst *argv,
+                                    int asIntN) {
   uint64_t bits;
-  bf_t a_s, *a = &a_s, r_s, *r = &r_s, mask_s, *mask = &mask_s;
-  BOOL is_legacy;
+  LEPUSValue res, a;
 
   if (LEPUS_ToIndex(ctx, &bits, argv[0])) return LEPUS_EXCEPTION;
-  a = JS_ToBigInt(ctx, &a_s, argv[1]);
-  if (!a) return LEPUS_EXCEPTION;
-  /* XXX: optimize */
-  bf_init(ctx->bf_ctx, r);
-  bf_init(ctx->bf_ctx, mask);
-  bf_set_ui(mask, 1);
-  bf_mul_2exp(mask, bits, BF_PREC_INF, BF_RNDZ);
-  bf_add_si(mask, mask, -1, BF_PREC_INF, BF_RNDZ);
-  bf_logic_and(r, a, mask);
-  if (asIntN && bits != 0) {
-    bf_set_ui(mask, 1);
-    bf_mul_2exp(mask, bits - 1, BF_PREC_INF, BF_RNDZ);
-    if (bf_cmpu(r, mask) >= 0) {
-      bf_set_ui(mask, 1);
-      bf_mul_2exp(mask, bits, BF_PREC_INF, BF_RNDZ);
-      bf_sub(r, r, mask, BF_PREC_INF, BF_RNDZ);
-    }
+  a = JS_ToBigInt(ctx, argv[1]);
+  if (LEPUS_IsException(a)) return LEPUS_EXCEPTION;
+  JSBigInt *r, *p = LEPUS_VALUE_GET_BIGINT(a);
+  if (bits == 0) {
+    LEPUS_FreeValue(ctx, a);
+    return LEPUS_NewBigInt64(ctx, 0);
   }
-  bf_delete(mask);
-  JS_FreeBigInt(ctx, a, &a_s);
-  is_legacy = is_bignum_mode(ctx) ^ 1;
-  return JS_NewBigInt2(ctx, r, is_legacy);
+  if (bits >= p->len * JS_LIMB_BITS) {
+    res = a;
+  } else {
+    int len, shift, i;
+    js_limb_t v;
+    len = (bits + JS_LIMB_BITS - 1) / JS_LIMB_BITS;
+    r = js_bigint_new(ctx, len);
+    if (!r) {
+      LEPUS_FreeValue(ctx, a);
+      return LEPUS_EXCEPTION;
+    }
+    r->len = len;
+    for (i = 0; i < len - 1; i++) r->tab[i] = p->tab[i];
+    shift = (-bits) & (JS_LIMB_BITS - 1);
+    /* 0 <= shift <= JS_LIMB_BITS - 1 */
+    v = p->tab[len - 1] << shift;
+    if (asIntN)
+      v = (js_slimb_t)v >> shift;
+    else
+      v = v >> shift;
+    r->tab[len - 1] = v;
+    r = js_bigint_normalize(ctx, r);
+    LEPUS_FreeValue(ctx, a);
+    res = JS_CompactBigInt(ctx, r);
+  }
+
+  return res;
 }
 
-static const LEPUSCFunctionListEntry js_integer_funcs[] = {
-    LEPUS_CFUNC_MAGIC_DEF("tdiv", 2, js_integer_div, BF_RNDZ),
-    LEPUS_CFUNC_MAGIC_DEF("fdiv", 2, js_integer_div, BF_RNDD),
-    LEPUS_CFUNC_MAGIC_DEF("cdiv", 2, js_integer_div, BF_RNDU),
-    LEPUS_CFUNC_MAGIC_DEF("ediv", 2, js_integer_div, BF_DIVREM_EUCLIDIAN),
-    LEPUS_CFUNC_MAGIC_DEF("tdivrem", 2, js_integer_div, BF_RNDZ | 0x10),
-    LEPUS_CFUNC_MAGIC_DEF("fdivrem", 2, js_integer_div, BF_RNDD | 0x10),
-    LEPUS_CFUNC_MAGIC_DEF("cdivrem", 2, js_integer_div, BF_RNDU | 0x10),
-    LEPUS_CFUNC_MAGIC_DEF("edivrem", 2, js_integer_div,
-                          BF_DIVREM_EUCLIDIAN | 0x10),
-    LEPUS_CFUNC_MAGIC_DEF("sqrt", 1, js_integer_sqrt, 0),
-    LEPUS_CFUNC_MAGIC_DEF("sqrtrem", 1, js_integer_sqrt, 1),
-    LEPUS_CFUNC_MAGIC_DEF("floorLog2", 1, js_integer_op1, 0),
-    LEPUS_CFUNC_MAGIC_DEF("ctz", 1, js_integer_op1, 1),
-    LEPUS_CFUNC_MAGIC_DEF("asUintN", 2, js_integer_asUintN, 0),
-    LEPUS_CFUNC_MAGIC_DEF("asIntN", 2, js_integer_asUintN, 1),
+static const LEPUSCFunctionListEntry js_bigint_funcs[] = {
+    LEPUS_CFUNC_MAGIC_DEF("asUintN", 2, js_bigint_asUintN, 0),
+    LEPUS_CFUNC_MAGIC_DEF("asIntN", 2, js_bigint_asUintN, 1),
 };
 
 static const LEPUSCFunctionListEntry js_bigint_proto_funcs[] = {
@@ -51113,444 +47855,18 @@ static const LEPUSCFunctionListEntry js_bigint_proto_funcs[] = {
                           LEPUS_PROP_CONFIGURABLE),
 };
 
-static LEPUSValue js_thisBigFloatValue(LEPUSContext *ctx,
-                                       LEPUSValueConst this_val) {
-  if (LEPUS_IsBigFloat(this_val)) return LEPUS_DupValue(ctx, this_val);
+QJS_STATIC void JS_AddIntrinsicBigInt(LEPUSContext *ctx) {
+  LEPUSValueConst obj1;
 
-  if (LEPUS_VALUE_IS_OBJECT(this_val)) {
-    LEPUSObject *p = LEPUS_VALUE_GET_OBJ(this_val);
-    if (p->class_id == JS_CLASS_BIG_FLOAT) {
-      if (LEPUS_IsBigFloat(p->u.object_data))
-        return LEPUS_DupValue(ctx, p->u.object_data);
-    }
-  }
-  return LEPUS_ThrowTypeError(ctx, "not a bigfloat");
+  ctx->class_proto[JS_CLASS_BIG_INT] = LEPUS_NewObject(ctx);
+  LEPUS_SetPropertyFunctionList(ctx, ctx->class_proto[JS_CLASS_BIG_INT],
+                                js_bigint_proto_funcs,
+                                countof(js_bigint_proto_funcs));
+  obj1 = JS_NewGlobalCConstructor(ctx, "BigInt", js_bigint_constructor, 1,
+                                  ctx->class_proto[JS_CLASS_BIG_INT]);
+  LEPUS_SetPropertyFunctionList(ctx, obj1, js_bigint_funcs,
+                                countof(js_bigint_funcs));
 }
-
-static LEPUSValue js_bigfloat_toString(LEPUSContext *ctx,
-                                       LEPUSValueConst this_val, int argc,
-                                       LEPUSValueConst *argv) {
-  LEPUSValue val;
-  int base;
-  LEPUSValue ret;
-
-  val = js_thisBigFloatValue(ctx, this_val);
-  if (LEPUS_IsException(val)) return val;
-  if (argc == 0 || LEPUS_IsUndefined(argv[0])) {
-    base = 10;
-  } else {
-    if (JS_ToInt32Sat(ctx, &base, argv[0])) goto fail;
-    if (base < 2 || base > 36) {
-      LEPUS_ThrowRangeError(ctx, "radix must be between 2 and 36");
-      goto fail;
-    }
-  }
-  ret = js_ftoa(ctx, val, base, 0, BF_RNDN | BF_FTOA_FORMAT_FREE_MIN);
-  LEPUS_FreeValue(ctx, val);
-  return ret;
-fail:
-  LEPUS_FreeValue(ctx, val);
-  return LEPUS_EXCEPTION;
-}
-
-static LEPUSValue js_bigfloat_valueOf(LEPUSContext *ctx,
-                                      LEPUSValueConst this_val, int argc,
-                                      LEPUSValueConst *argv) {
-  return js_thisBigFloatValue(ctx, this_val);
-}
-
-static const LEPUSCFunctionListEntry js_bigfloat_proto_funcs[] = {
-    LEPUS_CFUNC_DEF("toString", 0, js_bigfloat_toString),
-    LEPUS_CFUNC_DEF("valueOf", 0, js_bigfloat_valueOf),
-    LEPUS_CFUNC_MAGIC_DEF("toPrecision", 1, js_number_toPrecision, 1),
-    LEPUS_CFUNC_MAGIC_DEF("toFixed", 1, js_number_toFixed, 1),
-    LEPUS_CFUNC_MAGIC_DEF("toExponential", 1, js_number_toExponential, 1),
-};
-
-static LEPUSValue js_bigfloat_constructor(LEPUSContext *ctx,
-                                          LEPUSValueConst this_val, int argc,
-                                          LEPUSValueConst *argv) {
-  LEPUSValue val;
-  if (argc == 0) {
-    bf_t r_s, *r = &r_s;
-    bf_init(ctx->bf_ctx, r);
-    bf_set_zero(r, 0);
-    val = JS_NewBigFloat(ctx, r);
-  } else {
-    val = LEPUS_DupValue(ctx, argv[0]);
-  redo:
-    switch (LEPUS_VALUE_GET_NORM_TAG(val)) {
-      case LEPUS_TAG_BIG_FLOAT:
-        break;
-      case LEPUS_TAG_FLOAT64: {
-        bf_t r_s, *r = &r_s;
-        bf_init(ctx->bf_ctx, r);
-        bf_set_float64(r, LEPUS_VALUE_GET_FLOAT64(val));
-        val = JS_NewBigFloat(ctx, r);
-      } break;
-      case LEPUS_TAG_INT: {
-        bf_t r_s, *r = &r_s;
-        bf_init(ctx->bf_ctx, r);
-        bf_set_si(r, LEPUS_VALUE_GET_INT(val));
-        val = JS_NewBigFloat(ctx, r);
-      } break;
-      case LEPUS_TAG_BIG_INT:
-        /* We keep the full precision of the integer */
-        {
-          JSBigFloat *p = static_cast<JSBigFloat *>(LEPUS_VALUE_GET_PTR(val));
-          val = LEPUS_MKPTR(LEPUS_TAG_BIG_FLOAT, p);
-        }
-        break;
-      case LEPUS_TAG_SEPARABLE_STRING:
-      case LEPUS_TAG_STRING: {
-        const char *str, *p;
-        int err;
-
-        str = JS_ToCStringLen2_RC(ctx, NULL, val, 0);
-        LEPUS_FreeValue(ctx, val);
-        if (!str) return LEPUS_EXCEPTION;
-        val = js_atof(
-            ctx, str, &p, 0,
-            BF_ATOF_BIN_OCT | BF_ATOF_NO_PREFIX_AFTER_SIGN | BF_ATOF_JS_QUIRKS);
-        p += skip_spaces(p);
-        err = (*p != '\0');
-        LEPUS_FreeCString(ctx, str);
-        if (err) {
-          LEPUS_FreeValue(ctx, val);
-          return LEPUS_ThrowSyntaxError(ctx, "invalid bigfloat literal");
-        }
-      } break;
-      case LEPUS_TAG_OBJECT:
-        val = JS_ToPrimitiveFree_RC(ctx, val, HINT_NUMBER);
-        if (LEPUS_IsException(val)) break;
-        goto redo;
-      case LEPUS_TAG_NULL:
-      case LEPUS_TAG_UNDEFINED:
-      default:
-        LEPUS_FreeValue(ctx, val);
-        return LEPUS_ThrowTypeError(ctx, "cannot convert to bigfloat");
-    }
-  }
-  return val;
-}
-
-static LEPUSValue js_float_get_const(LEPUSContext *ctx,
-                                     LEPUSValueConst this_val, int magic) {
-  bf_t r_s, *r = &r_s;
-  bf_init(ctx->bf_ctx, r);
-  switch (magic) {
-    case 0: /* PI */
-      bf_const_pi(r, ctx->fp_env.prec, ctx->fp_env.flags);
-      break;
-    case 1: /* LN2 */
-      bf_const_log2(r, ctx->fp_env.prec, ctx->fp_env.flags);
-      break;
-    case 2: /* MIN_VALUE */
-    case 3: /* MAX_VALUE */
-    {
-      slimb_t e_range, e;
-      e_range = (limb_t)1 << (bf_get_exp_bits(ctx->fp_env.flags) - 1);
-      bf_set_ui(r, 1);
-      if (magic == 2) {
-        e = -e_range + 2;
-        if (ctx->fp_env.flags & BF_FLAG_SUBNORMAL) e -= ctx->fp_env.prec - 1;
-        bf_mul_2exp(r, e, ctx->fp_env.prec, ctx->fp_env.flags);
-      } else {
-        bf_mul_2exp(r, ctx->fp_env.prec, ctx->fp_env.prec, ctx->fp_env.flags);
-        bf_add_si(r, r, -1, ctx->fp_env.prec, ctx->fp_env.flags);
-        bf_mul_2exp(r, e_range - ctx->fp_env.prec, ctx->fp_env.prec,
-                    ctx->fp_env.flags);
-      }
-    } break;
-    case 4: /* EPSILON */
-      bf_set_ui(r, 1);
-      bf_mul_2exp(r, 1 - ctx->fp_env.prec, ctx->fp_env.prec, ctx->fp_env.flags);
-      break;
-    default:
-      abort();
-  }
-  return JS_NewBigFloat(ctx, r);
-}
-
-static LEPUSValue js_float_parseFloat(LEPUSContext *ctx,
-                                      LEPUSValueConst this_val, int argc,
-                                      LEPUSValueConst *argv) {
-  bf_t a_s, *a = &a_s;
-  const char *str;
-  LEPUSValue ret;
-  int radix;
-  JSFloatEnv *fe;
-
-  str = JS_ToCStringLen2_RC(ctx, NULL, argv[0], 0);
-  if (!str) return LEPUS_EXCEPTION;
-  if (LEPUS_ToInt32(ctx, &radix, argv[1])) {
-  fail:
-    LEPUS_FreeCString(ctx, str);
-    return LEPUS_EXCEPTION;
-  }
-  if (radix != 0 && (radix < 2 || radix > 36)) {
-    LEPUS_ThrowRangeError(ctx, "radix must be between 2 and 36");
-    goto fail;
-  }
-  fe = &ctx->fp_env;
-  if (argc > 2) {
-    fe = static_cast<JSFloatEnv *>(
-        LEPUS_GetOpaque2(ctx, (argv[2]), JS_CLASS_FLOAT_ENV));
-    if (!fe) goto fail;
-  }
-  bf_init(ctx->bf_ctx, a);
-  bf_atof(a, str, NULL, radix, fe->prec, BF_ATOF_JS_QUIRKS | fe->flags);
-  ret = JS_NewBigFloat(ctx, a);
-  LEPUS_FreeCString(ctx, str);
-  return ret;
-}
-
-static const LEPUSCFunctionListEntry js_bigfloat_funcs[] = {
-    LEPUS_CGETSET_MAGIC_DEF("PI", js_float_get_const, NULL, 0),
-    LEPUS_CGETSET_MAGIC_DEF("LN2", js_float_get_const, NULL, 1),
-    LEPUS_CGETSET_MAGIC_DEF("MIN_VALUE", js_float_get_const, NULL, 2),
-    LEPUS_CGETSET_MAGIC_DEF("MAX_VALUE", js_float_get_const, NULL, 3),
-    LEPUS_CGETSET_MAGIC_DEF("EPSILON", js_float_get_const, NULL, 4),
-    LEPUS_CFUNC_DEF("parseFloat", 1, js_float_parseFloat),
-    LEPUS_CFUNC_MAGIC_DEF("abs", 1, js_math_fop, MATH_OP_ABS),
-    LEPUS_CFUNC_MAGIC_DEF("fpRound", 1, js_math_fop, MATH_OP_FPROUND),
-    LEPUS_CFUNC_MAGIC_DEF("floor", 1, js_math_fop, MATH_OP_FLOOR),
-    LEPUS_CFUNC_MAGIC_DEF("ceil", 1, js_math_fop, MATH_OP_CEIL),
-    LEPUS_CFUNC_MAGIC_DEF("round", 1, js_math_fop, MATH_OP_ROUND),
-    LEPUS_CFUNC_MAGIC_DEF("trunc", 1, js_math_fop, MATH_OP_TRUNC),
-    LEPUS_CFUNC_MAGIC_DEF("sqrt", 1, js_math_fop, MATH_OP_SQRT),
-    LEPUS_CFUNC_MAGIC_DEF("acos", 1, js_math_fop, MATH_OP_ACOS),
-    LEPUS_CFUNC_MAGIC_DEF("asin", 1, js_math_fop, MATH_OP_ASIN),
-    LEPUS_CFUNC_MAGIC_DEF("atan", 1, js_math_fop, MATH_OP_ATAN),
-    LEPUS_CFUNC_MAGIC_DEF("atan2", 2, js_math_fop2, MATH_OP_ATAN2),
-    LEPUS_CFUNC_MAGIC_DEF("cos", 1, js_math_fop, MATH_OP_COS),
-    LEPUS_CFUNC_MAGIC_DEF("exp", 1, js_math_fop, MATH_OP_EXP),
-    LEPUS_CFUNC_MAGIC_DEF("log", 1, js_math_fop, MATH_OP_LOG),
-    LEPUS_CFUNC_MAGIC_DEF("pow", 2, js_math_fop2, MATH_OP_POW),
-    LEPUS_CFUNC_MAGIC_DEF("sin", 1, js_math_fop, MATH_OP_SIN),
-    LEPUS_CFUNC_MAGIC_DEF("tan", 1, js_math_fop, MATH_OP_TAN),
-    LEPUS_CFUNC_MAGIC_DEF("sign", 1, js_math_fop, MATH_OP_SIGN),
-    LEPUS_CFUNC_MAGIC_DEF("add", 2, js_math_fop2, MATH_OP_ADD),
-    LEPUS_CFUNC_MAGIC_DEF("sub", 2, js_math_fop2, MATH_OP_SUB),
-    LEPUS_CFUNC_MAGIC_DEF("mul", 2, js_math_fop2, MATH_OP_MUL),
-    LEPUS_CFUNC_MAGIC_DEF("div", 2, js_math_fop2, MATH_OP_DIV),
-    LEPUS_CFUNC_MAGIC_DEF("fmod", 2, js_math_fop2, MATH_OP_FMOD),
-    LEPUS_CFUNC_MAGIC_DEF("remainder", 2, js_math_fop2, MATH_OP_REM),
-};
-
-/* FloatEnv */
-
-static LEPUSValue js_float_env_constructor(LEPUSContext *ctx,
-                                           LEPUSValueConst new_target, int argc,
-                                           LEPUSValueConst *argv) {
-  LEPUSValue obj;
-  JSFloatEnv *fe;
-  int64_t prec;
-  int flags, rndmode;
-
-  prec = ctx->fp_env.prec;
-  flags = ctx->fp_env.flags;
-  if (!LEPUS_IsUndefined(argv[0])) {
-    if (JS_ToInt64Sat(ctx, &prec, argv[0])) return LEPUS_EXCEPTION;
-    if (prec < BF_PREC_MIN || prec > BF_PREC_MAX)
-      return LEPUS_ThrowRangeError(ctx, "invalid precision");
-    flags = BF_RNDN; /* RNDN, max exponent size, no subnormal */
-    if (argc > 1 && !LEPUS_IsUndefined(argv[1])) {
-      if (JS_ToInt32Sat(ctx, &rndmode, argv[1])) return LEPUS_EXCEPTION;
-      if (rndmode < BF_RNDN || rndmode > BF_RNDF)
-        return LEPUS_ThrowRangeError(ctx, "invalid rounding mode");
-      flags = rndmode;
-    }
-  }
-
-  obj = LEPUS_NewObjectClass(ctx, JS_CLASS_FLOAT_ENV);
-  if (LEPUS_IsException(obj)) return LEPUS_EXCEPTION;
-  fe = static_cast<JSFloatEnv *>(lepus_malloc(ctx, sizeof(*fe)));
-  if (!fe) return LEPUS_EXCEPTION;
-  fe->prec = prec;
-  fe->flags = flags;
-  fe->status = 0;
-  LEPUS_SetOpaque(obj, fe);
-  return obj;
-}
-
-static void js_float_env_finalizer(LEPUSRuntime *rt, LEPUSValue val) {
-  JSFloatEnv *fe =
-      static_cast<JSFloatEnv *>(LEPUS_GetOpaque(val, JS_CLASS_FLOAT_ENV));
-  lepus_free_rt(rt, fe);
-}
-
-static LEPUSValue js_float_env_get_prec(LEPUSContext *ctx,
-                                        LEPUSValueConst this_val) {
-  return LEPUS_NewInt64(ctx, ctx->fp_env.prec);
-}
-
-static LEPUSValue js_float_env_get_expBits(LEPUSContext *ctx,
-                                           LEPUSValueConst this_val) {
-  return LEPUS_NewInt32(ctx, bf_get_exp_bits(ctx->fp_env.flags));
-}
-
-/* temporary fix for string conversion overflows */
-#define BF_EXP_BITS_MAX1 (BF_EXP_BITS_MAX - 1)
-
-static LEPUSValue js_float_env_setPrec(LEPUSContext *ctx,
-                                       LEPUSValueConst this_val, int argc,
-                                       LEPUSValueConst *argv) {
-  LEPUSValueConst func;
-  int exp_bits, flags, saved_flags;
-  LEPUSValue ret;
-  limb_t saved_prec;
-  int64_t prec;
-
-  func = argv[0];
-  if (JS_ToInt64Sat(ctx, &prec, argv[1])) return LEPUS_EXCEPTION;
-  if (prec < BF_PREC_MIN || prec > BF_PREC_MAX)
-    return LEPUS_ThrowRangeError(ctx, "invalid precision");
-  exp_bits = BF_EXP_BITS_MAX1;
-
-  if (argc > 2 && !LEPUS_IsUndefined(argv[2])) {
-    if (JS_ToInt32Sat(ctx, &exp_bits, argv[2])) return LEPUS_EXCEPTION;
-    if (exp_bits < BF_EXP_BITS_MIN || exp_bits > BF_EXP_BITS_MAX1)
-      return LEPUS_ThrowRangeError(ctx, "invalid number of exponent bits");
-  }
-
-  flags = BF_RNDN | bf_set_exp_bits(exp_bits);
-  if (exp_bits != BF_EXP_BITS_MAX1) flags |= BF_FLAG_SUBNORMAL;
-
-  saved_prec = ctx->fp_env.prec;
-  saved_flags = ctx->fp_env.flags;
-
-  ctx->fp_env.prec = prec;
-  ctx->fp_env.flags = flags;
-
-  ret = JS_Call_RC(ctx, func, LEPUS_UNDEFINED, 0, NULL);
-  /* always restore the floating point precision */
-  ctx->fp_env.prec = saved_prec;
-  ctx->fp_env.flags = saved_flags;
-  return ret;
-}
-
-#define FE_PREC (-1)
-#define FE_EXP (-2)
-#define FE_RNDMODE (-3)
-#define FE_SUBNORMAL (-4)
-
-static LEPUSValue js_float_env_proto_get_status(LEPUSContext *ctx,
-                                                LEPUSValueConst this_val,
-                                                int magic) {
-  JSFloatEnv *fe;
-  fe = static_cast<JSFloatEnv *>(
-      LEPUS_GetOpaque2(ctx, this_val, JS_CLASS_FLOAT_ENV));
-  if (!fe) return LEPUS_EXCEPTION;
-  switch (magic) {
-    case FE_PREC:
-      return LEPUS_NewInt64(ctx, fe->prec);
-    case FE_EXP:
-      return LEPUS_NewInt32(ctx, bf_get_exp_bits(fe->flags));
-    case FE_RNDMODE:
-      return LEPUS_NewInt32(ctx, fe->flags & BF_RND_MASK);
-    case FE_SUBNORMAL:
-      return LEPUS_NewBool(ctx, (fe->flags & BF_FLAG_SUBNORMAL) != 0);
-    default:
-      return LEPUS_NewBool(ctx, (fe->status & magic) != 0);
-  }
-}
-
-static LEPUSValue js_float_env_proto_set_status(LEPUSContext *ctx,
-                                                LEPUSValueConst this_val,
-                                                LEPUSValue val, int magic) {
-  JSFloatEnv *fe;
-  int b;
-  int64_t prec;
-
-  fe = static_cast<JSFloatEnv *>(
-      LEPUS_GetOpaque2(ctx, this_val, JS_CLASS_FLOAT_ENV));
-  if (!fe) return LEPUS_EXCEPTION;
-  switch (magic) {
-    case FE_PREC:
-      if (JS_ToInt64Sat(ctx, &prec, val)) return LEPUS_EXCEPTION;
-      if (prec < BF_PREC_MIN || prec > BF_PREC_MAX)
-        return LEPUS_ThrowRangeError(ctx, "invalid precision");
-      fe->prec = prec;
-      break;
-    case FE_EXP:
-      if (JS_ToInt32Sat(ctx, &b, val)) return LEPUS_EXCEPTION;
-      if (b < BF_EXP_BITS_MIN || b > BF_EXP_BITS_MAX1)
-        return LEPUS_ThrowRangeError(ctx, "invalid number of exponent bits");
-      if (b == BF_EXP_BITS_MAX1) fe->flags &= ~BF_FLAG_SUBNORMAL;
-      fe->flags = (fe->flags & ~(BF_EXP_BITS_MASK << BF_EXP_BITS_SHIFT)) |
-                  bf_set_exp_bits(b);
-      break;
-    case FE_RNDMODE:
-      b = get_rnd_mode(ctx, val);
-      if (b < 0) return LEPUS_EXCEPTION;
-      fe->flags = (fe->flags & ~BF_RND_MASK) | b;
-      break;
-    case FE_SUBNORMAL:
-      b = LEPUS_ToBool(ctx, val);
-      if (bf_get_exp_bits(fe->flags) != BF_EXP_BITS_MAX1) {
-        fe->flags =
-            (fe->flags & ~BF_FLAG_SUBNORMAL) | (b ? BF_FLAG_SUBNORMAL : 0);
-      }
-      break;
-    default:
-      b = LEPUS_ToBool(ctx, val);
-      fe->status = (fe->status & ~magic) & ((-b) & magic);
-      break;
-  }
-  return LEPUS_UNDEFINED;
-}
-
-static LEPUSValue js_float_env_clearStatus(LEPUSContext *ctx,
-                                           LEPUSValueConst this_val, int argc,
-                                           LEPUSValueConst *argv) {
-  JSFloatEnv *fe = static_cast<JSFloatEnv *>(
-      LEPUS_GetOpaque2(ctx, this_val, JS_CLASS_FLOAT_ENV));
-  if (!fe) return LEPUS_EXCEPTION;
-  fe->status = 0;
-  return LEPUS_UNDEFINED;
-}
-
-static const LEPUSCFunctionListEntry js_float_env_funcs[] = {
-    LEPUS_CGETSET_DEF("prec", js_float_env_get_prec, NULL),
-    LEPUS_CGETSET_DEF("expBits", js_float_env_get_expBits, NULL),
-    LEPUS_CFUNC_DEF("setPrec", 2, js_float_env_setPrec),
-    LEPUS_PROP_INT32_DEF("RNDN", BF_RNDN, 0),
-    LEPUS_PROP_INT32_DEF("RNDZ", BF_RNDZ, 0),
-    LEPUS_PROP_INT32_DEF("RNDU", BF_RNDU, 0),
-    LEPUS_PROP_INT32_DEF("RNDD", BF_RNDD, 0),
-    LEPUS_PROP_INT32_DEF("RNDNA", BF_RNDNA, 0),
-    LEPUS_PROP_INT32_DEF("RNDNU", BF_RNDNU, 0),
-    LEPUS_PROP_INT32_DEF("RNDF", BF_RNDF, 0),
-    LEPUS_PROP_INT32_DEF("precMin", BF_PREC_MIN, 0),
-    LEPUS_PROP_INT64_DEF("precMax", BF_PREC_MAX, 0),
-    LEPUS_PROP_INT32_DEF("expBitsMin", BF_EXP_BITS_MIN, 0),
-    LEPUS_PROP_INT32_DEF("expBitsMax", BF_EXP_BITS_MAX1, 0),
-};
-
-static const LEPUSCFunctionListEntry js_float_env_proto_funcs[] = {
-    LEPUS_CGETSET_MAGIC_DEF("prec", js_float_env_proto_get_status,
-                            js_float_env_proto_set_status, FE_PREC),
-    LEPUS_CGETSET_MAGIC_DEF("expBits", js_float_env_proto_get_status,
-                            js_float_env_proto_set_status, FE_EXP),
-    LEPUS_CGETSET_MAGIC_DEF("rndMode", js_float_env_proto_get_status,
-                            js_float_env_proto_set_status, FE_RNDMODE),
-    LEPUS_CGETSET_MAGIC_DEF("subnormal", js_float_env_proto_get_status,
-                            js_float_env_proto_set_status, FE_SUBNORMAL),
-    LEPUS_CGETSET_MAGIC_DEF("invalidOperation", js_float_env_proto_get_status,
-                            js_float_env_proto_set_status, BF_ST_INVALID_OP),
-    LEPUS_CGETSET_MAGIC_DEF("divideByZero", js_float_env_proto_get_status,
-                            js_float_env_proto_set_status, BF_ST_DIVIDE_ZERO),
-    LEPUS_CGETSET_MAGIC_DEF("overflow", js_float_env_proto_get_status,
-                            js_float_env_proto_set_status, BF_ST_OVERFLOW),
-    LEPUS_CGETSET_MAGIC_DEF("underflow", js_float_env_proto_get_status,
-                            js_float_env_proto_set_status, BF_ST_UNDERFLOW),
-    LEPUS_CGETSET_MAGIC_DEF("inexact", js_float_env_proto_get_status,
-                            js_float_env_proto_set_status, BF_ST_INEXACT),
-    LEPUS_CFUNC_DEF("clearStatus", 0, js_float_env_clearStatus),
-};
-
-#endif /* CONFIG_BIGNUM */
 
 /* Minimum amount of objects to be able to compile code and display
    error messages. No JSAtom should be allocated by this function. */
@@ -51831,37 +48147,6 @@ void LEPUS_AddIntrinsicBaseObjects(LEPUSContext *ctx) {
                      0, LEPUS_PROP_CONFIGURABLE);
   LEPUS_FreeValue(ctx, obj1);
 
-#ifdef CONFIG_BIGNUM
-  ctx->class_proto[JS_CLASS_BIG_INT] = LEPUS_NewObject(ctx);
-  LEPUS_SetPropertyFunctionList(ctx, ctx->class_proto[JS_CLASS_BIG_INT],
-                                js_bigint_proto_funcs,
-                                countof(js_bigint_proto_funcs));
-  obj1 = LEPUS_NewCFunction(ctx, js_bigint_constructor, "BigInt", 1);
-  JS_NewGlobalCConstructor2(ctx, obj1, "BigInt",
-                            ctx->class_proto[JS_CLASS_BIG_INT]);
-  LEPUS_SetPropertyFunctionList(ctx, obj1, js_integer_funcs,
-                                countof(js_integer_funcs));
-
-  ctx->class_proto[JS_CLASS_BIG_FLOAT] = LEPUS_NewObject(ctx);
-  LEPUS_SetPropertyFunctionList(ctx, ctx->class_proto[JS_CLASS_BIG_FLOAT],
-                                js_bigfloat_proto_funcs,
-                                countof(js_bigfloat_proto_funcs));
-  obj1 = LEPUS_NewCFunction(ctx, js_bigfloat_constructor, "BigFloat", 1);
-  JS_NewGlobalCConstructor2(ctx, obj1, "BigFloat",
-                            ctx->class_proto[JS_CLASS_BIG_FLOAT]);
-  LEPUS_SetPropertyFunctionList(ctx, obj1, js_bigfloat_funcs,
-                                countof(js_bigfloat_funcs));
-
-  ctx->class_proto[JS_CLASS_FLOAT_ENV] = LEPUS_NewObject(ctx);
-  LEPUS_SetPropertyFunctionList(ctx, ctx->class_proto[JS_CLASS_FLOAT_ENV],
-                                js_float_env_proto_funcs,
-                                countof(js_float_env_proto_funcs));
-  obj1 =
-      JS_NewGlobalCConstructorOnly(ctx, "BigFloatEnv", js_float_env_constructor,
-                                   1, ctx->class_proto[JS_CLASS_FLOAT_ENV]);
-  LEPUS_SetPropertyFunctionList(ctx, obj1, js_float_env_funcs,
-                                countof(js_float_env_funcs));
-#endif
   /* global properties */
   ctx->eval_obj = LEPUS_NewCFunction(ctx, js_global_eval, "eval", 1);
   JS_DefinePropertyValue_RC(ctx, ctx->global_obj, JS_ATOM_eval,
@@ -51947,7 +48232,7 @@ LEPUS_BOOL LEPUS_IsTypedArray(LEPUSContext *ctx, LEPUSValueConst val) {
   if (LEPUS_VALUE_IS_NOT_OBJECT(val)) return FALSE;
   p = LEPUS_VALUE_GET_OBJ(val);
   return (p->class_id >= JS_CLASS_UINT8C_ARRAY) &&
-         (p->class_id <= JS_CLASS_FLOAT64_ARRAY);
+         (p->class_id <= JS_CLASS_BIG_UINT64_ARRAY);
 }
 
 LEPUS_BOOL LEPUS_StrictEq(LEPUSContext *ctx, LEPUSValueConst op1,
@@ -52224,7 +48509,7 @@ LEPUSObject *get_typed_array(LEPUSContext *ctx, LEPUSValueConst this_val,
     if (p->class_id != JS_CLASS_DATAVIEW) goto fail;
   } else {
     if (!(p->class_id >= JS_CLASS_UINT8C_ARRAY &&
-          p->class_id <= JS_CLASS_FLOAT64_ARRAY)) {
+          p->class_id <= JS_CLASS_BIG_UINT64_ARRAY)) {
     fail:
       LEPUS_ThrowTypeError(ctx, "not a %s",
                            is_dataview ? "DataView" : "TypedArray");
@@ -52326,7 +48611,7 @@ QJS_STATIC LEPUSValue js_typed_array_get_toStringTag(LEPUSContext *ctx,
   if (LEPUS_VALUE_IS_NOT_OBJECT(this_val)) return LEPUS_UNDEFINED;
   p = LEPUS_VALUE_GET_OBJ(this_val);
   if (!(p->class_id >= JS_CLASS_UINT8C_ARRAY &&
-        p->class_id <= JS_CLASS_FLOAT64_ARRAY))
+        p->class_id <= JS_CLASS_BIG_UINT64_ARRAY))
     return LEPUS_UNDEFINED;
   return LEPUS_AtomToString(ctx, ctx->rt->class_array[p->class_id].class_name);
 }
@@ -52354,7 +48639,7 @@ QJS_STATIC LEPUSValue js_typed_array_set_internal(LEPUSContext *ctx,
   if (LEPUS_IsException(src_obj)) goto fail;
   src_p = LEPUS_VALUE_GET_OBJ(src_obj);
   if (src_p->class_id >= JS_CLASS_UINT8C_ARRAY &&
-      src_p->class_id <= JS_CLASS_FLOAT64_ARRAY) {
+      src_p->class_id <= JS_CLASS_BIG_UINT64_ARRAY) {
     JSTypedArray *dest_ta = p->u.typed_array;
     JSArrayBuffer *dest_abuf = dest_ta->buffer->u.array_buffer;
     JSTypedArray *src_ta = src_p->u.typed_array;
@@ -52670,13 +48955,7 @@ QJS_STATIC LEPUSValue js_typed_array_fill(LEPUSContext *ctx,
     uint32_t v;
     if (LEPUS_ToUint32(ctx, &v, argv[0])) return LEPUS_EXCEPTION;
     v64 = v;
-  } else
-#ifdef CONFIG_BIGNUM
-      if (p->class_id <= JS_CLASS_BIG_UINT64_ARRAY) {
-    if (LEPUS_ToBigInt64(ctx, (int64_t *)&v64, argv[0])) return LEPUS_EXCEPTION;
-  } else
-#endif
-  {
+  } else if (p->class_id <= JS_CLASS_FLOAT64_ARRAY) {
     double d;
     if (LEPUS_ToFloat64(ctx, &d, argv[0])) return LEPUS_EXCEPTION;
     if (p->class_id == JS_CLASS_FLOAT32_ARRAY) {
@@ -52691,6 +48970,8 @@ QJS_STATIC LEPUSValue js_typed_array_fill(LEPUSContext *ctx,
       u.d = d;
       v64 = u.u64;
     }
+  } else {
+    if (LEPUS_ToBigInt64(ctx, (int64_t *)&v64, argv[0])) return LEPUS_EXCEPTION;
   }
 
   k = 0;
@@ -52861,15 +49142,11 @@ QJS_STATIC LEPUSValue js_typed_array_indexOf(LEPUSContext *ctx,
     d = LEPUS_VALUE_GET_FLOAT64(argv[0]);
     v64 = d;
     is_int = (v64 == d);
-  } else
-#ifdef CONFIG_BIGNUM
-      if (tag == LEPUS_TAG_BIG_INT || tag == LEPUS_TAG_BIG_FLOAT) {
+  } else if (tag == LEPUS_TAG_BIG_INT) {
     /* will a generic loop for bigint and bigfloat */
     /* XXX: should use the generic loop in math_mode? */
     is_big = 1;
-  } else
-#endif
-  {
+  } else {
     goto done;
   }
 
@@ -52979,7 +49256,6 @@ QJS_STATIC LEPUSValue js_typed_array_indexOf(LEPUSContext *ctx,
         }
       }
       break;
-#ifdef CONFIG_BIGNUM
     case JS_CLASS_BIG_INT64_ARRAY:
     case JS_CLASS_BIG_UINT64_ARRAY:
       if (is_big || is_strict_mode(ctx)) {
@@ -52999,7 +49275,6 @@ QJS_STATIC LEPUSValue js_typed_array_indexOf(LEPUSContext *ctx,
         }
       }
       break;
-#endif
   }
 
 done:
@@ -53255,7 +49530,6 @@ QJS_STATIC int js_TA_cmp_uint32(const void *a, const void *b, void *opaque) {
   return (y < x) - (y > x);
 }
 
-#ifdef CONFIG_BIGNUM
 static int js_TA_cmp_int64(const void *a, const void *b, void *opaque) {
   int64_t x = *(const int64_t *)a;
   int64_t y = *(const int64_t *)b;
@@ -53267,7 +49541,6 @@ static int js_TA_cmp_uint64(const void *a, const void *b, void *opaque) {
   uint64_t y = *(const uint64_t *)b;
   return (y < x) - (y > x);
 }
-#endif
 
 QJS_STATIC int js_TA_cmp_float32(const void *a, const void *b, void *opaque) {
   return js_cmp_doubles(*(const float *)a, *(const float *)b);
@@ -53301,7 +49574,6 @@ QJS_STATIC LEPUSValue js_TA_get_uint32(LEPUSContext *ctx, const void *a) {
   return JS_NewUint32(ctx, *(const uint32_t *)a);
 }
 
-#ifdef CONFIG_BIGNUM
 static LEPUSValue js_TA_get_int64(LEPUSContext *ctx, const void *a) {
   return LEPUS_NewBigInt64(ctx, *(int64_t *)a);
 }
@@ -53309,7 +49581,6 @@ static LEPUSValue js_TA_get_int64(LEPUSContext *ctx, const void *a) {
 static LEPUSValue js_TA_get_uint64(LEPUSContext *ctx, const void *a) {
   return LEPUS_NewBigUint64(ctx, *(uint64_t *)a);
 }
-#endif
 
 QJS_STATIC LEPUSValue js_TA_get_float32(LEPUSContext *ctx, const void *a) {
   return __JS_NewFloat64(ctx, *(const float *)a);
@@ -53423,7 +49694,6 @@ QJS_STATIC LEPUSValue js_typed_array_sort(LEPUSContext *ctx,
         tsc.getfun = js_TA_get_uint32;
         tsc.cmpfun = js_TA_cmp_uint32;
         break;
-#ifdef CONFIG_BIGNUM
       case JS_CLASS_BIG_INT64_ARRAY:
         tsc.getfun = js_TA_get_int64;
         tsc.cmpfun = js_TA_cmp_int64;
@@ -53432,7 +49702,6 @@ QJS_STATIC LEPUSValue js_typed_array_sort(LEPUSContext *ctx,
         tsc.getfun = js_TA_get_uint64;
         tsc.cmpfun = js_TA_cmp_uint64;
         break;
-#endif
       case JS_CLASS_FLOAT32_ARRAY:
         tsc.getfun = js_TA_get_float32;
         tsc.cmpfun = js_TA_cmp_float32;
@@ -53789,7 +50058,7 @@ QJS_STATIC LEPUSValue js_typed_array_constructor(LEPUSContext *ctx,
       buffer = LEPUS_DupValue(ctx, argv[0]);
     } else {
       if (p->class_id >= JS_CLASS_UINT8C_ARRAY &&
-          p->class_id <= JS_CLASS_FLOAT64_ARRAY) {
+          p->class_id <= JS_CLASS_BIG_UINT64_ARRAY) {
         return js_typed_array_constructor_ta(ctx, new_target, argv[0], classid);
       } else {
         return js_typed_array_constructor_obj(ctx, new_target, argv[0],
@@ -53936,7 +50205,6 @@ LEPUSValue js_dataview_getValue(LEPUSContext *ctx, LEPUSValueConst this_obj,
       v = get_u32(ptr);
       if (is_swap) v = bswap32(v);
       return JS_NewUint32(ctx, v);
-#ifdef CONFIG_BIGNUM
     case JS_CLASS_BIG_INT64_ARRAY: {
       uint64_t v;
       v = get_u64(ptr);
@@ -53949,7 +50217,6 @@ LEPUSValue js_dataview_getValue(LEPUSContext *ctx, LEPUSValueConst this_obj,
       if (is_swap) v = bswap64(v);
       return LEPUS_NewBigUint64(ctx, v);
     } break;
-#endif
     case JS_CLASS_FLOAT32_ARRAY: {
       union {
         float f;
@@ -53996,13 +50263,7 @@ LEPUSValue js_dataview_setValue(LEPUSContext *ctx, LEPUSValueConst this_obj,
   v64 = 0; /* avoid warning */
   if (class_id <= JS_CLASS_UINT32_ARRAY) {
     if (LEPUS_ToUint32(ctx, &v, val)) return LEPUS_EXCEPTION;
-  } else
-#ifdef CONFIG_BIGNUM
-      if (class_id <= JS_CLASS_BIG_UINT64_ARRAY) {
-    if (LEPUS_ToBigInt64(ctx, (int64_t *)&v64, val)) return LEPUS_EXCEPTION;
-  } else
-#endif
-  {
+  } else if (class_id <= JS_CLASS_FLOAT64_ARRAY) {
     double d;
     if (LEPUS_ToFloat64(ctx, &d, val)) return LEPUS_EXCEPTION;
     if (class_id == JS_CLASS_FLOAT32_ARRAY) {
@@ -54017,6 +50278,8 @@ LEPUSValue js_dataview_setValue(LEPUSContext *ctx, LEPUSValueConst this_obj,
       u.d = d;
       v64 = u.u64;
     }
+  } else {
+    if (LEPUS_ToBigInt64(ctx, (int64_t *)&v64, val)) return LEPUS_EXCEPTION;
   }
   is_swap = FALSE;
   if (argc > 2) is_swap = LEPUS_ToBool(ctx, argv[2]);
@@ -54045,10 +50308,8 @@ LEPUSValue js_dataview_setValue(LEPUSContext *ctx, LEPUSValueConst this_obj,
       if (is_swap) v = bswap32(v);
       put_u32(ptr, v);
       break;
-#ifdef CONFIG_BIGNUM
     case JS_CLASS_BIG_INT64_ARRAY:
     case JS_CLASS_BIG_UINT64_ARRAY:
-#endif
     case JS_CLASS_FLOAT64_ARRAY:
       if (is_swap) v64 = bswap64(v64);
       put_u64(ptr, v64);
@@ -54086,20 +50347,12 @@ static void *js_atomics_get_ptr(LEPUSContext *ctx, int *psize_log2,
 
   if (LEPUS_VALUE_IS_NOT_OBJECT(obj)) goto fail;
   p = LEPUS_VALUE_GET_OBJ(obj);
-#ifdef CONFIG_BIGNUM
   if (is_waitable)
     err = (p->class_id != JS_CLASS_INT32_ARRAY &&
            p->class_id != JS_CLASS_BIG_INT64_ARRAY);
   else
     err = !(p->class_id >= JS_CLASS_INT8_ARRAY &&
             p->class_id <= JS_CLASS_BIG_UINT64_ARRAY);
-#else
-  if (is_waitable)
-    err = (p->class_id != JS_CLASS_INT32_ARRAY);
-  else
-    err = !(p->class_id >= JS_CLASS_INT8_ARRAY &&
-            p->class_id <= JS_CLASS_UINT32_ARRAY);
-#endif
   if (err) {
   fail:
     LEPUS_ThrowTypeError(ctx, "integer TypedArray expected");
@@ -54128,11 +50381,8 @@ static void *js_atomics_get_ptr(LEPUSContext *ctx, int *psize_log2,
 static LEPUSValue js_atomics_op(LEPUSContext *ctx, LEPUSValueConst this_obj,
                                 int argc, LEPUSValueConst *argv, int op) {
   int size_log2;
-#ifdef CONFIG_BIGNUM
   uint64_t v, a, rep_val;
-#else
-  uint32_t v, a, rep_val;
-#endif
+
   void *ptr;
   LEPUSValue ret;
   LEPUSClassID class_id;
@@ -54142,9 +50392,7 @@ static LEPUSValue js_atomics_op(LEPUSContext *ctx, LEPUSValueConst this_obj,
   rep_val = 0;
   if (op == ATOMICS_OP_LOAD) {
     v = 0;
-  } else
-#ifdef CONFIG_BIGNUM
-      if (size_log2 == 3) {
+  } else if (size_log2 == 3) {
     int64_t v64;
     if (LEPUS_ToBigInt64(ctx, &v64, argv[2])) return LEPUS_EXCEPTION;
     v = v64;
@@ -54152,9 +50400,7 @@ static LEPUSValue js_atomics_op(LEPUSContext *ctx, LEPUSValueConst this_obj,
       if (LEPUS_ToBigInt64(ctx, &v64, argv[3])) return LEPUS_EXCEPTION;
       rep_val = v64;
     }
-  } else
-#endif
-  {
+  } else {
     uint32_t v32;
     if (LEPUS_ToUint32(ctx, &v32, argv[2])) return LEPUS_EXCEPTION;
     v = v32;
@@ -54164,7 +50410,6 @@ static LEPUSValue js_atomics_op(LEPUSContext *ctx, LEPUSValueConst this_obj,
     }
   }
   switch (op | (size_log2 << 3)) {
-#ifdef CONFIG_BIGNUM
 #define OP(op_name, func_name)                  \
   case ATOMICS_OP_##op_name | (0 << 3):         \
     a = func_name((_Atomic(uint8_t) *)ptr, v);  \
@@ -54178,18 +50423,7 @@ static LEPUSValue js_atomics_op(LEPUSContext *ctx, LEPUSValueConst this_obj,
   case ATOMICS_OP_##op_name | (3 << 3):         \
     a = func_name((_Atomic(uint64_t) *)ptr, v); \
     break;
-#else
-#define OP(op_name, func_name)                  \
-  case ATOMICS_OP_##op_name | (0 << 3):         \
-    a = func_name((_Atomic(uint8_t) *)ptr, v);  \
-    break;                                      \
-  case ATOMICS_OP_##op_name | (1 << 3):         \
-    a = func_name((_Atomic(uint16_t) *)ptr, v); \
-    break;                                      \
-  case ATOMICS_OP_##op_name | (2 << 3):         \
-    a = func_name((_Atomic(uint32_t) *)ptr, v); \
-    break;
-#endif
+
     OP(ADD, atomic_fetch_add)
     OP(AND, atomic_fetch_and)
     OP(OR, atomic_fetch_or)
@@ -54207,11 +50441,9 @@ static LEPUSValue js_atomics_op(LEPUSContext *ctx, LEPUSValueConst this_obj,
     case ATOMICS_OP_LOAD | (2 << 3):
       a = atomic_load((_Atomic(uint32_t) *)ptr);
       break;
-#ifdef CONFIG_BIGNUM
     case ATOMICS_OP_LOAD | (3 << 3):
       a = atomic_load((_Atomic(uint64_t) *)ptr);
       break;
-#endif
 
     case ATOMICS_OP_COMPARE_EXCHANGE | (0 << 3): {
       uint8_t v1 = v;
@@ -54228,13 +50460,11 @@ static LEPUSValue js_atomics_op(LEPUSContext *ctx, LEPUSValueConst this_obj,
       atomic_compare_exchange_strong((_Atomic(uint32_t) *)ptr, &v1, rep_val);
       a = v1;
     } break;
-#ifdef CONFIG_BIGNUM
     case ATOMICS_OP_COMPARE_EXCHANGE | (3 << 3): {
       uint64_t v1 = v;
       atomic_compare_exchange_strong((_Atomic(uint64_t) *)ptr, &v1, rep_val);
       a = v1;
     } break;
-#endif
     default:
       abort();
   }
@@ -54259,14 +50489,12 @@ static LEPUSValue js_atomics_op(LEPUSContext *ctx, LEPUSValueConst this_obj,
     case JS_CLASS_UINT32_ARRAY:
       ret = JS_NewUint32(ctx, a);
       break;
-#ifdef CONFIG_BIGNUM
     case JS_CLASS_BIG_INT64_ARRAY:
       ret = LEPUS_NewBigInt64(ctx, a);
       break;
     case JS_CLASS_BIG_UINT64_ARRAY:
       ret = LEPUS_NewBigUint64(ctx, a);
       break;
-#endif
     default:
       abort();
   }
@@ -54281,7 +50509,6 @@ static LEPUSValue js_atomics_store(LEPUSContext *ctx, LEPUSValueConst this_obj,
 
   ptr = js_atomics_get_ptr(ctx, &size_log2, NULL, argv[0], argv[1], FALSE);
   if (!ptr) return LEPUS_EXCEPTION;
-#ifdef CONFIG_BIGNUM
   if (size_log2 == 3) {
     int64_t v64;
     ret = JS_ToBigIntValueFree(ctx, LEPUS_DupValue(ctx, argv[2]));
@@ -54291,9 +50518,7 @@ static LEPUSValue js_atomics_store(LEPUSContext *ctx, LEPUSValueConst this_obj,
       return LEPUS_EXCEPTION;
     }
     atomic_store((_Atomic(uint64_t) *)ptr, v64);
-  } else
-#endif
-  {
+  } else {
     uint32_t v;
     /* XXX: spec, would be simpler to return the written value */
     ret = JS_ToIntegerFree(ctx, LEPUS_DupValue(ctx, argv[2]));
@@ -54324,11 +50549,7 @@ static LEPUSValue js_atomics_isLockFree(LEPUSContext *ctx,
                                         LEPUSValueConst *argv) {
   int v, ret;
   if (JS_ToInt32Sat(ctx, &v, argv[0])) return LEPUS_EXCEPTION;
-  ret = (v == 1 || v == 2 || v == 4
-#ifdef CONFIG_BIGNUM
-         || v == 8
-#endif
-  );
+  ret = (v == 1 || v == 2 || v == 4 || v == 8);
   return LEPUS_NewBool(ctx, ret);
 }
 
@@ -54356,12 +50577,9 @@ static LEPUSValue js_atomics_wait(LEPUSContext *ctx, LEPUSValueConst this_obj,
 
   ptr = js_atomics_get_ptr(ctx, &size_log2, NULL, argv[0], argv[1], TRUE);
   if (!ptr) return LEPUS_EXCEPTION;
-#ifdef CONFIG_BIGNUM
   if (size_log2 == 3) {
     if (LEPUS_ToBigInt64(ctx, &v, argv[2])) return LEPUS_EXCEPTION;
-  } else
-#endif
-  {
+  } else {
     if (LEPUS_ToInt32(ctx, &v32, argv[2])) return LEPUS_EXCEPTION;
     v = v32;
   }
@@ -54541,19 +50759,17 @@ void LEPUS_AddIntrinsicTypedArrays(LEPUSContext *ctx) {
                                 countof(js_typed_array_base_funcs));
   JS_SetConstructor(ctx, typed_array_base_func, typed_array_base_proto);
 
-  LEPUSCFunctionType ft2 = {.generic_magic = js_typed_array_constructor};
-  for (i = JS_CLASS_UINT8C_ARRAY;
-       i < JS_CLASS_UINT8C_ARRAY + JS_TYPED_ARRAY_COUNT; i++) {
+  auto add_intrinsic_typed_arrays = [&](LEPUSClassID i, LEPUSAtom atom) {
     LEPUSValue func_obj;
     char buf[ATOM_GET_STR_BUF_SIZE];
     const char *name;
+    LEPUSCFunctionType ft2 = {.generic_magic = js_typed_array_constructor};
 
     ctx->class_proto[i] = LEPUS_NewObjectProto(ctx, typed_array_base_proto);
     JS_DefinePropertyValueStr_RC(
         ctx, ctx->class_proto[i], "BYTES_PER_ELEMENT",
         LEPUS_NewInt32(ctx, 1 << typed_array_size_log2(i)), 0);
-    name = JS_AtomGetStr(ctx, buf, sizeof(buf),
-                         JS_ATOM_Uint8ClampedArray + i - JS_CLASS_UINT8C_ARRAY);
+    name = JS_AtomGetStr(ctx, buf, sizeof(buf), atom);
     func_obj = JS_NewCFunction3(ctx, ft2.generic, name, 3,
                                 LEPUS_CFUNC_constructor_magic, i,
                                 typed_array_base_func);
@@ -54561,6 +50777,21 @@ void LEPUS_AddIntrinsicTypedArrays(LEPUSContext *ctx) {
     JS_DefinePropertyValueStr_RC(
         ctx, func_obj, "BYTES_PER_ELEMENT",
         LEPUS_NewInt32(ctx, 1 << typed_array_size_log2(i)), 0);
+  };
+
+  for (i = JS_CLASS_UINT8C_ARRAY;
+       i < JS_CLASS_UINT8C_ARRAY + JS_TYPED_ARRAY_COUNT - 2; i++) {
+    add_intrinsic_typed_arrays(
+        i, JS_ATOM_Uint8ClampedArray + i - JS_CLASS_UINT8C_ARRAY);
+  }
+
+  /* BigInt64 BigUint64 */
+  LEPUSAtom bigint64array_atom =
+      ctx->rt->class_array[JS_CLASS_BIG_INT64_ARRAY].class_name;
+  for (i = JS_CLASS_BIG_INT64_ARRAY; i <= JS_CLASS_BIG_UINT64_ARRAY; ++i) {
+    LEPUSValue func_obj;
+    add_intrinsic_typed_arrays(
+        i, bigint64array_atom + (i - JS_CLASS_BIG_INT64_ARRAY));
   }
   LEPUS_FreeValue(ctx, typed_array_base_proto);
   LEPUS_FreeValue(ctx, typed_array_base_func);
@@ -55367,15 +51598,6 @@ no_inline void prim_js_print_func(LEPUSContext *ctx, LEPUSValue func_obj) {
   }
 }
 
-LEPUSValue prim_js_op_eval(LEPUSContext *ctx, int scope_idx, LEPUSValue op1) {
-  LEPUSValue ret_val;
-
-  ret_val = JS_EvalObject(ctx, LEPUS_UNDEFINED, op1, LEPUS_EVAL_TYPE_DIRECT,
-                          scope_idx);
-  LEPUS_FreeValue(ctx, op1);
-  return ret_val;
-}
-
 void prim_close_var_refs(LEPUSContext *ctx, LEPUSStackFrame *sf) {
   struct list_head *el, *el1;
   JSVarRef *var_ref;
@@ -55446,22 +51668,12 @@ void JS_FreeValueRef(LEPUSContext *ctx, LEPUSValue v) {
     case LEPUS_TAG_MODULE:
       abort(); /* never freed here */
       break;
-#ifdef CONFIG_BIGNUM
-    case LEPUS_TAG_BIG_INT:
-    case LEPUS_TAG_BIG_FLOAT: {
-      JSBigFloat *bf = reinterpret_cast<JSBigFloat *>(LEPUS_VALUE_GET_PTR(v));
-      bf_delete(&bf->num);
-      lepus_free_rt(rt, bf);
+    case LEPUS_TAG_BIG_INT: {
+      auto *p = LEPUS_VALUE_GET_BIGINT(v);
+      lepus_free_rt(rt, p);
     } break;
-#else
 #ifdef ENABLE_LEPUSNG
     // <Primjs begin>
-    case LEPUS_TAG_BIG_FLOAT:
-    case LEPUS_TAG_BIG_INT: {
-      JSBigFloat *bf = static_cast<JSBigFloat *>(LEPUS_VALUE_GET_PTR(v));
-      lepus_free_rt(rt, bf);
-      break;
-    }
     case LEPUS_TAG_LEPUS_REF: {
       if (rt->js_callbacks_.free_value) {
         rt->js_callbacks_.free_value(rt, v);
@@ -55469,7 +51681,6 @@ void JS_FreeValueRef(LEPUSContext *ctx, LEPUSValue v) {
       break;
     }
     // <Primjs end>
-#endif
 #endif
     case LEPUS_TAG_SYMBOL: {
       JSAtomStruct *p = static_cast<JSAtomStruct *>(LEPUS_VALUE_GET_PTR(v));
@@ -55479,580 +51690,6 @@ void JS_FreeValueRef(LEPUSContext *ctx, LEPUSValue v) {
       printf("__JS_FreeValue: unknown tag=%p\n", (void *)tag);
       abort();
   }
-}
-
-int prim_js_copy_data_properties(LEPUSContext *ctx, LEPUSValue *sp, int mask) {
-  if (JS_CopyDataProperties(ctx, sp[-1 - (mask & 3)],
-                            sp[-1 - ((mask >> 2) & 7)],
-                            sp[-1 - ((mask >> 5) & 7)], 0)) {
-    return -1;
-  }
-  return 0;
-}
-
-int prim_js_with_op(LEPUSContext *ctx, LEPUSValue *sp, JSAtom atom, int is_with,
-                    int opcode) {
-  LEPUSValue obj, val;
-  obj = sp[-1];
-  int ret = LEPUS_HasProperty(ctx, obj, atom);
-  if (unlikely(ret < 0)) goto exception;
-  if (ret) {
-    if (is_with) {
-      ret = js_has_unscopable(ctx, obj, atom);
-      if (unlikely(ret < 0)) goto exception;
-      if (ret) goto no_with;
-    }
-    switch (opcode) {
-      case OP_with_get_var:
-        val = JS_GetPropertyInternal_RC(ctx, obj, atom, obj, 0);
-        if (unlikely(LEPUS_IsException(val))) goto exception;
-        set_value(ctx, &sp[-1], val);
-        break;
-      case OP_with_put_var:
-        ret = JS_SetPropertyInternal_RC(ctx, obj, atom, sp[-2],
-                                        LEPUS_PROP_THROW_STRICT);
-        LEPUS_FreeValue(ctx, sp[-1]);
-        if (unlikely(ret < 0)) goto exception;
-        break;
-      case OP_with_delete_var:
-        ret = LEPUS_DeleteProperty(ctx, obj, atom, 0);
-        if (unlikely(ret < 0)) goto exception;
-        LEPUS_FreeValue(ctx, sp[-1]);
-        sp[-1] = LEPUS_NewBool(ctx, ret);
-        break;
-      case OP_with_make_ref:
-        /* produce a pair object/propname on the stack */
-        *sp++ = JS_AtomToValue_RC(ctx, atom);
-        break;
-      case OP_with_get_ref:
-        /* produce a pair object/method on the stack */
-        val = JS_GetPropertyInternal_RC(ctx, obj, atom, obj, 0);
-        if (unlikely(LEPUS_IsException(val))) goto exception;
-        *sp++ = val;
-        break;
-      case OP_with_get_ref_undef:
-        /* produce a pair undefined/function on the stack */
-        val = JS_GetPropertyInternal_RC(ctx, obj, atom, obj, 0);
-        if (unlikely(LEPUS_IsException(val))) goto exception;
-        LEPUS_FreeValue(ctx, sp[-1]);
-        sp[-1] = LEPUS_UNDEFINED;
-        *sp++ = val;
-        break;
-    }
-    return 1;
-  } else {
-  no_with:
-    /* if not jumping, drop the object argument */
-    LEPUS_FreeValue(ctx, sp[-1]);
-    return 0;
-  }
-exception:
-  return -1;
-}
-
-LEPUSValue prim_js_for_in_start(LEPUSContext *ctx, LEPUSValue op) {
-  LEPUSValue res = build_for_in_iterator(ctx, op);
-  return res;
-}
-
-LEPUSValue *prim_js_iterator_close_return(LEPUSContext *ctx, LEPUSValue *sp,
-                                          LEPUSValue *stack_buf) {
-  LEPUSValue ret_val;
-  /* iter_obj next catch_offset ... ret_val ->
-      ret_eval iter_obj next catch_offset */
-  ret_val = *--sp;
-  while (sp > stack_buf && !LEPUS_VALUE_IS_CATCH_OFFSET(sp[-1])) {
-    LEPUS_FreeValue(ctx, *--sp);
-  }
-  if (unlikely(sp < stack_buf + 3)) {
-    LEPUS_ThrowInternalError(ctx, "iterator_close_return");
-    LEPUS_FreeValue(ctx, ret_val);
-    goto exception;
-  }
-  sp[0] = sp[-1];
-  sp[-1] = sp[-2];
-  sp[-2] = sp[-3];
-  sp[-3] = ret_val;
-  sp++;
-exception:
-  return sp;
-}
-
-int prim_js_async_iterator_close(LEPUSContext *ctx, LEPUSValue *sp) {
-  LEPUSValue ret, method;
-  int ret_flag;
-  method = JS_GetPropertyInternal_RC(ctx, sp[-3], JS_ATOM_return, sp[-3], 0);
-  if (LEPUS_IsException(method)) goto exception;
-  if (LEPUS_IsUndefined(method) || LEPUS_IsNull(method)) {
-    ret = LEPUS_UNDEFINED;
-    ret_flag = TRUE;
-  } else {
-    ret = JS_CallFree(ctx, method, sp[-3], 0, NULL);
-    if (LEPUS_IsException(ret)) goto exception;
-    ret_flag = FALSE;
-  }
-  LEPUS_FreeValue(ctx, sp[-3]);
-  LEPUS_FreeValue(ctx, sp[-2]);
-  LEPUS_FreeValue(ctx, sp[-1]);
-  sp[-3] = ret;
-  sp[-2] = LEPUS_NewBool(ctx, ret_flag);
-  return 0;
-exception:
-  return -1;
-}
-
-int prim_js_async_iterator_get(LEPUSContext *ctx, LEPUSValue *sp, int flags) {
-  LEPUSValue method, ret;
-  BOOL ret_flag;
-  if (flags == 2) {
-    LEPUS_ThrowTypeError(ctx, "iterator does not have a throw method");
-    goto exception;
-  }
-  method = JS_GetPropertyInternal_RC(
-      ctx, sp[-4], flags ? JS_ATOM_throw : JS_ATOM_return, sp[-4], 0);
-  if (LEPUS_IsException(method)) goto exception;
-  if (LEPUS_IsUndefined(method) || LEPUS_IsNull(method)) {
-    ret_flag = TRUE;
-  } else {
-    ret = JS_CallFree(ctx, method, sp[-4], 1, (LEPUSValueConst *)(sp - 1));
-    if (LEPUS_IsException(ret)) goto exception;
-    LEPUS_FreeValue(ctx, sp[-1]);
-    sp[-1] = ret;
-    ret_flag = FALSE;
-  }
-  sp[0] = LEPUS_NewBool(ctx, ret_flag);
-  // sp += 1;
-  return 0;
-exception:
-  return -1;
-}
-
-LEPUSValue primjs_get_super_ctor(LEPUSContext *ctx, LEPUSValue op) {
-  LEPUSValue proto;
-  proto = LEPUS_DupValue(ctx, JS_GetPrototype_RC(ctx, op));
-  if (LEPUS_IsException(proto)) {
-    LEPUS_FreeValue(ctx, op);
-    return LEPUS_EXCEPTION;
-  }
-  if (!LEPUS_IsConstructor(ctx, proto)) {
-    LEPUS_FreeValue(ctx, proto);
-    LEPUS_FreeValue(ctx, op);
-    LEPUS_ThrowTypeError(ctx, "not a constructor");
-    return LEPUS_EXCEPTION;
-  }
-  LEPUS_FreeValue(ctx, op);
-  return proto;
-}
-
-LEPUSValue prim_js_unary_arith_slow(LEPUSContext *ctx, LEPUSValue op1,
-                                    OPCodeEnum op) {
-  double d;
-
-  if (unlikely(JS_ToFloat64Free(ctx, &d, op1))) {
-    return LEPUS_EXCEPTION;
-  }
-  switch (op) {
-    case OP_inc:
-    case OP_inc_loc:
-      d++;
-      break;
-    case OP_dec:
-    case OP_dec_loc:
-      d--;
-      break;
-    case OP_plus:
-      break;
-    case OP_neg:
-      d = -d;
-      break;
-    default: {
-      abort();
-    }
-  }
-  return LEPUS_NewFloat64(ctx, d);
-}
-
-LEPUSValue prim_js_add_slow(LEPUSContext *ctx, LEPUSValue op1, LEPUSValue op2) {
-  LEPUSValue ret_val;
-  if ((LEPUS_VALUE_IS_INT(op1) || LEPUS_VALUE_IS_FLOAT64(op1)) &&
-      (LEPUS_VALUE_IS_INT(op2) || LEPUS_VALUE_IS_FLOAT64(op2))) {
-    goto add_numbers;
-  } else {
-    op1 = JS_ToPrimitiveFree_RC(ctx, op1, HINT_NONE);
-    if (LEPUS_IsException(op1)) {
-      LEPUS_FreeValue(ctx, op2);
-      goto exception;
-    }
-    op2 = JS_ToPrimitiveFree_RC(ctx, op2, HINT_NONE);
-    if (LEPUS_IsException(op2)) {
-      LEPUS_FreeValue(ctx, op1);
-      goto exception;
-    }
-    if (LEPUS_IsString(op1) || LEPUS_IsString(op2)) {
-      ret_val = JS_ConcatString(ctx, op1, op2);
-      if (LEPUS_IsException(ret_val)) goto exception;
-    } else {
-      double d1, d2;
-    add_numbers:
-      if (JS_ToFloat64Free(ctx, &d1, op1)) {
-        LEPUS_FreeValue(ctx, op2);
-        goto exception;
-      }
-      if (JS_ToFloat64Free(ctx, &d2, op2)) goto exception;
-      ret_val = LEPUS_NewFloat64(ctx, d1 + d2);
-    }
-  }
-  return ret_val;
-exception:
-  return LEPUS_EXCEPTION;
-}
-
-no_inline LEPUSValue prim_js_not_slow(LEPUSContext *ctx, LEPUSValue op) {
-  int32_t v1;
-
-  if (unlikely(JS_ToInt32Free(ctx, &v1, op))) {
-    return LEPUS_EXCEPTION;
-  }
-  return LEPUS_NewInt32(ctx, ~v1);
-}
-
-LEPUSValue prim_js_binary_arith_slow(LEPUSContext *ctx, LEPUSValue op1,
-                                     LEPUSValue op2, OPCodeEnum op) {
-  double d1, d2, r;
-  if (unlikely(JS_ToFloat64Free(ctx, &d1, op1))) {
-    LEPUS_FreeValue(ctx, op2);
-    return LEPUS_EXCEPTION;
-  }
-  if (unlikely(JS_ToFloat64Free(ctx, &d2, op2))) {
-    return LEPUS_EXCEPTION;
-  }
-  switch (op) {
-    case OP_sub:
-      r = d1 - d2;
-      break;
-    case OP_mul:
-      r = d1 * d2;
-      break;
-    case OP_div:
-      r = d1 / d2;
-      break;
-    case OP_mod:
-      r = fmod(d1, d2);
-      break;
-    case OP_pow:
-      r = js_pow(d1, d2);
-      break;
-    default: {
-      prim_abort();
-    }
-  }
-  return LEPUS_NewFloat64(ctx, r);
-}
-
-double prim_js_fmod_double(double a, double b) {
-  double c = fmod(a, b);
-  return c;
-}
-
-LEPUSValue prim_js_binary_logic_slow(LEPUSContext *ctx, LEPUSValue op1,
-                                     LEPUSValue op2, OPCodeEnum op) {
-  uint32_t v1, v2, r;
-  if (unlikely(JS_ToInt32Free(ctx, (int32_t *)&v1, op1))) {
-    LEPUS_FreeValue(ctx, op2);
-    goto exception;
-  }
-  if (unlikely(JS_ToInt32Free(ctx, (int32_t *)&v2, op2))) goto exception;
-  switch (op) {
-    case OP_shl:
-      r = v1 << (v2 & 0x1f);
-      break;
-    case OP_sar:
-      r = (int)v1 >> (v2 & 0x1f);
-      break;
-    case OP_and:
-      r = v1 & v2;
-      break;
-    case OP_or:
-      r = v1 | v2;
-      break;
-    case OP_xor:
-      r = v1 ^ v2;
-      break;
-    default:
-      prim_abort();
-  }
-  return LEPUS_NewInt32(ctx, r);
-exception:
-  return LEPUS_EXCEPTION;
-}
-
-LEPUSValue prim_js_shr_slow(LEPUSContext *ctx, LEPUSValue op1, LEPUSValue op2) {
-  uint32_t v1, v2, r;
-  if (unlikely(JS_ToUint32Free(ctx, &v1, op1))) {
-    LEPUS_FreeValue(ctx, op2);
-    goto exception;
-  }
-  if (unlikely(JS_ToUint32Free(ctx, &v2, op2))) goto exception;
-  r = v1 >> (v2 & 0x1f);
-  return JS_NewUint32(ctx, r);
-exception:
-  return LEPUS_EXCEPTION;
-}
-
-LEPUSValue prim_js_relation_slow(LEPUSContext *ctx, LEPUSValue op1,
-                                 LEPUSValue op2, OPCodeEnum op) {
-  int res;
-  op1 = JS_ToPrimitiveFree_RC(ctx, op1, HINT_NUMBER);
-  if (LEPUS_IsException(op1)) {
-    LEPUS_FreeValue(ctx, op2);
-    goto exception;
-  }
-  op2 = JS_ToPrimitiveFree_RC(ctx, op2, HINT_NUMBER);
-  if (LEPUS_IsException(op2)) {
-    LEPUS_FreeValue(ctx, op1);
-    goto exception;
-  }
-
-  if (JS_IsSeparableString(op1)) {
-    auto tmp = JS_GetSeparableStringContent(ctx, op1);
-    LEPUS_FreeValue(ctx, op1);
-    op1 = tmp;
-  }
-
-  if (JS_IsSeparableString(op2)) {
-    auto tmp = JS_GetSeparableStringContent(ctx, op2);
-    LEPUS_FreeValue(ctx, op2);
-    op2 = tmp;
-  }
-  if (LEPUS_VALUE_IS_STRING(op1) && LEPUS_VALUE_IS_STRING(op2)) {
-    JSString *p1, *p2;
-    p1 = LEPUS_VALUE_GET_STRING(op1);
-    p2 = LEPUS_VALUE_GET_STRING(op2);
-    res = js_string_compare(ctx, p1, p2);
-    LEPUS_FreeValue(ctx, op1);
-    LEPUS_FreeValue(ctx, op2);
-    switch (op) {
-      case OP_lt:
-        res = (res < 0);
-        break;
-      case OP_lte:
-        res = (res <= 0);
-        break;
-      case OP_gt:
-        res = (res > 0);
-        break;
-      default:
-      case OP_gte:
-        res = (res >= 0);
-        break;
-    }
-  } else {
-    double d1, d2;
-    if (JS_ToFloat64Free(ctx, &d1, op1)) {
-      LEPUS_FreeValue(ctx, op2);
-      goto exception;
-    }
-    if (JS_ToFloat64Free(ctx, &d2, op2)) goto exception;
-    switch (op) {
-      case OP_lt:
-        res = (d1 < d2); /* if NaN return false */
-        break;
-      case OP_lte:
-        res = (d1 <= d2); /* if NaN return false */
-        break;
-      case OP_gt:
-        res = (d1 > d2); /* if NaN return false */
-        break;
-      default:
-      case OP_gte:
-        res = (d1 >= d2); /* if NaN return false */
-        break;
-    }
-  }
-  return LEPUS_NewBool(ctx, res);
-exception:
-  return LEPUS_EXCEPTION;
-}
-
-LEPUSValue prim_js_eq_slow(LEPUSContext *ctx, LEPUSValue op1, LEPUSValue op2,
-                           int is_neq) {
-  uint64_t tag1, tag2;
-  BOOL res;
-redo:
-  tag1 = LEPUS_VALUE_GET_NORM_TAG(op1);
-  tag2 = LEPUS_VALUE_GET_NORM_TAG(op2);
-  if (tag1 == tag2 || (tag1 == LEPUS_TAG_INT && tag2 == LEPUS_TAG_FLOAT64) ||
-      (tag2 == LEPUS_TAG_INT && tag1 == LEPUS_TAG_FLOAT64) ||
-      (LEPUS_IsString(op1) && LEPUS_IsString(op2))) {
-    res = js_strict_eq(ctx, op1, op2);
-  } else if ((tag1 == LEPUS_TAG_NULL && tag2 == LEPUS_TAG_UNDEFINED) ||
-             (tag2 == LEPUS_TAG_NULL && tag1 == LEPUS_TAG_UNDEFINED)) {
-    res = TRUE;
-  } else if ((LEPUS_IsString(op1) &&
-              (tag2 == LEPUS_TAG_INT || tag2 == LEPUS_TAG_FLOAT64)) ||
-             (LEPUS_IsString(op2) &&
-              (tag1 == LEPUS_TAG_INT || tag1 == LEPUS_TAG_FLOAT64))) {
-    double d1;
-    double d2;
-    if (JS_ToFloat64Free(ctx, &d1, op1)) {
-      LEPUS_FreeValue(ctx, op2);
-      goto exception;
-    }
-    if (JS_ToFloat64Free(ctx, &d2, op2)) goto exception;
-    res = (d1 == d2);
-  } else if (tag1 == LEPUS_TAG_BOOL) {
-    op1 = LEPUS_NewInt32(ctx, LEPUS_VALUE_GET_BOOL(op1));
-    goto redo;
-  } else if (tag2 == LEPUS_TAG_BOOL) {
-    op2 = LEPUS_NewInt32(ctx, LEPUS_VALUE_GET_BOOL(op2));
-    goto redo;
-  } else if (tag1 == LEPUS_TAG_OBJECT &&
-             (tag2 == LEPUS_TAG_INT || tag2 == LEPUS_TAG_FLOAT64 ||
-              tag2 == LEPUS_TAG_STRING || tag2 == LEPUS_TAG_SYMBOL ||
-              tag2 == LEPUS_TAG_SEPARABLE_STRING)) {
-    op1 = JS_ToPrimitiveFree_RC(ctx, op1, HINT_NONE);
-    if (LEPUS_IsException(op1)) {
-      LEPUS_FreeValue(ctx, op2);
-      goto exception;
-    }
-    goto redo;
-  } else if (tag2 == LEPUS_TAG_OBJECT &&
-             (tag1 == LEPUS_TAG_INT || tag1 == LEPUS_TAG_FLOAT64 ||
-              tag1 == LEPUS_TAG_STRING || tag1 == LEPUS_TAG_SYMBOL ||
-              tag1 == LEPUS_TAG_SEPARABLE_STRING)) {
-    op2 = JS_ToPrimitiveFree_RC(ctx, op2, HINT_NONE);
-    if (LEPUS_IsException(op2)) {
-      LEPUS_FreeValue(ctx, op1);
-      goto exception;
-    }
-    goto redo;
-  } else {
-    res = FALSE;
-    LEPUS_FreeValue(ctx, op1);
-    LEPUS_FreeValue(ctx, op2);
-  }
-  return LEPUS_NewBool(ctx, res ^ is_neq);
-exception:
-  return LEPUS_EXCEPTION;
-}
-
-LEPUSValue prim_js_strict_eq_slow(LEPUSContext *ctx, LEPUSValue op1,
-                                  LEPUSValue op2, BOOL is_neq) {
-  BOOL res;
-  res = js_strict_eq(ctx, op1, op2);
-  return LEPUS_NewBool(ctx, res ^ is_neq);
-}
-
-LEPUSValue prim_js_operator_instanceof(LEPUSContext *ctx, LEPUSValue op1,
-                                       LEPUSValue op2) {
-  BOOL ret;
-  ret = JS_IsInstanceOf_RC(ctx, op1, op2);
-  if (ret < 0) {
-    LEPUS_FreeValue(ctx, op1);
-    LEPUS_FreeValue(ctx, op2);
-    return LEPUS_EXCEPTION;
-  }
-  LEPUS_FreeValue(ctx, op1);
-  LEPUS_FreeValue(ctx, op2);
-  return LEPUS_NewBool(ctx, ret);
-}
-
-LEPUSValue prim_js_operator_in(LEPUSContext *ctx, LEPUSValue op1,
-                               LEPUSValue op2) {
-  JSAtom atom;
-  int ret;
-
-  if (LEPUS_VALUE_IS_NOT_OBJECT(op2) && !LEPUS_VALUE_IS_LEPUS_REF(op2)) {
-    atom = js_value_to_atom(ctx, op1);
-    if (unlikely(atom == JS_ATOM_NULL)) {
-      LEPUS_ThrowTypeError(ctx, "invalid 'in' operand search for null");
-      return LEPUS_EXCEPTION;
-    }
-    const char *msg = LEPUS_AtomToCString(ctx, atom);
-    char buffer[200];
-    if (msg) {
-      snprintf(buffer, 199, "invalid 'in' operand search for '%s'", msg);
-      LEPUS_FreeCString(ctx, msg);
-    } else {
-      snprintf(buffer, 199, "invalid 'in' operand search for null");
-    }
-    LEPUS_ThrowTypeError(ctx, "%s", buffer);
-    LEPUS_FreeAtom(ctx, atom);
-    return LEPUS_EXCEPTION;
-  }
-  atom = LEPUS_ValueToAtom(ctx, op1);
-  if (unlikely(atom == JS_ATOM_NULL)) {
-    return LEPUS_EXCEPTION;
-  }
-  ret = LEPUS_HasProperty(ctx, op2, atom);
-  LEPUS_FreeAtom(ctx, atom);
-  if (ret < 0) {
-    LEPUS_FreeValue(ctx, op1);
-    LEPUS_FreeValue(ctx, op2);
-    return LEPUS_EXCEPTION;
-  };
-  LEPUS_FreeValue(ctx, op1);
-  LEPUS_FreeValue(ctx, op2);
-  return LEPUS_NewBool(ctx, ret);
-}
-
-LEPUSValue prim_js_operator_delete(LEPUSContext *ctx, LEPUSValue op1,
-                                   LEPUSValue op2) {
-  JSAtom atom = LEPUS_ValueToAtom(ctx, op2);
-  if (unlikely(atom == JS_ATOM_NULL)) {
-    return LEPUS_EXCEPTION;
-  };
-  int ret = LEPUS_DeleteProperty(ctx, op1, atom, LEPUS_PROP_THROW_STRICT);
-  LEPUS_FreeAtom(ctx, atom);
-  if (unlikely(ret < 0)) {
-    LEPUS_FreeValue(ctx, op1);
-    LEPUS_FreeValue(ctx, op2);
-    return LEPUS_EXCEPTION;
-  }
-  LEPUS_FreeValue(ctx, op1);
-  LEPUS_FreeValue(ctx, op2);
-  return LEPUS_NewBool(ctx, ret);
-}
-#endif
-
-#ifdef ENABLE_PRIMJS_SNAPSHOT
-extern "C" void _call_stub_entry();
-
-extern "C" void _dispatch_table();
-
-extern "C" void _dispatch_table_offset();
-
-typedef unsigned char u_char;
-typedef u_char *address;
-
-address _table[NUM_OF_TOS_STATES][OP_COUNT];
-
-#define CAST_TO_FN_PTR(func_type, value) (reinterpret_cast<func_type>(value))
-
-QuickJsCallStub entry;
-uint8_t *prim_normal_entry;
-
-static void initialize_dispatchTable(LEPUSContext *ctx) {
-  for (int i = 0; i < NUM_OF_TOS_STATES; i++) {
-    for (int j = 1; j < OP_COUNT; j++) {
-      int offset = i * (OP_COUNT - 1) + j - 1;
-      int *table_entry = (int *)&_dispatch_table_offset + offset;
-      int table_offset = *table_entry;
-      _table[i][j] = (address)&_dispatch_table + table_offset;
-    }
-  }
-  ctx->dispatch_table = _table;
-}
-
-static QuickJsCallStub call_stub() {
-  return CAST_TO_FN_PTR(QuickJsCallStub, &_call_stub_entry);
-}
-
-void PrimInit(LEPUSContext *ctx) {
-  initialize_dispatchTable(ctx);
-#ifdef ENABLE_PRIMJS_SNAPSHOT
-  entry = call_stub();
-#endif
 }
 
 #endif

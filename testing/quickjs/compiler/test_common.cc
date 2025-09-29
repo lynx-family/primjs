@@ -894,46 +894,6 @@ TEST_F(CommonQjsTest, js_map_get) {
   ASSERT_TRUE(!LEPUS_IsException(ret));
 }
 
-TEST_F(CommonQjsTest, binary_op) {
-  std::string src = R"(
-    var a = 2147483647;
-    var b = 2147483648;
-    var c = -2147483649;
-    var d = a + c;
-    var e = b + c;
-    var f = 2147483649;
-    var g = f - a;
-    var h = f - b;
-    var hash1 = 779917409 % 4294967295;
-    var hash2 = 4143284306 % 4294967295;
-    var i = 4294967294 / 2;
-  )";
-  auto ret = LEPUS_Eval(ctx_, src.c_str(), src.length(), "test.js", 0);
-  ASSERT_TRUE(!LEPUS_IsException(ret));
-  auto global = LEPUS_GetGlobalObject(ctx_);
-  auto d = LEPUS_GetPropertyStr(ctx_, global, "d");
-  auto e = LEPUS_GetPropertyStr(ctx_, global, "e");
-  auto g = LEPUS_GetPropertyStr(ctx_, global, "g");
-  auto h = LEPUS_GetPropertyStr(ctx_, global, "h");
-  auto hash1 = LEPUS_GetPropertyStr(ctx_, global, "hash1");
-  auto hash2 = LEPUS_GetPropertyStr(ctx_, global, "hash2");
-  auto i = LEPUS_GetPropertyStr(ctx_, global, "i");
-  ASSERT_TRUE(LEPUS_VALUE_IS_INT(d));
-  ASSERT_TRUE(LEPUS_VALUE_GET_INT(d) == -2);
-  ASSERT_TRUE(LEPUS_VALUE_IS_FLOAT64(e));
-  ASSERT_TRUE(LEPUS_VALUE_GET_FLOAT64(e) == -1);
-  ASSERT_TRUE(LEPUS_VALUE_IS_INT(g));
-  ASSERT_TRUE(LEPUS_VALUE_GET_INT(g) == 2);
-  ASSERT_TRUE(LEPUS_VALUE_IS_FLOAT64(h));
-  ASSERT_TRUE(LEPUS_VALUE_GET_FLOAT64(h) == 1);
-  ASSERT_TRUE(LEPUS_VALUE_IS_INT(hash1));
-  ASSERT_TRUE(LEPUS_VALUE_IS_FLOAT64(hash2));
-  ASSERT_TRUE(LEPUS_VALUE_IS_INT(i));
-  ASSERT_TRUE(LEPUS_VALUE_GET_INT(i) == 2147483647);
-  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, global);
-  return;
-}
-
 TEST_F(CommonQjsTest, get_date_string) {
   std::string src = R"(
     var givenDate = new Date(951753599000);

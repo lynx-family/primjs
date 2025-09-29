@@ -119,15 +119,14 @@
 
 #define QJSDebuggerType(V)              \
   V(LEPUS_TAG_INT, number)              \
-  V(LEPUS_TAG_FLOAT64, number)          \
   V(LEPUS_TAG_BIG_INT, bigint)          \
-  V(LEPUS_TAG_BIG_FLOAT, bigint)        \
   V(LEPUS_TAG_STRING, string)           \
   V(LEPUS_TAG_SEPARABLE_STRING, string) \
   V(LEPUS_TAG_BOOL, boolean)            \
   V(LEPUS_TAG_SYMBOL, symbol)           \
   V(LEPUS_TAG_NULL, object)             \
-  V(LEPUS_TAG_EXCEPTION, exception)
+  V(LEPUS_TAG_EXCEPTION, exception)     \
+  V(LEPUS_TAG_FLOAT64, number)
 
 #define QJComplexObjDesc(V)                               \
   V(Promise, capital_promise)                             \
@@ -381,7 +380,6 @@ LEPUSValue GetValue(LEPUSContext* ctx, LEPUSValue value,
     case LEPUS_TAG_INT:
     case LEPUS_TAG_FLOAT64:
     case LEPUS_TAG_BIG_INT:
-    case LEPUS_TAG_BIG_FLOAT:
     case LEPUS_TAG_STRING:
     case LEPUS_TAG_SEPARABLE_STRING:
     case LEPUS_TAG_BOOL:
@@ -977,7 +975,6 @@ LEPUSValue GetDescription(LEPUSContext* ctx, LEPUSValue value) {
     case LEPUS_TAG_INT:
     case LEPUS_TAG_FLOAT64:
     case LEPUS_TAG_BIG_INT:
-    case LEPUS_TAG_BIG_FLOAT:
     case LEPUS_TAG_BOOL: {
       description = LEPUS_ToString(ctx, value);
       break;

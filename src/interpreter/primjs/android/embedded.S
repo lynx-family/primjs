@@ -3,7 +3,7 @@
 .align 2
 .global _exception_handler_entry
 _exception_handler_entry:
-.word 0xf9400a68
+.word 0xf9401268
 .word 0xf9407109
 .word 0xb940e903
 cbz w3, Label_3
@@ -49,7 +49,7 @@ bl JS_IteratorClose
 b Label_4
 Label_5:
 .word 0xf85e83ac
-.word 0xf9400a68
+.word 0xf9401268
 .word 0xf9407109
 .word 0xf8008689
 .word 0xb27f03e9
@@ -69,7 +69,7 @@ Label_1:
 .word 0xf100011f
 b.NE Label_6
 .word 0xf85b83b1
-.word 0xf9400a69
+.word 0xf9401269
 .word 0xf940022a
 .word 0xf900792a
 .word 0xaa1103e1
@@ -98,7 +98,7 @@ Label_6:
 .word 0xf9001a36
 .word 0xf9002234
 .word 0xf9400228
-.word 0xf9400a69
+.word 0xf9401269
 .word 0xf9007928
 .word 0xf94007be
 .cfi_startproc
@@ -544,7 +544,7 @@ Label_49:
 .word 0x91008229
 .word 0xa9002529
 .word 0xf9002234
-.word 0xf9400a69
+.word 0xf9401269
 .word 0xf940792a
 .word 0xf900022a
 .word 0xf9007931
@@ -564,7 +564,7 @@ _native_entry:
 .word 0xaa0c03e1
 .word 0xaa1903e2
 .word 0xaa0e03e3
-.word 0xf9400a69
+.word 0xf9401269
 .word 0x79400d88
 .word 0xf9402929
 .word 0xd280050a
@@ -596,7 +596,7 @@ _async_entry:
 .word 0xf9002634
 .word 0xf900223f
 .word 0xf9401a36
-.word 0xf9400a68
+.word 0xf9401268
 .word 0xf9407909
 .word 0xf9000229
 .word 0xf9007911
@@ -987,7 +987,7 @@ b.EQ Label_78
 .word 0xf1004b3f
 b.NE Label_79
 Label_78:
-.word 0xf9406660
+.word 0xf9406e60
 b Label_80
 Label_79:
 .word 0xf85b83b1
@@ -1041,7 +1041,7 @@ b.EQ Label_85
 .word 0xf1004b3f
 b.NE Label_86
 Label_85:
-.word 0xf9406660
+.word 0xf9406e60
 b Label_87
 Label_86:
 .word 0xf85b83b1
@@ -2230,7 +2230,7 @@ Label_143:
 .cfi_endproc
 .word 0xaa0003f9
 .word 0xf85b83b1
-.word 0xf9400a69
+.word 0xf9401269
 .word 0xf940022a
 .word 0xf900792a
 .word 0xaa1103e1
@@ -2336,7 +2336,7 @@ Label_152:
 .cfi_endproc
 .word 0xaa0003f9
 .word 0xf85b83b1
-.word 0xf9400a69
+.word 0xf9401269
 .word 0xf940022a
 .word 0xf900792a
 .word 0xaa1103e1
@@ -2553,7 +2553,7 @@ Label_169:
 .cfi_endproc
 .word 0xaa0003f9
 .word 0xf85b83b1
-.word 0xf9400a69
+.word 0xf9401269
 .word 0xf940022a
 .word 0xf900792a
 .word 0xaa1103e1
@@ -2662,7 +2662,7 @@ Label_178:
 .cfi_endproc
 .word 0xaa0003f9
 .word 0xf85b83b1
-.word 0xf9400a69
+.word 0xf9401269
 .word 0xf940022a
 .word 0xf900792a
 .word 0xaa1103e1
@@ -2883,7 +2883,7 @@ _dispatch_table_2_40:
 .word 0xf9002234
 .word 0xaa0003f9
 .word 0xf85b83b1
-.word 0xf9400a69
+.word 0xf9401269
 .word 0xf940022a
 .word 0xf900792a
 .word 0xaa1103e1
@@ -2915,7 +2915,7 @@ _dispatch_table_0_40:
 _dispatch_table_1_40:
 .word 0xaa0003f9
 .word 0xf85b83b1
-.word 0xf9400a69
+.word 0xf9401269
 .word 0xf940022a
 .word 0xf900792a
 .word 0xaa1103e1
@@ -2946,7 +2946,7 @@ _dispatch_table_1_41:
 .word 0xf85b83b1
 .word 0xf9002234
 .word 0xf85b83b1
-.word 0xf9400a69
+.word 0xf9401269
 .word 0xf940022a
 .word 0xf900792a
 .word 0xaa1103e1
@@ -2979,7 +2979,7 @@ _dispatch_table_2_41:
 .global _dispatch_table_0_41
 _dispatch_table_0_41:
 .word 0xf85b83b1
-.word 0xf9400a69
+.word 0xf9401269
 .word 0xf940022a
 .word 0xf900792a
 .word 0xaa1103e1
@@ -3281,7 +3281,7 @@ _dispatch_table_1_46:
 .word 0xf9001a36
 .word 0xf9002234
 .word 0xf9400228
-.word 0xf9400a69
+.word 0xf9401269
 .word 0xf9007928
 .word 0xf94007be
 .cfi_startproc
@@ -3309,7 +3309,7 @@ _dispatch_table_0_46:
 .word 0xf9001a36
 .word 0xf9002234
 .word 0xf9400228
-.word 0xf9400a69
+.word 0xf9401269
 .word 0xf9007928
 .word 0xf94007be
 .cfi_startproc
@@ -4430,7 +4430,7 @@ Label_290:
 b _exception_handler_entry
 b Label_289
 Label_288:
-.word 0xf9406679
+.word 0xf9406e79
 Label_289:
 Label_287:
 .word 0xb27103e4
@@ -4501,7 +4501,7 @@ Label_295:
 b _exception_handler_entry
 b Label_294
 Label_293:
-.word 0xf9406679
+.word 0xf9406e79
 Label_294:
 Label_292:
 .word 0xb27103e4
@@ -9921,7 +9921,7 @@ _dispatch_table_1_135:
 .word 0xf9001a36
 .word 0xf9002234
 .word 0xf9400228
-.word 0xf9400a69
+.word 0xf9401269
 .word 0xf9007928
 .word 0xf94007be
 .cfi_startproc
@@ -9949,7 +9949,7 @@ _dispatch_table_0_135:
 .word 0xf9001a36
 .word 0xf9002234
 .word 0xf9400228
-.word 0xf9400a69
+.word 0xf9401269
 .word 0xf9007928
 .word 0xf94007be
 .cfi_startproc
@@ -9976,7 +9976,7 @@ _dispatch_table_1_136:
 .word 0xf9001a36
 .word 0xf9002234
 .word 0xf9400228
-.word 0xf9400a69
+.word 0xf9401269
 .word 0xf9007928
 .word 0xf94007be
 .cfi_startproc
@@ -10005,7 +10005,7 @@ _dispatch_table_0_136:
 .word 0xf9001a36
 .word 0xf9002234
 .word 0xf9400228
-.word 0xf9400a69
+.word 0xf9401269
 .word 0xf9007928
 .word 0xf94007be
 .cfi_startproc
@@ -10032,7 +10032,7 @@ _dispatch_table_1_137:
 .word 0xf9001a36
 .word 0xf9002234
 .word 0xf9400228
-.word 0xf9400a69
+.word 0xf9401269
 .word 0xf9007928
 .word 0xf94007be
 .cfi_startproc
@@ -10061,7 +10061,7 @@ _dispatch_table_0_137:
 .word 0xf9001a36
 .word 0xf9002234
 .word 0xf9400228
-.word 0xf9400a69
+.word 0xf9401269
 .word 0xf9007928
 .word 0xf94007be
 .cfi_startproc
@@ -10088,7 +10088,7 @@ _dispatch_table_1_138:
 .word 0xf9001a36
 .word 0xf9002234
 .word 0xf9400228
-.word 0xf9400a69
+.word 0xf9401269
 .word 0xf9007928
 .word 0xf94007be
 .cfi_startproc
@@ -10117,7 +10117,7 @@ _dispatch_table_0_138:
 .word 0xf9001a36
 .word 0xf9002234
 .word 0xf9400228
-.word 0xf9400a69
+.word 0xf9401269
 .word 0xf9007928
 .word 0xf94007be
 .cfi_startproc
@@ -10143,7 +10143,7 @@ _dispatch_table_1_139:
 .word 0xf9001a36
 .word 0xf9002234
 .word 0xf9400228
-.word 0xf9400a69
+.word 0xf9401269
 .word 0xf9007928
 .word 0xf94007be
 .cfi_startproc
@@ -10171,7 +10171,7 @@ _dispatch_table_0_139:
 .word 0xf9001a36
 .word 0xf9002234
 .word 0xf9400228
-.word 0xf9400a69
+.word 0xf9401269
 .word 0xf9007928
 .word 0xf94007be
 .cfi_startproc
@@ -11154,7 +11154,7 @@ Label_705:
 .word 0xf9000107
 b Label_702
 Label_701:
-.word 0xd2801242
+.word 0xd28011c2
 .word 0xaa0703f9
 .word 0xf85b83b1
 .word 0xf9002234
@@ -11232,7 +11232,7 @@ Label_713:
 .word 0xf9000107
 b Label_710
 Label_709:
-.word 0xd2801242
+.word 0xd28011c2
 .word 0xaa0703f9
 .word 0xf8008680
 .word 0xf85b83b1
@@ -11312,7 +11312,7 @@ Label_721:
 .word 0xf9000107
 b Label_718
 Label_717:
-.word 0xd2801242
+.word 0xd28011c2
 .word 0xaa0703f9
 .word 0xf8008680
 .word 0xf8008681
@@ -12094,7 +12094,7 @@ _dispatch_table_1_153:
 .word 0xf85b83b1
 .word 0xf9002234
 .word 0xb84012c8
-.word 0xf9406661
+.word 0xf9406e61
 .word 0xd2800003
 .word 0xf85b83b1
 .word 0xf9002234
@@ -12129,7 +12129,7 @@ _dispatch_table_2_153:
 .global _dispatch_table_0_153
 _dispatch_table_0_153:
 .word 0xb84012c8
-.word 0xf9406661
+.word 0xf9406e61
 .word 0xd2800003
 .word 0xf85b83b1
 .word 0xf9002234
