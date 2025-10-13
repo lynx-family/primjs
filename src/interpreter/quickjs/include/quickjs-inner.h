@@ -3124,6 +3124,8 @@ void SetObjectCtxCheckStatus(LEPUSContext *ctx, bool enable);
 int64_t NapiAdjustExternalMemory(LEPUSRuntime *rt, int64_t size);
 
 void trig_gc(JSMallocState *s, size_t size, bool is_outer = false);
+void set_gc_info_threadhold(mstate s, uint32_t mode);
+void JS_UpdateGCInfo(JSMallocState *s, size_t size);
 
 QJS_HIDE pid_t get_tid();
 
