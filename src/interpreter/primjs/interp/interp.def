@@ -1,0 +1,63 @@
+// Copyright 2025 The Lynx Authors. All rights reserved.
+// Licensed under the Apache License Version 2.0 that can be found in the
+// LICENSE file in the root directory of this source tree.
+
+#ifndef DEF_INTERP_HANDLER
+#define DEF_INTERP_HANDLER(name)
+#endif
+
+#ifndef DEF_INTERP_HANDLER_NO_RET
+#define DEF_INTERP_HANDLER_NO_RET(name) DEF_INTERP_HANDLER(name)
+#endif
+
+#ifndef DEF_INTERP_HANDLER_RET
+#define DEF_INTERP_HANDLER_RET(name) DEF_INTERP_HANDLER(name)
+#endif
+
+#ifndef DEF_REGISTER
+#define DEF_REGISTER(...)
+#endif
+
+DEF_INTERP_HANDLER_NO_RET(common_return_direct)
+DEF_INTERP_HANDLER_NO_RET(common_set_property)
+DEF_INTERP_HANDLER_NO_RET(common_set_property_value)
+DEF_INTERP_HANDLER_RET(common_get_property)
+DEF_INTERP_HANDLER_RET(common_get_property_value)
+DEF_INTERP_HANDLER_RET(common_get_var)
+DEF_INTERP_HANDLER_RET(common_get_var_undef)
+DEF_INTERP_HANDLER_NO_RET(common_call)
+DEF_INTERP_HANDLER_NO_RET(call_native)
+DEF_INTERP_HANDLER_NO_RET(call_native_entry)
+DEF_INTERP_HANDLER_NO_RET(common_call_from_entry)
+DEF_INTERP_HANDLER_NO_RET(SlowCloseVarRefs)
+DEF_INTERP_HANDLER_NO_RET(common_return)
+DEF_INTERP_HANDLER_NO_RET(exception)
+DEF_INTERP_HANDLER_NO_RET(exception_spill_top0)
+DEF_INTERP_HANDLER_NO_RET(exception_spill_top1)
+DEF_INTERP_HANDLER_NO_RET(exception_spill_top0_top1)
+DEF_INTERP_HANDLER_NO_RET(SlowToObject)
+DEF_INTERP_HANDLER_NO_RET(SlowToBoolean)
+DEF_INTERP_HANDLER_NO_RET(SlowJSPostInc)
+DEF_INTERP_HANDLER_NO_RET(SlowJSNot)
+DEF_INTERP_HANDLER_NO_RET(ThrowReferenceErrorUninitialized)
+DEF_INTERP_HANDLER_NO_RET(ThrowThisReferenceError)
+DEF_INTERP_HANDLER_NO_RET(ThrowTypeErrorNotFunction_Return)
+DEF_INTERP_HANDLER_NO_RET(ThrowStackOverflow_Return)
+
+DEF_REGISTER(rVarBuf, x27, 27)
+DEF_REGISTER(rArgBuf, x28, 28)
+DEF_REGISTER(rVarRef, x26, 26)
+DEF_REGISTER(rCtx, x24, 24)
+DEF_REGISTER(rDispatchTable, x25, 25)
+DEF_REGISTER(rFrame, x29, 29)
+DEF_REGISTER(rCpool, x23, 23)
+DEF_REGISTER(rTop0, x22, 22)
+DEF_REGISTER(rTop1, x21, 21)
+DEF_REGISTER(rScratch, x9, 9)
+DEF_REGISTER(rLr, x30, 30)
+DEF_REGISTER(rRsp, sp, 31)
+
+#undef DEF_INTERP_HANDLER
+#undef DEF_INTERP_HANDLER_NO_RET
+#undef DEF_INTERP_HANDLER_RET
+#undef DEF_REGISTER

@@ -42,6 +42,8 @@ extern "C" {
 #include <stdlib.h>
 #include <string.h>
 
+#include "quickjs/include/bignum.h"
+
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wconversion"
 
@@ -118,8 +120,6 @@ static const REOpCode reopcode_info[REOP_COUNT] = {
 #define RE_HEADER_STACK_SIZE 2
 
 #define RE_HEADER_LEN 7
-
-static inline int is_digit(int c) { return c >= '0' && c <= '9'; }
 
 /* insert 'len' bytes at position 'pos' */
 static void dbuf_insert(DynBuf *s, int pos, int len) {

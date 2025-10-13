@@ -14,6 +14,7 @@
 #include <vector>
 
 #include "inspector/heapprofiler/edge.h"
+#include "quickjs/include/bignum.h"
 #include "quickjs/include/quickjs-inner.h"
 
 namespace quickjs {
@@ -27,7 +28,6 @@ struct JSOSRWHandler;
 struct JSOSSignalHandler;
 struct JSOSTimer;
 struct JSSTDFile;
-struct JSBigFloat;
 
 class HeapObjPtr {
  public:
@@ -74,12 +74,10 @@ class HeapObjPtr {
   size_t size_ = 0;
 };
 
-#ifdef CONFIG_BIGNUM
 #define VALUE_TAG_TYPE(V)                               \
   V(LEPUS_TAG_LEPUS_REF, LEPUSLepusRef)                 \
   V(LEPUS_TAG_SEPARABLE_STRING, JSSeparableString)      \
-  V(LEPUS_TAG_BIG_INT, JSBigFloat)                      \
-  V(LEPUS_TAG_BIG_FLOAT, JSBigFloat)                    \
+  V(LEPUS_TAG_BIG_INT, JSBigInt)                        \
   V(LEPUS_TAG_SYMBOL, JSString)                         \
   V(LEPUS_TAG_STRING, JSString)                         \
   V(LEPUS_TAG_SHAPE, JSShape)                           \
@@ -88,19 +86,6 @@ class HeapObjPtr {
   V(LEPUS_TAG_MODULE, LEPUSModuleDef)                   \
   V(LEPUS_TAG_FUNCTION_BYTECODE, LEPUSFunctionBytecode) \
   V(LEPUS_TAG_OBJECT, LEPUSObject)
-#else
-#define VALUE_TAG_TYPE(V)                               \
-  V(LEPUS_TAG_LEPUS_REF, LEPUSLepusRef)                 \
-  V(LEPUS_TAG_SEPARABLE_STRING, JSSeparableString)      \
-  V(LEPUS_TAG_SYMBOL, JSString)                         \
-  V(LEPUS_TAG_STRING, JSString)                         \
-  V(LEPUS_TAG_SHAPE, JSShape)                           \
-  V(LEPUS_TAG_ASYNC_FUNCTION, JSAsyncFunctionData)      \
-  V(LEPUS_TAG_VAR_REF, JSVarRef)                        \
-  V(LEPUS_TAG_MODULE, LEPUSModuleDef)                   \
-  V(LEPUS_TAG_FUNCTION_BYTECODE, LEPUSFunctionBytecode) \
-  V(LEPUS_TAG_OBJECT, LEPUSObject)
-#endif
 
 class HeapEntry {
  public:

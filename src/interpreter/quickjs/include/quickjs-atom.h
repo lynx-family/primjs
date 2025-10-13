@@ -169,10 +169,6 @@ DEF(exec, "exec")
 DEF(groups, "groups")
 DEF(status, "status")
 DEF(reason, "reason")
-#ifdef CONFIG_BIGNUM
-DEF(bigint, "bigint")
-DEF(bigfloat, "bigfloat")
-#endif
 #ifdef CONFIG_ATOMICS
 DEF(not_equal, "not-equal")
 DEF(timed_out, "timed-out")
@@ -205,18 +201,9 @@ DEF(Int16Array, "Int16Array")
 DEF(Uint16Array, "Uint16Array")
 DEF(Int32Array, "Int32Array")
 DEF(Uint32Array, "Uint32Array")
-#ifdef CONFIG_BIGNUM
-DEF(BigInt64Array, "BigInt64Array")
-DEF(BigUint64Array, "BigUint64Array")
-#endif
 DEF(Float32Array, "Float32Array")
 DEF(Float64Array, "Float64Array")
 DEF(DataView, "DataView")
-#ifdef CONFIG_BIGNUM
-DEF(BigInt, "BigInt")
-DEF(BigFloat, "BigFloat")
-DEF(BigFloatEnv, "BigFloatEnv")
-#endif
 DEF(Map, "Map")
 DEF(Set, "Set")         /* Map + 1 */
 DEF(WeakMap, "WeakMap") /* Map + 2 */
@@ -259,28 +246,5 @@ DEF(Symbol_hasInstance, "Symbol.hasInstance")
 DEF(Symbol_species, "Symbol.species")
 DEF(Symbol_unscopables, "Symbol.unscopables")
 DEF(Symbol_asyncIterator, "Symbol.asyncIterator")
-#ifdef CONFIG_BIGNUM
-DEF(Symbol_operatorOrder, "Symbol.operatorOrder")
-DEF(Symbol_operatorAdd, "Symbol.operatorAdd")
-DEF(Symbol_operatorSub, "Symbol.operatorSub")
-DEF(Symbol_operatorMul, "Symbol.operatorMul")
-DEF(Symbol_operatorDiv, "Symbol.operatorDiv")
-DEF(Symbol_operatorMod, "Symbol.operatorMod")
-DEF(Symbol_operatorPow, "Symbol.operatorPow")
-DEF(Symbol_operatorShl, "Symbol.operatorShl")
-DEF(Symbol_operatorShr, "Symbol.operatorShr")
-DEF(Symbol_operatorAnd, "Symbol.operatorAnd")
-DEF(Symbol_operatorOr, "Symbol.operatorOr")
-DEF(Symbol_operatorXor, "Symbol.operatorXor")
-DEF(Symbol_operatorCmpLT, "Symbol.operatorCmpLT")
-DEF(Symbol_operatorCmpLE, "Symbol.operatorCmpLE")
-DEF(Symbol_operatorCmpEQ, "Symbol.operatorCmpEQ")
-DEF(Symbol_operatorPlus, "Symbol.operatorPlus")
-DEF(Symbol_operatorNeg, "Symbol.operatorNeg")
-DEF(Symbol_operatorNot, "Symbol.operatorNot")
-DEF(Symbol_operatorInc, "Symbol.operatorInc")
-DEF(Symbol_operatorDec, "Symbol.operatorDec")
-DEF(Symbol_operatorMathMod, "Symbol.operatorMathMod")
-#endif
 
 #endif /* DEF */

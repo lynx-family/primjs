@@ -53,11 +53,9 @@ void Finalizer::DoFinalizer(void *ptr) noexcept {
       JSLepusRefFinalizer(ptr);
       break;
 #endif
-#ifdef CONFIG_BIGNUM
-    case ALLOC_TAG_JSBigFloat:
-      JSBigFloatFinalizer(ptr);
+    case ALLOC_TAG_JSBigInt:
+      JSBigIntFinalizer(ptr);
       break;
-#endif
     case ALLOC_TAG_JSString:
       JSStringFinalizer(ptr);
       break;
@@ -169,11 +167,9 @@ void Visitor::VisitRootLEPUSValue(LEPUSValue *val, int local_idx) noexcept {
 void Visitor::VisitRootJSToken(JSToken *token, int local_idx) noexcept {
   DCHECK(token != nullptr);
   switch (token->val) {
-#ifdef CONFIG_BIGNUM
     case TOK_NUMBER:
       VisitRootLEPUSValue(&token->u.num.val, local_idx);
       break;
-#endif
     case TOK_STRING:
     case TOK_TEMPLATE:
       VisitRootLEPUSValue(token->u.str.str, local_idx);
@@ -211,9 +207,7 @@ void Visitor::VisitEntry(void *ptr, int local_idx) noexcept {
       break;
     case ALLOC_TAG_WITHOUT_PTR:
     case ALLOC_TAG_WeakRefData:
-#ifdef CONFIG_BIGNUM
-    case ALLOC_TAG_JSBigFloat:
-#endif
+    case ALLOC_TAG_JSBigInt:
       break;
     // LEPUSValue with tag
     case ALLOC_TAG_LEPUSLepusRef:

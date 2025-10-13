@@ -275,12 +275,6 @@ DEF(strict_neq, 1, 2, 1, none)
 DEF(and, 1, 2, 1, none)
 DEF(xor, 1, 2, 1, none)
 DEF(or, 1, 2, 1, none)
-#ifdef CONFIG_BIGNUM
-DEF(mul_pow10, 1, 2, 1, none)
-DEF(math_div, 1, 2, 1, none)
-DEF(math_mod, 1, 2, 1, none)
-DEF(math_pow, 1, 2, 1, none)
-#endif
 /* must be the last non short and non temporary opcode */
 DEF(nop, 1, 0, 0, none)
 /* temporary opcodes: never emitted in the final bytecode */

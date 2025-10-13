@@ -178,7 +178,7 @@ static LEPUSValue js_print(LEPUSContext *ctx, LEPUSValueConst this_val,
   return LEPUS_UNDEFINED;
 }
 
-#if !defined(_WIN32)
+#if !defined(_WIN32) && !defined(LYNX_SIMPLIFY)
 void js_std_dump_error_gc(LEPUSContext *ctx) {
   LEPUSValue exception_val, val;
   const char *stack;
@@ -1592,7 +1592,7 @@ static int eval_buf(LEPUSContext *ctx, const char *buf, size_t buf_len,
   exception_val = LEPUS_UNDEFINED;
   error_name = NULL;
   async_done = 0;
-
+  fprintf(stdout, "filename: %s\n", filename);
   res_val = LEPUS_Eval(ctx, buf, buf_len, filename, eval_flags);
 
   if (is_async && !LEPUS_IsException(res_val)) {
@@ -1930,6 +1930,7 @@ int run_test_buf(const char *filename, char *harness, namelist_t *ip, char *buf,
     LEPUS_FreeRuntime(rt);
     fatal(1, "LEPUS_NewContext failure");
   }
+  fprintf(stdout, "filename: %s\n", filename);
   LEPUS_SetRuntimeInfo(rt, filename);
 
   LEPUS_SetCanBlock(rt, can_block);

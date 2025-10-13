@@ -10,7 +10,10 @@ if (enable_primjs_snapshot && current_toolchain == snapshot_toolchain) {
   }
 
   primjs_source_set("primjs") {
-    sources = [ "$target_os/$embedded_file" ]
+    sources = [ 
+      "interp/$target_os/$embedded_file",
+      "interp/call_stub.cc",
+    ]
   }
 } else {
   primjs_source_set("primjs") {

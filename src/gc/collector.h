@@ -176,7 +176,6 @@ class Visitor {
   void VisitJSObject(void *ptr, int local_idx) noexcept;
   /* LEPUSValue with tag -> end */
   // LEPUS_TAG_BIG_INT
-  // LEPUS_TAG_BIG_FLOAT
   /* LEPUSObject with class_id -> begin */
   void VisitJSBoundFunction(void *ptr,
                             int local_idx) noexcept;  // normal_free
@@ -259,9 +258,7 @@ class Finalizer {
 #ifdef ENABLE_LEPUSNG
   void JSLepusRefFinalizer(void *ptr) noexcept;
 #endif
-#ifdef CONFIG_BIGNUM
-  void JSBigFloatFinalizer(void *ptr) noexcept;
-#endif
+  void JSBigIntFinalizer(void *ptr) noexcept;
   void JSObjectFinalizer(void *ptr) noexcept;
   void JSObjectOnlyFinalizer(void *ptr) noexcept;
   void JSStringFinalizer(void *ptr) noexcept;

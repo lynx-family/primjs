@@ -1,0 +1,119 @@
+diff --git a/llvm/lib/Target/AArch64/AArch64FrameLowering.cpp b/llvm/lib/Target/AArch64/AArch64FrameLowering.cpp
+index 0f33e77d4eec..46f79f385cd4 100644
+--- a/llvm/lib/Target/AArch64/AArch64FrameLowering.cpp
++++ b/llvm/lib/Target/AArch64/AArch64FrameLowering.cpp
+@@ -1815,8 +1815,8 @@ void AArch64FrameLowering::emitPrologue(MachineFunction &MF,
+ 
+   // All calls are tail calls in GHC calling conv, and functions have no
+   // prologue/epilogue.
+-  if (MF.getFunction().getCallingConv() == CallingConv::GHC)
+-    return;
++  // if (MF.getFunction().getCallingConv() == CallingConv::GHC)
++  //   return;
+ 
+   // Set tagged base pointer to the requested stack slot.
+   // Ideally it should match SP value after prologue.
+@@ -2266,8 +2266,8 @@ void AArch64FrameLowering::emitEpilogue(MachineFunction &MF,
+ 
+   // All calls are tail calls in GHC calling conv, and functions have no
+   // prologue/epilogue.
+-  if (MF.getFunction().getCallingConv() == CallingConv::GHC)
+-    return;
++  // if (MF.getFunction().getCallingConv() == CallingConv::GHC)
++  //   return;
+ 
+   // How much of the stack used by incoming arguments this function is expected
+   // to restore in this particular epilogue.
+@@ -3590,8 +3590,8 @@ void AArch64FrameLowering::determineCalleeSaves(MachineFunction &MF,
+                                                 RegScavenger *RS) const {
+   // All calls are tail calls in GHC calling conv, and functions have no
+   // prologue/epilogue.
+-  if (MF.getFunction().getCallingConv() == CallingConv::GHC)
+-    return;
++  // if (MF.getFunction().getCallingConv() == CallingConv::GHC)
++  //   return;
+ 
+   TargetFrameLowering::determineCalleeSaves(MF, SavedRegs, RS);
+   const AArch64RegisterInfo *RegInfo = static_cast<const AArch64RegisterInfo *>(
+diff --git a/llvm/lib/Target/AArch64/AArch64ISelLowering.cpp b/llvm/lib/Target/AArch64/AArch64ISelLowering.cpp
+index 29b753a7d3a4..8a9172cf379b 100644
+--- a/llvm/lib/Target/AArch64/AArch64ISelLowering.cpp
++++ b/llvm/lib/Target/AArch64/AArch64ISelLowering.cpp
+@@ -8556,7 +8556,7 @@ SDValue AArch64TargetLowering::LowerCallResult(
+ 
+ /// Return true if the calling convention is one that we can guarantee TCO for.
+ static bool canGuaranteeTCO(CallingConv::ID CC, bool GuaranteeTailCalls) {
+-  return (CC == CallingConv::Fast && GuaranteeTailCalls) ||
++  return ((CC == CallingConv::GHC || CC == CallingConv::Fast) && GuaranteeTailCalls) ||
+          CC == CallingConv::Tail || CC == CallingConv::SwiftTail;
+ }
+ 
+@@ -8572,6 +8572,9 @@ static bool mayTailCallThisCC(CallingConv::ID CC) {
+   case CallingConv::SwiftTail:
+   case CallingConv::Tail:
+   case CallingConv::Fast:
++  // begin
++  case CallingConv::GHC:
++  // end
+     return true;
+   default:
+     return false;
+@@ -8855,7 +8858,7 @@ SDValue AArch64TargetLowering::addTokenForArgument(SDValue Chain,
+ 
+ bool AArch64TargetLowering::DoesCalleeRestoreStack(CallingConv::ID CallCC,
+                                                    bool TailCallOpt) const {
+-  return (CallCC == CallingConv::Fast && TailCallOpt) ||
++  return ((CallCC == CallingConv::GHC || CallCC == CallingConv::Fast) && TailCallOpt) ||
+          CallCC == CallingConv::Tail || CallCC == CallingConv::SwiftTail;
+ }
+ 
+diff --git a/llvm/lib/Target/AArch64/AArch64RegisterInfo.cpp b/llvm/lib/Target/AArch64/AArch64RegisterInfo.cpp
+index f49d96758df2..6e7e2545912a 100644
+--- a/llvm/lib/Target/AArch64/AArch64RegisterInfo.cpp
++++ b/llvm/lib/Target/AArch64/AArch64RegisterInfo.cpp
+@@ -561,6 +561,22 @@ AArch64RegisterInfo::getReservedRegs(const MachineFunction &MF) const {
+   // which becomes considerably expensive when considering the _HI registers.
+   Reserved |= getStrictlyReservedRegs(MF);
+ 
++  //if (MF.getFunction().getCallingConv() == CallingConv::PreserveNone) {
++    // markSuperRegs(Reserved, AArch64::W19);
++    // markSuperRegs(Reserved, AArch64::W20);
++    markSuperRegs(Reserved, AArch64::W9);
++    markSuperRegs(Reserved, AArch64::W21);
++    markSuperRegs(Reserved, AArch64::W22);
++    markSuperRegs(Reserved, AArch64::W23);
++    markSuperRegs(Reserved, AArch64::W24);
++    markSuperRegs(Reserved, AArch64::W25);
++    markSuperRegs(Reserved, AArch64::W26);
++    markSuperRegs(Reserved, AArch64::W27);
++    markSuperRegs(Reserved, AArch64::W28);
++    markSuperRegs(Reserved, AArch64::W29);
++    markSuperRegs(Reserved, AArch64::W30);
++  // }
++
+   return Reserved;
+ }
+ 
+diff --git a/llvm/lib/Target/AArch64/GISel/AArch64CallLowering.cpp b/llvm/lib/Target/AArch64/GISel/AArch64CallLowering.cpp
+index 9bef102e8abf..78b32b07fcbf 100644
+--- a/llvm/lib/Target/AArch64/GISel/AArch64CallLowering.cpp
++++ b/llvm/lib/Target/AArch64/GISel/AArch64CallLowering.cpp
+@@ -350,7 +350,7 @@ struct OutgoingArgHandler : public CallLowering::OutgoingValueHandler {
+ } // namespace
+ 
+ static bool doesCalleeRestoreStack(CallingConv::ID CallConv, bool TailCallOpt) {
+-  return (CallConv == CallingConv::Fast && TailCallOpt) ||
++  return ((CallConv == CallingConv::GHC || CallConv == CallingConv::Fast) && TailCallOpt) ||
+          CallConv == CallingConv::Tail || CallConv == CallingConv::SwiftTail;
+ }
+ 
+@@ -779,8 +779,7 @@ bool AArch64CallLowering::lowerFormalArguments(
+ 
+ /// Return true if the calling convention is one that we can guarantee TCO for.
+ static bool canGuaranteeTCO(CallingConv::ID CC, bool GuaranteeTailCalls) {
+-  return (CC == CallingConv::Fast && GuaranteeTailCalls) ||
+-         CC == CallingConv::Tail || CC == CallingConv::SwiftTail;
++  return ((CC == CallingConv::GHC || CC == CallingConv::Fast) && GuaranteeTailCalls);
+ }
+ 
+ /// Return true if we might ever do TCO for calls with this calling convention.

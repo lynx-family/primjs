@@ -41,15 +41,12 @@ extern "C" {
 #include "quickjs/include/list.h"
 #include "quickjs/include/quickjs.h"
 
-#ifdef CONFIG_BIGNUM
-#include "quickjs/include/libbf.h"
-#endif
-
 #ifdef __cplusplus
 }
 #endif
 
 #include "gc/allocator.h"
+#include "quickjs/include/dtoa.h"
 #include "quickjs/include/primjs_monitor.h"
 #include "quickjs/include/quickjs_queue.h"
 
@@ -86,9 +83,6 @@ typedef int BOOL;
 
 #include "gc/qjsvaluevalue-space.h"
 
-#if defined(CONFIG_BIGNUM) and defined(ENABLE_LEPUSNG)
-#error bignum and lepusng are now conflict!
-#endif
 #if defined(QJS_UNITTEST) || defined(__WASI_SDK__)
 #define QJS_STATIC
 #else
@@ -139,34 +133,28 @@ enum JS_CLASS_ID {
   JS_CLASS_MAPPED_ARGUMENTS, /*               | length */
   JS_CLASS_DATE,             /* u.object_data */
   JS_CLASS_MODULE_NS,
-  JS_CLASS_C_FUNCTION,          /* u.cfunc */
-  JS_CLASS_BYTECODE_FUNCTION,   /* u.func */
-  JS_CLASS_BOUND_FUNCTION,      /* u.bound_function */
-  JS_CLASS_C_FUNCTION_DATA,     /* u.c_function_data_record */
-  JS_CLASS_GENERATOR_FUNCTION,  /* u.func */
-  JS_CLASS_FOR_IN_ITERATOR,     /* u.for_in_iterator */
-  JS_CLASS_REGEXP,              /* u.regexp */
-  JS_CLASS_ARRAY_BUFFER,        /* u.array_buffer */
-  JS_CLASS_SHARED_ARRAY_BUFFER, /* u.array_buffer */
-  JS_CLASS_UINT8C_ARRAY,        /* u.array (typed_array) */
-  JS_CLASS_INT8_ARRAY,          /* u.array (typed_array) */
-  JS_CLASS_UINT8_ARRAY,         /* u.array (typed_array) */
-  JS_CLASS_INT16_ARRAY,         /* u.array (typed_array) */
-  JS_CLASS_UINT16_ARRAY,        /* u.array (typed_array) */
-  JS_CLASS_INT32_ARRAY,         /* u.array (typed_array) */
-  JS_CLASS_UINT32_ARRAY,        /* u.array (typed_array) */
-#ifdef CONFIG_BIGNUM
-  JS_CLASS_BIG_INT64_ARRAY,  /* u.array (typed_array) */
-  JS_CLASS_BIG_UINT64_ARRAY, /* u.array (typed_array) */
-#endif
-  JS_CLASS_FLOAT32_ARRAY, /* u.array (typed_array) */
-  JS_CLASS_FLOAT64_ARRAY, /* u.array (typed_array) */
-  JS_CLASS_DATAVIEW,      /* u.typed_array */
-#ifdef CONFIG_BIGNUM
-  JS_CLASS_BIG_INT,   /* u.object_data */
-  JS_CLASS_BIG_FLOAT, /* u.object_data */
-  JS_CLASS_FLOAT_ENV, /* u.float_env */
-#endif
+  JS_CLASS_C_FUNCTION,               /* u.cfunc */
+  JS_CLASS_BYTECODE_FUNCTION,        /* u.func */
+  JS_CLASS_BOUND_FUNCTION,           /* u.bound_function */
+  JS_CLASS_C_FUNCTION_DATA,          /* u.c_function_data_record */
+  JS_CLASS_GENERATOR_FUNCTION,       /* u.func */
+  JS_CLASS_FOR_IN_ITERATOR,          /* u.for_in_iterator */
+  JS_CLASS_REGEXP,                   /* u.regexp */
+  JS_CLASS_ARRAY_BUFFER,             /* u.array_buffer */
+  JS_CLASS_SHARED_ARRAY_BUFFER,      /* u.array_buffer */
+  JS_CLASS_UINT8C_ARRAY,             /* u.array (typed_array) */
+  JS_CLASS_INT8_ARRAY,               /* u.array (typed_array) */
+  JS_CLASS_UINT8_ARRAY,              /* u.array (typed_array) */
+  JS_CLASS_INT16_ARRAY,              /* u.array (typed_array) */
+  JS_CLASS_UINT16_ARRAY,             /* u.array (typed_array) */
+  JS_CLASS_INT32_ARRAY,              /* u.array (typed_array) */
+  JS_CLASS_UINT32_ARRAY,             /* u.array (typed_array) */
+  JS_CLASS_FLOAT32_ARRAY,            /* u.array (typed_array) */
+  JS_CLASS_FLOAT64_ARRAY,            /* u.array (typed_array) */
+  JS_CLASS_BIG_INT64_ARRAY,          /* u.array (typed_array) */
+  JS_CLASS_BIG_UINT64_ARRAY,         /* u.array (typed_array) */
+  JS_CLASS_DATAVIEW,                 /* u.typed_array */
+  JS_CLASS_BIG_INT,                  /* u.object_data */
   JS_CLASS_MAP,                      /* u.map_state */
   JS_CLASS_SET,                      /* u.map_state */
   JS_CLASS_WEAKMAP,                  /* u.map_state */
@@ -394,9 +382,6 @@ struct LEPUSRuntime {
   QJSDebuggerCallbacks2 debugger_callbacks_;
   int32_t next_script_id;  // next script id that can be used
 #endif
-#ifdef CONFIG_BIGNUM
-  bf_context_t bf_ctx;
-#endif
   // <Primjs begin>
 #ifdef ENABLE_PRIMJS_SNAPSHOT
   bool use_primjs;
@@ -470,8 +455,7 @@ struct LEPUSClass {
 
 #define JS_MODE_STRICT (1 << 0)
 #define JS_MODE_STRIP (1 << 1)
-#define JS_MODE_BIGINT (1 << 2)
-#define JS_MODE_MATH (1 << 3)
+#define JS_MODE_MATH (1 << 2)
 
 typedef struct LEPUSStackFrame {
   struct LEPUSStackFrame *prev_frame; /* NULL if first stack frame */
@@ -514,10 +498,9 @@ enum TOK {
   TOK_AND_ASSIGN,
   TOK_XOR_ASSIGN,
   TOK_OR_ASSIGN,
-#ifdef CONFIG_BIGNUM
-  TOK_MATH_POW_ASSIGN,
-#endif
   TOK_POW_ASSIGN,
+  TOK_LAND_ASSIGN,
+  TOK_LOR_ASSIGN,
   TOK_DOUBLE_QUESTION_MARK_ASSIGN,
   TOK_DEC,
   TOK_INC,
@@ -534,9 +517,7 @@ enum TOK {
   TOK_STRICT_NEQ,
   TOK_LAND,
   TOK_LOR,
-#ifdef CONFIG_BIGNUM
   TOK_MATH_POW,
-#endif
   TOK_POW,
   TOK_ARROW,
   TOK_ELLIPSIS,
@@ -643,32 +624,6 @@ typedef struct JSVarRef {
   LEPUSValue value;   /* used when the variable is no longer on the stack */
 } JSVarRef;
 
-#ifdef CONFIG_BIGNUM
-typedef struct JSFloatEnv {
-  limb_t prec;
-  bf_flags_t flags;
-  unsigned int status;
-} JSFloatEnv;
-
-typedef struct JSBigFloat {
-  LEPUSRefCountHeader header; /* must come first, 32-bit */
-  bf_t num;
-} JSBigFloat;
-
-/* the same structure is used for big integers and big floats. Big
-   integers are never infinite or NaNs */
-#else
-#ifdef ENABLE_LEPUSNG
-// <Primjs begin>
-typedef struct JSBigFloat {
-  LEPUSRefCountHeader header; /* must come first, 32-bit */
-  uint64_t num;
-} JSBigFloat;
-
-// <Primjs end>
-#endif
-#endif
-
 /* must be large enough to have a negligible runtime cost and small
    enough to call the interrupt callback often. */
 #define JS_INTERRUPT_COUNTER_INIT 10000
@@ -724,6 +679,12 @@ struct FinalizationRegistryContext;
 struct LEPUSContext {
 #ifdef ENABLE_PRIMJS_SNAPSHOT
   address (*dispatch_table)[OP_COUNT];
+  uintptr_t top_sp;
+#endif
+
+#if defined(USE_VIRTUAL_STACK) || defined(ENABLE_PRIMJS_SNAPSHOT)
+  uint8_t *stack_limit;
+  uint8_t *stack;
 #endif
 // <primjs end>
 #ifndef ALLOCATE_WINDOWS
@@ -753,10 +714,6 @@ struct LEPUSContext {
   LEPUSValue global_var_obj; /* contains the global let/const definitions */
 
   uint64_t random_state;
-#ifdef CONFIG_BIGNUM
-  bf_context_t *bf_ctx; /* points to rt->bf_ctx, shared by all contexts */
-  JSFloatEnv fp_env;    /* global FP environment */
-#endif
   /* when the counter reaches zero, JSRutime.interrupt_handler is called */
   int interrupt_counter;
   BOOL is_error_property_enabled;
@@ -777,10 +734,6 @@ struct LEPUSContext {
   // <Primjs begin>
   int64_t napi_env;
   BOOL no_lepus_strict_mode;
-#if defined(__APPLE__) && !defined(GEN_ANDROID_EMBEDDED)
-  uint32_t stack_pos;
-  uint8_t *stack;
-#endif
 #ifdef ENABLE_QUICKJS_DEBUGGER
   LEPUSDebuggerInfo *debugger_info;  // structure for quickjs debugger
 #endif
@@ -1288,10 +1241,7 @@ struct LEPUSObject {
     struct JSArrayBuffer *array_buffer;      /* JS_CLASS_ARRAY_BUFFER,
                                                    JS_CLASS_SHARED_ARRAY_BUFFER */
     struct JSTypedArray
-        *typed_array; /* JS_CLASS_UINT8C_ARRAY..JS_CLASS_DATAVIEW */
-#ifdef CONFIG_BIGNUM
-    struct JSFloatEnv *float_env; /* JS_CLASS_FLOAT_ENV */
-#endif
+        *typed_array;             /* JS_CLASS_UINT8C_ARRAY..JS_CLASS_DATAVIEW */
     struct JSMapState *map_state; /* JS_CLASS_MAP..JS_CLASS_WEAKSET */
     struct JSMapIteratorData *map_iterator_data; /* JS_CLASS_MAP_ITERATOR,
                                                        JS_CLASS_SET_ITERATOR */
@@ -1491,9 +1441,6 @@ typedef enum {
 #define HINT_STRING 0
 #define HINT_NUMBER 1
 #define HINT_NONE 2
-#ifdef CONFIG_BIGNUM
-#define HINT_INTEGER 3
-#endif
 /* don't try Symbol.toPrimitive */
 #define HINT_FORCE_ORDINARY (1 << 4)
 
@@ -1797,8 +1744,6 @@ QJS_HIDE int js_method_set_properties(LEPUSContext *ctx,
 QJS_HIDE int js_method_set_properties_gc(LEPUSContext *ctx,
                                          LEPUSValueConst func_obj, JSAtom name,
                                          int flags, LEPUSValueConst home_obj);
-QJS_HIDE int prim_js_copy_data_properties(LEPUSContext *ctx, LEPUSValue *sp,
-                                          int mask);
 QJS_HIDE int prim_js_copy_data_properties_gc(LEPUSContext *ctx, LEPUSValue *sp,
                                              int mask);
 QJS_HIDE int JS_ToBoolFree(LEPUSContext *ctx, LEPUSValue val);
@@ -1837,10 +1782,9 @@ QJS_HIDE void prim_HeapObjStorePtr(void *dstObj, address_t offset, void *value);
 QJS_HIDE LEPUSValue js_get_length(LEPUSContext *ctx, LEPUSValueConst obj);
 QJS_HIDE LEPUSValue prim_js_op_eval(LEPUSContext *ctx, int scope_idx,
                                     LEPUSValue op1);
+QJS_HIDE LEPUSValue js_get_length(LEPUSContext *ctx, LEPUSValueConst obj);
 QJS_HIDE LEPUSValue prim_js_op_eval_gc(LEPUSContext *ctx, int scope_idx,
                                        LEPUSValue op1);
-QJS_HIDE int prim_js_with_op(LEPUSContext *ctx, LEPUSValue *sp, JSAtom atom,
-                             int is_with, int opcode);
 
 QJS_HIDE LEPUSValue JS_GetGlobalVarImpl(LEPUSContext *ctx, JSAtom prop,
                                         BOOL throw_ref_error);
@@ -1849,7 +1793,6 @@ QJS_HIDE LEPUSValue JS_GetGlobalVarImpl_GC(LEPUSContext *ctx, JSAtom prop,
 QJS_HIDE int JS_GetGlobalVarRef(LEPUSContext *ctx, JSAtom prop, LEPUSValue *sp);
 QJS_HIDE int JS_GetGlobalVarRef_GC(LEPUSContext *ctx, JSAtom prop,
                                    LEPUSValue *sp);
-QJS_HIDE LEPUSValue prim_js_for_in_start(LEPUSContext *ctx, LEPUSValue op);
 QJS_HIDE LEPUSValue prim_js_for_in_start_gc(LEPUSContext *ctx, LEPUSValue op);
 QJS_HIDE int js_for_in_next(LEPUSContext *ctx, LEPUSValue *sp);
 QJS_HIDE int js_for_in_next_gc(LEPUSContext *ctx, LEPUSValue *sp);
@@ -1862,21 +1805,12 @@ QJS_HIDE int js_for_of_start_gc(LEPUSContext *ctx, LEPUSValue *sp,
                                 BOOL is_async);
 QJS_HIDE int js_for_of_next(LEPUSContext *ctx, LEPUSValue *sp, int offset);
 QJS_HIDE int js_for_of_next_gc(LEPUSContext *ctx, LEPUSValue *sp, int offset);
-QJS_HIDE LEPUSValue *prim_js_iterator_close_return(LEPUSContext *ctx,
-                                                   LEPUSValue *sp,
-                                                   LEPUSValue *stack_buf);
 QJS_HIDE LEPUSValue *prim_js_iterator_close_return_gc(LEPUSContext *ctx,
                                                       LEPUSValue *sp);
-QJS_HIDE int prim_js_async_iterator_close(LEPUSContext *ctx, LEPUSValue *sp);
 QJS_HIDE int prim_js_async_iterator_close_gc(LEPUSContext *ctx, LEPUSValue *sp);
-QJS_HIDE int prim_js_async_iterator_get(LEPUSContext *ctx, LEPUSValue *sp,
-                                        int flags);
 QJS_HIDE int prim_js_async_iterator_get_gc(LEPUSContext *ctx, LEPUSValue *sp,
                                            int flags);
-QJS_HIDE LEPUSValue primjs_get_super_ctor(LEPUSContext *ctx, LEPUSValue op);
 QJS_HIDE LEPUSValue primjs_get_super_ctor_gc(LEPUSContext *ctx, LEPUSValue op);
-QJS_HIDE int prim_js_iterator_call(LEPUSContext *ctx, LEPUSValue *sp,
-                                   int flags);
 
 QJS_HIDE LEPUSValue JS_ToPrimitiveFree(LEPUSContext *ctx, LEPUSValue val,
                                        int hint);
@@ -1886,63 +1820,36 @@ QJS_HIDE LEPUSValue JS_ConcatString(LEPUSContext *ctx, LEPUSValue op1,
                                     LEPUSValue op2);
 QJS_HIDE LEPUSValue JS_ConcatString_GC(LEPUSContext *ctx, LEPUSValue op1,
                                        LEPUSValue op2);
-QJS_HIDE LEPUSValue prim_js_unary_arith_slow(LEPUSContext *ctx, LEPUSValue op1,
-                                             OPCodeEnum op);
 QJS_HIDE LEPUSValue prim_js_unary_arith_slow_gc(LEPUSContext *ctx,
                                                 LEPUSValue op1, OPCodeEnum op);
-QJS_HIDE LEPUSValue prim_js_add_slow(LEPUSContext *ctx, LEPUSValue op1,
-                                     LEPUSValue op2);
 QJS_HIDE LEPUSValue prim_js_add_slow_gc(LEPUSContext *ctx, LEPUSValue op1,
                                         LEPUSValue op2);
-QJS_HIDE no_inline LEPUSValue prim_js_not_slow(LEPUSContext *ctx,
-                                               LEPUSValue op);
 QJS_HIDE no_inline LEPUSValue prim_js_not_slow_gc(LEPUSContext *ctx,
                                                   LEPUSValue op);
-QJS_HIDE LEPUSValue prim_js_binary_arith_slow(LEPUSContext *ctx, LEPUSValue op1,
-                                              LEPUSValue op2, OPCodeEnum op);
 QJS_HIDE LEPUSValue prim_js_binary_arith_slow_gc(LEPUSContext *ctx,
                                                  LEPUSValue op1, LEPUSValue op2,
                                                  OPCodeEnum op);
-QJS_HIDE double prim_js_fmod_double(double a, double b);
 QJS_HIDE double prim_js_fmod_double_gc(double a, double b);
-QJS_HIDE int js_post_inc_slow(LEPUSContext *ctx, LEPUSValue *sp, OPCodeEnum op);
 QJS_HIDE int js_post_inc_slow_gc(LEPUSContext *ctx, LEPUSValue *sp,
                                  OPCodeEnum op);
-QJS_HIDE LEPUSValue prim_js_binary_logic_slow(LEPUSContext *ctx, LEPUSValue op1,
-                                              LEPUSValue op2, OPCodeEnum op);
 QJS_HIDE LEPUSValue prim_js_binary_logic_slow_gc(LEPUSContext *ctx,
                                                  LEPUSValue op1, LEPUSValue op2,
                                                  OPCodeEnum op);
-QJS_HIDE LEPUSValue prim_js_shr_slow(LEPUSContext *ctx, LEPUSValue op1,
-                                     LEPUSValue op2);
 QJS_HIDE LEPUSValue prim_js_shr_slow_gc(LEPUSContext *ctx, LEPUSValue op1,
                                         LEPUSValue op2);
-QJS_HIDE LEPUSValue prim_js_relation_slow(LEPUSContext *ctx, LEPUSValue op1,
-                                          LEPUSValue op2, OPCodeEnum op);
 QJS_HIDE LEPUSValue prim_js_relation_slow_gc(LEPUSContext *ctx, LEPUSValue op1,
                                              LEPUSValue op2, OPCodeEnum op);
-QJS_HIDE LEPUSValue prim_js_eq_slow(LEPUSContext *ctx, LEPUSValue op1,
-                                    LEPUSValue op2, int is_neq);
 QJS_HIDE LEPUSValue prim_js_eq_slow_gc(LEPUSContext *ctx, LEPUSValue op1,
                                        LEPUSValue op2, int is_neq);
-QJS_HIDE LEPUSValue prim_js_strict_eq_slow(LEPUSContext *ctx, LEPUSValue op1,
-                                           LEPUSValue op2, BOOL is_neq);
 QJS_HIDE LEPUSValue prim_js_strict_eq_slow_gc(LEPUSContext *ctx, LEPUSValue op1,
                                               LEPUSValue op2, BOOL is_neq);
-QJS_HIDE LEPUSValue prim_js_operator_instanceof(LEPUSContext *ctx,
-                                                LEPUSValue op1, LEPUSValue op2);
 QJS_HIDE LEPUSValue prim_js_operator_instanceof_gc(LEPUSContext *ctx,
                                                    LEPUSValue op1,
                                                    LEPUSValue op2);
-QJS_HIDE LEPUSValue prim_js_operator_in(LEPUSContext *ctx, LEPUSValue op1,
-                                        LEPUSValue op2);
 QJS_HIDE LEPUSValue prim_js_operator_in_gc(LEPUSContext *ctx, LEPUSValue op1,
                                            LEPUSValue op2);
-QJS_HIDE __exception int js_operator_typeof(LEPUSContext *ctx, LEPUSValue op1);
 QJS_HIDE __exception int js_operator_typeof_gc(LEPUSContext *ctx,
                                                LEPUSValue op1);
-QJS_HIDE LEPUSValue prim_js_operator_delete(LEPUSContext *ctx, LEPUSValue op1,
-                                            LEPUSValue op2);
 QJS_HIDE LEPUSValue prim_js_operator_delete_gc(LEPUSContext *ctx,
                                                LEPUSValue op1, LEPUSValue op2);
 QJS_HIDE int JS_SetPropertyInternalImpl(LEPUSContext *ctx,
@@ -1972,7 +1879,8 @@ typedef LEPUSValue (*QuickJsCallStub)(LEPUSValue this_arg,
                                       LEPUSValue func_obj, address entry_point,
                                       int argc, LEPUSValue *argv, int flags);
 
-extern QuickJsCallStub entry;
+inline QuickJsCallStub entry;
+
 QJS_HIDE void compile_function(LEPUSContext *, LEPUSFunctionBytecode *bytecode);
 #endif
 
@@ -1980,7 +1888,8 @@ QJS_HIDE void compile_function(LEPUSContext *, LEPUSFunctionBytecode *bytecode);
 
 typedef struct JSToken {
   int val;
-  int line_num; /* line number of token start */
+  int line_num; /* line number of token
+                   start */
   const uint8_t *ptr;
   union {
     struct {
@@ -1989,9 +1898,6 @@ typedef struct JSToken {
     } str;
     struct {
       LEPUSValue val;
-#ifdef CONFIG_BIGNUM
-      slimb_t exponent; /* may be != 0 only if val is a float */
-#endif
     } num;
     struct {
       JSAtom atom;
@@ -2094,7 +2000,6 @@ void JS_MarkValue_GC(LEPUSRuntime *rt, LEPUSValueConst val,
 LEPUSValue JS_NewInt64_GC(LEPUSContext *ctx, int64_t v);
 LEPUSValue JS_NewError_GC(LEPUSContext *ctx);
 
-void JS_SetVirtualStackSize_GC(LEPUSContext *ctx, uint32_t stack_size);
 int JS_ToBool_GC(LEPUSContext *ctx, LEPUSValueConst val);
 int JS_ToInt32_GC(LEPUSContext *ctx, int32_t *pres, LEPUSValueConst val);
 int JS_ToInt64_GC(LEPUSContext *ctx, int64_t *pres, LEPUSValueConst val);
@@ -2272,7 +2177,6 @@ QJS_HIDE __exception int js_iterator_get_value_done_gc(LEPUSContext *ctx,
 QJS_HIDE int JS_ToBoolFree_GC(LEPUSContext *ctx, LEPUSValue val);
 QJS_HIDE LEPUSValue JS_ToPrimitiveFree_GC(LEPUSContext *ctx, LEPUSValue val,
                                           int hint);
-QJS_HIDE LEPUSValue JS_NewBigUint64_GC(LEPUSContext *ctx, uint64_t v);
 
 QJS_HIDE void JS_VisitLEPUSValue_GC(LEPUSRuntime *rt, LEPUSValue *val,
                                     int local_idx);
@@ -2387,14 +2291,22 @@ QJS_HIDE BOOL set_object_name(JSParseState *s, JSAtom name);
 QJS_HIDE int add_scope_var(LEPUSContext *ctx, JSFunctionDef *fd, JSAtom name,
                            JSVarKindEnum var_kind);
 QJS_HIDE int add_var(LEPUSContext *ctx, JSFunctionDef *fd, JSAtom name);
-typedef struct JSHoistedDef {  // called JSGlobalVar in latest version
-  int cpool_idx;               /* -1 means variable global definition */
-  uint8_t force_init : 1;      /* initialize to undefined */
-  uint8_t is_lexical : 1;      /* global let/const definition */
+typedef struct JSHoistedDef {  // called
+                               // JSGlobalVar
+                               // in latest
+                               // version
+  int cpool_idx;               /* -1 means variable global
+                                  definition */
+  uint8_t force_init : 1;      /* initialize to
+                                  undefined */
+  uint8_t is_lexical : 1;      /* global let/const
+                                  definition */
   uint8_t is_const : 1;        /* const definition */
-  int var_idx;                 /* function object index if cpool_idx >= 0 */
+  int var_idx;                 /* function object index if
+                                  cpool_idx >= 0 */
   int scope_level;             /* scope of definition */
-  JSAtom var_name;             /* variable name if cpool_idx < 0 */
+  JSAtom var_name;             /* variable name if
+                                  cpool_idx < 0 */
 } JSHoistedDef;
 QJS_HIDE JSHoistedDef *add_hoisted_def(LEPUSContext *ctx, JSFunctionDef *s,
                                        int cpool_idx, JSAtom name, int var_idx,
@@ -2423,8 +2335,13 @@ typedef enum {
   JS_VAR_DEF_WITH,
   JS_VAR_DEF_LET,
   JS_VAR_DEF_CONST,
-  JS_VAR_DEF_FUNCTION_DECL,     /* function declaration */
-  JS_VAR_DEF_NEW_FUNCTION_DECL, /* async/generator function declaration */
+  JS_VAR_DEF_FUNCTION_DECL,     /* function
+                                   declaration
+                                 */
+  JS_VAR_DEF_NEW_FUNCTION_DECL, /* async/generator
+                                   function
+                                   declaration
+                                 */
   JS_VAR_DEF_CATCH,
   JS_VAR_DEF_VAR,
 } JSVarDefEnum;
@@ -2477,11 +2394,17 @@ QJS_HIDE int get_lvalue(JSParseState *s, int *popcode, int *pscope,
                         int tok);
 typedef enum {
   PUT_LVALUE_NOKEEP,        /* [depth] v -> */
-  PUT_LVALUE_NOKEEP_DEPTH,  /* [depth] v -> , keep depth (currently
-                               just disable optimizations) */
+  PUT_LVALUE_NOKEEP_DEPTH,  /* [depth] v -> ,
+                               keep depth
+                               (currently
+                               just disable
+                               optimizations)
+                             */
   PUT_LVALUE_KEEP_TOP,      /* [depth] v -> v */
-  PUT_LVALUE_KEEP_SECOND,   /* [depth] v0 v -> v0 */
-  PUT_LVALUE_NOKEEP_BOTTOM, /* v [depth] -> */
+  PUT_LVALUE_KEEP_SECOND,   /* [depth] v0 v ->
+                               v0 */
+  PUT_LVALUE_NOKEEP_BOTTOM, /* v [depth] ->
+                             */
 } PutLValueEnum;
 QJS_HIDE void put_lvalue(JSParseState *s, int opcode, int scope, JSAtom name,
                          int label, PutLValueEnum special, BOOL is_let);
@@ -2542,11 +2465,14 @@ QJS_HIDE int add_arg(LEPUSContext *ctx, JSFunctionDef *fd, JSAtom name);
 #ifndef NO_QUICKJS_COMPILER
 typedef struct JSParseState {
   LEPUSContext *ctx;
-  int last_line_num; /* line number of last token */
-  int line_num;      /* line number of current offset */
+  int last_line_num; /* line number of last
+                        token */
+  int line_num;      /* line number of current
+                        offset */
   const char *filename;
   JSToken token;
-  BOOL got_lf; /* true if got line feed before the current token */
+  BOOL got_lf; /* true if got line feed
+                  before the current token */
   const uint8_t *last_ptr;
   const uint8_t *buf_ptr;
   const uint8_t *buf_end;
@@ -2594,8 +2520,7 @@ typedef union json_val_uni {
   double f64;
   const char *str;
   size_t ofs;
-  LEPUSValue bigf;  // for JSON.stringify bigfloat
-  LEPUSValue num;   // for JSON.parse number
+  LEPUSValue num;  // for JSON.parse number
 } json_val_uni;
 
 struct json_val {
@@ -2662,12 +2587,10 @@ const LEPUSCFunctionListEntry js_dataview_proto_funcs[] = {
                           JS_CLASS_INT32_ARRAY),
     LEPUS_CFUNC_MAGIC_DEF("getUint32", 1, js_dataview_getValue,
                           JS_CLASS_UINT32_ARRAY),
-#ifdef CONFIG_BIGNUM
     LEPUS_CFUNC_MAGIC_DEF("getBigInt64", 1, js_dataview_getValue,
                           JS_CLASS_BIG_INT64_ARRAY),
     LEPUS_CFUNC_MAGIC_DEF("getBigUint64", 1, js_dataview_getValue,
                           JS_CLASS_BIG_UINT64_ARRAY),
-#endif
     LEPUS_CFUNC_MAGIC_DEF("getFloat32", 1, js_dataview_getValue,
                           JS_CLASS_FLOAT32_ARRAY),
     LEPUS_CFUNC_MAGIC_DEF("getFloat64", 1, js_dataview_getValue,
@@ -2684,12 +2607,10 @@ const LEPUSCFunctionListEntry js_dataview_proto_funcs[] = {
                           JS_CLASS_INT32_ARRAY),
     LEPUS_CFUNC_MAGIC_DEF("setUint32", 2, js_dataview_setValue,
                           JS_CLASS_UINT32_ARRAY),
-#ifdef CONFIG_BIGNUM
     LEPUS_CFUNC_MAGIC_DEF("setBigInt64", 2, js_dataview_setValue,
                           JS_CLASS_BIG_INT64_ARRAY),
     LEPUS_CFUNC_MAGIC_DEF("setBigUint64", 2, js_dataview_setValue,
                           JS_CLASS_BIG_UINT64_ARRAY),
-#endif
     LEPUS_CFUNC_MAGIC_DEF("setFloat32", 2, js_dataview_setValue,
                           JS_CLASS_FLOAT32_ARRAY),
     LEPUS_CFUNC_MAGIC_DEF("setFloat64", 2, js_dataview_setValue,
@@ -2697,7 +2618,6 @@ const LEPUSCFunctionListEntry js_dataview_proto_funcs[] = {
     LEPUS_PROP_STRING_DEF("[Symbol.toStringTag]", "DataView",
                           LEPUS_PROP_CONFIGURABLE),
 };
-QJS_HIDE void js_dtoa1(char *buf, double d, int radix, int n_digits, int flags);
 QJS_HIDE LEPUSValue js_closure2(LEPUSContext *ctx, LEPUSValue func_obj,
                                 LEPUSFunctionBytecode *b,
                                 JSVarRef **cur_var_refs, LEPUSStackFrame *sf);
@@ -2767,7 +2687,8 @@ typedef struct BlockEnv {
   JSAtom label_name; /* JS_ATOM_NULL if none */
   int label_break;   /* -1 if none */
   int label_cont;    /* -1 if none */
-  int drop_count;    /* number of stack elements to drop */
+  int drop_count;    /* number of stack
+                        elements to drop */
   int label_finally; /* -1 if none */
   int scope_level;
   int has_iterator;
@@ -2776,7 +2697,8 @@ typedef struct BlockEnv {
 typedef struct RelocEntry {
   struct RelocEntry *next;
   uint32_t addr; /* address to patch */
-  int size;      /* address size: 1, 2 or 4 bytes */
+  int size;      /* address size: 1, 2 or 4 bytes
+                  */
 } RelocEntry;
 
 typedef struct JumpSlot {
@@ -2788,9 +2710,12 @@ typedef struct JumpSlot {
 
 typedef struct LabelSlot {
   int ref_count;
-  int pos;  /* phase 1 address, -1 means not resolved yet */
-  int pos2; /* phase 2 address, -1 means not resolved yet */
-  int addr; /* phase 3 address, -1 means not resolved yet */
+  int pos;  /* phase 1 address, -1 means not
+               resolved yet */
+  int pos2; /* phase 2 address, -1 means not
+               resolved yet */
+  int addr; /* phase 3 address, -1 means not
+               resolved yet */
   RelocEntry *first_reloc;
 } LabelSlot;
 
@@ -2804,86 +2729,165 @@ typedef struct LineNumberSlot {
 typedef struct JSFunctionDef {
   LEPUSContext *ctx;
   struct JSFunctionDef *parent;
-  int parent_cpool_idx;   /* index in the constant pool of the parent
-                             or -1 if none */
-  int parent_scope_level; /* scope level in parent at point of definition */
-  struct list_head child_list; /* list of JSFunctionDef.link */
+  int parent_cpool_idx;        /* index in the
+                                  constant pool of
+                                  the parent   or
+                                  -1   if none */
+  int parent_scope_level;      /* scope level in
+                                  parent at point
+                                  of definition
+                                */
+  struct list_head child_list; /* list of
+                                  JSFunctionDef.link */
   struct list_head link;
 
   BOOL is_eval;         /* TRUE if eval code */
-  int eval_type;        /* only valid if is_eval = TRUE */
-  BOOL is_global_var;   /* TRUE if variables are not defined locally:
-                           eval global, eval module or non strict eval */
-  BOOL is_func_expr;    /* TRUE if function expression */
-  BOOL has_home_object; /* TRUE if the home object is available */
-  BOOL has_prototype;   /* true if a prototype field is necessary */
+  int eval_type;        /* only valid if is_eval =
+                           TRUE */
+  BOOL is_global_var;   /* TRUE if variables
+                           are not defined
+                           locally:   eval
+                           global, eval module
+                           or non strict eval
+                         */
+  BOOL is_func_expr;    /* TRUE if function
+                           expression */
+  BOOL has_home_object; /* TRUE if the home
+                           object is
+                           available */
+  BOOL has_prototype;   /* true if a prototype
+                           field is necessary
+                         */
   BOOL has_simple_parameter_list;
-  BOOL has_parameter_expressions; /* if true, an argument scope is created */
-  BOOL has_use_strict;            /* to reject directive in special cases */
-  BOOL has_eval_call; /* true if the function contains a call to eval() */
-  BOOL has_arguments_binding; /* true if the 'arguments' binding is
-                                 available in the function */
-  BOOL has_this_binding;      /* true if the 'this' and new.target binding are
-                                 available in the function */
-  BOOL new_target_allowed;    /* true if the 'new.target' does not
-                                 throw a syntax error */
-  BOOL super_call_allowed;    /* true if super() is allowed */
-  BOOL super_allowed;         /* true if super. or super[] is allowed */
-  BOOL arguments_allowed; /* true if the 'arguments' identifier is allowed */
+  BOOL has_parameter_expressions; /* if true,
+                                     an
+                                     argument
+                                     scope is
+                                     created
+                                   */
+  BOOL has_use_strict;            /* to reject directive
+                                     in special cases */
+  BOOL has_eval_call;             /* true if the
+                                     function contains a
+                                     call to eval() */
+  BOOL has_arguments_binding;     /* true if the
+                                     'arguments'
+                                     binding is
+                                     available
+                                     in the
+                                     function */
+  BOOL has_this_binding;          /* true if the
+                                     'this' and
+                                     new.target
+                                     binding are
+                                     available in the
+                                     function */
+  BOOL new_target_allowed;        /* true if the
+                                     'new.target'
+                                     does not    throw
+                                     a syntax error
+                                   */
+  BOOL super_call_allowed;        /* true if super()
+                                     is allowed */
+  BOOL super_allowed;             /* true if super. or
+                                     super[] is allowed
+                                   */
+  BOOL arguments_allowed;         /* true if the
+                                     'arguments'
+                                     identifier is
+                                     allowed */
   BOOL is_derived_class_constructor;
   BOOL in_function_body;
   JSFunctionKindEnum func_kind : 8;
   JSParseFunctionEnum func_type : 8;
   uint8_t js_mode;  /* bitmap of JS_MODE_x */
-  JSAtom func_name; /* JS_ATOM_NULL if no name */
+  JSAtom func_name; /* JS_ATOM_NULL if no
+                       name */
 
   JSVarDef *vars;
-  int var_size; /* allocated size for vars[] */
+  int var_size; /* allocated size for vars[]
+                 */
   int var_count;
   JSVarDef *args;
-  int arg_size;  /* allocated size for args[] */
+  int arg_size;  /* allocated size for args[]
+                  */
   int arg_count; /* number of arguments */
   int defined_arg_count;
-  int var_object_idx;     /* -1 if none */
-  int arg_var_object_idx; /* -1 if none (var object for the argument scope) */
-  int arguments_var_idx;  /* -1 if none */
-  int arguments_arg_idx;  /* argument variable definition in argument scope, -1
-                             if none */
-  int func_var_idx;       /* variable containing the current function (-1
-                             if none, only used if is_func_expr is true) */
-  int eval_ret_idx; /* variable containing the return value of the eval, -1 if
-                       none */
-  int this_var_idx; /* variable containg the 'this' value, -1 if none */
-  int new_target_var_idx; /* variable containg the 'new.target' value, -1 if
-                             none */
-  int this_active_func_var_idx; /* variable containg the 'this.active_func'
-                                   value, -1 if none */
+  int var_object_idx;           /* -1 if none */
+  int arg_var_object_idx;       /* -1 if none (var
+                                   object for the
+                                   argument scope)
+                                 */
+  int arguments_var_idx;        /* -1 if none */
+  int arguments_arg_idx;        /* argument
+                                   variable
+                                   definition in
+                                   argument scope,
+                                   -1  if none */
+  int func_var_idx;             /* variable containing
+                                   the current function
+                                   (-1 if none, only
+                                   used if is_func_expr
+                                   is true) */
+  int eval_ret_idx;             /* variable containing
+                                   the return value of
+                                   the eval, -1 if none
+                                 */
+  int this_var_idx;             /* variable containg the
+                                   'this' value, -1 if
+                                   none */
+  int new_target_var_idx;       /* variable
+                                   containg the
+                                   'new.target'
+                                   value, -1 if
+                                   none */
+  int this_active_func_var_idx; /* variable
+                                   containg
+                                   the
+                                   'this.active_func'
+                                   value, -1
+                                   if none
+                                 */
   int home_object_var_idx;
   BOOL need_home_object;
 
-  int scope_level; /* index into fd->scopes if the current lexical scope */
-  int scope_first; /* index into vd->vars of first lexically scoped variable */
-  int scope_size;  /* allocated size of fd->scopes array */
-  int scope_count; /* number of entries used in the fd->scopes array */
+  int scope_level; /* index into fd->scopes
+                      if the current lexical
+                      scope */
+  int scope_first; /* index into vd->vars of
+                      first lexically scoped
+                      variable */
+  int scope_size;  /* allocated size of
+                      fd->scopes array */
+  int scope_count; /* number of entries used
+                      in the fd->scopes
+                      array */
   JSVarScope *scopes;
   JSVarScope def_scope_array[4];
-  int body_scope; /* scope of the body of the function or eval */
+  int body_scope; /* scope of the body of
+                     the function or eval */
 
   int hoisted_def_count;
   int hoisted_def_size;
   JSHoistedDef *hoisted_def;
 
   DynBuf byte_code;
-  int last_opcode_pos; /* -1 if no last opcode */
+  int last_opcode_pos; /* -1 if no last
+                          opcode */
   int last_opcode_line_num;
-  BOOL use_short_opcodes; /* true if short opcodes are used in byte_code */
+  BOOL use_short_opcodes; /* true if short
+                             opcodes are used
+                             in byte_code */
 
   LabelSlot *label_slots;
-  int label_size; /* allocated size for label_slots[] */
+  int label_size; /* allocated size for
+                     label_slots[] */
   int label_count;
-  BlockEnv *top_break; /* break/continue label stack */
+  BlockEnv *top_break; /* break/continue
+                          label stack */
 
-  /* constant pool (strings, functions, numbers) */
+  /* constant pool (strings, functions,
+   * numbers) */
   LEPUSValue *cpool;
   uint32_t cpool_count;
   uint32_t cpool_size;
@@ -2921,10 +2925,12 @@ typedef struct JSFunctionDef {
   bool should_add_slot;
 
   const char *src_start;
-  char *source; /* raw source, utf-8 encoded */
+  char *source; /* raw source, utf-8 encoded
+                 */
   int source_len;
 
-  LEPUSModuleDef *module; /* != NULL when parsing a module */
+  LEPUSModuleDef *module; /* != NULL when parsing a
+                             module */
 } JSFunctionDef;
 
 QJS_HIDE int add_closure_variables(LEPUSContext *ctx, JSFunctionDef *s,
@@ -2951,8 +2957,8 @@ QJS_HIDE LEPUSValueConst JS_GetActiveFunction(LEPUSContext *ctx);
 QJS_HIDE LEPUSValue js_array_buffer_get_byteLength(LEPUSContext *,
                                                    LEPUSValueConst, int32_t);
 #ifndef NO_QUICKJS_COMPILER
-// the last two parameters are needed for qjs debugger, default value: false,
-// NULL
+// the last two parameters are needed for
+// qjs debugger, default value: false, NULL
 QJS_HIDE LEPUSValue JS_EvalInternal(LEPUSContext *, LEPUSValue, const char *,
                                     size_t, const char *, int, int,
                                     bool = false, LEPUSStackFrame * = nullptr,
@@ -3029,9 +3035,11 @@ typedef enum JSPromiseStateEnum {
 
 typedef struct JSPromiseData {
   JSPromiseStateEnum promise_state;
-  /* 0=fulfill, 1=reject, list of JSPromiseReactionData.link */
+  /* 0=fulfill, 1=reject, list of
+   * JSPromiseReactionData.link */
   struct list_head promise_reactions[2];
-  BOOL is_handled; /* Note: only useful to debug */
+  BOOL is_handled; /* Note: only useful to
+                      debug */
   LEPUSValue promise_result;
 } JSPromiseData;
 
@@ -3046,7 +3054,8 @@ typedef struct JSPromiseFunctionData {
 } JSPromiseFunctionData;
 
 typedef struct JSPromiseReactionData {
-  struct list_head link; /* not used in promise_reaction_job */
+  struct list_head link; /* not used in
+                            promise_reaction_job */
   LEPUSValue resolving_funcs[2];
   LEPUSValue handler;
 } JSPromiseReactionData;
@@ -3067,8 +3076,11 @@ typedef struct RegistryRecord {
 } RegistryRecord;
 
 typedef struct JSMapRecord {
-  int ref_count; /* used during enumeration to avoid freeing the record */
-  BOOL empty;    /* TRUE if the record is deleted */
+  int ref_count; /* used during enumeration
+                    to avoid freeing the
+                    record */
+  BOOL empty;    /* TRUE if the record is
+                    deleted */
   struct JSMapState *map;
   struct list_head link;
   struct list_head hash_link;
@@ -3238,4 +3250,81 @@ enum {
   ArrayFindLastIndex,
 };
 
+typedef enum JSToNumberHintEnum {
+  TON_FLAG_NUMBER,
+  TON_FLAG_INTEGER,
+  TON_FLAG_NUMERIC,
+} JSToNumberHintEnum;
+
+LEPUSValue js_new_string8_len(LEPUSContext *ctx, const char *buf, int32_t len);
+
+inline LEPUSValue js_new_string8(LEPUSContext *ctx, const uint8_t *buf,
+                                 int32_t len) {
+  return js_new_string8_len(ctx, reinterpret_cast<const char *>(buf), len);
+}
+
+inline LEPUSValue js_new_string8(LEPUSContext *ctx, const char *buf,
+                                 int32_t len) {
+  return js_new_string8_len(ctx, buf, len);
+}
+
+inline BOOL JS_IsBigInt(LEPUSContext *ctx, LEPUSValueConst v) {
+  return LEPUS_VALUE_GET_TAG(v) == LEPUS_TAG_BIG_INT;
+}
+
+inline BOOL tag_is_number(int64_t tag) {
+  return (tag == LEPUS_TAG_INT || tag == LEPUS_TAG_BIG_INT ||
+          tag == LEPUS_TAG_FLOAT64);
+}
+
+inline BOOL tag_is_string(uint64_t tag) {
+  return tag == LEPUS_TAG_STRING || tag == LEPUS_TAG_SEPARABLE_STRING;
+}
+
+LEPUSValue JS_ToBigIntFree(LEPUSContext *ctx, LEPUSValue val);
+
+int JS_ToBigInt64Free(LEPUSContext *ctx, int64_t *pres, LEPUSValue val);
+LEPUSValue JS_StringToBigIntErr(LEPUSContext *ctx, LEPUSValue val);
+LEPUSValue JS_StringToBigInt(LEPUSContext *ctx, LEPUSValue val);
+
+inline double js_pow(double a, double b) {
+  if (unlikely(!isfinite(b)) && fabs(a) == 1) {
+    /* not compatible with IEEE 754 */
+    return LEPUS_FLOAT64_NAN;
+  } else {
+    return pow(a, b);
+  }
+}
+
+int js_unary_arith_slow(LEPUSContext *ctx, LEPUSValue *sp, OPCodeEnum op);
+JSAtom __JS_NewAtomInit_NOGC(LEPUSRuntime *rt, const char *str, int len,
+                             int atom_type, int is_const);
+JSAtom __JS_NewAtomInit(LEPUSRuntime *rt, const char *str, int len,
+                        int atom_type, int is_const);
+int init_bigint_name(LEPUSRuntime *rt);
+void InitVirtualStack(LEPUSContext *ctx);
+uintptr_t get_thread_stack_limit();
+
+inline uintptr_t get_thread_stack_limit2() {
+  thread_local uintptr_t stack_limit = get_thread_stack_limit();
+  return stack_limit;
+}
+
+uint32_t map_hash_key(LEPUSContext *ctx, LEPUSValueConst key);
+
+#ifdef USE_VIRTUAL_STACK
+inline BOOL js_check_virtual_sp_overflow(LEPUSContext *ctx, size_t size) {
+  return (ctx->stack - size < ctx->stack_limit);
+}
+
+inline LEPUSValue *js_get_virtual_sp(LEPUSContext *ctx, size_t alloc_size) {
+  ctx->stack -= alloc_size;
+  return reinterpret_cast<LEPUSValue *>(ctx->stack);
+}
+
+inline void js_pop_virtual_sp(LEPUSContext *ctx, size_t size) {
+  ctx->stack += size;
+}
+
+#endif
 #endif  // SRC_INTERPRETER_QUICKJS_INCLUDE_QUICKJS_INNER_H_
