@@ -1284,6 +1284,9 @@ void JS_FreeRuntimeForEffect(LEPUSRuntime *rt) {
       rt->gc = nullptr;
     }
   }
+  pthread_mutex_lock(&runtime_mutex);
+  g_rt_set.erase(rt);
+  pthread_mutex_unlock(&runtime_mutex);
 }
 
 #if defined(EMSCRIPTEN)
