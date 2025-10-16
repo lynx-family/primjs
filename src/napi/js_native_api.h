@@ -501,6 +501,12 @@ struct napi_env__ {
                                      size_t script_len, const uint8_t** data,
                                      int* length);
 #endif  // ENABLE_CODECACHE
+
+  napi_status (*napi_get_instance_data_spec_compl)(napi_env env, void** data);
+
+  napi_status (*napi_set_instance_data_spec_compl)(napi_env env, void* data,
+                                                   napi_finalize finalize_cb,
+                                                   void* finalize_hint);
 };
 
 #ifdef ENABLE_CODECACHE
@@ -520,6 +526,10 @@ struct napi_env__ {
 #define NAPI_RUNTIME_CODECACHE_CALL(V)
 #define NAPI_ENGINE_CACHE_CALL(V)
 #endif  // ENABLE_CODECACHE
+
+#define NAPI_ENGINE_SPEC_CALL(V)  \
+  V(get_instance_data_spec_compl) \
+  V(set_instance_data_spec_compl)
 
 // These functions are different in JS engines
 #define FOR_EACH_NAPI_ENGINE_CALL(V)   \
@@ -627,7 +637,8 @@ struct napi_env__ {
   V(open_context_scope)                \
   V(close_context_scope)               \
   V(get_own_property_descriptor)       \
-  NAPI_ENGINE_CACHE_CALL(V)
+  NAPI_ENGINE_CACHE_CALL(V)            \
+  NAPI_ENGINE_SPEC_CALL(V)
 
 // These functions share same implementations across JS engines
 #define FOR_EACH_NAPI_ENV_CALL(V) \
