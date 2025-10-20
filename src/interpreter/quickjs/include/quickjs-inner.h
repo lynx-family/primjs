@@ -909,7 +909,7 @@ enum class EntryMode { INTERPRETER, BASELINE };
 
 // <primjs end>
 enum {
-  GC_INFO_THREADHOLD_MB = 0xFF000000,
+  GC_INFO_THRESHOLD_MB = 0xFF000000,
 };
 
 // settings key opt
@@ -3228,7 +3228,7 @@ void SetObjectCtxCheckStatus(LEPUSContext *ctx, bool enable);
 int64_t NapiAdjustExternalMemory(LEPUSRuntime *rt, int64_t size);
 
 void trig_gc(JSMallocState *s, size_t size, bool is_outer = false);
-void set_gc_info_threadhold(mstate s, uint32_t mode);
+void set_gc_info_threshold(mstate s, uint32_t mode);
 void JS_UpdateGCInfo(JSMallocState *s, size_t size);
 
 QJS_HIDE pid_t get_tid();

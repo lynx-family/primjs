@@ -28,9 +28,9 @@ void Sweeper::traverse_finalizer(bool is_only, int64_t begin_time) {
   size_t psize;
   mchunkptr p;
   uintptr_t end;
-  int64_t time_threadhold = 3000000;  // 3s
+  int64_t time_threshold = 3000000;  // 3s
   while (sp != NULL) {
-    if (is_only && get_daytime() - begin_time > time_threadhold) {
+    if (is_only && get_daytime() - begin_time > time_threshold) {
 #if defined(ANDROID) || defined(__ANDROID__)
       __android_log_print(ANDROID_LOG_ERROR, "PRIMJS_GC",
                           "only_finalizer's time > 3s, rt: %p, footprint: %zu, "

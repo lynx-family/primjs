@@ -682,7 +682,7 @@ LEPUSRuntime *JS_NewRuntime2_GC(const LEPUSMallocFunctions *mf, void *opaque,
 #else
   rt->malloc_state.allocate_state.footprint_limit = 64 * MB;
 #endif
-  set_gc_info_threadhold(&rt->malloc_state.allocate_state, mode);
+  set_gc_info_threshold(&rt->malloc_state.allocate_state, mode);
 
   /* for trace gc */
   rt->ptr_handles = new PtrHandles(rt);
@@ -33781,10 +33781,10 @@ bool CheckTools::IsValidTid(int tid) {
 void JS_UpdateGCInfo(JSMallocState *s, size_t size) {
   mstate m = &s->allocate_state;
   LEPUSRuntime *rt = static_cast<LEPUSRuntime *>(m->runtime);
-  if (m->gc_info_threadhold == 0) return;
+  if (m->gc_info_threshold == 0) return;
   m->gc_info_interval_size += size;
-  if (m->gc_info_interval_size > m->gc_info_threadhold &&
-      LEPUS_GetHeapSize(rt) > m->gc_info_threadhold) {
+  if (m->gc_info_interval_size > m->gc_info_threshold &&
+      LEPUS_GetHeapSize(rt) > m->gc_info_threshold) {
     if (rt->gc_enable) {
 #ifdef ENABLE_COMPATIBLE_MM
       rt->gc->UpdateGCInfo(0, 0);
