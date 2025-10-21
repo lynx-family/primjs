@@ -36,6 +36,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include <sstream>
 #if defined(_WIN32)
 #if defined(_MSC_VER)
 #include <BaseTsd.h>
@@ -1019,6 +1021,8 @@ LEPUSRuntime *LEPUS_NewRuntime2(const LEPUSMallocFunctions *mf, void *opaque,
   }
   rt->malloc_state = ms;
   rt->malloc_gc_threshold = 256 * 1024;
+  rt->malloc_state.allocate_state.runtime = static_cast<void *>(rt);
+  set_gc_info_threadhold(&rt->malloc_state.allocate_state, mode);
 
 #ifdef CONFIG_BIGNUM
   bf_context_init(&rt->bf_ctx, js_bf_realloc, rt);
@@ -1161,6 +1165,7 @@ QJS_STATIC inline size_t js_def_malloc_usable_size(void *ptr) {
 
 QJS_STATIC void *js_def_malloc(JSMallocState *s, size_t size,
                                int alloc_tag = 0) {
+  JS_UpdateGCInfo(s, size);
   void *ptr;
 
   /* Do not allocate zero bytes: behavior is platform dependent */
@@ -1186,6 +1191,7 @@ QJS_STATIC void js_def_free(JSMallocState *s, void *ptr) {
 
 QJS_STATIC void *js_def_realloc(JSMallocState *s, void *ptr, size_t size,
                                 int alloc_tag = 0) {
+  JS_UpdateGCInfo(s, size);
   size_t old_size;
 
   if (!ptr) {
@@ -1245,6 +1251,11 @@ LEPUSRuntime *LEPUS_NewRuntimeWithMode(uint32_t mode) {
   }
 #endif
   return LEPUS_NewRuntime2(&def_malloc_funcs, NULL, mode);
+}
+
+void set_gc_info_threadhold(mstate s, uint32_t mode) {
+  s->gc_info_threadhold = ((mode & GC_INFO_THREADHOLD_MB) >> 24) * MB;
+  s->gc_info_interval_size = 0;
 }
 
 #ifdef ENABLE_COMPATIBLE_MM
