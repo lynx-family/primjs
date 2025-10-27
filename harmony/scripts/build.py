@@ -134,7 +134,7 @@ def main(argv):
         harmony_ndk_root=f'{harmony_sdk}/openharmony/native'
         harmony_cmake = f'{harmony_ndk_root}/build-tools/cmake/bin/cmake'
         harmony_toolchain_file=f'{harmony_sdk}/hms/native/build/cmake/hmos.toolchain.cmake'
-        abis = ['arm64-v8a'] # temporarily build arm64
+        abis = ['arm64-v8a', 'x86_64'] # temporarily build arm64
         with tempfile.TemporaryDirectory() as temp_dir:
             for abi in abis:
                 # 1. create native lib dir
