@@ -3320,7 +3320,7 @@ LEPUSValue JS_GetPropertyInternalImpl_GC(LEPUSContext *ctx, LEPUSValueConst obj,
           idx = __JS_AtomToUInt32(prop);
           if (idx < separable_string->len) {
             LEPUSValue str = JS_GetSeparableStringContentNotDup_GC(ctx, obj);
-            HandleScope block_scope(ctx, &str, HANDLE_TYPE_LEPUS_VALUE);
+            ctx->ptr_handles->PushLEPUSValuePtr(str);
             return JS_GetPropertyInternalImpl_GC(ctx, str, prop, this_obj,
                                                  throw_ref_error);
           }
@@ -3396,8 +3396,10 @@ LEPUSValue JS_GetPropertyInternalImpl_GC(LEPUSContext *ctx, LEPUSValueConst obj,
         if (em) {
           if (em->get_property) {
             /* XXX: should pass throw_ref_error */
-            return em->get_property(ctx, LEPUS_MKPTR(LEPUS_TAG_OBJECT, p), prop,
-                                    this_obj);
+            LEPUSValue ret = em->get_property(
+                ctx, LEPUS_MKPTR(LEPUS_TAG_OBJECT, p), prop, this_obj);
+            ctx->ptr_handles->PushLEPUSValuePtr(ret);
+            return ret;
           }
           if (em->get_own_property) {
             LEPUSPropertyDescriptor desc;
