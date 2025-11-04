@@ -53,6 +53,17 @@ android {
         }
     }
 
+    // Add flavor configuration
+    flavorDimensions "engine"
+    productFlavors {
+        normal {
+            dimension "engine"
+        }
+        v8 {
+            dimension "engine"
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled false
@@ -84,7 +95,12 @@ android {
 
     libraryVariants.all { variant ->
         variant.outputs.all { output ->
-            outputFileName = "primjs-${variant.baseName}.aar"
+            // For normal flavor, use primjs-release.aar as output file name
+            if (variant.flavorName == "normal" && variant.buildType.name == "release") {
+                outputFileName = "primjs-release.aar"
+            } else {
+                outputFileName = "primjs-${variant.baseName}.aar"
+            }
         }
     }
 }
@@ -136,6 +152,29 @@ task removePrefabMetaFiles {
                             file.delete()
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+// Add flavor-specific so library removal logic in afterEvaluate
+afterEvaluate {
+    project.android.libraryVariants.all { variant ->
+        def variantName = variant.name
+        def mergeNativeLibsTask = project.tasks.findByName("merge${variantName.capitalize()}NativeLibs")
+
+        if (mergeNativeLibsTask != null) {
+            // Remove corresponding so libraries based on flavor type
+            if (variant.flavorName == "normal") {
+                // normal flavor needs to remove libnapi_v8.so
+                mergeNativeLibsTask.doLast {
+                    delete fileTree(dir: mergeNativeLibsTask.outputDir, includes: ["lib/*/libnapi_v8.so"])
+                }
+            } else if (variant.flavorName == "v8") {
+                // v8 flavor needs to remove libquick.so and libnapi.so
+                mergeNativeLibsTask.doLast {
+                    delete fileTree(dir: mergeNativeLibsTask.outputDir, includes: ["lib/*/libquick.so", "lib/*/libnapi.so"])
                 }
             }
         }

@@ -65,8 +65,8 @@ jobs:
       run: |-
         pushd Android
         chmod +x ./gradlew
-        ./gradlew :app:assemblerelease
-        ./gradlew :app:publish \
+        ./gradlew :app:assembleNormalRelease :app:assembleV8Release
+        ./gradlew :app:publishNormalReleasePublicationToMavenRepository :app:publishV8ReleasePublicationToMavenRepository \
         -Pversion=${{ needs.get-version.outputs.version }} \
         -Psigning.keyId=${{ secrets.SIGNING_KEY_ID }} \
         -Psigning.password=${{ secrets.SIGNING_PASSWORD }} \
@@ -96,7 +96,9 @@ jobs:
         token: ${{ secrets.GITHUB_TOKEN }}
         replacesArtifacts: true
         allowUpdates: true
-        artifacts: "Android/app/build/outputs/aar/primjs-release.aar"
+        artifacts: |
+          Android/app/build/outputs/aar/primjs-release.aar
+          Android/app/build/outputs/aar/primjs-v8-release.aar
         body: ${{ fromJSON(steps.get_release.outputs.data).body }}
         draft: ${{ fromJSON(steps.get_release.outputs.data).draft }}
         prerelease: ${{ fromJSON(steps.get_release.outputs.data).prerelease }}

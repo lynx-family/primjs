@@ -16,12 +16,21 @@ buildscript {
 }
 import org.json.simple.JSONArray
 
-def getAARPath(buildPath) {
-    FileTree fileTree = project.fileTree(dir: buildPath, includes: ['**/*.aar'])
-    if (fileTree.files) {
-        return fileTree.files[0]
+def getAARPath(buildPath, flavor = null) {
+    if (flavor == "normal") {
+        FileTree fileTree = project.fileTree(dir: buildPath, includes: ["primjs-release.aar"])
+        if (fileTree.files) {
+            return fileTree.files[0]
+        } else {
+            throw new GradleException("No aar found in the path $buildPath.")
+        }
     } else {
-        throw new GradleException("No aar found in the path $buildPath.")
+        FileTree fileTree = project.fileTree(dir: buildPath, includes: flavor ? ["**/*-${flavor}-release.aar"] : ['**/*.aar'])
+        if (fileTree.files) {
+            return fileTree.files[0]
+        } else {
+            throw new GradleException("No aar found in the path $buildPath.")
+        }
     }
 }
 
@@ -31,21 +40,24 @@ afterEvaluate {
     if (runTasks.contains("publish")) {
         publishing {
             publications {
-                release(MavenPublication) {
+                // normal flavor publishing configuration
+                normalRelease(MavenPublication) {
                     groupId ARTIFACT_GROUP
-                    artifactId ARTIFACT_NAME
+                    artifactId "${ARTIFACT_NAME}-normal"
                     version findProperty("version")
-                    artifact(getAARPath("$project.buildDir/outputs/aar"))
+                    artifact(getAARPath("$project.buildDir/outputs/aar", "normal"))
                     // Obtain all the so symbol tables of the component.
                     def soSymbolsPathMap = [:]
                     project.android.libraryVariants.all { variant ->
-                        def nativeBuildTask = project.tasks.findByName("externalNativeBuild${variant.name.capitalize()}")
-                        if (nativeBuildTask != null) {
-                            def folder = nativeBuildTask.getObjFolder()
-                            FileTree fileTree = project.fileTree(nativeBuildTask.getObjFolder())
-                            fileTree.include "**/*.so"
-                            fileTree.files.each { item ->
-                                soSymbolsPathMap[item.name[0..(item.name.lastIndexOf('.')-1)]] = item.path
+                        if (variant.flavorName == "normal") {
+                            def nativeBuildTask = project.tasks.findByName("externalNativeBuild${variant.name.capitalize()}")
+                            if (nativeBuildTask != null) {
+                                def folder = nativeBuildTask.getObjFolder()
+                                FileTree fileTree = project.fileTree(nativeBuildTask.getObjFolder())
+                                fileTree.include "**/*.so"
+                                fileTree.files.each { item ->
+                                    soSymbolsPathMap[item.name[0..(item.name.lastIndexOf('.')-1)]] = item.path
+                                }
                             }
                         }
                     }
@@ -83,7 +95,67 @@ afterEvaluate {
                             def signingPassword = findProperty("signing.password")
                             def signingSecretKey = findProperty("signing.secretKey")
                             useInMemoryPgpKeys(signingKeyId, signingSecretKey, signingPassword)
-                            sign publishing.publications.release
+                            sign publishing.publications.normalRelease
+                        }
+                    }
+                }
+
+                // v8 flavor publishing configuration
+                v8Release(MavenPublication) {
+                    groupId ARTIFACT_GROUP
+                    artifactId "${ARTIFACT_NAME}-v8"
+                    version findProperty("version")
+                    artifact(getAARPath("$project.buildDir/outputs/aar", "v8"))
+                    // Obtain all the so symbol tables of the component.
+                    def soSymbolsPathMap = [:]
+                    project.android.libraryVariants.all { variant ->
+                        if (variant.flavorName == "v8") {
+                            def nativeBuildTask = project.tasks.findByName("externalNativeBuild${variant.name.capitalize()}")
+                            if (nativeBuildTask != null) {
+                                def folder = nativeBuildTask.getObjFolder()
+                                FileTree fileTree = project.fileTree(nativeBuildTask.getObjFolder())
+                                fileTree.include "**/*.so"
+                                fileTree.files.each { item ->
+                                    soSymbolsPathMap[item.name[0..(item.name.lastIndexOf('.')-1)]] = item.path
+                                }
+                            }
+                        }
+                    }
+                    // Add so symbol tables into the component artifact.
+                    if (!soSymbolsPathMap.isEmpty()) {
+                        soSymbolsPathMap.each { name, path ->
+                            artifact(path) {
+                                classifier name
+                            }
+                        }
+                    }
+                    pom {
+                        name = artifactId
+                        url = REPOSITORY_URL
+                        description = DESCRIPTION
+                        licenses {
+                            license {
+                                name = 'The Apache License, Version 2.0'
+                                url = 'http://www.apache.org/licenses/LICENSE-2.0.txt'
+                            }
+                        }
+                        developers {
+                            developer {
+                                name = DEVELOPER_NAME
+                                email = DEVELOPER_EMAIL
+                            }
+                        }
+                        scm {
+                            url = REPOSITORY_URL
+                            connection = "scm:git:git://$REPOSITORY_SSH_URL"
+                            developerConnection = "scm:git:ssh://$REPOSITORY_SSH_URL"
+                        }
+                        signing {
+                            def signingKeyId = findProperty("signing.keyId")
+                            def signingPassword = findProperty("signing.password")
+                            def signingSecretKey = findProperty("signing.secretKey")
+                            useInMemoryPgpKeys(signingKeyId, signingSecretKey, signingPassword)
+                            sign publishing.publications.v8Release
                         }
                     }
                 }
