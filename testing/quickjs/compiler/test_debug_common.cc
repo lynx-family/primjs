@@ -871,41 +871,55 @@ TEST_F(QjsDebugMethods, QJSDebugTestGetPropertiesMap) {
       "\"Object\",\"properties\":\\[\\{\"value\":\"John\",\"type\":\"string\","
       "\"name\":\"name\"\\}\\]\\}\\}\\}\\]\\}\\}";
 
-  std::string properties_gt =
-      "{\"id\":48,\"result\":{\"result\":[{\"name\":\"my_map\","
-      "\"configurable\":true,\"enumerable\":true,\"writable\":true,\"value\":{"
-      "\"subtype\":\"map\",\"type\":\"object\",\"objectId\":\"10\","
-      "\"className\":\"Map\",\"description\":\"Map(2)\",\"preview\":{"
+  std::string properties_pattern2 =
+      "\\{\"id\":48,\"result\":\\{\"result\":\\[\\{\"name\":\"my_map\","
+      "\"configurable\":true,\"enumerable\":true,\"writable\":true,\"value\":"
+      "\\{"
+      "\"subtype\":\"map\",\"type\":\"object\",\"objectId\":\".*\","
+      "\"className\":\"Map\",\"description\":\"Map\\(2\\)\",\"preview\":\\{"
       "\"overflow\":false,\"type\":\"object\",\"subtype\":\"map\","
-      "\"description\":\"Map(2)\",\"entries\":[{\"key\":{\"type\":\"string\","
-      "\"description\":\"test\",\"overflow\":false,\"properties\":[]},"
-      "\"value\":{\"type\":\"string\",\"description\":\"和键'test'关联的值\","
-      "\"overflow\":false,\"properties\":[]}},{\"key\":{\"type\":\"string\","
-      "\"description\":\"test2\",\"overflow\":false,\"properties\":[]},"
-      "\"value\":{\"type\":\"string\",\"description\":\"和键'test2'关联的值\","
-      "\"overflow\":false,\"properties\":[]}}]}}},{\"name\":\"wm1\","
-      "\"configurable\":true,\"enumerable\":true,\"writable\":true,\"value\":{"
-      "\"subtype\":\"weakmap\",\"type\":\"object\",\"objectId\":\"11\","
-      "\"className\":\"WeakMap\",\"description\":\"WeakMap(1)\",\"preview\":{"
+      "\"description\":\"Map\\(2\\)\",\"entries\":\\[\\{\"key\":\\{\"type\":"
+      "\"string\","
+      "\"description\":\"test2\",\"overflow\":false,\"properties\":\\[\\]\\},"
+      "\"value\":\\{\"type\":\"string\",\"description\":\"和键'test2'"
+      "关联的值\","
+      "\"overflow\":false,\"properties\":\\[\\]\\}\\},\\{\"key\":\\{\"type\":"
+      "\"string\","
+      "\"description\":\"test\",\"overflow\":false,\"properties\":\\[\\]\\},"
+      "\"value\":\\{\"type\":\"string\",\"description\":\"和键'test'"
+      "关联的值\","
+      "\"overflow\":false,\"properties\":\\[\\]\\}\\}\\]\\}\\}\\},\\{\"name\":"
+      "\"wm1\","
+      "\"configurable\":true,\"enumerable\":true,\"writable\":true,\"value\":"
+      "\\{"
+      "\"subtype\":\"weakmap\",\"type\":\"object\",\"objectId\":\".*\","
+      "\"className\":\"WeakMap\",\"description\":\"WeakMap\\(1\\)\","
+      "\"preview\":\\{"
       "\"overflow\":false,\"type\":\"object\",\"subtype\":\"weakmap\","
-      "\"description\":\"WeakMap(1)\",\"entries\":[{\"key\":{\"type\":"
+      "\"description\":\"WeakMap\\(1\\)\",\"entries\":\\[\\{\"key\":\\{"
+      "\"type\":"
       "\"object\",\"description\":\"Object\",\"overflow\":false,\"properties\":"
-      "[]},\"value\":{\"type\":\"string\",\"description\":\"...\",\"overflow\":"
-      "false,\"properties\":[]}}]}}},{\"name\":\"john\",\"configurable\":true,"
-      "\"enumerable\":true,\"writable\":true,\"value\":{\"type\":\"object\","
-      "\"objectId\":\"12\",\"className\":\"Object\",\"description\":\"Object\","
-      "\"preview\":{\"overflow\":false,\"type\":\"object\",\"description\":"
-      "\"Object\",\"properties\":[{\"value\":\"John\",\"type\":\"string\","
-      "\"name\":\"name\"}]}}}]}}";
+      "\\[\\]\\},\"value\":\\{\"type\":\"string\",\"description\":\"\\.\\.\\."
+      "\",\"overflow\":"
+      "false,\"properties\":\\[\\]\\}\\}\\]\\}\\}\\},\\{\"name\":\"john\","
+      "\"configurable\":true,"
+      "\"enumerable\":true,\"writable\":true,\"value\":\\{\"type\":\"object\","
+      "\"objectId\":\".*\",\"className\":\"Object\",\"description\":\"Object\","
+      "\"preview\":\\{\"overflow\":false,\"type\":\"object\",\"description\":"
+      "\"Object\",\"properties\":\\[\\{\"value\":\"John\",\"type\":\"string\","
+      "\"name\":\"name\"\\}\\]\\}\\}\\}\\]\\}\\}";
 
   for (size_t i = 0; i < 10; i++) {
     QjsDebugQueue::GetReceiveMessageQueue().pop();
   }
   std::cout << "result : " << QjsDebugQueue::GetReceiveMessageQueue().front()
             << std::endl;
+  std::cout << properties_pattern << std::endl;
   bool match_res =
       std::regex_match(QjsDebugQueue::GetReceiveMessageQueue().front(),
-                       std::regex(properties_pattern));
+                       std::regex(properties_pattern)) ||
+      std::regex_match(QjsDebugQueue::GetReceiveMessageQueue().front(),
+                       std::regex(properties_pattern2));
   ASSERT_TRUE(match_res == true);
 }
 

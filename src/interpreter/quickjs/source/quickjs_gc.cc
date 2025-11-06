@@ -21465,11 +21465,13 @@ static LEPUSValue js_map_constructor(LEPUSContext *ctx,
   init_list_head(&s->records);
   s->is_weak = is_weak;
   LEPUS_SetOpaque(obj, s);
-  s->hash_size = 1;
+  s->hash_bits = 1;
+  s->hash_size = 1U << s->hash_bits;
   s->hash_table = static_cast<struct list_head *>(lepus_malloc(
       ctx, sizeof(s->hash_table[0]) * s->hash_size, ALLOC_TAG_WITHOUT_PTR));
   if (!s->hash_table) goto fail;
   init_list_head(&s->hash_table[0]);
+  init_list_head(&s->hash_table[1]);
   s->record_count_threshold = 4;
 
   arr = LEPUS_UNDEFINED;
@@ -21558,7 +21560,7 @@ static JSMapRecord *map_find_record(LEPUSContext *ctx, JSMapState *s,
   JSMapRecord *mr;
   uint32_t h;
 
-  h = map_hash_key(ctx, key) & (s->hash_size - 1);
+  h = map_hash_key(ctx, key, s->hash_bits);
   list_for_each_safe(el, el1, &s->hash_table[h]) {
     mr = list_entry(el, JSMapRecord, hash_link);
     if (js_same_value_zero(ctx, mr->key, key)) return mr;
@@ -21567,16 +21569,14 @@ static JSMapRecord *map_find_record(LEPUSContext *ctx, JSMapState *s,
 }
 
 static void map_hash_resize(LEPUSContext *ctx, JSMapState *s) {
-  uint32_t new_hash_size, i, h;
+  uint32_t new_hash_size, i, h, new_hash_bits;
   size_t slack;
   struct list_head *new_hash_table, *el;
   JSMapRecord *mr;
 
   /* XXX: no reporting of memory allocation failure */
-  if (s->hash_size == 1)
-    new_hash_size = 4;
-  else
-    new_hash_size = s->hash_size * 2;
+  new_hash_bits = min_int(s->hash_bits + 1, 31);
+  new_hash_size = 1U << new_hash_bits;
   new_hash_table = static_cast<struct list_head *>(lepus_realloc2(
       ctx, s->hash_table, sizeof(new_hash_table[0]) * new_hash_size, &slack,
       ALLOC_TAG_WITHOUT_PTR));
@@ -21589,12 +21589,13 @@ static void map_hash_resize(LEPUSContext *ctx, JSMapState *s) {
   list_for_each(el, &s->records) {
     mr = list_entry(el, JSMapRecord, link);
     if (!mr->empty) {
-      h = map_hash_key(ctx, mr->key) & (new_hash_size - 1);
+      h = map_hash_key(ctx, mr->key, new_hash_bits);
       list_add_tail(&mr->hash_link, &new_hash_table[h]);
     }
   }
   s->hash_table = new_hash_table;
   s->hash_size = new_hash_size;
+  s->hash_bits = new_hash_bits;
   s->record_count_threshold = new_hash_size * 2;
 }
 
@@ -21625,7 +21626,7 @@ static JSMapRecord *map_add_record(LEPUSContext *ctx, JSMapState *s,
     insert_weakref_record(LEPUS_VALUE_GET_OBJ(key), wr);
   }
   mr->key = (LEPUSValue)key;
-  h = map_hash_key(ctx, key) & (s->hash_size - 1);
+  h = map_hash_key(ctx, key, s->hash_bits);
   list_add_tail(&mr->hash_link, &s->hash_table[h]);
   list_add_tail(&mr->link, &s->records);
   s->record_count++;

@@ -256,14 +256,13 @@ QJS_HIDE JSMapRecord* DebuggerMapFindIndex(LEPUSContext* ctx,
   auto* s = static_cast<JSMapState*>(
       LEPUS_GetOpaque2(ctx, this_val, JS_CLASS_MAP + magic));
   struct list_head* el;
-  JSMapRecord* mr;
   int32_t num = 0;
-  list_for_each(el, s->hash_table) {
-    if (num == index) {
-      mr = list_entry(el, JSMapRecord, hash_link);
-      return mr;
-    } else {
-      num++;
+  for (size_t i = 0; i < s->hash_size; ++i) {
+    list_for_each(el, &s->hash_table[i]) {
+      if (num == index) {
+        return list_entry(el, JSMapRecord, hash_link);
+      }
+      ++num;
     }
   }
   return NULL;
@@ -504,29 +503,33 @@ static LEPUSValue GetMapSetProperties(LEPUSContext* ctx, LEPUSValue obj,
   func_scope.PushHandle(&key_value, HANDLE_TYPE_LEPUS_VALUE);
   func_scope.PushHandle(&key_ret, HANDLE_TYPE_LEPUS_VALUE);
   func_scope.PushHandle(&value_ret, HANDLE_TYPE_LEPUS_VALUE);
-  for (int32_t i = 0; i < size; i++) {
-    struct JSMapRecord* record = DebuggerMapFindIndex(ctx, obj, i, magic);
-    if (!record) {
-      continue;
+  auto* s = static_cast<JSMapState*>(
+      LEPUS_GetOpaque2(ctx, obj, JS_CLASS_MAP + magic));
+  size_t i = 0;
+  for (auto j = 0; j < s->hash_size; ++j) {
+    list_head* el;
+    list_for_each(el, &s->hash_table[j]) {
+      auto* record = list_entry(el, JSMapRecord, hash_link);
+      key_value = LEPUS_NewObject(ctx);
+      LEPUSValue key = LEPUS_DupValue(ctx, record->key);      // dup
+      LEPUSValue value = LEPUS_DupValue(ctx, record->value);  // dup
+      key_ret = callback(ctx, key, LEPUS_PROP_WRITABLE, LEPUS_PROP_CONFIGURABLE,
+                         LEPUS_PROP_ENUMERABLE);  // free key
+      if (LEPUS_IsUndefined(value)) {
+        // set/weakset: value
+        DebuggerSetPropertyStr(ctx, key_value, "value", key_ret);
+      } else {
+        // map/weakmap: key-value
+        value_ret =
+            callback(ctx, value, LEPUS_PROP_WRITABLE, LEPUS_PROP_CONFIGURABLE,
+                     LEPUS_PROP_ENUMERABLE);  // free value
+        DebuggerSetPropertyStr(ctx, key_value, "key", key_ret);
+        DebuggerSetPropertyStr(ctx, key_value, "value", value_ret);
+      }
+      LEPUS_SetPropertyUint32(ctx, result, i++, key_value);
     }
-    key_value = LEPUS_NewObject(ctx);
-    LEPUSValue key = LEPUS_DupValue(ctx, record->key);      // dup
-    LEPUSValue value = LEPUS_DupValue(ctx, record->value);  // dup
-    key_ret = callback(ctx, key, LEPUS_PROP_WRITABLE, LEPUS_PROP_CONFIGURABLE,
-                       LEPUS_PROP_ENUMERABLE);  // free key
-    if (LEPUS_IsUndefined(value)) {
-      // set/weakset: value
-      DebuggerSetPropertyStr(ctx, key_value, "value", key_ret);
-    } else {
-      // map/weakmap: key-value
-      value_ret =
-          callback(ctx, value, LEPUS_PROP_WRITABLE, LEPUS_PROP_CONFIGURABLE,
-                   LEPUS_PROP_ENUMERABLE);  // free value
-      DebuggerSetPropertyStr(ctx, key_value, "key", key_ret);
-      DebuggerSetPropertyStr(ctx, key_value, "value", value_ret);
-    }
-    LEPUS_SetPropertyUint32(ctx, result, i, key_value);
   }
+
   return result;
 }
 

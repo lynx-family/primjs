@@ -44055,11 +44055,13 @@ QJS_STATIC LEPUSValue js_map_constructor(LEPUSContext *ctx,
   init_list_head(&s->records);
   s->is_weak = is_weak;
   LEPUS_SetOpaque(obj, s);
-  s->hash_size = 1;
+  s->hash_bits = 1;
+  s->hash_size = 1U << s->hash_bits;
   s->hash_table = static_cast<struct list_head *>(
       lepus_malloc(ctx, sizeof(s->hash_table[0]) * s->hash_size));
   if (!s->hash_table) goto fail;
   init_list_head(&s->hash_table[0]);
+  init_list_head(&s->hash_table[1]);
   s->record_count_threshold = 4;
 
   arr = LEPUS_UNDEFINED;
@@ -44155,26 +44157,52 @@ void LEPUS_FreeRefCountedWeakRef(LEPUSRuntime *rt,
                                  struct JSMapRecord *first_mr) {}
 #endif
 
-/* XXX: better hash ? */
-uint32_t map_hash_key(LEPUSContext *ctx, LEPUSValueConst key) {
+/* hash multipliers, same as the Linux kernel (see Knuth vol 3,
+   section 6.4, exercise 9) */
+#define HASH_MUL32 0x61C88647
+#define HASH_MUL64 UINT64_C(0x61C8864680B583EB)
+
+static uint32_t map_hash32(uint32_t a, int hash_bits) {
+  return (a * HASH_MUL32) >> (32 - hash_bits);
+}
+
+static uint32_t map_hash64(uint64_t a, int hash_bits) {
+  return (a * HASH_MUL64) >> (64 - hash_bits);
+}
+
+static uint32_t map_hash_pointer(uintptr_t a, int hash_bits) {
+#ifdef LEPUS_PTR64
+  return map_hash64(a, hash_bits);
+#else
+  return map_hash32(a, hash_bits);
+#endif
+}
+
+/* precondition: 1 <= hash_bits <= 32 */
+uint32_t map_hash_key(LEPUSContext *ctx, LEPUSValueConst key,
+                      uint32_t hash_bits) {
   int64_t tag = LEPUS_VALUE_GET_NORM_TAG(key);
   uint32_t h;
   double d;
-  JSFloat64Union u;
+  JSBigInt *p;
+  JSBigIntBuf buf;
 
   switch (tag) {
     case LEPUS_TAG_BOOL:
-      h = LEPUS_VALUE_GET_BOOL(key);
+      h = map_hash32(LEPUS_VALUE_GET_BOOL(key) ^ LEPUS_TAG_BOOL, hash_bits);
       break;
     case LEPUS_TAG_SEPARABLE_STRING:
       key = JS_GetSeparableStringContentNotDup(ctx, key);
     case LEPUS_TAG_STRING:
-      h = hash_string(LEPUS_VALUE_GET_STRING(key), 0);
-      return h ^ LEPUS_TAG_STRING;
+      h = map_hash32(
+          hash_string(LEPUS_VALUE_GET_STRING(key), 0) ^ LEPUS_TAG_STRING,
+          hash_bits);
+      break;
     case LEPUS_TAG_OBJECT:
     case LEPUS_TAG_LEPUS_CPOINTER:
     case LEPUS_TAG_SYMBOL:
-      h = (uintptr_t)LEPUS_VALUE_GET_PTR(key) * 3163;
+      h = map_hash_pointer((uintptr_t)LEPUS_VALUE_GET_PTR(key) ^ tag,
+                           hash_bits);
       break;
     case LEPUS_TAG_INT:
       d = LEPUS_VALUE_GET_INT(key);
@@ -44184,23 +44212,25 @@ uint32_t map_hash_key(LEPUSContext *ctx, LEPUSValueConst key) {
       /* normalize the NaN */
       if (isnan(d)) d = LEPUS_FLOAT64_NAN;
     hash_float64:
-      u.d = d;
-      h = (u.u32[0] ^ u.u32[1]) * 3163;
-      return h ^ LEPUS_TAG_FLOAT64;
-    case LEPUS_TAG_BIG_INT: {
-      JSBigInt *p = LEPUS_VALUE_GET_BIGINT(key);
-      int32_t i = 0;
-      h = 1;
-      for (i = p->len - 1; i >= 0; i--) {
-        h = h * 263 + p->tab[i];
+      h = map_hash64(float64_as_uint64(d) ^ LEPUS_TAG_FLOAT64, hash_bits);
+      break;
+    case LEPUS_TAG_BIG_INT:
+      p = LEPUS_VALUE_GET_BIGINT(key);
+      {
+        int i;
+        h = 1;
+        for (i = p->len - 1; i >= 0; i--) {
+          h = h * 263 + p->tab[i];
+        }
+        /* the final step is necessary otherwise h mod n only
+           depends of p->tab[i] mod n */
+        h = map_hash32(h ^ LEPUS_TAG_BIG_INT, hash_bits);
       }
-      h *= 3163;
-    } break;
+      break;
     default:
       h = 0;
       break;
   }
-  h ^= tag;
   return h;
 }
 
@@ -44209,7 +44239,7 @@ QJS_STATIC JSMapRecord *map_find_record(LEPUSContext *ctx, JSMapState *s,
   struct list_head *el, *el1;
   JSMapRecord *mr;
   uint32_t h;
-  h = map_hash_key(ctx, key) & (s->hash_size - 1);
+  h = map_hash_key(ctx, key, s->hash_bits);
   list_for_each_safe(el, el1, &s->hash_table[h]) {
     mr = list_entry(el, JSMapRecord, hash_link);
     if (js_same_value_zero(ctx, mr->key, key)) return mr;
@@ -44218,16 +44248,14 @@ QJS_STATIC JSMapRecord *map_find_record(LEPUSContext *ctx, JSMapState *s,
 }
 
 QJS_STATIC void map_hash_resize(LEPUSContext *ctx, JSMapState *s) {
-  uint32_t new_hash_size, i, h;
+  uint32_t new_hash_size, i, h, new_hash_bits;
   size_t slack;
   struct list_head *new_hash_table, *el;
   JSMapRecord *mr;
 
   /* XXX: no reporting of memory allocation failure */
-  if (s->hash_size == 1)
-    new_hash_size = 4;
-  else
-    new_hash_size = s->hash_size * 2;
+  new_hash_bits = min_int(s->hash_bits + 1, 31);
+  new_hash_size = 1U << new_hash_bits;
   new_hash_table = static_cast<struct list_head *>(lepus_realloc2(
       ctx, s->hash_table, sizeof(new_hash_table[0]) * new_hash_size, &slack));
   if (!new_hash_table) return;
@@ -44238,12 +44266,13 @@ QJS_STATIC void map_hash_resize(LEPUSContext *ctx, JSMapState *s) {
   list_for_each(el, &s->records) {
     mr = list_entry(el, JSMapRecord, link);
     if (!mr->empty) {
-      h = map_hash_key(ctx, mr->key) & (new_hash_size - 1);
+      h = map_hash_key(ctx, mr->key, new_hash_bits);
       list_add_tail(&mr->hash_link, &new_hash_table[h]);
     }
   }
   s->hash_table = new_hash_table;
   s->hash_size = new_hash_size;
+  s->hash_bits = new_hash_bits;
   s->record_count_threshold = new_hash_size * 2;
 }
 
@@ -44273,7 +44302,7 @@ QJS_STATIC JSMapRecord *map_add_record(LEPUSContext *ctx, JSMapState *s,
     LEPUS_DupValue(ctx, key);
   }
   mr->key = (LEPUSValue)key;
-  h = map_hash_key(ctx, key) & (s->hash_size - 1);
+  h = map_hash_key(ctx, key, s->hash_bits);
   list_add_tail(&mr->hash_link, &s->hash_table[h]);
   list_add_tail(&mr->link, &s->records);
   s->record_count++;

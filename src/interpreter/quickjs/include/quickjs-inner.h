@@ -430,9 +430,10 @@ static const char *const native_error_name[JS_NATIVE_ERROR_COUNT] = {
 typedef struct JSMapState {
   BOOL is_weak;             /* TRUE if WeakSet/WeakMap */
   struct list_head records; /* list of JSMapRecord.link */
-  uint32_t record_count;
   struct list_head *hash_table;
-  uint32_t hash_size;              /* must be a power of two */
+  uint32_t hash_bits;
+  uint32_t hash_size; /* must be a power of two */
+  uint32_t record_count;
   uint32_t record_count_threshold; /* count at which a hash table
                                       resize is needed */
 } JSMapState;
@@ -3196,7 +3197,8 @@ inline uintptr_t get_thread_stack_limit2() {
   return stack_limit;
 }
 
-uint32_t map_hash_key(LEPUSContext *ctx, LEPUSValueConst key);
+uint32_t map_hash_key(LEPUSContext *ctx, LEPUSValueConst key,
+                      uint32_t hash_bits);
 
 #ifdef ENABLE_VIRTUAL_STACK
 
