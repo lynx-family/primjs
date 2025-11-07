@@ -1041,6 +1041,7 @@ int js_bigint_cmp(LEPUSContext *ctx, const JSBigInt *a, const JSBigInt *b) {
 JSBigInt *js_bigint_from_string(LEPUSContext *ctx, const char *str, int radix) {
   const char *p = str;
   int is_neg, log2_radix;
+  size_t n_digits1;
   size_t n_digits, n_bits, len, i, n_limbs;
   JSBigInt *r;
   js_limb_t v, c, h;
@@ -1051,10 +1052,16 @@ JSBigInt *js_bigint_from_string(LEPUSContext *ctx, const char *str, int radix) {
     p++;
   }
   while (*p == '0') p++;
-  n_digits = strlen(p);
+  n_digits1 = strlen(p);
+  /* the real check for overflox is done js_bigint_new(). Here
+     we just avoid integer overflow */
+  if (n_digits1 > JS_BIGINT_MAX_SIZE * JS_LIMB_BITS) {
+    LEPUS_ThrowRangeError(ctx, "BigInt is too large to allocate");
+    return nullptr;
+  }
+  n_digits = n_digits1;
   log2_radix = 32 - clz32(radix - 1); /* ceil(log2(radix)) */
   /* compute the maximum number of limbs */
-  /* XXX: overflow */
   if (radix == 10) {
     n_bits = (n_digits * 27 + 7) / 8; /* >= ceil(n_digits * log2(10)) */
   } else {
@@ -1484,11 +1491,9 @@ LEPUSValue js_bigint_to_string1(LEPUSContext *ctx, LEPUSValueConst val,
       bit_pos = i * log2_radix;
       pos = bit_pos / JS_LIMB_BITS;
       shift = bit_pos % JS_LIMB_BITS;
-      if (likely((shift + log2_radix) <= JS_LIMB_BITS)) {
-        c = r->tab[pos] >> shift;
-      } else {
-        c = (r->tab[pos] >> shift) |
-            (r->tab[pos + 1] << (JS_LIMB_BITS - shift));
+      c = r->tab[pos] >> shift;
+      if ((shift + log2_radix) > JS_LIMB_BITS && (pos + 1) < r->len) {
+        c |= r->tab[pos + 1] << (JS_LIMB_BITS - shift);
       }
       c &= (radix - 1);
       *--q = digits[c];
