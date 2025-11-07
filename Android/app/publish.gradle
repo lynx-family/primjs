@@ -43,7 +43,7 @@ afterEvaluate {
                 // normal flavor publishing configuration
                 normalRelease(MavenPublication) {
                     groupId ARTIFACT_GROUP
-                    artifactId "${ARTIFACT_NAME}-normal"
+                    artifactId "${ARTIFACT_NAME}"
                     version findProperty("version")
                     artifact(getAARPath("$project.buildDir/outputs/aar", "normal"))
                     // Obtain all the so symbol tables of the component.
