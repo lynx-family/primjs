@@ -110,6 +110,7 @@ config("napi_public_config") {
     ".",
     "./src",
     "./src/napi",
+    "./src/napi/adapter",
     "./src/napi/common",
     "./src/napi/env",
     "./src/napi/internal",
