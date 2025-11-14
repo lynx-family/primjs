@@ -319,7 +319,12 @@ QJS_STATIC inline BOOL __JS_AtomIsConst(JSAtom v) {
 static const int NUM_OF_LEPUSREF = 20000;
 static const int UPDATE_GC_INFO_TIMES = 1;
 static pthread_mutex_t runtime_mutex = PTHREAD_MUTEX_INITIALIZER;
-static std::unordered_set<LEPUSRuntime *> g_rt_set;
+
+static std::unordered_set<LEPUSRuntime *> *js_get_rt_set() {
+  static std::unordered_set<LEPUSRuntime *> *g_rt_set =
+      new std::unordered_set<LEPUSRuntime *>();
+  return g_rt_set;
+}
 
 // <Primjs begin>
 #ifdef ENABLE_LEPUSNG
@@ -754,7 +759,7 @@ LEPUSRuntime *JS_NewRuntime2_GC(const LEPUSMallocFunctions *mf, void *opaque,
   // Primjs end
 
   pthread_mutex_lock(&runtime_mutex);
-  g_rt_set.insert(rt);
+  js_get_rt_set()->insert(rt);
   pthread_mutex_unlock(&runtime_mutex);
 
   return rt;
@@ -1154,7 +1159,8 @@ QJS_STATIC inline JSAtomStruct *atom_set_free(uint32_t v) {
 
 void JS_FreeRuntime_GC(LEPUSRuntime *rt) {
   pthread_mutex_lock(&runtime_mutex);
-  g_rt_set.erase(rt);
+  std::unordered_set<LEPUSRuntime *> *g_rt_set = js_get_rt_set();
+  if (g_rt_set->find(rt) != g_rt_set->end()) g_rt_set->erase(rt);
   pthread_mutex_unlock(&runtime_mutex);
   rt->gc->DoOnlyFinalizer();
 #if defined(ENABLE_GC_DEBUG_TOOLS) && (defined(ANDROID) || defined(__ANDROID__))
@@ -1252,6 +1258,10 @@ void JS_FreeRuntime_GC(LEPUSRuntime *rt) {
 }
 
 void JS_FreeRuntimeForEffect(LEPUSRuntime *rt) {
+  pthread_mutex_lock(&runtime_mutex);
+  std::unordered_set<LEPUSRuntime *> *g_rt_set = js_get_rt_set();
+  if (g_rt_set->find(rt) != g_rt_set->end()) g_rt_set->erase(rt);
+  pthread_mutex_unlock(&runtime_mutex);
   /* free the classes */
   rt->class_count = 0;
   rt->class_array = NULL;
@@ -1284,9 +1294,6 @@ void JS_FreeRuntimeForEffect(LEPUSRuntime *rt) {
       rt->gc = nullptr;
     }
   }
-  pthread_mutex_lock(&runtime_mutex);
-  g_rt_set.erase(rt);
-  pthread_mutex_unlock(&runtime_mutex);
 }
 
 #if defined(EMSCRIPTEN)
@@ -32008,9 +32015,10 @@ void GarbageCollector::UpdateGCInfo(size_t heapsize_before, int64_t duration) {
             << "  \"gc_info\": [\n";
   }
   pthread_mutex_lock(&runtime_mutex);
-  size_t rt_num = g_rt_set.size();
+  std::unordered_set<LEPUSRuntime *> *g_rt_set = js_get_rt_set();
+  size_t rt_num = g_rt_set->size();
   size_t total_mem = 0;
-  for (auto it : g_rt_set) {
+  for (auto it : *g_rt_set) {
     total_mem += it->malloc_state.allocate_state.footprint;
   }
   pthread_mutex_unlock(&runtime_mutex);
