@@ -14,6 +14,7 @@
 #include <pthread.h>
 #endif
 
+#include <atomic>
 #include <cassert>
 #include <cstdlib>
 #include <future>

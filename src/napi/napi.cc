@@ -10,6 +10,8 @@
 // LICENSE file in the root directory of this source tree.
 #include "napi.h"
 
+#include <cstdlib>
+
 ////////////////////////////////////////////////////////////////////////////////
 // N-API C++ Wrapper Classes
 //

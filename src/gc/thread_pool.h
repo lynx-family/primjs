@@ -22,6 +22,7 @@
 
 #ifndef _WIN32
 #include <pthread.h>
+#include <unistd.h>
 #endif
 
 #include <atomic>
@@ -29,6 +30,7 @@
 #include <functional>
 #include <mutex>
 #include <queue>
+#include <string>
 
 class ByteTask {
  public:
