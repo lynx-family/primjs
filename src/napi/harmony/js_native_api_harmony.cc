@@ -840,10 +840,14 @@ static napi_status napi_wrap(napi_env env, napi_value js_object,
 
 static napi_status napi_unwrap(napi_env env, napi_value js_object,
                                void **result) {
-  ExternalNativeInfo *napi_finalizer;
-  CALL_JSVM(OH_JSVM_Unwrap(env->ctx->vm_env_, NapiValueToJS(js_object),
-                           (void **)&napi_finalizer));
-  *result = napi_finalizer ? (void *)napi_finalizer->Data() : nullptr;
+  if (result == nullptr) return napi_clear_last_error(env);
+  ExternalNativeInfo *napi_finalizer = nullptr;
+  *result = nullptr;
+  auto status = OH_JSVM_Unwrap(env->ctx->vm_env_, NapiValueToJS(js_object),
+                               (void **)&napi_finalizer);
+  if (status == JSVM_OK && napi_finalizer) {
+    *result = (void *)napi_finalizer->Data();
+  }
   return napi_clear_last_error(env);
 }
 
