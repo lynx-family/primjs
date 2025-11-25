@@ -553,16 +553,15 @@ napi_status napi_add_finalizer_primjs(napi_env env, napi_value js_object,
                                  finalize_hint, result);
 }
 
-napi_status napi_set_instance_data_primjs(napi_env env, uint64_t key,
-                                          void* data, napi_finalize finalize_cb,
+napi_status napi_set_instance_data_primjs(napi_env env, void* data,
+                                          napi_finalize finalize_cb,
                                           void* finalize_hint) {
-  return env->napi_set_instance_data(env, key, data, finalize_cb,
-                                     finalize_hint);
+  return env->napi_set_instance_data_spec_compl(env, data, finalize_cb,
+                                                finalize_hint);
 }
 
-napi_status napi_get_instance_data_primjs(napi_env env, uint64_t key,
-                                          void** data) {
-  return env->napi_get_instance_data(env, key, data);
+napi_status napi_get_instance_data_primjs(napi_env env, void** data) {
+  return env->napi_get_instance_data_spec_compl(env, data);
 }
 
 napi_status napi_get_last_error_info_primjs(

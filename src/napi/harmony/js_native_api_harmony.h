@@ -111,12 +111,22 @@ struct Reference {
   std::list<Reference*>::const_iterator iter_;
 };
 
+#define CHECK_ENV(env)         \
+  do {                         \
+    if ((env) == nullptr) {    \
+      return napi_invalid_arg; \
+    }                          \
+  } while (0)
+
 #define RETURN_STATUS_IF_FALSE(env, condition, status) \
   do {                                                 \
     if (!(condition)) {                                \
       return napi_set_last_error((env), (status));     \
     }                                                  \
   } while (0)
+
+#define CHECK_ARG(env, arg) \
+  RETURN_STATUS_IF_FALSE((env), ((arg) != nullptr), napi_invalid_arg)
 
 inline napi_value JSValueToNapi(JSVM_Value value) {
   return reinterpret_cast<napi_value>(value);

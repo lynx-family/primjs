@@ -2516,6 +2516,30 @@ napi_status napi_get_instance_data(napi_env env, uint64_t key, void** data) {
   return napi_clear_last_error(env);
 }
 
+static const uint64_t kNapiInstanceDataKey =
+    reinterpret_cast<uint64_t>(&kNapiInstanceDataKey);
+napi_status napi_get_instance_data_spec_compl(napi_env env, void** data) {
+  CHECK_ENV(env);
+  CHECK_ARG(env, data);
+  return napi_get_instance_data(env, kNapiInstanceDataKey, data);
+}
+
+napi_status napi_set_instance_data_spec_compl(napi_env env, void* data,
+                                              napi_finalize finalize_cb,
+                                              void* finalize_hint) {
+  CHECK_ENV(env);
+  auto it = env->ctx->instance_data_registry.find(kNapiInstanceDataKey);
+  if (it != env->ctx->instance_data_registry.end()) {
+    v8impl::RefBase* idata = static_cast<v8impl::RefBase*>(it->second);
+    v8impl::RefBase::Delete(idata);
+  }
+
+  env->ctx->instance_data_registry[kNapiInstanceDataKey] =
+      v8impl::RefBase::New(env, 0, true, finalize_cb, data, finalize_hint);
+
+  return napi_clear_last_error(env);
+}
+
 v8::Local<v8::Value> napi_js_value_to_v8_value(napi_env env, napi_value value) {
   return v8impl::V8LocalValueFromJsValue(value);
 }

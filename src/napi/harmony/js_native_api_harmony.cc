@@ -1230,6 +1230,29 @@ static napi_status napi_get_instance_data(napi_env env, uint64_t key,
   return napi_clear_last_error(env);
 }
 
+static const uint64_t kNapiInstanceDataKey =
+    reinterpret_cast<uint64_t>(&kNapiInstanceDataKey);
+napi_status napi_get_instance_data_spec_compl(napi_env env, void **data) {
+  CHECK_ENV(env);
+  CHECK_ARG(env, data);
+  return napi_get_instance_data(env, kNapiInstanceDataKey, data);
+}
+
+napi_status napi_set_instance_data_spec_compl(napi_env env, void *data,
+                                              napi_finalize finalize_cb,
+                                              void *finalize_hint) {
+  CHECK_ENV(env);
+  auto &map = env->ctx->instance_data_;
+  auto it = map.find(kNapiInstanceDataKey);
+  if (it != map.end()) {
+    ExternalNativeInfo::Delete(nullptr, it->second, nullptr);
+  }
+  map[kNapiInstanceDataKey] =
+      ExternalNativeInfo::Create(env, finalize_cb, data, finalize_hint);
+
+  return napi_clear_last_error(env);
+}
+
 static napi_status napi_open_context_scope(napi_env env,
                                            napi_context_scope *result) {
   *result = reinterpret_cast<napi_context_scope>(1);

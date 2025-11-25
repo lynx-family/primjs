@@ -2545,6 +2545,30 @@ napi_status napi_get_instance_data(napi_env env, uint64_t key, void** data) {
   return napi_clear_last_error(env);
 }
 
+static const uint64_t kNapiInstanceDataKey =
+    reinterpret_cast<uint64_t>(&kNapiInstanceDataKey);
+napi_status napi_get_instance_data_spec_compl(napi_env env, void** data) {
+  CHECK_ENV(env);
+  CHECK_ARG(env, data);
+  return napi_get_instance_data(env, kNapiInstanceDataKey, data);
+}
+
+napi_status napi_set_instance_data_spec_compl(napi_env env, void* data,
+                                              napi_finalize finalize_cb,
+                                              void* finalize_hint) {
+  CHECK_ENV(env);
+  auto it = env->ctx->instance_data_registry.find(kNapiInstanceDataKey);
+  if (it != env->ctx->instance_data_registry.end()) {
+    qjsimpl::RefBase* idata = static_cast<qjsimpl::RefBase*>(it->second);
+    qjsimpl::RefBase::Delete(idata);
+  }
+
+  env->ctx->instance_data_registry[kNapiInstanceDataKey] =
+      qjsimpl::RefBase::New(env, 0, true, finalize_cb, data, finalize_hint);
+
+  return napi_clear_last_error(env);
+}
+
 void napi_attach_quickjs(napi_env env, LEPUSContext* context) {
 #define SET_METHOD(API) env->napi_##API = &napi_##API;
 

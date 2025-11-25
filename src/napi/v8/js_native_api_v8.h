@@ -143,6 +143,13 @@ struct napi_context__v8 {
   std::unordered_map<uint64_t, void*> instance_data_registry;
 };
 
+#define CHECK_ENV(env)         \
+  do {                         \
+    if ((env) == nullptr) {    \
+      return napi_invalid_arg; \
+    }                          \
+  } while (0)
+
 #define RETURN_STATUS_IF_FALSE(env, condition, status) \
   do {                                                 \
     if (!(condition)) {                                \

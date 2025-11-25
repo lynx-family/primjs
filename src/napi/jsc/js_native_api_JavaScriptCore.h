@@ -169,6 +169,13 @@ struct napi_class__jsc {
   JSObjectRef _ctor;
 };
 
+#define CHECK_ENV(env)         \
+  do {                         \
+    if ((env) == nullptr) {    \
+      return napi_invalid_arg; \
+    }                          \
+  } while (0)
+
 #define RETURN_STATUS_IF_FALSE(env, condition, status) \
   do {                                                 \
     if (!(condition)) {                                \
