@@ -32,6 +32,7 @@
 #include <queue>
 #include <string>
 
+// for class
 class ByteTask {
  public:
   ByteTask() = default;
