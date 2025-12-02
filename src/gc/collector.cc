@@ -394,7 +394,7 @@ void Visitor::VisitDebuggerInfo(void *ptr, int32_t local_idx) noexcept {
   for (auto &[pc, value] : info->break_bytecode_map) {
     PushObjLEPUSValue(value, local_idx);
   }
-  VisitRootHeapObj(info->pause_on_next_statement_reason, local_idx);
+  VisitRootCString(info->pause_on_next_statement_reason, local_idx);
 #endif
 
   return;
