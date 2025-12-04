@@ -28,7 +28,7 @@ class GarbageCollector {
   GarbageCollector(LEPUSRuntime *rt, mstate) noexcept;
   ~GarbageCollector();
   // gc
-  void CollectGarbage(size_t size = 0) noexcept;
+  void CollectGarbage(size_t size = 0, bool gc_state = false) noexcept;
   void DoOnlyFinalizer() noexcept;
 
   void Init(LEPUSRuntime *rt);

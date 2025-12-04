@@ -2942,6 +2942,15 @@ void JS_MarkValue_GC(LEPUSRuntime *rt, LEPUSValueConst val,
 
 void JS_RunGC_GC(LEPUSRuntime *rt) { rt->gc->CollectGarbage(); }
 
+void LEPUS_RunAllGC() {
+  pthread_mutex_lock(&runtime_mutex);
+  std::unordered_set<LEPUSRuntime *> *g_rt_set = js_get_rt_set();
+  for (auto it : *g_rt_set) {
+    it->gc->CollectGarbage(0, true);
+  }
+  pthread_mutex_unlock(&runtime_mutex);
+}
+
 LEPUSValue gc(LEPUSContext *ctx, LEPUSValueConst this_val, int argc,
               LEPUSValueConst *argv) {
   ctx->rt->gc->CollectGarbage();
@@ -28590,7 +28599,7 @@ bool lepusng_stragety_enabled() {
 
 /* trace gc end */
 
-void GarbageCollector::CollectGarbage(size_t size) noexcept {
+void GarbageCollector::CollectGarbage(size_t size, bool gc_state) noexcept {
   TRACE_EVENT("RunGC");
   rt_->gc_cnt++;
 #ifdef ENABLE_FORCE_GC
@@ -28649,7 +28658,7 @@ void GarbageCollector::CollectGarbage(size_t size) noexcept {
   forbid_gc_--;
   int64_t gc_end = get_daytime();
   AddGCDuration(gc_end - gc_begin);
-  if (gc_info_enabled()) {
+  if (gc_info_enabled() && !gc_state) {
     UpdateGCInfo(heapsize_before, gc_end - gc_begin);
   }
 }
@@ -30259,6 +30268,7 @@ LEPUSValue js_get_length(LEPUSContext *ctx, LEPUSValueConst obj) {
   return LEPUS_UNDEFINED;
 }
 
+void LEPUS_RunAllGC() {}
 #endif  // ENABLE_COMPATIBLE_MM
 
 PtrHandles::PtrHandles(LEPUSRuntime *rt) : rt_(rt) { InitialHandles(); }

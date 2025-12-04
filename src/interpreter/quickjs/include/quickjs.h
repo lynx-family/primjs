@@ -720,6 +720,7 @@ void LEPUS_FreeRuntime(LEPUSRuntime *rt);
 void LEPUS_MarkValue(LEPUSRuntime *rt, LEPUSValueConst val,
                      LEPUS_MarkFunc *mark_func, uint64_t trace_tool);
 void LEPUS_RunGC(LEPUSRuntime *rt);
+void LEPUS_RunAllGC();
 LEPUS_BOOL LEPUS_IsInGCSweep(LEPUSRuntime *rt);
 
 LEPUSContext *LEPUS_NewContext(LEPUSRuntime *rt);
