@@ -37,11 +37,19 @@ jobs:
           fi
 
   publish-pod:
-    runs-on: macos-13
+    runs-on: macos-14
     needs: get-version
     steps:
       - name: Download Source
         uses: actions/checkout@v4.2.2
+      - name: Python Setup
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Set up Ruby + specify Bundler version
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '2.6.10'
       - name: Bundle Install
         run: |-
           SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk bundle install --path .bundle
