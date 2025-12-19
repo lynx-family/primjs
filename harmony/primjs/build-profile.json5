@@ -3,7 +3,7 @@
   "buildOption": {
     "nativeLib": {
       "debugSymbol": {
-        "strip": true
+        "strip": false
       },
     }
   },
