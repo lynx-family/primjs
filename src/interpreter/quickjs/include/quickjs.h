@@ -1346,6 +1346,7 @@ typedef enum LEPUSCFunctionEnum { /* XXX: should rename for namespace isolation
                                    */
                                   LEPUS_CFUNC_generic,
                                   LEPUS_CFUNC_generic_magic,
+                                  LEPUS_CFUNC_generic_opaque,
                                   LEPUS_CFUNC_constructor,
                                   LEPUS_CFUNC_constructor_magic,
                                   LEPUS_CFUNC_constructor_or_func,
@@ -1363,6 +1364,9 @@ typedef union LEPUSCFunctionType {
   LEPUSCFunction *generic;
   LEPUSValue (*generic_magic)(LEPUSContext *ctx, LEPUSValueConst this_val,
                               int argc, LEPUSValueConst *argv, int magic);
+  LEPUSValue (*generic_opaque)(LEPUSContext *ctx, LEPUSValueConst this_val,
+                               int32_t argc, LEPUSValueConst *argv,
+                               void *opaque);
   LEPUSCFunction *constructor;
   LEPUSValue (*constructor_magic)(LEPUSContext *ctx, LEPUSValueConst new_target,
                                   int argc, LEPUSValueConst *argv, int magic);
@@ -1624,6 +1628,23 @@ void UpdateOuterObjSize(LEPUSRuntime *rt, int size);
 
 void LEPUS_SetGCObserver(LEPUSRuntime *rt, void *opaque);
 void *LEPUS_GetGCObserver(LEPUSRuntime *rt);
+
+/*
+ * Used by lynx, and the cfunc will be called with opaque.
+ * Reason for defining a separate struct:
+ * If we add an opaque field to LEPUSCFunctionListEntry, it will increase the
+ * memory usage for all structures that use it In reality, only a few functions
+ * need the opaque field, so defining a separate struct can save memory
+ */
+typedef struct LynxCFunctionListEntry {
+  const char *name;
+  void *opaque;
+  LEPUSCFunctionType cfunc;
+} LynxCFunctionListEntry;
+
+void JS_SetLynxCFunctionList(LEPUSContext *ctx, LEPUSValue obj,
+                             const LynxCFunctionListEntry *funcs, size_t size);
+
 // <Primjs end>
 
 #undef lepus_unlikely

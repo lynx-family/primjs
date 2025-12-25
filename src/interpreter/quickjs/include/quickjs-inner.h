@@ -676,7 +676,15 @@ typedef enum OPCodeEnum {
 } OPCodeEnum;
 
 struct FinalizationRegistryContext;
-constexpr size_t kFunctionShapeSize = 2;
+typedef enum JSFunctionKindEnum {
+  JS_FUNC_NORMAL = 0,
+  JS_FUNC_GENERATOR = (1 << 0),
+  JS_FUNC_ASYNC = (1 << 1),
+  JS_FUNC_ASYNC_GENERATOR = (JS_FUNC_GENERATOR | JS_FUNC_ASYNC),
+  JS_FUNC_Kind_Count,
+} JSFunctionKindEnum;
+
+constexpr size_t kFunctionShapeSize = JS_FUNC_Kind_Count * 2;
 
 struct LEPUSContext {
   // <primjs begin>
@@ -695,6 +703,7 @@ struct LEPUSContext {
 
   JSShape *array_shape; /* initial shape for Array objects */
   JSShape *function_shape[kFunctionShapeSize];
+  JSShape *c_function_shape;
 
   LEPUSValue *class_proto;
   LEPUSValue function_proto;
@@ -845,13 +854,6 @@ typedef struct JSVarDef {
 // use 2 bits for type.
 #define LINE_COLUMN_TYPE_SHIFT 62
 // <Primjs end>
-
-typedef enum JSFunctionKindEnum {
-  JS_FUNC_NORMAL = 0,
-  JS_FUNC_GENERATOR = (1 << 0),
-  JS_FUNC_ASYNC = (1 << 1),
-  JS_FUNC_ASYNC_GENERATOR = (JS_FUNC_GENERATOR | JS_FUNC_ASYNC),
-} JSFunctionKindEnum;
 
 // <primjs begin>
 enum class EntryMode { INTERPRETER, BASELINE };
@@ -1265,8 +1267,8 @@ struct LEPUSObject {
     struct FinalizationRegistryData
         *fin_reg_data;  // JS_CLASS_FinalizationRegistry
     struct WeakRefData *weak_ref_data;
-    struct { /* JS_CLASS_BYTECODE_FUNCTION: 12/24
- bytes */
+    struct {
+      /* JS_CLASS_BYTECODE_FUNCTION: 12/24 bytes */
       /* also used by JS_CLASS_GENERATOR_FUNCTION, JS_CLASS_ASYNC_FUNCTION
        * and JS_CLASS_ASYNC_GENERATOR_FUNCTION */
       struct LEPUSFunctionBytecode *function_bytecode;
@@ -1278,6 +1280,7 @@ struct LEPUSObject {
       uint8_t length;
       uint8_t cproto;
       int16_t magic;
+      void *opaque;
     } cfunc;
     /* array part for fast arrays and typed arrays */
     struct { /* JS_CLASS_ARRAY, JS_CLASS_ARGUMENTS,
@@ -3261,20 +3264,31 @@ inline const LEPUSCFunctionListEntry js_typed_array_funcs[] = {
 };
 
 inline const LEPUSCFunctionListEntry js_native_error_proto_funcs[] = {
+// clang-format off
 #define DEF(name)                                                     \
   LEPUS_PROP_ATOM_DEF("name", name,                                   \
                       LEPUS_PROP_WRITABLE | LEPUS_PROP_CONFIGURABLE), \
-      LEPUS_PROP_STRING_DEF("message", "",                            \
+  LEPUS_PROP_STRING_DEF("message", "",                            \
                             LEPUS_PROP_WRITABLE | LEPUS_PROP_CONFIGURABLE),
-
-    DEF(JS_ATOM_EvalError) DEF(JS_ATOM_RangeError) DEF(JS_ATOM_ReferenceError)
-        DEF(JS_ATOM_SyntaxError) DEF(JS_ATOM_TypeError) DEF(JS_ATOM_URIError)
-            DEF(JS_ATOM_InternalError) LEPUS_PROP_STRING_DEF(
-                "name", "AggregateError",
-                LEPUS_PROP_WRITABLE | LEPUS_PROP_CONFIGURABLE),
-    LEPUS_PROP_STRING_DEF("message", "",
-                          LEPUS_PROP_WRITABLE | LEPUS_PROP_CONFIGURABLE),
+    
+  DEF(JS_ATOM_EvalError) 
+  DEF(JS_ATOM_RangeError) 
+  DEF(JS_ATOM_ReferenceError)
+  DEF(JS_ATOM_SyntaxError) 
+  DEF(JS_ATOM_TypeError) 
+  DEF(JS_ATOM_URIError)
+  DEF(JS_ATOM_InternalError) 
+  LEPUS_PROP_STRING_DEF("name", "AggregateError", 
+                        LEPUS_PROP_WRITABLE | LEPUS_PROP_CONFIGURABLE),
+  LEPUS_PROP_STRING_DEF("message", "", 
+                        LEPUS_PROP_WRITABLE | LEPUS_PROP_CONFIGURABLE),
 #undef DEF
+    // clang-format on
+
 };
+
+void JS_SetLynxCFunctionList_GC(LEPUSContext *ctx, LEPUSValue obj,
+                                const LynxCFunctionListEntry *funcs,
+                                size_t size);
 
 #endif  // SRC_INTERPRETER_QUICKJS_INCLUDE_QUICKJS_INNER_H_

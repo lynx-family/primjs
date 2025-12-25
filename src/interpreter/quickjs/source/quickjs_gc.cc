@@ -1335,6 +1335,7 @@ LEPUSContext *JS_NewContextRaw_GC(LEPUSRuntime *rt) {
 static void JS_AddIntrinsicWeakRef(LEPUSContext *ctx);
 static void JS_AddIntrinsicFinalizationRegistry(LEPUSContext *ctx);
 static void JS_AddIntrinsicBigInt(LEPUSContext *ctx);
+static void JS_InitFunctionShape(LEPUSContext *ctx);
 
 LEPUSContext *JS_NewContext_GC(LEPUSRuntime *rt) {
   LEPUSContext *ctx;
@@ -1355,6 +1356,7 @@ LEPUSContext *JS_NewContext_GC(LEPUSRuntime *rt) {
   JS_AddIntrinsicWeakRef(ctx);
   JS_AddIntrinsicFinalizationRegistry(ctx);
   JS_AddIntrinsicBigInt(ctx);
+  JS_InitFunctionShape(ctx);
   return ctx;
 }
 
@@ -2816,21 +2818,37 @@ int js_method_set_properties_gc(LEPUSContext *ctx, LEPUSValueConst func_obj,
 static LEPUSValue JS_NewCFunction3(LEPUSContext *ctx, LEPUSCFunction *func,
                                    const char *name, int length,
                                    LEPUSCFunctionEnum cproto, int magic,
-                                   LEPUSValueConst proto_val,
-                                   int32_t n_fields = 0) {
-  LEPUSValue func_obj;
+                                   LEPUSValueConst proto_val = LEPUS_UNDEFINED,
+                                   int32_t n_fileds = 0) {
+  LEPUSValue func_obj = LEPUS_UNDEFINED;
   LEPUSObject *p;
   JSAtom name_atom;
-
-  if (n_fields > 0) {
+  if (!name) {
+    name = "";
+  }
+  name_atom = LEPUS_NewAtom(ctx, name);
+  HandleScope func_scope(ctx, &func_obj, HANDLE_TYPE_LEPUS_VALUE);
+  func_scope.PushLEPUSAtom(name_atom);
+  if (n_fileds > 0) {
     func_obj = JS_NewObjectProtoClassAlloc(ctx, proto_val, JS_CLASS_C_FUNCTION,
-                                           n_fields);
+                                           n_fileds);
+    if (LEPUS_IsException(func_obj)) goto end;
+    p = LEPUS_VALUE_GET_OBJ(func_obj);
+    js_function_set_properties(ctx, p, name_atom, length);
+  } else if (LEPUS_VALUE_IS_UNDEFINED(proto_val)) {
+    func_obj = JS_NewObjectFromShape_GC(
+        ctx, js_dup_shape(ctx->c_function_shape), JS_CLASS_C_FUNCTION);
+    if (LEPUS_IsException(func_obj)) goto end;
+    p = LEPUS_VALUE_GET_OBJ(func_obj);
+    p->prop[0].u.value = LEPUS_NewInt32(ctx, length);
+    p->prop[1].u.value = JS_AtomToValue_GC(ctx, name_atom);
   } else {
     func_obj = JS_NewObjectProtoClass_GC(ctx, proto_val, JS_CLASS_C_FUNCTION);
+    if (LEPUS_IsException(func_obj)) goto end;
+    p = LEPUS_VALUE_GET_OBJ(func_obj);
+    js_function_set_properties(ctx, p, name_atom, length);
   }
-  if (LEPUS_IsException(func_obj)) return func_obj;
-  HandleScope func_scope(ctx, &func_obj, HANDLE_TYPE_LEPUS_VALUE);
-  p = LEPUS_VALUE_GET_OBJ(func_obj);
+
   p->u.cfunc.c_function.generic = func;
   p->u.cfunc.length = length;
   p->u.cfunc.cproto = cproto;
@@ -2839,12 +2857,7 @@ static LEPUSValue JS_NewCFunction3(LEPUSContext *ctx, LEPUSCFunction *func,
                        cproto == LEPUS_CFUNC_constructor_magic ||
                        cproto == LEPUS_CFUNC_constructor_or_func ||
                        cproto == LEPUS_CFUNC_constructor_or_func_magic);
-  if (!name) {
-    name = "";
-  }
-  name_atom = LEPUS_NewAtom(ctx, name);
-  func_scope.PushLEPUSAtom(name_atom);
-  js_function_set_properties(ctx, p, name_atom, length);
+end:
   return func_obj;
 }
 
@@ -2852,8 +2865,7 @@ static LEPUSValue JS_NewCFunction3(LEPUSContext *ctx, LEPUSCFunction *func,
 LEPUSValue JS_NewCFunction2_GC(LEPUSContext *ctx, LEPUSCFunction *func,
                                const char *name, int length,
                                LEPUSCFunctionEnum cproto, int magic) {
-  return JS_NewCFunction3(ctx, func, name, length, cproto, magic,
-                          ctx->function_proto);
+  return JS_NewCFunction3(ctx, func, name, length, cproto, magic);
 }
 
 LEPUSValue JS_ThrowStackOverflow_GC(LEPUSContext *ctx) {
@@ -3267,12 +3279,9 @@ static int JS_AutoInitProperty(LEPUSContext *ctx, LEPUSObject *p, JSAtom prop,
                                JSProperty *pr, JSShapeProperty *prs) {
   LEPUSValue val;
   JSAutoInitFunc *func;
-
-  if (js_shape_prepare_update(ctx, p, &prs)) return -1;
   func = pr->u.init.init_func;
   /* 'func' shall not modify the object properties 'pr' */
   val = func(ctx, p, prop, pr->u.init.opaque);
-  HandleScope func_scope(ctx, &val, HANDLE_TYPE_LEPUS_VALUE);
   prs->flags &= ~LEPUS_PROP_TMASK;
   pr->u.value = LEPUS_UNDEFINED;
   if (LEPUS_IsException(val)) return -1;
@@ -3377,6 +3386,7 @@ LEPUSValue JS_GetPropertyInternalImpl_GC(LEPUSContext *ctx, LEPUSValueConst obj,
   for (;;) {
     prs = find_own_property(&pr, p, prop);
     if (prs) {
+    retry:
       /* found */
       if (unlikely(prs->flags & LEPUS_PROP_TMASK)) {
         if ((prs->flags & LEPUS_PROP_TMASK) == LEPUS_PROP_GETSET) {
@@ -3398,7 +3408,7 @@ LEPUSValue JS_GetPropertyInternalImpl_GC(LEPUSContext *ctx, LEPUSValueConst obj,
           /* Instantiate property and retry */
           if (JS_AutoInitProperty(ctx, p, prop, pr, prs))
             return LEPUS_EXCEPTION;
-          continue;
+          goto retry;
         }
       } else {
         return pr->u.value;
@@ -3871,9 +3881,9 @@ QJS_STATIC int JS_GetOwnPropertyInternal(LEPUSContext *ctx,
   JSShapeProperty *prs;
   JSProperty *pr;
 
-retry:
   prs = find_own_property(&pr, p, prop);
   if (prs) {
+  retry:
     if (desc) {
       desc->flags = prs->flags & LEPUS_PROP_C_W_E;
       desc->getter = LEPUS_UNDEFINED;
@@ -4650,9 +4660,9 @@ int JS_SetPropertyInternalImpl_GC(LEPUSContext *ctx, LEPUSValueConst this_obj,
 
   CheckObjectCtx(ctx, val);
 
-retry:
   prs = find_own_property(&pr, p, prop);
   if (prs) {
+  retry:
     if (likely((prs->flags & (LEPUS_PROP_TMASK | LEPUS_PROP_WRITABLE |
                               LEPUS_PROP_LENGTH)) == LEPUS_PROP_WRITABLE)) {
       /* fast case */
@@ -4765,9 +4775,9 @@ retry:
   prototype_lookup:
     if (!p1) break;
 
-  retry2:
     prs = find_own_property(&pr, p1, prop);
     if (prs) {
+    retry2:
       if ((prs->flags & LEPUS_PROP_TMASK) == LEPUS_PROP_GETSET) {
         return call_setter(ctx, pr->u.getset.setter, this_obj, val, flags);
       } else if ((prs->flags & LEPUS_PROP_TMASK) == LEPUS_PROP_AUTOINIT) {
@@ -5178,6 +5188,7 @@ int JS_DefineProperty_GC(LEPUSContext *ctx, LEPUSValueConst this_obj,
 redo_prop_update:
   prs = find_own_property(&pr, p, prop);
   if (prs) {
+  redo_prop_update2:
     /* the range of the Array length property is always tested before */
     if ((prs->flags & LEPUS_PROP_LENGTH) && (flags & LEPUS_PROP_HAS_VALUE)) {
       uint32_t array_length;
@@ -5199,7 +5210,7 @@ redo_prop_update:
     if ((prs->flags & LEPUS_PROP_TMASK) == LEPUS_PROP_AUTOINIT) {
       /* Instantiate property and retry */
       if (JS_AutoInitProperty(ctx, p, prop, pr, prs)) return -1;
-      goto redo_prop_update;
+      goto redo_prop_update2;
     }
 
     if (flags & (LEPUS_PROP_HAS_VALUE | LEPUS_PROP_HAS_WRITABLE |
@@ -7751,21 +7762,46 @@ LEPUSValue js_closure_gc(LEPUSContext *ctx, LEPUSValue bfunc,
   JSAtom name_atom;  // life cycle same as b
   LEPUSObject *p;
   JSProperty *pr;
+  JSShape *sh;
 
   b = static_cast<LEPUSFunctionBytecode *>(LEPUS_VALUE_GET_PTR(bfunc));
-  func_obj = JS_NewObjectClass_GC(ctx, func_kind_to_class_id[b->func_kind]);
+  if (b->func_kind & JS_FUNC_GENERATOR) {
+    auto *new_sh = js_clone_shape(ctx, ctx->function_shape[2 * b->func_kind]);
+    func_scope.PushHandle(get_alloc_from_shape(new_sh),
+                          HANDLE_TYPE_DIR_HEAP_OBJ);
+    func_obj = JS_NewObjectFromShape_GC(ctx, new_sh,
+                                        func_kind_to_class_id[b->func_kind]);
+  } else if (b->has_prototype) {
+    auto *new_sh =
+        js_clone_shape(ctx, ctx->function_shape[2 * b->func_kind + 1]);
+    func_scope.PushHandle(get_alloc_from_shape(new_sh),
+                          HANDLE_TYPE_DIR_HEAP_OBJ);
+    func_obj = JS_NewObjectFromShape_GC(ctx, new_sh,
+                                        func_kind_to_class_id[b->func_kind]);
+  } else {
+    auto *new_sh = js_clone_shape(ctx, ctx->function_shape[2 * b->func_kind]);
+    func_scope.PushHandle(get_alloc_from_shape(new_sh),
+                          HANDLE_TYPE_DIR_HEAP_OBJ);
+    func_obj = JS_NewObjectFromShape_GC(ctx, new_sh,
+                                        func_kind_to_class_id[b->func_kind]);
+  }
+
   if (LEPUS_IsException(func_obj)) {
     return LEPUS_EXCEPTION;
   }
+
+  p = LEPUS_VALUE_GET_OBJ(func_obj);
+  name_atom = b->func_name;
+  if (name_atom == JS_ATOM_NULL)
+    name_atom = LEPUS_DupAtom(ctx, JS_ATOM_empty_string);
+  p->prop[0].u.value = LEPUS_NewInt32(ctx, b->defined_arg_count);
+  p->prop[1].u.value = LEPUS_AtomToValue(ctx, name_atom);
+
   func_obj = js_closure2(ctx, func_obj, b, cur_var_refs, sf);
   if (LEPUS_IsException(func_obj)) {
     /* bfunc has been freed */
     goto fail;
   }
-  p = LEPUS_VALUE_GET_OBJ(func_obj);
-  name_atom = b->func_name;
-  if (name_atom == JS_ATOM_NULL) name_atom = JS_ATOM_empty_string;
-  js_function_set_properties(ctx, p, name_atom, b->defined_arg_count);
 
   LEPUSValue proto;
   if (b->func_kind & JS_FUNC_GENERATOR) {
@@ -7778,20 +7814,14 @@ LEPUSValue js_closure_gc(LEPUSContext *ctx, LEPUSValue bfunc,
       proto_class_id = JS_CLASS_GENERATOR;
     proto = JS_NewObjectProto_GC(ctx, ctx->class_proto[proto_class_id]);
     if (LEPUS_IsException(proto)) goto fail;
-    func_scope.PushHandle(&proto, HANDLE_TYPE_LEPUS_VALUE);
-    pr = add_property_gc(ctx, p, JS_ATOM_prototype, LEPUS_PROP_WRITABLE);
-    if (pr) pr->u.value = proto;
+    p->prop[2].u.value = proto;
   } else if (b->has_prototype) {
     /* add the 'prototype' property: delay instantiation to avoid
        creating cycles for every javascript function. The prototype
        object is created on the fly when first accessed */
     LEPUS_SetConstructorBit(ctx, func_obj, TRUE);
-    pr = add_property_gc(ctx, p, JS_ATOM_prototype,
-                         LEPUS_PROP_AUTOINIT | LEPUS_PROP_WRITABLE);
-    if (pr) {
-      pr->u.init.init_func = js_instantiate_prototype;
-      pr->u.init.opaque = nullptr;
-    }
+    p->prop[2].u.init.init_func = js_instantiate_prototype;
+    p->prop[2].u.init.opaque = nullptr;
   }
   return func_obj;
 fail:
@@ -7888,6 +7918,10 @@ QJS_STATIC LEPUSValue js_call_c_function(LEPUSContext *ctx,
     case LEPUS_CFUNC_generic:
       ret_val = func.generic(ctx, this_obj, argc, arg_buf);
       break;
+    case LEPUS_CFUNC_generic_opaque: {
+      auto *opauqe = p->u.cfunc.opaque;
+      ret_val = func.generic_opaque(ctx, this_obj, argc, arg_buf, opauqe);
+    } break;
     case LEPUS_CFUNC_constructor_magic:
     case LEPUS_CFUNC_constructor_or_func_magic:
       if (!(flags & LEPUS_CALL_FLAG_CONSTRUCTOR)) {
@@ -24887,30 +24921,47 @@ QJS_STATIC void JS_AddIntrinsicBigInt(LEPUSContext *ctx) {
 }
 
 static void JS_InitFunctionShape(LEPUSContext *ctx) {
-  LEPUSObject *proto = LEPUS_VALUE_GET_OBJ(ctx->function_proto);
-  // 1. The length property
-  auto *shape = js_new_shape2(ctx, proto, JS_PROP_INITIAL_HASH_SIZE,
-                              JS_PROP_INITIAL_SIZE);
-  add_shape_property(ctx, &shape, nullptr, JS_ATOM_length,
-                     LEPUS_PROP_CONFIGURABLE);
-  ctx->function_shape[0] = shape;
-  // length + name
-  shape = js_new_shape2(ctx, proto, JS_PROP_INITIAL_HASH_SIZE,
-                        JS_PROP_INITIAL_SIZE);
-  add_shape_property(ctx, &shape, nullptr, JS_ATOM_length,
-                     LEPUS_PROP_CONFIGURABLE);
-  add_shape_property(ctx, &shape, nullptr, JS_ATOM_name,
-                     LEPUS_PROP_CONFIGURABLE);
-  ctx->function_shape[1] = shape;
+  for (int32_t i = 0; i < JS_FUNC_Kind_Count; ++i) {
+    JSShape *shape = nullptr;
+    LEPUSObject *proto =
+        LEPUS_VALUE_GET_OBJ(ctx->class_proto[func_kind_to_class_id[i]]);
+    if (i & JS_FUNC_GENERATOR) {
+      shape = js_new_shape_nohash(ctx, proto, 8, 4);
+      add_shape_property(ctx, &shape, nullptr, JS_ATOM_length,
+                         LEPUS_PROP_CONFIGURABLE);
+      add_shape_property(ctx, &shape, nullptr, JS_ATOM_name,
+                         LEPUS_PROP_CONFIGURABLE);
+      add_shape_property(ctx, &shape, nullptr, JS_ATOM_prototype,
+                         LEPUS_PROP_WRITABLE);
+      ctx->function_shape[2 * i] = shape;
+      continue;
+    }
+    shape = js_new_shape_nohash(ctx, proto, JS_PROP_INITIAL_HASH_SIZE,
+                                JS_PROP_INITIAL_SIZE);
+    add_shape_property(ctx, &shape, nullptr, JS_ATOM_length,
+                       LEPUS_PROP_CONFIGURABLE);
+    add_shape_property(ctx, &shape, nullptr, JS_ATOM_name,
+                       LEPUS_PROP_CONFIGURABLE);
+    ctx->function_shape[2 * i] = shape;
+
+    shape = js_new_shape_nohash(ctx, proto, 8, 4);
+    add_shape_property(ctx, &shape, nullptr, JS_ATOM_length,
+                       LEPUS_PROP_CONFIGURABLE);
+    add_shape_property(ctx, &shape, nullptr, JS_ATOM_name,
+                       LEPUS_PROP_CONFIGURABLE);
+    add_shape_property(ctx, &shape, nullptr, JS_ATOM_prototype,
+                       LEPUS_PROP_WRITABLE | LEPUS_PROP_AUTOINIT);
+    ctx->function_shape[2 * i + 1] = shape;
+  }
   return;
 }
-
 /* Minimum amount of objects to be able to compile code and display
    error messages. No JSAtom should be allocated by this function. */
 QJS_STATIC void JS_AddIntrinsicBasicObjects_GC(LEPUSContext *ctx) {
   LEPUSValue proto = LEPUS_UNDEFINED, obj = LEPUS_UNDEFINED;
   LEPUSCFunctionType ft;
   HandleScope func_scope(ctx, &obj, HANDLE_TYPE_LEPUS_VALUE);
+  JSShape *sh;
 
   int i;
 
@@ -24924,7 +24975,12 @@ QJS_STATIC void JS_AddIntrinsicBasicObjects_GC(LEPUSContext *ctx) {
                        ctx->class_proto[JS_CLASS_OBJECT],
                        countof(js_function_proto_funcs) + 3 + 2);
 
-  JS_InitFunctionShape(ctx);
+  sh = js_new_shape2(ctx, LEPUS_VALUE_GET_OBJ(ctx->function_proto),
+                     JS_PROP_INITIAL_HASH_SIZE, JS_PROP_INITIAL_SIZE);
+  add_shape_property(ctx, &sh, nullptr, JS_ATOM_length,
+                     LEPUS_PROP_CONFIGURABLE);
+  add_shape_property(ctx, &sh, nullptr, JS_ATOM_name, LEPUS_PROP_CONFIGURABLE);
+  ctx->c_function_shape = sh;
 
   ctx->class_proto[JS_CLASS_BYTECODE_FUNCTION] = ctx->function_proto;
   ctx->class_proto[JS_CLASS_ERROR] = JS_NewObject_GC(ctx);
@@ -28978,6 +29034,10 @@ void Visitor::ScanContext(LEPUSContext *ctx) noexcept {
     VisitRootHeapObj(get_alloc_from_shape(ctx->array_shape), local_idx);
   }
 
+  if (ctx->c_function_shape) {
+    VisitRootHeapObj(get_alloc_from_shape(ctx->c_function_shape), local_idx);
+  }
+
   for (size_t i = 0; i < kFunctionShapeSize; ++i) {
     if (ctx->function_shape[i] == nullptr) continue;
     VisitRootHeapObj(get_alloc_from_shape(ctx->function_shape[i]), local_idx);
@@ -30162,6 +30222,33 @@ void AddLepusRefCount(LEPUSContext *ctx) {
     LEPUS_RunGC(rt);  // Collect JSValue
   }
 }
+
+static LEPUSValue JS_InstantiateLynxFunctionListItem_GC(LEPUSContext *ctx,
+                                                        LEPUSObject *p,
+                                                        JSAtom atom,
+                                                        void *opaque) {
+  const LynxCFunctionListEntry *e =
+      static_cast<LynxCFunctionListEntry *>(opaque);
+  LEPUSCFunctionType ft{.generic_opaque = e->cfunc.generic_opaque};
+  LEPUSValue val = JS_NewCFunction3(ctx, ft.generic, e->name, 0,
+                                    LEPUS_CFUNC_generic_opaque, 0);
+  LEPUS_VALUE_GET_OBJ(val)->u.cfunc.opaque = e->opaque;
+  return val;
+}
+
+void JS_SetLynxCFunctionList_GC(LEPUSContext *ctx, LEPUSValue obj,
+                                const LynxCFunctionListEntry *funcs,
+                                size_t size) {
+  for (size_t i = 0; i < size; ++i) {
+    if (funcs[i].cfunc.generic == nullptr) continue;
+    JSAtom atom = find_atom(ctx, funcs[i].name);
+    JS_DefineAutoInitProperty_GC(ctx, obj, atom,
+                                 JS_InstantiateLynxFunctionListItem_GC,
+                                 (void *)(&funcs[i]), LEPUS_PROP_C_W_E, false);
+  }
+  return;
+}
+
 // <Primjs end>
 
 #else
@@ -30208,6 +30295,7 @@ LEPUSValue js_get_length(LEPUSContext *ctx, LEPUSValueConst obj) {
 }
 
 void LEPUS_RunAllGC() {}
+
 #endif  // ENABLE_COMPATIBLE_MM
 
 PtrHandles::PtrHandles(LEPUSRuntime *rt) : rt_(rt) { InitialHandles(); }
