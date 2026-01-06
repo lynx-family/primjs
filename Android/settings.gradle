@@ -13,3 +13,4 @@ pluginManagement {
 
 rootProject.name = "primjs"
 include ':app'
+include ':PrimjsWasm'

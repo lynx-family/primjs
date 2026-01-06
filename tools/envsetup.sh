@@ -22,6 +22,7 @@ PRIMJS_envsetup() {
     export PATH=${SCRIPT_DIR}:$PATH
     export PATH=${PRIMJS_BUILDTOOLS_DIR}/gn:$PATH
     export PATH=${PRIMJS_BUILDTOOLS_DIR}/ninja:$PATH
+    export PATH=${PRIMJS_BUILDTOOLS_DIR}/cmake/bin:$PATH
     export PATH=${PRIMJS_BUILDTOOLS_DIR}/llvm/bin:$PATH
     export PATH=${SCRIPT_DIR}/cli:$PATH
     export PATH=${SCRIPT_DIR}/release:$PATH

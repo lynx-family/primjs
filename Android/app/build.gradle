@@ -5,7 +5,7 @@
 plugins {
     id 'com.android.library'
 }
-apply from: './publish.gradle'
+apply from: '../publish.gradle'
 
 
 android {

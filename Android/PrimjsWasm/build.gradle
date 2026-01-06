@@ -1,0 +1,141 @@
+// Copyright 2024 The Lynx Authors. All rights reserved.
+// Licensed under the Apache License Version 2.0 that can be found in the
+// LICENSE file in the root directory of this source tree.
+
+plugins {
+    id 'com.android.library'
+}
+apply from: '../publish.gradle'
+
+
+ext.ABI_FILTERS = ['armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64']
+
+android {
+    namespace 'com.lynx.primjswasm'
+    compileSdk 30
+
+    defaultConfig {
+        minSdk 16
+        targetSdk 30
+        versionCode 1
+        versionName "1.0"
+        
+        externalNativeBuild {
+            cmake {
+                cppFlags '-std=c++17'
+                arguments(
+                        '-DANDROID_PLATFORM=android-14',
+                        '-DANDROID_TOOLCHAIN=clang',
+                        '-DANDROID_LD=lld',
+                        '-DANDROID_STL='+getCppLib(),
+                        '-DENABLE_LITE='+enable_lite,
+                        '-DENABLE_LEPUSNG='+enable_lepusng,
+                        '-DENABLE_CODECACHE='+enable_codecache,
+                        '-DCACHE_PROFILE='+cache_profile,
+                        '-DENABLE_QUICKJS_DEBUGGER='+enable_quickjs_debugger,
+                        '-DENABLE_MEM='+enable_mem,
+                        '-DFORCE_GC='+force_gc,
+                        '-DENABLE_PRIMJS_SNAPSHOT='+enable_primjs_snapshot,
+                        '-DDISABLE_NANBOX='+disable_nanbox,
+                        '-DENABLE_COMPATIBLE_MM='+enable_compatible_mm,
+                        '-DJS_ENGINE='+js_engine,
+                        '-DENABLE_BUILD_AAR=TRUE',
+                        '-LH'
+                )
+                targets "wasm"
+            }
+            ndk {
+                abiFilters "arm64-v8a", "armeabi-v7a", "x86", "x86_64"
+            }
+        }
+
+        packagingOptions {
+            exclude 'lib/*/libc++_shared.so'
+            exclude 'lib/**/libquick.so'
+            if (enable_debugging == 'true') {
+                println("enable_debugging(${enable_debugging}) doNotStrip libquick.so libwasm.so")
+                doNotStrip "**/libquick.so"
+                doNotStrip "**/libwasm.so"
+            }
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            consumerProguardFiles 'proguard-rules.pro'
+        }
+        debug {
+            minifyEnabled false
+            jniDebuggable true
+            debuggable true
+        }
+    }
+
+    externalNativeBuild {
+        cmake {
+            path "CMakeLists.txt"
+        }
+    }
+    
+    
+    libraryVariants.all { variant ->
+        variant.outputs.all { output ->
+            outputFileName = "primjswasm-${variant.baseName}.aar"
+        }
+    }
+}
+
+def getCppLib() {
+    if (project.property('use_cpp_shared') == 'true') {
+        return 'c++_shared'
+    } else {
+        return 'c++_static'
+    }
+}
+
+def copyQuickLib(String buildType) {
+    println ">>> Executing copyQuickLib for buildType: ${buildType}"
+    ABI_FILTERS.each { abi ->
+        String soName = 'libquick.so'
+        String soPath = "$buildDir/../../app/build/intermediates/cmake/${buildType}/obj/$abi/${soName}"
+        println ">>> Checking for source: ${soPath}"
+        File soFile = new File(soPath)
+        if (!soFile.exists()) {
+            println ">>> Source file NOT FOUND: ${soPath}"
+            return
+        }
+        File desFile = new File(projectDir, "libs/$abi/")
+        println ">>> Copying ${soName} to: ${desFile.absolutePath}"
+        copy {
+            from soPath
+            into desFile
+        }
+    }
+}
+
+afterEvaluate {
+    android.libraryVariants.all { variant ->
+        def buildType = variant.buildType.name
+        def task = tasks.create(name: "copyQuickLibFor${variant.name.capitalize()}") {
+            doLast {
+                println ">>> Launching task copyQuickLibFor${variant.name.capitalize()}"
+                copyQuickLib(buildType)
+            }
+        }
+        def preBuildTask = tasks.findByName("pre${variant.name.capitalize()}Build")
+        if (preBuildTask != null) {
+            preBuildTask.dependsOn(task)
+        }
+    }
+}
+
+dependencies {
+    implementation fileTree(dir: 'libs', include: ['*.jar'])
+    implementation project(':app')
+}

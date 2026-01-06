@@ -1,0 +1,44 @@
+# Copyright 2024 The Lynx Authors. All rights reserved.
+# Licensed under the Apache License Version 2.0 that can be found in the
+# LICENSE file in the root directory of this source tree.
+
+config("wasm3_config") {
+  include_dirs = [ "${root_build_dir}/wasm3/out/include/" ]
+  lib_dirs = [ "${root_build_dir}/wasm3/out/lib" ]
+  libs = [ "wasm3" ]  # or use full path directly
+  ldflags = [ "-Wl,-rpath,@loader_path/" +
+              rebase_path("${root_build_dir}/wasm3/out/lib", root_build_dir) ]
+  visibility = [
+    ":wasm3_libs",
+    "//tools/qjs-cli:qjs_wasm_binding",
+    "//tools/qjs-cli"
+  ]
+
+  defines = []
+  if (is_debug) {
+    defines += [ "DEBUG=1" ]
+  }
+}
+
+action("wasm3_build") {
+  script = "//tools/wasm3/wasm3_build.py"
+  sources = [ "//third_party/wasm3/source" ]
+  outputs = [ "$root_build_dir/wasm3/out" ]
+
+  args = [
+    "-d",
+    "${is_debug}",
+    "-o",
+    rebase_path(outputs[0], root_build_dir),
+    "-b",
+    rebase_path("//tools/wasm3/wasm3_build.sh", root_build_dir),
+    rebase_path(sources[0], root_build_dir),
+    "-arch",
+    "$target_cpu",
+  ]
+}
+
+group("wasm3_libs") {
+  public_configs = [ ":wasm3_config" ]
+  deps = [ ":wasm3_build" ]
+}

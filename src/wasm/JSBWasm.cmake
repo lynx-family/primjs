@@ -1,0 +1,59 @@
+# Copyright 2024 The Lynx Authors. All rights reserved.
+# Licensed under the Apache License Version 2.0 that can be found in the
+# LICENSE file in the root directory of this source tree.
+
+set(JSB_WASM_SOURCE_ROOT ${CMAKE_CURRENT_LIST_DIR})
+set(JSB_WASM_HEADER_DIR ${JSBWASM_SOURCE_ROOT})
+
+file(GLOB_RECURSE JSB_WASM_COMMON_SRC FOLLOW_SYMLINKS
+  "${JSB_WASM_SOURCE_ROOT}/common/*.h"
+  "${JSB_WASM_SOURCE_ROOT}/common/*.cc"
+)
+
+file(GLOB_RECURSE JSB_WASM_JSC_SRC FOLLOW_SYMLINKS
+  "${JSB_WASM_SOURCE_ROOT}/runtime/base/*.h"
+  "${JSB_WASM_SOURCE_ROOT}/jsc/*.h"
+  "${JSB_WASM_SOURCE_ROOT}/jsc/*.cc"
+)
+
+file(GLOB_RECURSE JSB_WASM_QJS_SRC FOLLOW_SYMLINKS
+  "${JSB_WASM_SOURCE_ROOT}/runtime/base/*.h"
+  "${JSB_WASM_SOURCE_ROOT}/qjs/*.h"
+  "${JSB_WASM_SOURCE_ROOT}/qjs/*.cc"
+)
+
+file(GLOB_RECURSE JSB_WASM_RUNTIME_PRISM_SRC FOLLOW_SYMLINKS
+  "${JSB_WASM_SOURCE_ROOT}/runtime/base/*.h"
+  "${JSB_WASM_SOURCE_ROOT}/runtime/prism/*.h"
+  "${JSB_WASM_SOURCE_ROOT}/runtime/prism/*.cc"
+)
+
+file(GLOB_RECURSE JSB_WASM_RUNTIME_WASM3_SRC FOLLOW_SYMLINKS
+  "${JSB_WASM_SOURCE_ROOT}/runtime/base/*.h"
+  "${JSB_WASM_SOURCE_ROOT}/runtime/wasm3/*.h"
+  "${JSB_WASM_SOURCE_ROOT}/runtime/wasm3/*.cc"
+)
+
+set(JSC_WASM3_SOURCES
+  ${JSB_WASM_COMMON_SRC}
+  ${JSB_WASM_JSC_SRC}
+  ${JSB_WASM_RUNTIME_WASM3_SRC}
+)
+
+set(JSC_PRISM_SOURCES
+  ${JSB_WASM_COMMON_SRC}
+  ${JSB_WASM_JSC_SRC}
+  ${JSB_WASM_RUNTIME_PRISM_SRC}
+)
+
+set(QJS_WASM3_SOURCES
+  ${JSB_WASM_COMMON_SRC}
+  ${JSB_WASM_QJS_SRC}
+  ${JSB_WASM_RUNTIME_WASM3_SRC}
+)
+
+set(QJS_PRISM_SOURCES
+  ${JSB_WASM_COMMON_SRC}
+  ${JSB_WASM_QJS_SRC}
+  ${JSB_WASM_RUNTIME_PRISM_SRC}
+)

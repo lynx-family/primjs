@@ -133,11 +133,38 @@ config("napi_public_config") {
   }
 }
 
+config("wasm_public_config") {
+  include_dirs = [
+    "./src/wasm",
+  ]
+
+  defines = []
+
+  if (is_debug) {
+    defines += [
+      "WASM_DEBUG",
+      "DEBUG",
+      "LOG_LEVEL=LOG_LEVEL_VERBOSE",
+      "d_m3HasTracer",
+    ]
+  } 
+}
+
 group("all") {
   deps = [ "src:src" ]
 
   if (enable_unittests) {
     testonly = true
     deps += [ "./testing" ]
+  }
+}
+
+group("cli") {
+  testonly = true
+  deps = []
+  if (is_mac || is_ios) {
+    deps += [
+      "//tools/qjs-cli",
+    ]
   }
 }

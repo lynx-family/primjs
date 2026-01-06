@@ -69,3 +69,7 @@ jobs:
       - name: Run unittests
         run: 
           python3 tools/ci/check_test_run.py
+      - name: Run wasm tests
+        run: |
+          source tools/envsetup.sh
+          bash testing/wasm/wasm_run.sh

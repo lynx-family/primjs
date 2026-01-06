@@ -65,41 +65,19 @@ jobs:
       run: |-
         pushd Android
         chmod +x ./gradlew
-        ./gradlew :app:assemblerelease
-        ./gradlew :app:publish \
+        ./gradlew assembleAllModulesRelease
+        ./gradlew publishAllModules \
         -Pversion=${{ needs.get-version.outputs.version }} \
         -Psigning.keyId=${{ secrets.SIGNING_KEY_ID }} \
         -Psigning.password=${{ secrets.SIGNING_PASSWORD }} \
         -Psigning.secretKey=${{ secrets.SIGNING_SECRET_KEY }}
-        ./gradlew :app:zipArtifacts -Pversion=${{ needs.get-version.outputs.version }} :app:getArtifactList
+        ./gradlew zipArtifacts -Pversion=${{ needs.get-version.outputs.version }} getArtifactList
         popd
-        pushd Android/app/build/
+        pushd Android/build/
         artifact_list=$(<artifact-list)
         echo "artifact_list=$artifact_list" >> $GITHUB_OUTPUT;
         popd
       id: build_artifact
-
-    - name: Get release info
-      if: ${{ github.event_name == 'push' }}
-      id: get_release
-      uses: octokit/request-action@v2.x
-      with:
-        route: GET /repos/${{ github.repository }}/releases/tags/${{ needs.get-version.outputs.version }}
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Push to release
-      if: ${{ github.event_name == 'push' }}
-      uses: ncipollo/release-action@v1
-      with:
-        tag: ${{ needs.get-version.outputs.version }}
-        token: ${{ secrets.GITHUB_TOKEN }}
-        replacesArtifacts: true
-        allowUpdates: true
-        artifacts: "Android/app/build/outputs/aar/primjs-release.aar"
-        body: ${{ fromJSON(steps.get_release.outputs.data).body }}
-        draft: ${{ fromJSON(steps.get_release.outputs.data).draft }}
-        prerelease: ${{ fromJSON(steps.get_release.outputs.data).prerelease }}
 
     - name: Publish artifact to maven
       uses: lynx-infra/maven-publish-action@2a55bab5273ffd84ebbb600e783286fc6251c239

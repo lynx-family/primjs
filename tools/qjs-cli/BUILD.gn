@@ -1,0 +1,136 @@
+# Copyright 2024 The Lynx Authors. All rights reserved.
+# Licensed under the Apache License Version 2.0 that can be found in the
+# LICENSE file in the root directory of this source tree.
+
+wasm_src = [
+  "//src/wasm/runtime/prism/wasm_runtime.cc",
+  "//src/wasm/runtime/prism/wasm_runtime.h",
+  "//src/wasm/runtime/prism/wasm_instance.cc",
+  "//src/wasm/runtime/prism/wasm_instance.h",
+  "//src/wasm/runtime/prism/wasm_module.cc",
+  "//src/wasm/runtime/prism/wasm_module.h",
+  "//src/wasm/runtime/prism/wasm_memory.h",
+  "//src/wasm/runtime/prism/wasm_memory.cc",
+  "//src/wasm/runtime/prism/wasm_table.cc",
+  "//src/wasm/runtime/prism/wasm_table.h",
+  "//src/wasm/runtime/prism/wasm_global.h",
+  "//src/wasm/runtime/prism/wasm_global.cc",
+  "//src/wasm/runtime/prism/wasm_function.cc",
+  "//src/wasm/runtime/prism/wasm_function.h",
+  "//src/wasm/runtime/wasm3/wasm_runtime.cc",
+  "//src/wasm/runtime/wasm3/wasm_runtime.h",
+  "//src/wasm/runtime/wasm3/wasm_module.cc",
+  "//src/wasm/runtime/wasm3/wasm_module.h",
+  "//src/wasm/runtime/wasm3/wasm_instance.cc",
+  "//src/wasm/runtime/wasm3/wasm_instance.h",
+  "//src/wasm/runtime/wasm3/wasm_function.cc",
+  "//src/wasm/runtime/wasm3/wasm_function.h",
+  "//src/wasm/runtime/wasm3/wasm_memory.h",
+  "//src/wasm/runtime/wasm3/wasm_memory.cc",
+  "//src/wasm/runtime/wasm3/wasm_table.h",
+  "//src/wasm/runtime/wasm3/wasm_table.cc",
+  "//src/wasm/runtime/wasm3/wasm_global.h",
+  "//src/wasm/runtime/wasm3/wasm_global.cc",
+]
+
+js_binding_src = [
+  "//src/wasm/qjs/js_env_qjs.cc",
+  "//src/wasm/qjs/js_env_qjs.h",
+  "//src/wasm/qjs/qjs_wasm.cc",
+  "//src/wasm/qjs/qjs_wasm.h",
+  "//src/wasm/qjs/qjs_ext_api.cc",
+  "//src/wasm/qjs/qjs_ext_api.h",
+  "//src/wasm/qjs/qjs_wasm_global.cc",
+  "//src/wasm/qjs/qjs_wasm_global.h",
+  "//src/wasm/qjs/qjs_wasm_instance.cc",
+  "//src/wasm/qjs/qjs_wasm_instance.h",
+  "//src/wasm/qjs/qjs_wasm_memory.cc",
+  "//src/wasm/qjs/qjs_wasm_memory.h",
+  "//src/wasm/qjs/qjs_wasm_module.cc",
+  "//src/wasm/qjs/qjs_wasm_module.h",
+  "//src/wasm/qjs/qjs_wasm_table.cc",
+  "//src/wasm/qjs/qjs_wasm_table.h",
+  "//src/wasm/qjs/qjs_wasm_function.cc",
+  "//src/wasm/qjs/qjs_wasm_function.h",
+  "//src/wasm/common/interop_runtime.h",
+  "//src/wasm/common/one_of.h",
+  "//src/wasm/common/wasm_type.h",
+  "//src/wasm/common/js_type.h",
+  "//src/wasm/common/wasm_log.h",
+  "//src/wasm/common/messages.h",
+]
+
+if (is_mac || is_ios) {
+  js_binding_src += [
+    "//src/wasm/jsc/jsc_builtin_objects.cc",
+    "//src/wasm/jsc/jsc_builtin_objects.h",
+    "//src/wasm/jsc/jsc_class_creator.cc",
+    "//src/wasm/jsc/jsc_class_creator.h",
+    "//src/wasm/jsc/jsc_ext_api.cc",
+    "//src/wasm/jsc/jsc_ext_api.h",
+    "//src/wasm/jsc/jsc_wasm.cc",
+    "//src/wasm/jsc/jsc_wasm.h",
+    "//src/wasm/jsc/jsc_wasm_module.h",
+    "//src/wasm/jsc/jsc_wasm_module.cc",
+    "//src/wasm/jsc/jsc_wasm_instance.h",
+    "//src/wasm/jsc/jsc_wasm_instance.cc",
+    "//src/wasm/jsc/jsc_wasm_table.cc",
+    "//src/wasm/jsc/jsc_wasm_table.h",
+    "//src/wasm/jsc/jsc_wasm_memory.h",
+    "//src/wasm/jsc/jsc_wasm_memory.cc",
+    "//src/wasm/jsc/jsc_wasm_global.h",
+    "//src/wasm/jsc/jsc_wasm_global.cc",
+    "//src/wasm/jsc/jsc_wasm_function.h",
+    "//src/wasm/jsc/jsc_wasm_function.cc",
+    "//src/wasm/jsc/js_env_jsc.h",
+    "//src/wasm/jsc/js_env_jsc.cc",
+  ]
+}
+
+prism_dummy_src = [
+  "//src/wasm/prism/prism_dummy.cc",
+]
+
+config("wasm_internal_config") {
+  include_dirs = [ "//src/wasm/include" ]
+}
+
+static_library("qjs_wasm_binding") {
+  sources = js_binding_src
+  sources += wasm_src
+  sources += prism_dummy_src
+  complete_static_lib = true
+  public_deps = [
+    "//src:quickjs_lib",
+  ]
+  deps = [
+    "//src/basic/modp_b64:modp_b64",
+    "//tools/wasm3:wasm3_libs",
+  ]
+
+  configs += [
+    "//tools/wasm3:wasm3_config",
+  ]
+  
+  public_configs = [
+    "//:wasm_public_config",
+    "//src/wasm:qjs_priv_config",
+    ":wasm_internal_config"
+  ]
+  if (is_mac || is_ios) {
+    frameworks = [ "JavaScriptCore.framework" ]
+  }
+}
+
+executable("qjs-cli") {
+  cflags = [ "-Wno-c99-designator" ]
+  sources = [ "quick-cli.cc" ]
+  deps = [
+    ":qjs_wasm_binding",
+  ]
+  configs += [
+    # "//:quickjs_public_config",
+    ":wasm_internal_config",
+    "//tools/wasm3:wasm3_config",
+  ]
+}
