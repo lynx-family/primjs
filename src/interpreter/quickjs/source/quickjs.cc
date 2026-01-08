@@ -13915,17 +13915,8 @@ QJS_STATIC LEPUSValue JS_CallInternal(LEPUSContext *caller_ctx,
 #endif
 
 #if !DIRECT_DISPATCH
-#if 0
-#define SWITCH(pc)                                                  \
-  opcode = *pc;                                                     \
-  if (ctx->op_transform_callback.decode_opcode) {                   \
-    opcode = ctx->op_transform_callback.decode_opcode(ctx, opcode); \
-  }                                                                 \
-  pc++;                                                             \
-  switch (opcode)
-#else
+
 #define SWITCH(pc) switch (opcode = *pc++)
-#endif
 #define CASE(op) case op
 #define DEFAULT default
 #define BREAK break
@@ -13940,17 +13931,8 @@ QJS_STATIC LEPUSValue JS_CallInternal(LEPUSContext *caller_ctx,
 #include "quickjs/include/quickjs-opcode.h"
     [OP_COUNT... 255] = &&case_default
   };
-#if 0
-#define SWITCH(pc)                                                       \
-  opcode = *pc;                                                          \
-  if (ctx->op_transform_callback.decode_opcode) {                        \
-    opcode = (int)ctx->op_transform_callback.decode_opcode(ctx, opcode); \
-  }                                                                      \
-  pc++;                                                                  \
-  goto *dispatch_table[opcode];
-#else
+
 #define SWITCH(pc) goto *dispatch_table[opcode = *pc++];
-#endif
 #define CASE(op) case_##op
 #define DEFAULT case_default
 #define BREAK SWITCH(pc)
