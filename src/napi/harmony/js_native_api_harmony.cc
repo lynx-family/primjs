@@ -1,4 +1,8 @@
 
+// Copyright 2024 The Lynx Authors. All rights reserved.
+// Licensed under the Apache License Version 2.0 that can be found in the
+// LICENSE file in the root directory of this source tree.
+
 #include "js_native_api_harmony.h"
 
 #include <ark_runtime/jsvm.h>
@@ -46,14 +50,39 @@ namespace harmonyimpl {
 
 static std::string GetExceptionMessage(JSVM_Env env, JSVM_Value exception) {
   std::string ret;
-  JSVM_Value stack, message;
-  OH_JSVM_GetNamedProperty(env, exception, "stack", &stack);
-  OH_JSVM_GetNamedProperty(env, exception, "message", &message);
-  char buffer[256];
-  OH_JSVM_GetValueStringUtf8(env, message, buffer, sizeof(buffer), nullptr);
-  ret += buffer;
-  OH_JSVM_GetValueStringUtf8(env, stack, buffer, sizeof(buffer), nullptr);
-  return ret + "\n" + buffer;
+  JSVM_Value stack = nullptr, message = nullptr;
+  bool is_string = false;
+  if ((OH_JSVM_GetNamedProperty(env, exception, "stack", &stack) == JSVM_OK) &&
+      (OH_JSVM_GetNamedProperty(env, exception, "message", &message) ==
+       JSVM_OK) &&
+      stack && message) {
+    OH_JSVM_IsString(env, message, &is_string);
+    ret = "exception message: ";
+    if (is_string) {
+      size_t length;
+      OH_JSVM_GetValueStringUtf8(env, message, nullptr, 0, &length);
+      if (length) {
+        std::string message_str(length + 1, '\0');
+        OH_JSVM_GetValueStringUtf8(env, message, message_str.data(), length,
+                                   nullptr);
+        ret += message_str;
+      }
+    }
+    ret += "\nstack:\n";
+    is_string = false;
+    OH_JSVM_IsString(env, stack, &is_string);
+    if (is_string) {
+      size_t length;
+      OH_JSVM_GetValueStringUtf8(env, stack, nullptr, 0, &length);
+      if (length) {
+        std::string stack_str(length + 1, '\0');
+        OH_JSVM_GetValueStringUtf8(env, stack, stack_str.data(), length,
+                                   nullptr);
+        ret += stack_str;
+      }
+    }
+  }
+  return ret;
 }
 
 ExternalNativeInfo::ExternalNativeInfo(napi_env env, napi_finalize fcb,
