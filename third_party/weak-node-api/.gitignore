@@ -1,0 +1,17 @@
+# Node/Build outputs
+node_modules/
+build/
+dist/
+out/
+xcframeworks/
+vendor/
+generated/
+include/
+prebuilt/
+
+# macOS
+.DS_Store
+
+# Archives
+*.tgz
+*.zip
