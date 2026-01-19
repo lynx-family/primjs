@@ -30,6 +30,10 @@
 #ifndef SRC_INTERPRETER_QUICKJS_INCLUDE_QUICKJS_H_
 #define SRC_INTERPRETER_QUICKJS_INCLUDE_QUICKJS_H_
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <math.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -71,6 +75,8 @@ typedef struct LEPUSRuntime LEPUSRuntime;
 typedef struct LEPUSContext LEPUSContext;
 typedef struct LEPUSObject LEPUSObject;
 typedef struct LEPUSClass LEPUSClass;
+typedef struct JSMapRecord JSMapRecord;
+typedef struct JSString JSString;
 typedef uint32_t LEPUSClassID;
 typedef uint32_t JSAtom;
 typedef uint32_t LEPUSAtom;
@@ -97,12 +103,65 @@ typedef struct LEPUSScriptSource LEPUSScriptSource;
 
 enum {
   ALLOC_TAG_WITHOUT_PTR = 1,
-#define DEFTAG(name, str) ALLOC_TAG_##name,
-#include "quickjs-tag.h"
-#undef DEFTAG
+  ALLOC_TAG_LEPUSObject,
+  ALLOC_TAG_LEPUSLepusRef,
+  ALLOC_TAG_JSString,
+  ALLOC_TAG_JSShape,
+  ALLOC_TAG_LEPUSFunctionBytecode,
+  ALLOC_TAG_JSTypedArray,
+  ALLOC_TAG_JSMapState,
+  ALLOC_TAG_JSMapIteratorData,
+  ALLOC_TAG_JSFunctionDef,
+  ALLOC_TAG_JSArrayBuffer,
+  ALLOC_TAG_LEPUSScriptSource,
+  ALLOC_TAG_LEPUSModuleDef,
+  ALLOC_TAG_JSGeneratorData,
+  ALLOC_TAG_JSAsyncFunctionData,
+  ALLOC_TAG_JSVarRef,
+  ALLOC_TAG_JSBoundFunction,
+  ALLOC_TAG_JSCFunctionDataRecord,
+  ALLOC_TAG_JSForInIterator,
+  ALLOC_TAG_JSSeparableString,
+  ALLOC_TAG_JSArrayIteratorData,
+  ALLOC_TAG_JSRegExpStringIteratorData,
+  ALLOC_TAG_JSProxyData,
+  ALLOC_TAG_JSPromiseData,
+  ALLOC_TAG_JSPromiseReactionData,
+  ALLOC_TAG_JSPromiseFunctionData,
+  ALLOC_TAG_JSAsyncFromSyncIteratorData,
+  ALLOC_TAG_JSAsyncGeneratorData,
+  ALLOC_TAG_LEPUSPropertyEnum,
+  ALLOC_TAG_JSMapRecord,
+  ALLOC_TAG_FinalizationRegistryData,
+  ALLOC_TAG_WeakRefData,
+  ALLOC_TAG_FinalizationRegistryEntry,
+  ALLOC_TAG_WeakRefRecord,
+  ALLOC_TAG_RelocEntry,
+  ALLOC_TAG_JSBigInt,
+  ALLOC_TAG_JSOSRWHandler,
+  ALLOC_TAG_JSOSSignalHandler,
+  ALLOC_TAG_JSOSTimer,
+  ALLOC_TAG_JSSTDFile,
+  ALLOC_TAG_JSSymbol,
+  ALLOC_TAG_JSValueArray,
+  ALLOC_TAG_JSConstString,
+  ALLOC_TAG_JsonStrArray,
+  ALLOC_TAG_LabelSlotArray,
+  ALLOC_TAG_CallerStrSlotArray,
+  ALLOC_TAG_LEPUSPropertyEnumArray,
+  ALLOC_TAG_JSVarRefPtrArray,
+  ALLOC_TAG_JSReqModuleEntryArray,
+  ALLOC_TAG_JSExportEntryArray,
+  ALLOC_TAG_JSImportEntryArray,
+  ALLOC_TAG_JSResolveEntryArray,
+  ALLOC_TAG_LEPUSBreakpointArray,
+  ALLOC_TAG_JSPropertyArray,
+  ALLOC_TAG_ValueSlotArray,
+  ALLOC_TAG_AtomArray,
+  ALLOC_TAG_JSAsyncGeneratorRequest,
+  ALLOC_TAG_JSAsyncVarRef,
   ALLOC_TAG_END,
 };
-
 // <Primjs begin>
 typedef enum LEPUSTypedArrayType {
   LEPUS_TYPED_UNKNOW,
@@ -1628,5 +1687,9 @@ void *LEPUS_GetGCObserver(LEPUSRuntime *rt);
 
 #undef lepus_unlikely
 #undef lepus_force_inline
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif  // SRC_INTERPRETER_QUICKJS_INCLUDE_QUICKJS_H_
