@@ -185,28 +185,6 @@ int64_t HEAP_TAG_INNER = 0;
 #include <stdatomic.h>
 #endif
 
-// <primjs begin>
-
-static const int OUTER_HEAP_SIZE_LIMIT = 32 * MB;
-
-#if defined(ENABLE_PRIMJS_SNAPSHOT)
-static const int NUM_OF_TOS_STATES = 3;
-#endif
-
-#if defined(ENABLE_PRIMJS_SNAPSHOT)
-static pthread_mutex_t prim_init_mutex = PTHREAD_MUTEX_INITIALIZER;
-
-static bool IS_PRIM_INITIALIZED = false;
-
-#endif
-
-#if defined(ENABLE_PRIMJS_TRACE) && PRINT_LOG_TO_FILE && \
-    (defined(ANDROID) || defined(__ANDROID__))
-FILE *log_f = nullptr;
-#endif
-
-// <primjs end>
-
 /* number of typed array types */
 #define JS_TYPED_ARRAY_COUNT \
   (JS_CLASS_BIG_UINT64_ARRAY - JS_CLASS_UINT8C_ARRAY + 1)
@@ -893,15 +871,6 @@ int init_bigint_name(LEPUSRuntime *rt) {
   return 0;
 }
 
-#ifdef ENABLE_PRIMJS_SNAPSHOT
-bool primjs_snapshot_enabled() {
-  if (gc_enabled()) {
-    return true;
-  }
-  return false;
-}
-#endif
-
 bool gc_enabled() {
 #ifdef ENABLE_COMPATIBLE_MM
 #if defined(ENABLE_TRACING_GC) || defined(ENABLE_TT_ANDROID_MODE)
@@ -978,9 +947,7 @@ LEPUSRuntime *LEPUS_NewRuntime2(const LEPUSMallocFunctions *mf, void *opaque,
 
   rt->qjsvaluevalue_allocator = new QJSValueValueSpace(rt);
 
-#ifdef ENABLE_PRIMJS_SNAPSHOT
   rt->use_primjs = false;
-#endif
   rt->mf = *mf;
 #if defined(__aarch64__) && (defined(ANDROID) || defined(__ANDROID__)) && \
     !DISABLE_NANBOX
@@ -1043,9 +1010,6 @@ LEPUSRuntime *LEPUS_NewRuntime2(const LEPUSMallocFunctions *mf, void *opaque,
   rt->stack_size = LEPUS_DEFAULT_STACK_SIZE;
   rt->current_exception = LEPUS_NULL;
 
-  // Primjs begin
-  js_init_settings_options(rt);
-  // Primjs end
   return rt;
 fail:
   LEPUS_FreeRuntime(rt);
@@ -1062,10 +1026,7 @@ void JS_ResetRuntimeForEffect(LEPUSRuntime *rt, const LEPUSMallocFunctions *mf,
 
   if (!rt) return;
   rt->gc_enable = false;
-
-#ifdef ENABLE_PRIMJS_SNAPSHOT
   rt->use_primjs = false;
-#endif
   rt->mf = *mf;
 #if defined(__aarch64__) && (defined(ANDROID) || defined(__ANDROID__)) && \
     !DISABLE_NANBOX
@@ -3978,9 +3939,6 @@ QJS_STATIC LEPUSValue JS_ConcatSeparableString(LEPUSContext *ctx,
 }
 
 LEPUSValue JS_ConcatString(LEPUSContext *ctx, LEPUSValue op1, LEPUSValue op2) {
-  if (separable_string_disabled(ctx->rt)) {
-    return JS_ConcatStringOriginal(ctx, op1, op2);
-  }
   return JS_ConcatSeparableString(ctx, op1, op2);
 }
 
@@ -4661,24 +4619,11 @@ LEPUSValue LEPUS_NewObjectProto(LEPUSContext *ctx, LEPUSValueConst proto) {
   return JS_NewObjectProtoClass_RC(ctx, proto, JS_CLASS_OBJECT);
 }
 
-LEPUSValue PRIM_JS_NewArray(LEPUSContext *ctx) {
-  return JS_NewObjectFromShape(ctx, js_dup_shape(ctx->array_shape),
-                               JS_CLASS_ARRAY);
-}
-
 LEPUSValue LEPUS_NewArray(LEPUSContext *ctx) {
   CallGCFunc(JS_NewArray_GC, ctx);
   return JS_NewObjectFromShape(ctx, js_dup_shape(ctx->array_shape),
                                JS_CLASS_ARRAY);
 }
-
-// <primjs begin>
-LEPUSValue PRIM_JS_NewObject(LEPUSContext *ctx) {
-  /* inline LEPUS_NewObjectClass(ctx, JS_CLASS_OBJECT); */
-  return JS_NewObjectProtoClass_RC(ctx, ctx->class_proto[JS_CLASS_OBJECT],
-                                   JS_CLASS_OBJECT);
-}
-// <primjs end>
 
 LEPUSValue LEPUS_NewObject(LEPUSContext *ctx) {
   CallGCFunc(JS_NewObject_GC, ctx);
@@ -28712,14 +28657,7 @@ QJS_STATIC __exception int compute_stack_size_rec(LEPUSContext *ctx,
     if (s->stack_level_tab[pos] != 0xffff) {
       /* already explored: check that the stack size is consistent */
       if (s->stack_level_tab[pos] != stack_len) {
-        if (!ctx->rt->settings_option.disable_adjust_stacksize) {
-          s->stack_level_tab[pos] = max_int(stack_len, s->stack_level_tab[pos]);
-        } else {
-          LEPUS_ThrowInternalError(ctx,
-                                   "unconsistent stack size: %d %d (pc=%d)",
-                                   s->stack_level_tab[pos], stack_len, pos);
-          return -1;
-        }
+        s->stack_level_tab[pos] = max_int(stack_len, s->stack_level_tab[pos]);
       } else {
         return 0;
       }
@@ -41184,11 +41122,7 @@ QJS_STATIC LEPUSValue js_json_parse(LEPUSContext *ctx, LEPUSValueConst this_val,
 
   str = JS_ToCStringLen2_RC(ctx, &len, argv[0], 0);
   if (!str) return LEPUS_EXCEPTION;
-  if (!json_opt_disabled(ctx->rt)) {
-    obj = JS_ParseJSONOPT(ctx, str, len, "<input>");
-  } else {
-    obj = LEPUS_ParseJSON(ctx, str, len, "<input>");
-  }
+  obj = JS_ParseJSONOPT(ctx, str, len, "<input>");
   LEPUS_FreeCString(ctx, str);
   if (LEPUS_IsException(obj)) return obj;
   if (argc > 1 && LEPUS_IsFunction(ctx, argv[1])) {
@@ -42872,13 +42806,8 @@ static const LEPUSCFunctionListEntry js_json_obj_opt[] = {
 void LEPUS_AddIntrinsicJSON(LEPUSContext *ctx) {
   CallGCFunc(JS_AddIntrinsicJSON_GC, ctx);
   /* add JSON as autoinit object */
-  if (!json_opt_disabled(ctx->rt)) {
-    LEPUS_SetPropertyFunctionList(ctx, ctx->global_obj, js_json_obj_opt,
-                                  countof(js_json_obj_opt));
-  } else {
-    LEPUS_SetPropertyFunctionList(ctx, ctx->global_obj, js_json_obj,
-                                  countof(js_json_obj));
-  }
+  LEPUS_SetPropertyFunctionList(ctx, ctx->global_obj, js_json_obj_opt,
+                                countof(js_json_obj_opt));
 }
 
 /* Reflect */
@@ -51105,23 +51034,18 @@ LEPUSValue JS_StructuredClone(LEPUSContext *ctx, LEPUSValue src,
       JSShape *sh = nullptr;
       LEPUSValue ret = LEPUS_UNDEFINED;
 
-      if (!deepclone_opt_disabled(ctx->rt)) {
-        if (class_id != JS_CLASS_PROMISE &&
-            ((class_id >= JS_CLASS_C_FUNCTION &&
-              class_id <= JS_CLASS_GENERATOR_FUNCTION) ||
-             (class_id >= JS_CLASS_MAP_ITERATOR &&
-              class_id <= JS_CLASS_ASYNC_GENERATOR) ||
-             class_id >= JS_CLASS_INIT_COUNT)) {
-          return LEPUS_DupValue(ctx, src);
-        }
-        sh = p->shape;
-        proto = sh->proto;
-        ret = JS_NewObjectProtoClass_RC(
-            ctx, LEPUS_MKPTR(LEPUS_TAG_OBJECT, proto), class_id);
-      } else {
-        sh = p->shape;
-        ret = LEPUS_NewObjectClass(ctx, class_id);
+      if (class_id != JS_CLASS_PROMISE &&
+          ((class_id >= JS_CLASS_C_FUNCTION &&
+            class_id <= JS_CLASS_GENERATOR_FUNCTION) ||
+           (class_id >= JS_CLASS_MAP_ITERATOR &&
+            class_id <= JS_CLASS_ASYNC_GENERATOR) ||
+           class_id >= JS_CLASS_INIT_COUNT)) {
+        return LEPUS_DupValue(ctx, src);
       }
+      sh = p->shape;
+      proto = sh->proto;
+      ret = JS_NewObjectProtoClass_RC(ctx, LEPUS_MKPTR(LEPUS_TAG_OBJECT, proto),
+                                      class_id);
 
       LEPUSObject *ret_p = LEPUS_VALUE_GET_OBJ(ret);
       state.SetValue(p, ret_p);
@@ -51257,70 +51181,63 @@ LEPUSValue JS_StructuredClone(LEPUSContext *ctx, LEPUSValue src,
           }
         } break;
         case JS_CLASS_MAP ... JS_CLASS_WEAKSET: {
-          if (!deepclone_opt_disabled(ctx->rt)) {
-            uint8_t magic = class_id - JS_CLASS_MAP;
-            bool is_set = magic & MAGIC_SET;
-            auto map_state = p->u.map_state;
-            auto *ms = reinterpret_cast<JSMapState *>(
-                lepus_mallocz(ctx, sizeof(JSMapState)));
-            if (!ms) goto fail;
-            init_list_head(&ms->records);
-            LEPUS_SetOpaque(ret, ms);
-            ms->is_weak = map_state->is_weak;
-            ms->record_count = 0;
-            ms->hash_size = 1;
-            ms->hash_table = static_cast<struct list_head *>(
-                lepus_malloc(ctx, sizeof(ms->hash_table[0]) * ms->hash_size));
-            if (!ms->hash_table) goto fail;
-            init_list_head(&ms->hash_table[0]);
-            ms->record_count_threshold = 4;
-            LEPUSValue adder = JS_GetPropertyInternal_RC(
-                ctx, ret, is_set ? JS_ATOM_add : JS_ATOM_set, ret, 0);
-            if (unlikely(LEPUS_IsException(adder))) goto fail;
-            if (unlikely(!LEPUS_IsFunction(ctx, adder))) {
-              LEPUS_ThrowTypeError(ctx, "set/add is not a function");
+          uint8_t magic = class_id - JS_CLASS_MAP;
+          bool is_set = magic & MAGIC_SET;
+          auto map_state = p->u.map_state;
+          auto *ms = reinterpret_cast<JSMapState *>(
+              lepus_mallocz(ctx, sizeof(JSMapState)));
+          if (!ms) goto fail;
+          init_list_head(&ms->records);
+          LEPUS_SetOpaque(ret, ms);
+          ms->is_weak = map_state->is_weak;
+          ms->record_count = 0;
+          ms->hash_size = 1;
+          ms->hash_table = static_cast<struct list_head *>(
+              lepus_malloc(ctx, sizeof(ms->hash_table[0]) * ms->hash_size));
+          if (!ms->hash_table) goto fail;
+          init_list_head(&ms->hash_table[0]);
+          ms->record_count_threshold = 4;
+          LEPUSValue adder = JS_GetPropertyInternal_RC(
+              ctx, ret, is_set ? JS_ATOM_add : JS_ATOM_set, ret, 0);
+          if (unlikely(LEPUS_IsException(adder))) goto fail;
+          if (unlikely(!LEPUS_IsFunction(ctx, adder))) {
+            LEPUS_ThrowTypeError(ctx, "set/add is not a function");
+            goto fail1;
+          }
+          list_head *el;
+          JSMapRecord *rec;
+          LEPUSValue res;
+          list_for_each(el, &map_state->records) {
+            rec = list_entry(el, JSMapRecord, link);
+            if (rec->empty) continue;
+            LEPUSValue ms_key = JS_StructuredClone(ctx, rec->key, state);
+            if (LEPUS_IsException(ms_key)) {
               goto fail1;
             }
-            list_head *el;
-            JSMapRecord *rec;
-            LEPUSValue res;
-            list_for_each(el, &map_state->records) {
-              rec = list_entry(el, JSMapRecord, link);
-              if (rec->empty) continue;
-              LEPUSValue ms_key = JS_StructuredClone(ctx, rec->key, state);
-              if (LEPUS_IsException(ms_key)) {
+            LEPUSValue ms_value = LEPUS_UNDEFINED;
+            if (!is_set) {
+              LEPUSValue args[2];
+              args[0] = ms_key;
+              ms_value = JS_StructuredClone(ctx, rec->value, state);
+              if (LEPUS_IsException(ms_value)) {
                 goto fail1;
               }
-              LEPUSValue ms_value = LEPUS_UNDEFINED;
-              if (!is_set) {
-                LEPUSValue args[2];
-                args[0] = ms_key;
-                ms_value = JS_StructuredClone(ctx, rec->value, state);
-                if (LEPUS_IsException(ms_value)) {
-                  goto fail1;
-                }
-                args[1] = ms_value;
+              args[1] = ms_value;
 
-                res = JS_Call_RC(ctx, adder, ret, 2, args);
-                LEPUS_FreeValue(ctx, ms_value);
-              } else {
-                res = JS_Call_RC(ctx, adder, ret, 1, &ms_key);
-              }
-              LEPUS_FreeValue(ctx, ms_key);
-              if (unlikely(LEPUS_IsException(res))) goto fail1;
-              LEPUS_FreeValue(ctx, res);
+              res = JS_Call_RC(ctx, adder, ret, 2, args);
+              LEPUS_FreeValue(ctx, ms_value);
+            } else {
+              res = JS_Call_RC(ctx, adder, ret, 1, &ms_key);
             }
-            LEPUS_FreeValue(ctx, adder);
-            break;
-          fail1:
-            LEPUS_FreeValue(ctx, adder);
-            goto fail;
-          } else {
-            LEPUS_ThrowTypeError(
-                ctx, "object classid: %d is not supported in StructuredClone",
-                p->class_id);
-            goto fail;
+            LEPUS_FreeValue(ctx, ms_key);
+            if (unlikely(LEPUS_IsException(res))) goto fail1;
+            LEPUS_FreeValue(ctx, res);
           }
+          LEPUS_FreeValue(ctx, adder);
+          break;
+        fail1:
+          LEPUS_FreeValue(ctx, adder);
+          goto fail;
         }
         default: {
           LEPUS_ThrowTypeError(
@@ -51562,136 +51479,6 @@ LEPUSValue GetAnonFunc(LEPUSFunctionBytecode *b) {
 #endif
 
 #endif  // end of quickjs debugger
-
-// <primjs begin>
-#ifdef ENABLE_PRIMJS_SNAPSHOT
-
-no_inline void prim_js_print(const char *msg) { printf("msg: %s\n", msg); }
-
-no_inline void prim_js_print_register(uint64_t reg_val) {
-  printf("Register: %p\n", (void *)reg_val);
-}
-
-static int trace_id = 0;
-
-void prim_js_print_trace(int bytecode, int tos) {
-  const char *name = short_opcode_info((OPCodeEnum)bytecode).name;
-  PRIM_LOG("TRACE: id: %d, opcode %d, %s tos %d\n", trace_id++, bytecode, name,
-           tos);
-}
-
-no_inline void prim_js_print_func(LEPUSContext *ctx, LEPUSValue func_obj) {
-  if (LEPUS_VALUE_IS_OBJECT(func_obj)) {
-    LEPUSObject *p = LEPUS_VALUE_GET_OBJ(func_obj);
-    LEPUSFunctionBytecode *b = p->u.func.function_bytecode;
-    if (p->class_id == JS_CLASS_BYTECODE_FUNCTION) {
-      const char *func_name = get_func_name(ctx, func_obj);
-      if (!func_name || func_name[0] == '\0') {
-        PRIM_LOG("primjs call bytecode function: \n");
-      } else {
-        PRIM_LOG("primjs call bytecode function: %s\n", func_name);
-      }
-    }
-  }
-}
-
-void prim_close_var_refs(LEPUSContext *ctx, LEPUSStackFrame *sf) {
-  struct list_head *el, *el1;
-  JSVarRef *var_ref;
-  int var_idx;
-  list_for_each_safe(el, el1, &sf->var_ref_list) {
-    var_ref = list_entry(el, JSVarRef, link);
-    if (var_ref->header.ref_count > 1) {
-      var_ref->value = LEPUS_DupValue(ctx, *var_ref->pvalue);
-      var_ref->pvalue = &var_ref->value;
-      var_ref->is_detached = 1;
-      var_ref->header.ref_count--;
-    } else {
-      lepus_free(ctx, var_ref);
-    }
-  }
-  lepus_free(ctx, sf->var_refs);
-  return;
-}
-
-/* called with the ref_count of 'v' reaches zero. */
-void JS_FreeValueRef(LEPUSContext *ctx, LEPUSValue v) {
-  LEPUSRuntime *rt = ctx->rt;
-  int64_t tag = LEPUS_VALUE_GET_TAG(v);
-
-#ifdef DUMP_FREE
-  {
-    printf("Freeing ");
-    if (tag == LEPUS_TAG_OBJECT) {
-      JS_DumpObject(rt, LEPUS_VALUE_GET_OBJ(v));
-    } else {
-      JS_DumpValueShort(rt, v);
-      printf("\n");
-    }
-  }
-#endif
-
-  switch (tag) {
-    case LEPUS_TAG_STRING: {
-      JSString *p = LEPUS_VALUE_GET_STRING(v);
-      if (p->atom_type) {
-        JS_FreeAtomStruct(rt, p);
-      } else {
-#ifdef DUMP_LEAKS
-        list_del(&p->link);
-#endif
-
-#ifdef ENABLE_LEPUSNG
-        // <Primjs begin>
-        JS_FreeStringCache(rt, p);
-        // <Primjs end>
-#endif
-        lepus_free_rt(rt, p);
-      }
-    } break;
-    case LEPUS_TAG_SEPARABLE_STRING: {
-      JS_FreeSeparableString(rt, v);
-    } break;
-    case LEPUS_TAG_OBJECT:
-      free_object(rt, LEPUS_VALUE_GET_OBJ(v));
-      break;
-    case LEPUS_TAG_FUNCTION_BYTECODE:
-      free_function_bytecode(
-          rt, static_cast<LEPUSFunctionBytecode *>(LEPUS_VALUE_GET_PTR(v)));
-      break;
-    case LEPUS_TAG_SHAPE:
-    case LEPUS_TAG_ASYNC_FUNCTION:
-    case LEPUS_TAG_VAR_REF:
-    case LEPUS_TAG_MODULE:
-      abort(); /* never freed here */
-      break;
-    case LEPUS_TAG_BIG_INT: {
-      auto *p = LEPUS_VALUE_GET_BIGINT(v);
-      lepus_free_rt(rt, p);
-    } break;
-#ifdef ENABLE_LEPUSNG
-    // <Primjs begin>
-    case LEPUS_TAG_LEPUS_REF: {
-      if (rt->js_callbacks_.free_value) {
-        rt->js_callbacks_.free_value(rt, v);
-      }
-      break;
-    }
-    // <Primjs end>
-#endif
-    case LEPUS_TAG_SYMBOL: {
-      JSAtomStruct *p = static_cast<JSAtomStruct *>(LEPUS_VALUE_GET_PTR(v));
-      JS_FreeAtomStruct(rt, p);
-    } break;
-    default:
-      printf("__JS_FreeValue: unknown tag=%p\n", (void *)tag);
-      abort();
-  }
-}
-
-#endif
-
-// <primjs end>
 
 void *AllocateQJSValueValue(LEPUSRuntime *runtime) {
   return runtime->qjsvaluevalue_allocator->Create();
