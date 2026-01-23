@@ -106,13 +106,11 @@ endif()
 
 
 # primjs snapshot version
-if(${ENABLE_PRIMJS_SNAPSHOT} AND (${PLATFORM_ABI} MATCHES "arm64"))
+if(${ENABLE_COMPATIBLE_MM} AND (${PLATFORM_ABI} MATCHES "arm64"))
   add_definitions(-DENABLE_PRIMJS_SNAPSHOT)
-  if(${ENABLE_COMPATIBLE_MM} AND (${PLATFORM_ABI} MATCHES "arm64"))
-    add_definitions(-DENABLE_COMPATIBLE_MM)
-    if (ENABLE_TT_ANDROID_MODE MATCHES ${REGEX_TRUE})
-      add_definitions(-DENABLE_TT_ANDROID_MODE)
-    endif()
+  add_definitions(-DENABLE_COMPATIBLE_MM)
+  if (ENABLE_TT_ANDROID_MODE MATCHES ${REGEX_TRUE})
+    add_definitions(-DENABLE_TT_ANDROID_MODE)
   endif()
   if(${ENABLE_QUICKJS_DEBUGGER})
     set(primjs_embedded_sources
@@ -122,8 +120,6 @@ if(${ENABLE_PRIMJS_SNAPSHOT} AND (${PLATFORM_ABI} MATCHES "arm64"))
     set(primjs_embedded_sources
         ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/primjs/android/embedded.S)
   endif()
-else()
-
 endif()
 
 # armeabi can't use fenv.h/fesetround()

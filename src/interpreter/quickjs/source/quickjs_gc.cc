@@ -482,14 +482,14 @@ static const LEPUSClassExoticMethods js_arguments_exotic_methods = {
 static const LEPUSClassExoticMethods js_string_exotic_methods = {
     .get_own_property = js_string_get_own_property,
     .get_own_property_names = js_string_get_own_property_names,
-    .define_own_property = js_string_define_own_property,
     .delete_property = js_string_delete_property,
+    .define_own_property = js_string_define_own_property,
 };
 static const LEPUSClassExoticMethods js_proxy_exotic_methods = {
     .get_own_property = js_proxy_get_own_property,
-    .define_own_property = js_proxy_define_own_property,
-    .delete_property = js_proxy_delete_property,
     .get_own_property_names = js_proxy_get_own_property_names,
+    .delete_property = js_proxy_delete_property,
+    .define_own_property = js_proxy_define_own_property,
     .has_property = js_proxy_has,
     .get_property = js_proxy_get,
     .set_property = js_proxy_set,

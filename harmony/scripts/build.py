@@ -155,6 +155,7 @@ def main(argv):
                     f"-DENABLE_WORKER=true" if args.build_worker else "-DENABLE_WORKER=false",
                     f"-DENABLE_MONITOR=true",
                     f"-DENABLE_QUICKJS_DEBUGGER=true",
+                    f"-DENABLE_COMPATIBLE_MM=true",
                     f"-LH",
                     f'-DENABLE_BUILD_AAR=true',
                     f'-DENABLE_PRIMJS_HARMONY=true', 
