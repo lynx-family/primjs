@@ -13854,6 +13854,9 @@ QJS_STATIC LEPUSValue JS_CallInternal(LEPUSContext *caller_ctx,
       (!rt->debugger_callbacks_.run_message_loop_on_pause ||
        !caller_ctx->debugger_info)) {
     caller_ctx->debugger_mode = false;
+#ifdef ENABLE_PRIMJS_SNAPSHOT
+    JS_DetachDebuggerDispatchTable(caller_ctx);
+#endif
   }
   BOOL is_debug_mode = caller_ctx->debugger_mode;
   sf->pthis = is_debug_mode ? this_obj : LEPUS_UNDEFINED;
@@ -13982,7 +13985,7 @@ QJS_STATIC LEPUSValue JS_CallInternal(LEPUSContext *caller_ctx,
   ctx = caller_ctx;
 
 #ifdef ENABLE_QUICKJS_DEBUGGER
-  if (is_debug_mode) {
+  if (unlikely(is_debug_mode)) {
     DebuggerCallEachFunc(ctx, pc + 1);
   }
 #endif
@@ -13993,7 +13996,7 @@ restart:
 
     // <Primjs begin>
 #ifdef ENABLE_QUICKJS_DEBUGGER
-    if (is_debug_mode) {
+    if (unlikely(is_debug_mode)) {
       DebuggerCallEachOp(ctx, pc + 1, b);
     }
 #endif
@@ -14006,7 +14009,7 @@ restart:
       CASE(OP_push_const) : {
         *sp = LEPUS_DupValue(ctx, b->cpool[get_u32(pc)]);
 #ifdef ENABLE_QUICKJS_DEBUGGER
-        if (is_debug_mode) {
+        if (unlikely(is_debug_mode)) {
           DebuggerPause(ctx, *sp, pc);
         }
 #endif
@@ -14034,7 +14037,7 @@ restart:
       CASE(OP_push_const8) : {
         *sp = LEPUS_DupValue(ctx, b->cpool[*pc]);
 #ifdef ENABLE_QUICKJS_DEBUGGER
-        if (is_debug_mode) {
+        if (unlikely(is_debug_mode)) {
           DebuggerPause(ctx, *sp, pc);
         }
 #endif
@@ -51456,9 +51459,15 @@ void PrepareQJSDebuggerForSharedContext(LEPUSContext *ctx, void **funcs,
 
   if (devtool_connect) {
     ctx->debugger_mode = 1;
+#ifdef ENABLE_PRIMJS_SNAPSHOT
+    JS_AttachDebuggerDispatchTable(ctx);
+#endif
   } else {
     ctx->debugger_parse_script = 1;
     ctx->debugger_mode = 0;
+#ifdef ENABLE_PRIMJS_SNAPSHOT
+    JS_DetachDebuggerDispatchTable(ctx);
+#endif
   }
 #endif
   return;

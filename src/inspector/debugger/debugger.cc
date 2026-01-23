@@ -1678,6 +1678,9 @@ void HandleEnable(DebuggerParams *debugger_options) {
     // event
     if (!is_already_enabled) {
       ctx->debugger_mode = 1;
+#if defined(ENABLE_PRIMJS_SNAPSHOT) && defined(ENABLE_QUICKJS_DEBUGGER)
+      JS_AttachDebuggerDispatchTable(ctx);
+#endif
       info->is_debugger_enabled += 1;
       int32_t script_num = info->script_num;
       for (int32_t index = 0; index < script_num; ++index) {
@@ -2277,6 +2280,9 @@ LEPUSDebuggerInfo::LEPUSDebuggerInfo(LEPUSContext *ctx_) : ctx{ctx_} {
   if (auto *check_connect = ctx->rt->debugger_callbacks_.is_devtool_on) {
     if (check_connect(ctx->rt)) {
       ctx_->debugger_mode = 1;
+#if defined(ENABLE_PRIMJS_SNAPSHOT) && defined(ENABLE_QUICKJS_DEBUGGER)
+      JS_AttachDebuggerDispatchTable(ctx_);
+#endif
     }
   }
   return;
@@ -2339,6 +2345,9 @@ LEPUSDebuggerInfo::~LEPUSDebuggerInfo() {
     FreeStringPool(this);
   }
   ctx->debugger_mode = 0;
+#ifdef ENABLE_COMPATIBLE_MM
+  JS_DetachDebuggerDispatchTable(ctx);
+#endif
   return;
 }
 

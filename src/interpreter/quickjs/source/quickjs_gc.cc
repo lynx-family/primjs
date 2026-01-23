@@ -172,28 +172,6 @@ extern "C" {
 #include <stdatomic.h>
 #endif
 
-// <primjs begin>
-#define UNLIKELY(condition) (__builtin_expect(!!(condition), 0))
-#define LIKELY(condition) (__builtin_expect(!!(condition), 1))
-
-#if defined(ENABLE_PRIMJS_SNAPSHOT)
-static const int NUM_OF_TOS_STATES = 3;
-#endif
-
-#if defined(ENABLE_PRIMJS_SNAPSHOT)
-static pthread_mutex_t prim_init_mutex = PTHREAD_MUTEX_INITIALIZER;
-
-static bool IS_PRIM_INITIALIZED = false;
-
-#endif
-
-#if defined(ENABLE_PRIMJS_TRACE) && PRINT_LOG_TO_FILE && \
-    (defined(ANDROID) || defined(__ANDROID__))
-FILE *log_f = nullptr;
-#endif
-
-// <primjs end>
-
 /* number of typed array types */
 #define JS_TYPED_ARRAY_COUNT \
   (JS_CLASS_BIG_UINT64_ARRAY - JS_CLASS_UINT8C_ARRAY + 1)
@@ -1263,6 +1241,16 @@ static inline uint8_t *js_get_stack_pointer(void) {
 #endif
 
 // <primjs begin>
+static const int NUM_OF_TOS_STATES = 3;
+
+static pthread_mutex_t prim_init_mutex = PTHREAD_MUTEX_INITIALIZER;
+
+static bool IS_PRIM_INITIALIZED = false;
+
+#if defined(ENABLE_PRIMJS_TRACE) && PRINT_LOG_TO_FILE && \
+    (defined(ANDROID) || defined(__ANDROID__))
+FILE *log_f = nullptr;
+#endif
 
 void PrimInit_GC(LEPUSContext *ctx);
 // <primjs end>
@@ -8015,12 +8003,10 @@ QJS_STATIC inline __exception int js_poll_interrupts(LEPUSContext *ctx) {
 LEPUSValue JS_CallInternalTI_GC(LEPUSContext *caller_ctx, LEPUSValue func_obj,
                                 LEPUSValue this_obj, LEPUSValue new_target,
                                 int argc, LEPUSValue *argv, int flags) {
-#ifdef ENABLE_PRIMJS_SNAPSHOT
   if (caller_ctx->rt->use_primjs) {
     return entry(this_obj, new_target, func_obj, (address)caller_ctx, argc,
                  argv, flags);
   }
-#endif
   return LEPUS_UNDEFINED;
 }
 
@@ -27381,7 +27367,6 @@ failed:
 }
 
 // <primjs begin>
-#ifdef ENABLE_PRIMJS_SNAPSHOT
 
 no_inline void prim_js_print_gc(const char *msg) { printf("msg: %s\n", msg); }
 
@@ -28321,34 +28306,85 @@ LEPUSValue prim_js_operator_delete_gc(LEPUSContext *ctx, LEPUSValue op1,
   }
   return LEPUS_NewBool(ctx, ret);
 }
-#endif
+// <primjs begin>
 
-#ifdef ENABLE_PRIMJS_SNAPSHOT
 extern "C" void _call_stub_entry();
 
 extern "C" void _dispatch_table();
 
 extern "C" void _dispatch_table_offset();
 
+#if defined(ENABLE_PRIMJS_SNAPSHOT) && defined(ENABLE_QUICKJS_DEBUGGER)
+extern "C" void _debugger_check_0_0();
+extern "C" void _debugger_check_1_0();
+extern "C" void _debugger_check_2_0();
+#endif
+
 typedef unsigned char u_char;
 typedef u_char *address;
 
-address _table_gc[NUM_OF_TOS_STATES][OP_COUNT];
-
 #define CAST_TO_FN_PTR(func_type, value) (reinterpret_cast<func_type>(value))
 
-static void initialize_dispatchTable(LEPUSContext *ctx) {
-  for (int i = 0; i < NUM_OF_TOS_STATES; i++) {
-    for (int j = 1; j < OP_COUNT; j++) {
-      int offset = i * (OP_COUNT - 1) + j - 1;
-      int *table_entry =
-          reinterpret_cast<int *>(&_dispatch_table_offset) + offset;
-      int table_offset = *table_entry;
-      _table_gc[i][j] = (address)&_dispatch_table + table_offset;
+struct InterpreterTable {
+  InterpreterTable() {
+    table_ = new address[OP_COUNT * NUM_OF_TOS_STATES * 2];
+    for (int i = 0; i < NUM_OF_TOS_STATES; i++) {
+      for (int j = 1; j < OP_COUNT; j++) {
+        int offset = i * (OP_COUNT - 1) + j - 1;
+        int *table_entry =
+            reinterpret_cast<int *>(&_dispatch_table_offset) + offset;
+        int table_offset = *table_entry;
+        table_[i * OP_COUNT + j] = (address)&_dispatch_table + table_offset;
+      }
     }
+    debugger_table_ = table_ + NUM_OF_TOS_STATES * OP_COUNT;
+    debugger_table_[0] = nullptr;
   }
-  ctx->dispatch_table = _table_gc;
+
+#if defined(ENABLE_QUICKJS_DEBUGGER) && defined(ENABLE_PRIMJS_SNAPSHOT)
+  address *GetDebuggerTable() const {
+    if (debugger_table_[0] == nullptr) {
+      for (int32_t j = 0; j < OP_COUNT; ++j) {
+        debugger_table_[j] = (address)&_debugger_check_0_0;
+      }
+      for (int32_t j = 0; j < OP_COUNT; ++j) {
+        debugger_table_[OP_COUNT + j] = (address)&_debugger_check_1_0;
+      }
+      for (int32_t j = 0; j < OP_COUNT; ++j) {
+        debugger_table_[OP_COUNT * 2 + j] = (address)&_debugger_check_2_0;
+      }
+    }
+    return debugger_table_;
+  }
+#endif
+
+  static auto &GetInstance() {
+    static InterpreterTable table;
+    return table;
+  }
+
+  ~InterpreterTable() { delete[] table_; }
+
+  address *table_ = nullptr;
+  address *debugger_table_ = nullptr;
+};
+
+static void initialize_dispatchTable(LEPUSContext *ctx) {
+  ctx->dispatch_table = InterpreterTable::GetInstance().table_;
+  return;
 }
+
+#if defined(ENABLE_PRIMJS_SNAPSHOT) && defined(ENABLE_QUICKJS_DEBUGGER)
+void JS_AttachDebuggerDispatchTable(LEPUSContext *ctx) {
+  ctx->dispatch_table = InterpreterTable::GetInstance().GetDebuggerTable();
+  return;
+}
+
+void JS_DetachDebuggerDispatchTable(LEPUSContext *ctx) {
+  ctx->dispatch_table = InterpreterTable::GetInstance().table_;
+  return;
+}
+#endif
 
 static QuickJsCallStub call_stub() {
   return CAST_TO_FN_PTR(QuickJsCallStub, &_call_stub_entry);
@@ -28356,14 +28392,8 @@ static QuickJsCallStub call_stub() {
 
 void PrimInit_GC(LEPUSContext *ctx) {
   initialize_dispatchTable(ctx);
-#ifdef ENABLE_PRIMJS_SNAPSHOT
   entry = call_stub();
-#endif
 }
-
-#endif
-
-// <primjs end>
 
 #pragma clang diagnostic pop
 
@@ -30201,7 +30231,7 @@ PtrHandles::~PtrHandles() {
 }
 
 void PtrHandles::PushHandle(void *ptr, HandleType type) {
-  if (UNLIKELY(handle_idx == handle_size - 1)) {
+  if (unlikely(handle_idx == handle_size - 1)) {
     ResizeHandles();
   }
   handles[handle_idx].ptr = reinterpret_cast<void *>(ptr);

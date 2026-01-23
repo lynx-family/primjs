@@ -57,22 +57,6 @@ Label_5:
 .word 0xf9401988
 .word 0xf9400508
 .word 0x8b190116
-.word 0xb9414a69
-cbz w9, Label_6
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb10006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_6:
 .word 0x38400ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -83,7 +67,7 @@ Label_1:
 .word 0x39401908
 .word 0x121c0508
 .word 0xf100011f
-b.NE Label_7
+b.NE Label_6
 .word 0xf85b83b1
 .word 0xf9400a69
 .word 0xf940022a
@@ -94,21 +78,21 @@ b.NE Label_7
 bl _prim_close_var_refs_gc
 .word 0xa8c17ffe
 .word 0xf85c03bb
-Label_10:
-.word 0xeb1b029f
-b.EQ Label_9
-.word 0xf85f8e88
-b Label_10
 Label_9:
+.word 0xeb1b029f
+b.EQ Label_8
+.word 0xf85f8e88
+b Label_9
+Label_8:
 .word 0xa9770ba0
-cbnz x0, Label_11
-b Label_12
-Label_11:
+cbnz x0, Label_10
+b Label_11
+Label_10:
 .word 0xaa0203e0
 .word 0xa9bf7ffe
 bl _js_pop_virtual_sp
 .word 0xa8c17ffe
-Label_12:
+Label_11:
 .word 0xf94007be
 .cfi_startproc
 .word 0x910003bf
@@ -117,8 +101,8 @@ Label_12:
 .cfi_offset x29, -16
 .cfi_offset x30, -8
 .cfi_endproc
-b Label_8
-Label_7:
+b Label_7
+Label_6:
 .word 0xf85b83b1
 .word 0xf9001a36
 .word 0xf9002234
@@ -133,7 +117,7 @@ Label_7:
 .cfi_offset x29, -16
 .cfi_offset x30, -8
 .cfi_endproc
-Label_8:
+Label_7:
 .word 0xd2801040
 .word 0xd65f03c0
 .word 0xd4bbd5c1
@@ -148,12 +132,12 @@ _return_entry_0_1:
 .word 0xf85e03ae
 .word 0x910005d8
 .word 0xea18031f
-b.LE Label_13
-Label_14:
+b.LE Label_12
+Label_13:
 .word 0xd1002294
 .word 0xd1000718
-cbnz x24, Label_14
-Label_13:
+cbnz x24, Label_13
+Label_12:
 .word 0xf85983b6
 .word 0xf85c83ba
 .word 0xa97ae3b7
@@ -161,28 +145,12 @@ Label_13:
 .word 0xf85903a9
 .word 0x9100013f
 .word 0xf102081f
-b.NE Label_15
+b.NE Label_14
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_15:
-.word 0xb9414a69
-cbz w9, Label_16
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_16:
+Label_14:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -198,12 +166,12 @@ _return_entry_1_1:
 .word 0xf85e03ae
 .word 0x910005d8
 .word 0xea18031f
-b.LE Label_17
-Label_18:
+b.LE Label_15
+Label_16:
 .word 0xd1002294
 .word 0xd1000718
-cbnz x24, Label_18
-Label_17:
+cbnz x24, Label_16
+Label_15:
 .word 0xf85983b6
 .word 0xf85c83ba
 .word 0xa97ae3b7
@@ -211,28 +179,12 @@ Label_17:
 .word 0xf85903a9
 .word 0x9100013f
 .word 0xf102081f
-b.NE Label_19
+b.NE Label_17
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_19:
-.word 0xb9414a69
-cbz w9, Label_20
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_20:
+Label_17:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -240,6 +192,40 @@ Label_20:
 .cfi_endproc
 .global _return_entry_2_1
 _return_entry_2_1:
+.cfi_startproc
+.cfi_def_cfa x29,  16
+.cfi_offset x29, -16
+.cfi_offset x30, -8
+.word 0xf85f03b4
+.word 0xf85e03ae
+.word 0x910005d8
+.word 0xea18031f
+b.LE Label_18
+Label_19:
+.word 0xd1002294
+.word 0xd1000718
+cbnz x24, Label_19
+Label_18:
+.word 0xf85983b6
+.word 0xf85c83ba
+.word 0xa97ae3b7
+.word 0xf85a03bc
+.word 0xf85903a9
+.word 0x9100013f
+.word 0xf102081f
+b.NE Label_20
+.word 0x910006d6
+.word 0xf85b83b1
+.word 0xf9002234
+b __exception_handler_entry
+Label_20:
+.word 0x38401ec8
+.word 0x91079108
+.word 0xf8685aa9
+.word 0xd61f0120
+.cfi_endproc
+.global _return_entry_0_2
+_return_entry_0_2:
 .cfi_startproc
 .cfi_def_cfa x29,  16
 .cfi_offset x29, -16
@@ -262,77 +248,11 @@ Label_21:
 .word 0x9100013f
 .word 0xf102081f
 b.NE Label_23
-.word 0x910006d6
-.word 0xf85b83b1
-.word 0xf9002234
-b __exception_handler_entry
-Label_23:
-.word 0xb9414a69
-cbz w9, Label_24
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_24:
-.word 0x38401ec8
-.word 0x91079108
-.word 0xf8685aa9
-.word 0xd61f0120
-.cfi_endproc
-.global _return_entry_0_2
-_return_entry_0_2:
-.cfi_startproc
-.cfi_def_cfa x29,  16
-.cfi_offset x29, -16
-.cfi_offset x30, -8
-.word 0xf85f03b4
-.word 0xf85e03ae
-.word 0x910005d8
-.word 0xea18031f
-b.LE Label_25
-Label_26:
-.word 0xd1002294
-.word 0xd1000718
-cbnz x24, Label_26
-Label_25:
-.word 0xf85983b6
-.word 0xf85c83ba
-.word 0xa97ae3b7
-.word 0xf85a03bc
-.word 0xf85903a9
-.word 0x9100013f
-.word 0xf102081f
-b.NE Label_27
 .word 0x91000ad6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_27:
-.word 0xb9414a69
-cbz w9, Label_28
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_28:
+Label_23:
 .word 0x38402ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -348,12 +268,12 @@ _return_entry_1_2:
 .word 0xf85e03ae
 .word 0x910005d8
 .word 0xea18031f
-b.LE Label_29
-Label_30:
+b.LE Label_24
+Label_25:
 .word 0xd1002294
 .word 0xd1000718
-cbnz x24, Label_30
-Label_29:
+cbnz x24, Label_25
+Label_24:
 .word 0xf85983b6
 .word 0xf85c83ba
 .word 0xa97ae3b7
@@ -361,28 +281,12 @@ Label_29:
 .word 0xf85903a9
 .word 0x9100013f
 .word 0xf102081f
-b.NE Label_31
+b.NE Label_26
 .word 0x91000ad6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_31:
-.word 0xb9414a69
-cbz w9, Label_32
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_32:
+Label_26:
 .word 0x38402ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -390,6 +294,74 @@ Label_32:
 .cfi_endproc
 .global _return_entry_2_2
 _return_entry_2_2:
+.cfi_startproc
+.cfi_def_cfa x29,  16
+.cfi_offset x29, -16
+.cfi_offset x30, -8
+.word 0xf85f03b4
+.word 0xf85e03ae
+.word 0x910005d8
+.word 0xea18031f
+b.LE Label_27
+Label_28:
+.word 0xd1002294
+.word 0xd1000718
+cbnz x24, Label_28
+Label_27:
+.word 0xf85983b6
+.word 0xf85c83ba
+.word 0xa97ae3b7
+.word 0xf85a03bc
+.word 0xf85903a9
+.word 0x9100013f
+.word 0xf102081f
+b.NE Label_29
+.word 0x91000ad6
+.word 0xf85b83b1
+.word 0xf9002234
+b __exception_handler_entry
+Label_29:
+.word 0x38402ec8
+.word 0x91079108
+.word 0xf8685aa9
+.word 0xd61f0120
+.cfi_endproc
+.global _return_entry_0_3
+_return_entry_0_3:
+.cfi_startproc
+.cfi_def_cfa x29,  16
+.cfi_offset x29, -16
+.cfi_offset x30, -8
+.word 0xf85f03b4
+.word 0xf85e03ae
+.word 0x910005d8
+.word 0xea18031f
+b.LE Label_30
+Label_31:
+.word 0xd1002294
+.word 0xd1000718
+cbnz x24, Label_31
+Label_30:
+.word 0xf85983b6
+.word 0xf85c83ba
+.word 0xa97ae3b7
+.word 0xf85a03bc
+.word 0xf85903a9
+.word 0x9100013f
+.word 0xf102081f
+b.NE Label_32
+.word 0x91000ed6
+.word 0xf85b83b1
+.word 0xf9002234
+b __exception_handler_entry
+Label_32:
+.word 0x38403ec8
+.word 0x91000108
+.word 0xf8685aa9
+.word 0xd61f0120
+.cfi_endproc
+.global _return_entry_1_3
+_return_entry_1_3:
 .cfi_startproc
 .cfi_def_cfa x29,  16
 .cfi_offset x29, -16
@@ -412,127 +384,11 @@ Label_33:
 .word 0x9100013f
 .word 0xf102081f
 b.NE Label_35
-.word 0x91000ad6
+.word 0x91000ed6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
 Label_35:
-.word 0xb9414a69
-cbz w9, Label_36
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_36:
-.word 0x38402ec8
-.word 0x91079108
-.word 0xf8685aa9
-.word 0xd61f0120
-.cfi_endproc
-.global _return_entry_0_3
-_return_entry_0_3:
-.cfi_startproc
-.cfi_def_cfa x29,  16
-.cfi_offset x29, -16
-.cfi_offset x30, -8
-.word 0xf85f03b4
-.word 0xf85e03ae
-.word 0x910005d8
-.word 0xea18031f
-b.LE Label_37
-Label_38:
-.word 0xd1002294
-.word 0xd1000718
-cbnz x24, Label_38
-Label_37:
-.word 0xf85983b6
-.word 0xf85c83ba
-.word 0xa97ae3b7
-.word 0xf85a03bc
-.word 0xf85903a9
-.word 0x9100013f
-.word 0xf102081f
-b.NE Label_39
-.word 0x91000ed6
-.word 0xf85b83b1
-.word 0xf9002234
-b __exception_handler_entry
-Label_39:
-.word 0xb9414a69
-cbz w9, Label_40
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb10012c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_40:
-.word 0x38403ec8
-.word 0x91000108
-.word 0xf8685aa9
-.word 0xd61f0120
-.cfi_endproc
-.global _return_entry_1_3
-_return_entry_1_3:
-.cfi_startproc
-.cfi_def_cfa x29,  16
-.cfi_offset x29, -16
-.cfi_offset x30, -8
-.word 0xf85f03b4
-.word 0xf85e03ae
-.word 0x910005d8
-.word 0xea18031f
-b.LE Label_41
-Label_42:
-.word 0xd1002294
-.word 0xd1000718
-cbnz x24, Label_42
-Label_41:
-.word 0xf85983b6
-.word 0xf85c83ba
-.word 0xa97ae3b7
-.word 0xf85a03bc
-.word 0xf85903a9
-.word 0x9100013f
-.word 0xf102081f
-b.NE Label_43
-.word 0x91000ed6
-.word 0xf85b83b1
-.word 0xf9002234
-b __exception_handler_entry
-Label_43:
-.word 0xb9414a69
-cbz w9, Label_44
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb10012c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_44:
 .word 0x38403ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -548,12 +404,12 @@ _return_entry_2_3:
 .word 0xf85e03ae
 .word 0x910005d8
 .word 0xea18031f
-b.LE Label_45
-Label_46:
+b.LE Label_36
+Label_37:
 .word 0xd1002294
 .word 0xd1000718
-cbnz x24, Label_46
-Label_45:
+cbnz x24, Label_37
+Label_36:
 .word 0xf85983b6
 .word 0xf85c83ba
 .word 0xa97ae3b7
@@ -561,28 +417,12 @@ Label_45:
 .word 0xf85903a9
 .word 0x9100013f
 .word 0xf102081f
-b.NE Label_47
+b.NE Label_38
 .word 0x91000ed6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_47:
-.word 0xb9414a69
-cbz w9, Label_48
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb10012c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_48:
+Label_38:
 .word 0x38403ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -596,14 +436,14 @@ _normal_entry:
 .word 0x79405062
 .word 0x79405463
 .word 0xeb0201df
-b.LT Label_50
+b.LT Label_40
 .word 0x721f00df
-b.NE Label_50
+b.NE Label_40
 .word 0xd2800008
-b Label_49
-Label_50:
+b Label_39
+Label_40:
 .word 0xaa0203e8
-Label_49:
+Label_39:
 .word 0xd101c3f4
 .word 0xaa1403fb
 .word 0xa9097bfd
@@ -633,11 +473,11 @@ bl _js_get_stack_gc
 .word 0xa8c147ed
 .word 0xa8c17bee
 .word 0xa8c13fec
-cbz x0, Label_51
+cbz x0, Label_41
 .word 0xaa0003f4
-b Label_52
-b Label_52
-Label_51:
+b Label_42
+b Label_42
+Label_41:
 .word 0xa9bf7bee
 .word 0xaa1303e0
 .word 0xa9bf7ffe
@@ -645,51 +485,51 @@ bl _JS_ThrowStackOverflow_GC
 .word 0xa8c17ffe
 .word 0xa8c17bee
 .word 0xd65f03c0
-Label_52:
+Label_42:
 .word 0x910243fd
 .word 0x9100037f
 .word 0xaa1b03e0
 .word 0xaa0903e7
 .word 0xb9003a2e
 .word 0xaa1703fb
-cbz x8, Label_55
+cbz x8, Label_45
 .word 0xeb0201df
 .word 0xaa0e03eb
-b.LE Label_56
+b.LE Label_46
 .word 0xaa0203eb
-Label_56:
+Label_46:
 .word 0xd2800009
-Label_58:
+Label_48:
 .word 0xeb0b013f
-b.EQ Label_57
+b.EQ Label_47
 .word 0xf8697aea
 .word 0xf8297a8a
 .word 0x11000529
-b Label_58
-Label_57:
-Label_60:
+b Label_48
+Label_47:
+Label_50:
 .word 0xeb02013f
-b.EQ Label_59
+b.EQ Label_49
 .word 0xd280024a
 .word 0xf8297a8a
 .word 0x11000529
-b Label_60
-Label_59:
+b Label_50
+Label_49:
 .word 0xaa1403f7
 .word 0xb9003a22
-Label_55:
+Label_45:
 .word 0x8b284e98
 .word 0xaa1403f0
 .word 0x8b234f14
 .word 0xaa1803e9
 .word 0xea03007f
-b.LE Label_61
-Label_62:
+b.LE Label_51
+Label_52:
 .word 0xd280024a
 .word 0xf800852a
 .word 0xd1000463
-cbnz x3, Label_62
-Label_61:
+cbnz x3, Label_52
+Label_51:
 .word 0xf9401988
 .word 0xf9400516
 .word 0xa9386fb4
@@ -715,23 +555,23 @@ Label_61:
 .word 0xb090109
 .word 0xb9006229
 .word 0xb9414a68
-cbz w8, Label_63
+cbz w8, Label_53
 .word 0xf9400a68
 .word 0x91086108
 .word 0x91000108
 .word 0xf9400108
-cbz x8, Label_65
+cbz x8, Label_55
 .word 0xf9409a68
-cbz x8, Label_65
+cbz x8, Label_55
 .word 0xf9002a39
-b Label_64
-Label_65:
+b Label_54
+Label_55:
 .word 0x52a00008
 .word 0xb9014a68
-Label_63:
+Label_53:
 .word 0xd2800248
 .word 0xf9002a28
-Label_64:
+Label_54:
 .word 0xa9016237
 .word 0x91008229
 .word 0xa9002529
@@ -741,30 +581,14 @@ Label_64:
 .word 0xf900022a
 .word 0xf9007931
 .word 0xb9414a69
-cbz w9, Label_66
+cbz w9, Label_56
 .word 0x910006c8
 .word 0xaa0803e1
 .word 0xaa1303e0
 .word 0xa9bf7ffe
 bl _DebuggerCallEachFunc
 .word 0xa8c17ffe
-Label_66:
-.word 0xb9414a69
-cbz w9, Label_67
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb10006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_67:
+Label_56:
 .word 0x38400ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -788,11 +612,11 @@ _native_entry:
 .word 0x9b0a2509
 .word 0xf9400d28
 .word 0xf100011f
-b.EQ Label_68
+b.EQ Label_57
 .word 0xaa0603e5
 .word 0xaa1703e4
 .word 0xd61f0100
-Label_68:
+Label_57:
 .word 0xaa1303e0
 b _JS_ThrowTypeErrorNotFunction
 .cfi_endproc
@@ -843,11 +667,17 @@ _async_entry:
 .word 0xa93b47b8
 .word 0xb9400d68
 .word 0xf100011f
-b.EQ Label_69
+b.EQ Label_58
 b __exception_handler_entry
-Label_69:
-.word 0xb9414a69
-cbz w9, Label_70
+Label_58:
+.word 0x38400ec8
+.word 0x91000108
+.word 0xf8685aa9
+.word 0xd63f0120
+.word 0xd2802460
+.cfi_endproc
+.global __debugger_check_0_0
+__debugger_check_0_0:
 .word 0xf8008680
 .word 0xf8008681
 .word 0xb10006c8
@@ -861,24 +691,15 @@ bl _DebuggerCallEachOp
 .word 0xa8c17ffe
 .word 0xf85f8e81
 .word 0xf85f8e80
-Label_70:
-.word 0x38400ec8
-.word 0x91000108
-.word 0xf8685aa9
-.word 0xd63f0120
-.word 0xd2802460
-.cfi_endproc
-.global __dispatch_table
-__dispatch_table:
-.global _dispatch_table_0_1
-_dispatch_table_0_1:
-.word 0xb84012c0
-.word 0xb24f3800
-.word 0xb9414a69
-cbz w9, Label_71
+.word 0x394002c8
+.word 0xf10b5908
+.word 0xf8687aa9
+.word 0xd61f0120
+.global __debugger_check_1_0
+__debugger_check_1_0:
 .word 0xf8008680
 .word 0xf8008681
-.word 0xb1001ac8
+.word 0xb10006c8
 .word 0xf85e83ac
 .word 0xf9401989
 .word 0xaa0903e2
@@ -889,7 +710,35 @@ bl _DebuggerCallEachOp
 .word 0xa8c17ffe
 .word 0xf85f8e81
 .word 0xf85f8e80
-Label_71:
+.word 0x394002c8
+.word 0xf1079108
+.word 0xf8687aa9
+.word 0xd61f0120
+.global __debugger_check_2_0
+__debugger_check_2_0:
+.word 0xf8008680
+.word 0xf8008681
+.word 0xb10006c8
+.word 0xf85e83ac
+.word 0xf9401989
+.word 0xaa0903e2
+.word 0xaa0803e1
+.word 0xaa1303e0
+.word 0xa9bf7ffe
+bl _DebuggerCallEachOp
+.word 0xa8c17ffe
+.word 0xf85f8e81
+.word 0xf85f8e80
+.word 0x394002c8
+.word 0xf103c908
+.word 0xf8687aa9
+.word 0xd61f0120
+.global __dispatch_table
+__dispatch_table:
+.global _dispatch_table_0_1
+_dispatch_table_0_1:
+.word 0xb84012c0
+.word 0xb24f3800
 .word 0x38405ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -898,22 +747,6 @@ Label_71:
 _dispatch_table_1_1:
 .word 0xb84012c1
 .word 0xb24f3821
-.word 0xb9414a69
-cbz w9, Label_72
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_72:
 .word 0x38405ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -924,22 +757,6 @@ _dispatch_table_2_1:
 .word 0xaa0103e0
 .word 0xb84012c1
 .word 0xb24f3821
-.word 0xb9414a69
-cbz w9, Label_73
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_73:
 .word 0x38405ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -949,7 +766,7 @@ _dispatch_table_0_2:
 .word 0xb84012c0
 .word 0xf8607b40
 .word 0xb9414a68
-cbz w8, Label_74
+cbz w8, Label_59
 .word 0xf8008680
 .word 0xaa1603e2
 .word 0xaa0003e1
@@ -958,23 +775,7 @@ cbz w8, Label_74
 bl _DebuggerPause
 .word 0xa8c17ffe
 .word 0xf85f8e80
-Label_74:
-.word 0xb9414a69
-cbz w9, Label_75
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_75:
+Label_59:
 .word 0x38405ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -984,7 +785,7 @@ _dispatch_table_1_2:
 .word 0xb84012c1
 .word 0xf8617b41
 .word 0xb9414a68
-cbz w8, Label_76
+cbz w8, Label_60
 .word 0xf8008680
 .word 0xf8008681
 .word 0xaa1603e2
@@ -994,23 +795,7 @@ bl _DebuggerPause
 .word 0xa8c17ffe
 .word 0xf85f8e81
 .word 0xf85f8e80
-Label_76:
-.word 0xb9414a69
-cbz w9, Label_77
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_77:
+Label_60:
 .word 0x38405ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -1022,7 +807,7 @@ _dispatch_table_2_2:
 .word 0xb84012c1
 .word 0xf8617b41
 .word 0xb9414a68
-cbz w8, Label_78
+cbz w8, Label_61
 .word 0xf8008680
 .word 0xf8008681
 .word 0xaa1603e2
@@ -1032,23 +817,7 @@ bl _DebuggerPause
 .word 0xa8c17ffe
 .word 0xf85f8e81
 .word 0xf85f8e80
-Label_78:
-.word 0xb9414a69
-cbz w9, Label_79
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_79:
+Label_61:
 .word 0x38405ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -1067,30 +836,14 @@ _dispatch_table_0_3:
 bl _js_closure_gc
 .word 0xa8c17ffe
 .word 0xf102081f
-b.NE Label_82
+b.NE Label_64
 .word 0xd1002294
 .word 0x910016d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_82:
+Label_64:
 .word 0xd1002294
-.word 0xb9414a69
-cbz w9, Label_85
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_85:
 .word 0x38405ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -1112,7 +865,7 @@ _dispatch_table_1_3:
 bl _js_closure_gc
 .word 0xa8c17ffe
 .word 0xf102081f
-b.NE Label_89
+b.NE Label_70
 .word 0xd1002294
 .word 0xd1002294
 .word 0xf8008699
@@ -1120,27 +873,11 @@ b.NE Label_89
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_89:
+Label_70:
 .word 0xd1002294
 .word 0xd1002294
 .word 0xaa0003e1
 .word 0xaa1903e0
-.word 0xb9414a69
-cbz w9, Label_91
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_91:
 .word 0x38405ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -1162,7 +899,7 @@ _dispatch_table_2_3:
 bl _js_closure_gc
 .word 0xa8c17ffe
 .word 0xf102081f
-b.NE Label_96
+b.NE Label_76
 .word 0xd1002294
 .word 0xd1002294
 .word 0xf8008699
@@ -1170,27 +907,11 @@ b.NE Label_96
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_96:
+Label_76:
 .word 0xd1002294
 .word 0xd1002294
 .word 0xaa0003e1
 .word 0xaa1903e0
-.word 0xb9414a69
-cbz w9, Label_97
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_97:
 .word 0x38405ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -1205,22 +926,6 @@ _dispatch_table_0_4:
 .word 0xa9bf7ffe
 bl ___JS_AtomToValue_GC
 .word 0xa8c17ffe
-.word 0xb9414a69
-cbz w9, Label_98
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_98:
 .word 0x38405ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -1242,22 +947,6 @@ bl ___JS_AtomToValue_GC
 .word 0xf9002234
 .word 0xaa0003e1
 .word 0xaa1903e0
-.word 0xb9414a69
-cbz w9, Label_99
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_99:
 .word 0x38405ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -1280,22 +969,6 @@ bl ___JS_AtomToValue_GC
 .word 0xf9002234
 .word 0xaa0003e1
 .word 0xaa1903e0
-.word 0xb9414a69
-cbz w9, Label_100
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_100:
 .word 0x38405ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -1311,28 +984,12 @@ _dispatch_table_0_5:
 bl _JS_NewSymbolFromAtom_GC
 .word 0xa8c17ffe
 .word 0xf102081f
-b.NE Label_103
+b.NE Label_79
 .word 0x910016d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_103:
-.word 0xb9414a69
-cbz w9, Label_104
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_104:
+Label_79:
 .word 0x38405ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -1350,33 +1007,17 @@ _dispatch_table_1_5:
 bl _JS_NewSymbolFromAtom_GC
 .word 0xa8c17ffe
 .word 0xf102081f
-b.NE Label_105
+b.NE Label_80
 .word 0xd1002294
 .word 0xf8008699
 .word 0x910016d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_105:
+Label_80:
 .word 0xd1002294
 .word 0xaa0003e1
 .word 0xaa1903e0
-.word 0xb9414a69
-cbz w9, Label_107
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_107:
 .word 0x38405ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -1395,33 +1036,17 @@ _dispatch_table_2_5:
 bl _JS_NewSymbolFromAtom_GC
 .word 0xa8c17ffe
 .word 0xf102081f
-b.NE Label_109
+b.NE Label_83
 .word 0xd1002294
 .word 0xf8008699
 .word 0x910016d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_109:
+Label_83:
 .word 0xd1002294
 .word 0xaa0003e1
 .word 0xaa1903e0
-.word 0xb9414a69
-cbz w9, Label_110
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_110:
 .word 0x38405ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -1429,22 +1054,6 @@ Label_110:
 .global _dispatch_table_0_6
 _dispatch_table_0_6:
 .word 0xd2800240
-.word 0xb9414a69
-cbz w9, Label_111
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_111:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -1452,22 +1061,6 @@ Label_111:
 .global _dispatch_table_1_6
 _dispatch_table_1_6:
 .word 0xd2800241
-.word 0xb9414a69
-cbz w9, Label_112
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_112:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -1477,22 +1070,6 @@ _dispatch_table_2_6:
 .word 0xf8008680
 .word 0xaa0103e0
 .word 0xd2800241
-.word 0xb9414a69
-cbz w9, Label_113
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_113:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -1500,22 +1077,6 @@ Label_113:
 .global _dispatch_table_0_7
 _dispatch_table_0_7:
 .word 0xb27f03e0
-.word 0xb9414a69
-cbz w9, Label_114
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_114:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -1523,22 +1084,6 @@ Label_114:
 .global _dispatch_table_1_7
 _dispatch_table_1_7:
 .word 0xb27f03e1
-.word 0xb9414a69
-cbz w9, Label_115
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_115:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -1548,22 +1093,6 @@ _dispatch_table_2_7:
 .word 0xf8008680
 .word 0xaa0103e0
 .word 0xb27f03e1
-.word 0xb9414a69
-cbz w9, Label_116
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_116:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -1577,25 +1106,25 @@ _dispatch_table_1_8:
 .word 0xf9401988
 .word 0x39401508
 .word 0x7200011f
-b.NE Label_118
+b.NE Label_85
 .word 0xd2800049
 .word 0xf2ffffe9
 .word 0xf85d83b9
 .word 0xea09033f
-b.NE Label_117
-Label_118:
+b.NE Label_84
+Label_85:
 .word 0xf85d83b9
 .word 0xaa1903e0
-b Label_119
-Label_117:
+b Label_86
+Label_84:
 .word 0xf1000b3f
-b.EQ Label_120
+b.EQ Label_87
 .word 0xf1004b3f
-b.NE Label_121
-Label_120:
+b.NE Label_88
+Label_87:
 .word 0xf9406e60
-b Label_122
-Label_121:
+b Label_89
+Label_88:
 .word 0xf85b83b1
 .word 0xf9002234
 .word 0xaa1903e1
@@ -1604,50 +1133,18 @@ Label_121:
 bl _JS_ToObject_GC
 .word 0xa8c17ffe
 .word 0xf102081f
-b.NE Label_123
+b.NE Label_90
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_123:
-Label_122:
-.word 0xb9414a69
-cbz w9, Label_124
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_124:
+Label_90:
+Label_89:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_119:
-.word 0xb9414a69
-cbz w9, Label_125
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_125:
+Label_86:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -1663,25 +1160,25 @@ _dispatch_table_0_8:
 .word 0xf9401988
 .word 0x39401508
 .word 0x7200011f
-b.NE Label_127
+b.NE Label_92
 .word 0xd2800049
 .word 0xf2ffffe9
 .word 0xf85d83b9
 .word 0xea09033f
-b.NE Label_126
-Label_127:
+b.NE Label_91
+Label_92:
 .word 0xf85d83b9
 .word 0xaa1903e0
-b Label_128
-Label_126:
+b Label_93
+Label_91:
 .word 0xf1000b3f
-b.EQ Label_129
+b.EQ Label_94
 .word 0xf1004b3f
-b.NE Label_130
-Label_129:
+b.NE Label_95
+Label_94:
 .word 0xf9406e60
-b Label_131
-Label_130:
+b Label_96
+Label_95:
 .word 0xf85b83b1
 .word 0xf9002234
 .word 0xaa1903e1
@@ -1690,50 +1187,18 @@ Label_130:
 bl _JS_ToObject_GC
 .word 0xa8c17ffe
 .word 0xf102081f
-b.NE Label_132
+b.NE Label_97
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_132:
-Label_131:
-.word 0xb9414a69
-cbz w9, Label_133
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_133:
+Label_97:
+Label_96:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_128:
-.word 0xb9414a69
-cbz w9, Label_134
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_134:
+Label_93:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -1741,22 +1206,6 @@ Label_134:
 .global _dispatch_table_0_9
 _dispatch_table_0_9:
 .word 0xb27f07e0
-.word 0xb9414a69
-cbz w9, Label_135
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_135:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -1764,22 +1213,6 @@ Label_135:
 .global _dispatch_table_1_9
 _dispatch_table_1_9:
 .word 0xb27f07e1
-.word 0xb9414a69
-cbz w9, Label_136
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_136:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -1789,22 +1222,6 @@ _dispatch_table_2_9:
 .word 0xf8008680
 .word 0xaa0103e0
 .word 0xb27f07e1
-.word 0xb9414a69
-cbz w9, Label_137
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_137:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -1812,22 +1229,6 @@ Label_137:
 .global _dispatch_table_0_10
 _dispatch_table_0_10:
 .word 0xb2400be0
-.word 0xb9414a69
-cbz w9, Label_138
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_138:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -1835,22 +1236,6 @@ Label_138:
 .global _dispatch_table_1_10
 _dispatch_table_1_10:
 .word 0xb2400be1
-.word 0xb9414a69
-cbz w9, Label_139
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_139:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -1860,22 +1245,6 @@ _dispatch_table_2_10:
 .word 0xf8008680
 .word 0xaa0103e0
 .word 0xb2400be1
-.word 0xb9414a69
-cbz w9, Label_140
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_140:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -1889,28 +1258,12 @@ _dispatch_table_0_11:
 bl _PRIM_JS_NewObject_GC
 .word 0xa8c17ffe
 .word 0xf102081f
-b.NE Label_141
+b.NE Label_98
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_141:
-.word 0xb9414a69
-cbz w9, Label_142
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_142:
+Label_98:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -1925,30 +1278,14 @@ _dispatch_table_1_11:
 bl _PRIM_JS_NewObject_GC
 .word 0xa8c17ffe
 .word 0xf102081f
-b.NE Label_143
+b.NE Label_99
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_143:
+Label_99:
 .word 0xaa0003e1
 .word 0xf85f8e80
-.word 0xb9414a69
-cbz w9, Label_144
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_144:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -1963,30 +1300,14 @@ _dispatch_table_2_11:
 bl _PRIM_JS_NewObject_GC
 .word 0xa8c17ffe
 .word 0xf102081f
-b.NE Label_145
+b.NE Label_100
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_145:
+Label_100:
 .word 0xaa0003e1
 .word 0xf85f8e80
-.word 0xb9414a69
-cbz w9, Label_146
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_146:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -1999,7 +1320,7 @@ _dispatch_table_1_12:
 .word 0x394006c8
 .word 0xf85e03ae
 .word 0xf100011f
-b.NE Label_147
+b.NE Label_101
 .word 0xf85883a2
 .word 0xf85b83b1
 .word 0xf9002234
@@ -2009,24 +1330,24 @@ b.NE Label_147
 bl _js_build_arguments_gc
 .word 0xa8c17ffe
 .word 0xf102081f
-b.NE Label_154
+b.NE Label_108
 .word 0x91000ad6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_154:
-b Label_153
-Label_147:
+Label_108:
+b Label_107
+Label_101:
 .word 0xf100051f
-b.NE Label_148
+b.NE Label_102
 .word 0xf85e83ac
 .word 0xf9401989
 .word 0x79405129
 .word 0xeb0e013f
-b.LT Label_156
-Label_155:
+b.LT Label_110
+Label_109:
 .word 0xaa0e03e9
-Label_156:
+Label_110:
 .word 0xf85b83b1
 .word 0xf85883a2
 .word 0xf9002234
@@ -2038,39 +1359,39 @@ Label_156:
 bl _js_build_mapped_arguments_gc
 .word 0xa8c17ffe
 .word 0xf102081f
-b.NE Label_157
+b.NE Label_111
 .word 0x91000ad6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_157:
-b Label_153
-Label_148:
+Label_111:
+b Label_107
+Label_102:
 .word 0xf100091f
-b.NE Label_149
+b.NE Label_103
 .word 0xf85e83a0
-b Label_153
-Label_149:
+b Label_107
+Label_103:
 .word 0xf1000d1f
-b.NE Label_150
+b.NE Label_104
 .word 0xf85d03af
 .word 0xaa0f03e0
-b Label_153
-Label_150:
+b Label_107
+Label_104:
 .word 0xf100111f
-b.NE Label_151
+b.NE Label_105
 .word 0xf85e83ac
 .word 0xf9402189
-cbz x9, Label_158
+cbz x9, Label_112
 .word 0xaa0903e0
-b Label_159
-Label_158:
+b Label_113
+Label_112:
 .word 0xd2800240
-Label_159:
-b Label_153
-Label_151:
+Label_113:
+b Label_107
+Label_105:
 .word 0xf100151f
-b.NE Label_152
+b.NE Label_106
 .word 0xb27f03e9
 .word 0xf85b83b1
 .word 0xf9002234
@@ -2080,31 +1401,15 @@ b.NE Label_152
 bl _LEPUS_NewObjectProto
 .word 0xa8c17ffe
 .word 0xf102081f
-b.NE Label_160
+b.NE Label_114
 .word 0x91000ad6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_160:
-b Label_153
-Label_152:
-Label_153:
-.word 0xb9414a69
-cbz w9, Label_161
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_161:
+Label_114:
+b Label_107
+Label_106:
+Label_107:
 .word 0x38402ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -2119,7 +1424,7 @@ _dispatch_table_0_12:
 .word 0x394006c8
 .word 0xf85e03ae
 .word 0xf100011f
-b.NE Label_162
+b.NE Label_115
 .word 0xf85883a2
 .word 0xf85b83b1
 .word 0xf9002234
@@ -2129,24 +1434,24 @@ b.NE Label_162
 bl _js_build_arguments_gc
 .word 0xa8c17ffe
 .word 0xf102081f
-b.NE Label_169
+b.NE Label_122
 .word 0x91000ad6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_169:
-b Label_168
-Label_162:
+Label_122:
+b Label_121
+Label_115:
 .word 0xf100051f
-b.NE Label_163
+b.NE Label_116
 .word 0xf85e83ac
 .word 0xf9401989
 .word 0x79405129
 .word 0xeb0e013f
-b.LT Label_171
-Label_170:
+b.LT Label_124
+Label_123:
 .word 0xaa0e03e9
-Label_171:
+Label_124:
 .word 0xf85b83b1
 .word 0xf85883a2
 .word 0xf9002234
@@ -2158,39 +1463,39 @@ Label_171:
 bl _js_build_mapped_arguments_gc
 .word 0xa8c17ffe
 .word 0xf102081f
-b.NE Label_172
+b.NE Label_125
 .word 0x91000ad6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_172:
-b Label_168
-Label_163:
+Label_125:
+b Label_121
+Label_116:
 .word 0xf100091f
-b.NE Label_164
+b.NE Label_117
 .word 0xf85e83a0
-b Label_168
-Label_164:
+b Label_121
+Label_117:
 .word 0xf1000d1f
-b.NE Label_165
+b.NE Label_118
 .word 0xf85d03af
 .word 0xaa0f03e0
-b Label_168
-Label_165:
+b Label_121
+Label_118:
 .word 0xf100111f
-b.NE Label_166
+b.NE Label_119
 .word 0xf85e83ac
 .word 0xf9402189
-cbz x9, Label_173
+cbz x9, Label_126
 .word 0xaa0903e0
-b Label_174
-Label_173:
+b Label_127
+Label_126:
 .word 0xd2800240
-Label_174:
-b Label_168
-Label_166:
+Label_127:
+b Label_121
+Label_119:
 .word 0xf100151f
-b.NE Label_167
+b.NE Label_120
 .word 0xb27f03e9
 .word 0xf85b83b1
 .word 0xf9002234
@@ -2200,31 +1505,15 @@ b.NE Label_167
 bl _LEPUS_NewObjectProto
 .word 0xa8c17ffe
 .word 0xf102081f
-b.NE Label_175
+b.NE Label_128
 .word 0x91000ad6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_175:
-b Label_168
-Label_167:
-Label_168:
-.word 0xb9414a69
-cbz w9, Label_176
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_176:
+Label_128:
+b Label_121
+Label_120:
+Label_121:
 .word 0x38402ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -2242,28 +1531,12 @@ _dispatch_table_0_13:
 bl _js_build_rest_gc
 .word 0xa8c17ffe
 .word 0xf102081f
-b.NE Label_177
+b.NE Label_129
 .word 0x91000ed6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_177:
-.word 0xb9414a69
-cbz w9, Label_178
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb10012c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_178:
+Label_129:
 .word 0x38403ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -2282,30 +1555,14 @@ _dispatch_table_1_13:
 bl _js_build_rest_gc
 .word 0xa8c17ffe
 .word 0xf102081f
-b.NE Label_179
+b.NE Label_130
 .word 0x91000ed6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_179:
+Label_130:
 .word 0xaa0003e1
 .word 0xf85f8e80
-.word 0xb9414a69
-cbz w9, Label_180
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb10012c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_180:
 .word 0x38403ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -2324,30 +1581,14 @@ _dispatch_table_2_13:
 bl _js_build_rest_gc
 .word 0xa8c17ffe
 .word 0xf102081f
-b.NE Label_181
+b.NE Label_131
 .word 0x91000ed6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_181:
+Label_131:
 .word 0xaa0003e1
 .word 0xf85f8e80
-.word 0xb9414a69
-cbz w9, Label_182
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb10012c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_182:
 .word 0x38403ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -2355,66 +1596,18 @@ Label_182:
 .global _dispatch_table_0_14
 _dispatch_table_0_14:
 .word 0xf85f8e80
-.word 0xb9414a69
-cbz w9, Label_183
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_183:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
 .global _dispatch_table_1_14
 _dispatch_table_1_14:
-.word 0xb9414a69
-cbz w9, Label_184
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_184:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
 .global _dispatch_table_2_14
 _dispatch_table_2_14:
-.word 0xb9414a69
-cbz w9, Label_185
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_185:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -2423,22 +1616,6 @@ Label_185:
 _dispatch_table_0_15:
 .word 0xa9ff0680
 .word 0xaa0103e0
-.word 0xb9414a69
-cbz w9, Label_186
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_186:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -2450,22 +1627,6 @@ _dispatch_table_1_15:
 .global _dispatch_table_2_15
 _dispatch_table_2_15:
 .word 0xaa0103e0
-.word 0xb9414a69
-cbz w9, Label_187
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_187:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -2476,22 +1637,6 @@ _dispatch_table_0_16:
 .word 0xf85f8e88
 .word 0xf8008680
 .word 0xf8008681
-.word 0xb9414a69
-cbz w9, Label_188
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_188:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -2505,22 +1650,6 @@ _dispatch_table_2_16:
 .word 0xf85f8e88
 .word 0xf8008680
 .word 0xf8008681
-.word 0xb9414a69
-cbz w9, Label_189
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_189:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -2532,22 +1661,6 @@ _dispatch_table_2_17:
 .word 0xf85b83b1
 .word 0xf9002234
 .word 0xaa0003e1
-.word 0xb9414a69
-cbz w9, Label_190
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_190:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -2558,22 +1671,6 @@ _dispatch_table_0_17:
 .global _dispatch_table_1_17
 _dispatch_table_1_17:
 .word 0xaa0003e1
-.word 0xb9414a69
-cbz w9, Label_191
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_191:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -2582,22 +1679,6 @@ Label_191:
 _dispatch_table_0_18:
 .word 0xa9ff0680
 .word 0xf8008680
-.word 0xb9414a69
-cbz w9, Label_192
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_192:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -2609,22 +1690,6 @@ _dispatch_table_1_18:
 .global _dispatch_table_2_18
 _dispatch_table_2_18:
 .word 0xf8008680
-.word 0xb9414a69
-cbz w9, Label_193
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_193:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -2634,22 +1699,6 @@ _dispatch_table_0_19:
 .word 0xa9ff0680
 .word 0xf8008680
 .word 0xf8008681
-.word 0xb9414a69
-cbz w9, Label_194
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_194:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -2662,22 +1711,6 @@ _dispatch_table_1_19:
 _dispatch_table_2_19:
 .word 0xf8008680
 .word 0xf8008681
-.word 0xb9414a69
-cbz w9, Label_195
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_195:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -2691,22 +1724,6 @@ _dispatch_table_1_20:
 .word 0xf85f0280
 .word 0xf85f8281
 .word 0xf8008688
-.word 0xb9414a69
-cbz w9, Label_196
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_196:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -2722,22 +1739,6 @@ _dispatch_table_0_20:
 .word 0xf85f0280
 .word 0xf85f8281
 .word 0xf8008688
-.word 0xb9414a69
-cbz w9, Label_197
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_197:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -2748,22 +1749,6 @@ _dispatch_table_0_21:
 .word 0xf85f0281
 .word 0xf81f8281
 .word 0xf81f0280
-.word 0xb9414a69
-cbz w9, Label_198
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_198:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -2773,22 +1758,6 @@ _dispatch_table_1_21:
 .word 0xaa0003e1
 .word 0xf85f8280
 .word 0xf81f8281
-.word 0xb9414a69
-cbz w9, Label_199
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_199:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -2796,22 +1765,6 @@ Label_199:
 .global _dispatch_table_2_21
 _dispatch_table_2_21:
 .word 0xf8008681
-.word 0xb9414a69
-cbz w9, Label_200
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_200:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -2828,22 +1781,6 @@ _dispatch_table_2_22:
 .word 0xf8008688
 .word 0xf8008681
 .word 0xaa0803e1
-.word 0xb9414a69
-cbz w9, Label_201
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_201:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -2859,22 +1796,6 @@ _dispatch_table_1_22:
 .word 0xf8008688
 .word 0xf8008681
 .word 0xaa0803e1
-.word 0xb9414a69
-cbz w9, Label_202
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_202:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -2893,22 +1814,6 @@ _dispatch_table_2_23:
 .word 0xf8008689
 .word 0xf8008681
 .word 0xaa0803e1
-.word 0xb9414a69
-cbz w9, Label_203
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_203:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -2926,22 +1831,6 @@ _dispatch_table_1_23:
 .word 0xf8008689
 .word 0xf8008681
 .word 0xaa0803e1
-.word 0xb9414a69
-cbz w9, Label_204
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_204:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -2952,22 +1841,6 @@ _dispatch_table_0_24:
 .word 0xaa0003e8
 .word 0xf85f8e80
 .word 0xf8008688
-.word 0xb9414a69
-cbz w9, Label_205
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_205:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -2981,22 +1854,6 @@ _dispatch_table_2_24:
 .word 0xaa0003e8
 .word 0xf85f8e80
 .word 0xf8008688
-.word 0xb9414a69
-cbz w9, Label_206
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_206:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -3009,22 +1866,6 @@ _dispatch_table_0_25:
 .word 0xf85f8e89
 .word 0xf8008688
 .word 0xf8008689
-.word 0xb9414a69
-cbz w9, Label_207
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_207:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -3040,22 +1881,6 @@ _dispatch_table_2_25:
 .word 0xf85f8e89
 .word 0xf8008688
 .word 0xf8008689
-.word 0xb9414a69
-cbz w9, Label_208
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_208:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -3070,22 +1895,6 @@ _dispatch_table_0_26:
 .word 0xf8008688
 .word 0xf8008683
 .word 0xf8008689
-.word 0xb9414a69
-cbz w9, Label_209
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_209:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -3103,22 +1912,6 @@ _dispatch_table_2_26:
 .word 0xf8008688
 .word 0xf8008683
 .word 0xf8008689
-.word 0xb9414a69
-cbz w9, Label_210
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_210:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -3129,22 +1922,6 @@ _dispatch_table_0_27:
 .word 0xaa0003e8
 .word 0xaa0103e0
 .word 0xaa0803e1
-.word 0xb9414a69
-cbz w9, Label_211
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_211:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -3158,22 +1935,6 @@ _dispatch_table_2_27:
 .word 0xaa0003e8
 .word 0xaa0103e0
 .word 0xaa0803e1
-.word 0xb9414a69
-cbz w9, Label_212
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_212:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -3187,22 +1948,6 @@ _dispatch_table_0_28:
 .word 0xf85f8e80
 .word 0xf8008688
 .word 0xf8008689
-.word 0xb9414a69
-cbz w9, Label_213
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_213:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -3219,22 +1964,6 @@ _dispatch_table_2_28:
 .word 0xf85f8e80
 .word 0xf8008688
 .word 0xf8008689
-.word 0xb9414a69
-cbz w9, Label_214
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_214:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -3246,22 +1975,6 @@ _dispatch_table_0_29:
 .word 0xf8008680
 .word 0xaa0103e0
 .word 0xaa0803e1
-.word 0xb9414a69
-cbz w9, Label_215
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_215:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -3276,22 +1989,6 @@ _dispatch_table_2_29:
 .word 0xf8008680
 .word 0xaa0103e0
 .word 0xaa0803e1
-.word 0xb9414a69
-cbz w9, Label_216
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_216:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -3303,22 +2000,6 @@ _dispatch_table_0_30:
 .word 0xf8008681
 .word 0xaa0003e1
 .word 0xaa0803e0
-.word 0xb9414a69
-cbz w9, Label_217
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_217:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -3333,22 +2014,6 @@ _dispatch_table_2_30:
 .word 0xf8008681
 .word 0xaa0003e1
 .word 0xaa0803e0
-.word 0xb9414a69
-cbz w9, Label_218
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_218:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -3362,22 +2027,6 @@ _dispatch_table_0_31:
 .word 0xf8008680
 .word 0xaa0103e0
 .word 0xaa0903e1
-.word 0xb9414a69
-cbz w9, Label_219
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_219:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -3394,22 +2043,6 @@ _dispatch_table_2_31:
 .word 0xf8008680
 .word 0xaa0103e0
 .word 0xaa0903e1
-.word 0xb9414a69
-cbz w9, Label_220
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_220:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -3425,22 +2058,6 @@ _dispatch_table_0_32:
 .word 0xf8008680
 .word 0xaa0103e0
 .word 0xaa0303e1
-.word 0xb9414a69
-cbz w9, Label_221
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_221:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -3459,22 +2076,6 @@ _dispatch_table_2_32:
 .word 0xf8008680
 .word 0xaa0103e0
 .word 0xaa0303e1
-.word 0xb9414a69
-cbz w9, Label_222
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_222:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -3508,39 +2109,23 @@ _dispatch_table_1_33:
 bl _JS_CallConstructorInternal_GC
 .word 0xa8c17ffe
 .word 0xf102081f
-b.NE Label_223
+b.NE Label_132
 .word 0x91000ed6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_223:
+Label_132:
 .word 0xaa0003f9
 .word 0xf85e03ae
 .word 0xaa0e03e8
 .word 0xea08011f
-b.EQ Label_224
-Label_225:
+b.EQ Label_133
+Label_134:
 .word 0xd1002294
 .word 0xd1000508
-cbnz x8, Label_225
-Label_224:
+cbnz x8, Label_134
+Label_133:
 .word 0xaa1903e0
-.word 0xb9414a69
-cbz w9, Label_226
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb10012c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_226:
 .word 0x38403ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -3576,39 +2161,23 @@ _dispatch_table_0_33:
 bl _JS_CallConstructorInternal_GC
 .word 0xa8c17ffe
 .word 0xf102081f
-b.NE Label_227
+b.NE Label_135
 .word 0x91000ed6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_227:
+Label_135:
 .word 0xaa0003f9
 .word 0xf85e03ae
 .word 0xaa0e03e8
 .word 0xea08011f
-b.EQ Label_228
-Label_229:
+b.EQ Label_136
+Label_137:
 .word 0xd1002294
 .word 0xd1000508
-cbnz x8, Label_229
-Label_228:
+cbnz x8, Label_137
+Label_136:
 .word 0xaa1903e0
-.word 0xb9414a69
-cbz w9, Label_230
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb10012c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_230:
 .word 0x38403ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -3634,31 +2203,31 @@ _dispatch_table_1_34:
 .word 0xd2800048
 .word 0xf2ffffe8
 .word 0xea08019f
-b.NE Label_234
+b.NE Label_141
 .word 0x79400d88
 .word 0xf1003508
-b.NE Label_232
+b.NE Label_139
 .word 0xaa1e03e1
 adrp x30, _normal_entry@PAGE
 add x30, x30, _normal_entry@PAGEOFF
 .word 0xaa1e03e0
 .word 0xaa0103fe
-b Label_233
-Label_232:
+b Label_140
+Label_139:
 .word 0xaa1e03e1
 adrp x30, _native_entry@PAGE
 add x30, x30, _native_entry@PAGEOFF
 .word 0xaa1e03e0
 .word 0xaa0103fe
-b Label_233
-Label_234:
+b Label_140
+Label_141:
 .word 0xaa1303e0
 .word 0xa9bf7ffe
 bl _JS_ThrowTypeErrorNotFunction
 .word 0xa8c17ffe
 .word 0x91000ed6
 b __exception_handler_entry
-Label_233:
+Label_140:
 .word 0xcb2e4e97
 .word 0xf81983b6
 .word 0xd2800006
@@ -3688,31 +2257,31 @@ _dispatch_table_0_34:
 .word 0xd2800048
 .word 0xf2ffffe8
 .word 0xea08019f
-b.NE Label_238
+b.NE Label_145
 .word 0x79400d88
 .word 0xf1003508
-b.NE Label_236
+b.NE Label_143
 .word 0xaa1e03e1
 adrp x30, _normal_entry@PAGE
 add x30, x30, _normal_entry@PAGEOFF
 .word 0xaa1e03e0
 .word 0xaa0103fe
-b Label_237
-Label_236:
+b Label_144
+Label_143:
 .word 0xaa1e03e1
 adrp x30, _native_entry@PAGE
 add x30, x30, _native_entry@PAGEOFF
 .word 0xaa1e03e0
 .word 0xaa0103fe
-b Label_237
-Label_238:
+b Label_144
+Label_145:
 .word 0xaa1303e0
 .word 0xa9bf7ffe
 bl _JS_ThrowTypeErrorNotFunction
 .word 0xa8c17ffe
 .word 0x91000ed6
 b __exception_handler_entry
-Label_237:
+Label_144:
 .word 0xcb2e4e97
 .word 0xf81983b6
 .word 0xd2800006
@@ -3744,31 +2313,31 @@ _dispatch_table_1_35:
 .word 0xd2800048
 .word 0xf2ffffe8
 .word 0xea08019f
-b.NE Label_242
+b.NE Label_149
 .word 0x79400d88
 .word 0xf1003508
-b.NE Label_240
+b.NE Label_147
 .word 0xaa1e03e1
 adrp x30, _normal_entry@PAGE
 add x30, x30, _normal_entry@PAGEOFF
 .word 0xaa1e03e0
 .word 0xaa0103fe
-b Label_241
-Label_240:
+b Label_148
+Label_147:
 .word 0xaa1e03e1
 adrp x30, _native_entry@PAGE
 add x30, x30, _native_entry@PAGEOFF
 .word 0xaa1e03e0
 .word 0xaa0103fe
-b Label_241
-Label_242:
+b Label_148
+Label_149:
 .word 0xaa1303e0
 .word 0xa9bf7ffe
 bl _JS_ThrowTypeErrorNotFunction
 .word 0xa8c17ffe
 .word 0x91000ed6
 b __exception_handler_entry
-Label_241:
+Label_148:
 .word 0xcb2e4e97
 .word 0xf81983b6
 .word 0xd2800006
@@ -3777,12 +2346,12 @@ Label_241:
 .word 0xf85e03ae
 .word 0x910005d8
 .word 0xea18031f
-b.LE Label_243
-Label_244:
+b.LE Label_150
+Label_151:
 .word 0xd1002294
 .word 0xd1000718
-cbnz x24, Label_244
-Label_243:
+cbnz x24, Label_151
+Label_150:
 .word 0xf85983b6
 .word 0xf85c83ba
 .word 0xa97ae3b7
@@ -3790,12 +2359,12 @@ Label_243:
 .word 0xf85903a9
 .word 0x9100013f
 .word 0xf102081f
-b.NE Label_245
+b.NE Label_152
 .word 0x91000ed6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_245:
+Label_152:
 .cfi_endproc
 .word 0xaa0003f9
 .word 0xf85b83b1
@@ -3808,21 +2377,21 @@ Label_245:
 bl _prim_close_var_refs_gc
 .word 0xa8c17ffe
 .word 0xf85c03bb
-Label_247:
+Label_154:
 .word 0xeb1b029f
-b.EQ Label_246
+b.EQ Label_153
 .word 0xf85f8e88
-b Label_247
-Label_246:
+b Label_154
+Label_153:
 .word 0xa9770ba0
-cbnz x0, Label_248
-b Label_249
-Label_248:
+cbnz x0, Label_155
+b Label_156
+Label_155:
 .word 0xaa0203e0
 .word 0xa9bf7ffe
 bl _js_pop_virtual_sp
 .word 0xa8c17ffe
-Label_249:
+Label_156:
 .word 0xf94007be
 .cfi_startproc
 .word 0x910003bf
@@ -3860,31 +2429,31 @@ _dispatch_table_0_35:
 .word 0xd2800048
 .word 0xf2ffffe8
 .word 0xea08019f
-b.NE Label_253
+b.NE Label_160
 .word 0x79400d88
 .word 0xf1003508
-b.NE Label_251
+b.NE Label_158
 .word 0xaa1e03e1
 adrp x30, _normal_entry@PAGE
 add x30, x30, _normal_entry@PAGEOFF
 .word 0xaa1e03e0
 .word 0xaa0103fe
-b Label_252
-Label_251:
+b Label_159
+Label_158:
 .word 0xaa1e03e1
 adrp x30, _native_entry@PAGE
 add x30, x30, _native_entry@PAGEOFF
 .word 0xaa1e03e0
 .word 0xaa0103fe
-b Label_252
-Label_253:
+b Label_159
+Label_160:
 .word 0xaa1303e0
 .word 0xa9bf7ffe
 bl _JS_ThrowTypeErrorNotFunction
 .word 0xa8c17ffe
 .word 0x91000ed6
 b __exception_handler_entry
-Label_252:
+Label_159:
 .word 0xcb2e4e97
 .word 0xf81983b6
 .word 0xd2800006
@@ -3893,12 +2462,12 @@ Label_252:
 .word 0xf85e03ae
 .word 0x910005d8
 .word 0xea18031f
-b.LE Label_254
-Label_255:
+b.LE Label_161
+Label_162:
 .word 0xd1002294
 .word 0xd1000718
-cbnz x24, Label_255
-Label_254:
+cbnz x24, Label_162
+Label_161:
 .word 0xf85983b6
 .word 0xf85c83ba
 .word 0xa97ae3b7
@@ -3906,12 +2475,12 @@ Label_254:
 .word 0xf85903a9
 .word 0x9100013f
 .word 0xf102081f
-b.NE Label_256
+b.NE Label_163
 .word 0x91000ed6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_256:
+Label_163:
 .cfi_endproc
 .word 0xaa0003f9
 .word 0xf85b83b1
@@ -3924,21 +2493,21 @@ Label_256:
 bl _prim_close_var_refs_gc
 .word 0xa8c17ffe
 .word 0xf85c03bb
-Label_258:
+Label_165:
 .word 0xeb1b029f
-b.EQ Label_257
+b.EQ Label_164
 .word 0xf85f8e88
-b Label_258
-Label_257:
+b Label_165
+Label_164:
 .word 0xa9770ba0
-cbnz x0, Label_259
-b Label_260
-Label_259:
+cbnz x0, Label_166
+b Label_167
+Label_166:
 .word 0xaa0203e0
 .word 0xa9bf7ffe
 bl _js_pop_virtual_sp
 .word 0xa8c17ffe
-Label_260:
+Label_167:
 .word 0xf94007be
 .cfi_startproc
 .word 0x910003bf
@@ -3973,31 +2542,31 @@ _dispatch_table_1_36:
 .word 0xd2800048
 .word 0xf2ffffe8
 .word 0xea08019f
-b.NE Label_264
+b.NE Label_171
 .word 0x79400d88
 .word 0xf1003508
-b.NE Label_262
+b.NE Label_169
 .word 0xaa1e03e1
 adrp x30, _normal_entry@PAGE
 add x30, x30, _normal_entry@PAGEOFF
 .word 0xaa1e03e0
 .word 0xaa0103fe
-b Label_263
-Label_262:
+b Label_170
+Label_169:
 .word 0xaa1e03e1
 adrp x30, _native_entry@PAGE
 add x30, x30, _native_entry@PAGEOFF
 .word 0xaa1e03e0
 .word 0xaa0103fe
-b Label_263
-Label_264:
+b Label_170
+Label_171:
 .word 0xaa1303e0
 .word 0xa9bf7ffe
 bl _JS_ThrowTypeErrorNotFunction
 .word 0xa8c17ffe
 .word 0x91000ed6
 b __exception_handler_entry
-Label_263:
+Label_170:
 .word 0xcb2e4e97
 .word 0xf81983b6
 .word 0xd2800006
@@ -4030,31 +2599,31 @@ _dispatch_table_0_36:
 .word 0xd2800048
 .word 0xf2ffffe8
 .word 0xea08019f
-b.NE Label_268
+b.NE Label_175
 .word 0x79400d88
 .word 0xf1003508
-b.NE Label_266
+b.NE Label_173
 .word 0xaa1e03e1
 adrp x30, _normal_entry@PAGE
 add x30, x30, _normal_entry@PAGEOFF
 .word 0xaa1e03e0
 .word 0xaa0103fe
-b Label_267
-Label_266:
+b Label_174
+Label_173:
 .word 0xaa1e03e1
 adrp x30, _native_entry@PAGE
 add x30, x30, _native_entry@PAGEOFF
 .word 0xaa1e03e0
 .word 0xaa0103fe
-b Label_267
-Label_268:
+b Label_174
+Label_175:
 .word 0xaa1303e0
 .word 0xa9bf7ffe
 bl _JS_ThrowTypeErrorNotFunction
 .word 0xa8c17ffe
 .word 0x91000ed6
 b __exception_handler_entry
-Label_267:
+Label_174:
 .word 0xcb2e4e97
 .word 0xf81983b6
 .word 0xd2800006
@@ -4089,31 +2658,31 @@ _dispatch_table_1_37:
 .word 0xd2800048
 .word 0xf2ffffe8
 .word 0xea08019f
-b.NE Label_272
+b.NE Label_179
 .word 0x79400d88
 .word 0xf1003508
-b.NE Label_270
+b.NE Label_177
 .word 0xaa1e03e1
 adrp x30, _normal_entry@PAGE
 add x30, x30, _normal_entry@PAGEOFF
 .word 0xaa1e03e0
 .word 0xaa0103fe
-b Label_271
-Label_270:
+b Label_178
+Label_177:
 .word 0xaa1e03e1
 adrp x30, _native_entry@PAGE
 add x30, x30, _native_entry@PAGEOFF
 .word 0xaa1e03e0
 .word 0xaa0103fe
-b Label_271
-Label_272:
+b Label_178
+Label_179:
 .word 0xaa1303e0
 .word 0xa9bf7ffe
 bl _JS_ThrowTypeErrorNotFunction
 .word 0xa8c17ffe
 .word 0x91000ed6
 b __exception_handler_entry
-Label_271:
+Label_178:
 .word 0xcb2e4e97
 .word 0xf81983b6
 .word 0xd2800006
@@ -4122,12 +2691,12 @@ Label_271:
 .word 0xf85e03ae
 .word 0x910005d8
 .word 0xea18031f
-b.LE Label_273
-Label_274:
+b.LE Label_180
+Label_181:
 .word 0xd1002294
 .word 0xd1000718
-cbnz x24, Label_274
-Label_273:
+cbnz x24, Label_181
+Label_180:
 .word 0xf85983b6
 .word 0xf85c83ba
 .word 0xa97ae3b7
@@ -4135,12 +2704,12 @@ Label_273:
 .word 0xf85903a9
 .word 0x9100013f
 .word 0xf102081f
-b.NE Label_275
+b.NE Label_182
 .word 0x91000ed6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_275:
+Label_182:
 .cfi_endproc
 .word 0xaa0003f9
 .word 0xf85b83b1
@@ -4153,21 +2722,21 @@ Label_275:
 bl _prim_close_var_refs_gc
 .word 0xa8c17ffe
 .word 0xf85c03bb
-Label_277:
+Label_184:
 .word 0xeb1b029f
-b.EQ Label_276
+b.EQ Label_183
 .word 0xf85f8e88
-b Label_277
-Label_276:
+b Label_184
+Label_183:
 .word 0xa9770ba0
-cbnz x0, Label_278
-b Label_279
-Label_278:
+cbnz x0, Label_185
+b Label_186
+Label_185:
 .word 0xaa0203e0
 .word 0xa9bf7ffe
 bl _js_pop_virtual_sp
 .word 0xa8c17ffe
-Label_279:
+Label_186:
 .word 0xf94007be
 .cfi_startproc
 .word 0x910003bf
@@ -4208,31 +2777,31 @@ _dispatch_table_0_37:
 .word 0xd2800048
 .word 0xf2ffffe8
 .word 0xea08019f
-b.NE Label_283
+b.NE Label_190
 .word 0x79400d88
 .word 0xf1003508
-b.NE Label_281
+b.NE Label_188
 .word 0xaa1e03e1
 adrp x30, _normal_entry@PAGE
 add x30, x30, _normal_entry@PAGEOFF
 .word 0xaa1e03e0
 .word 0xaa0103fe
-b Label_282
-Label_281:
+b Label_189
+Label_188:
 .word 0xaa1e03e1
 adrp x30, _native_entry@PAGE
 add x30, x30, _native_entry@PAGEOFF
 .word 0xaa1e03e0
 .word 0xaa0103fe
-b Label_282
-Label_283:
+b Label_189
+Label_190:
 .word 0xaa1303e0
 .word 0xa9bf7ffe
 bl _JS_ThrowTypeErrorNotFunction
 .word 0xa8c17ffe
 .word 0x91000ed6
 b __exception_handler_entry
-Label_282:
+Label_189:
 .word 0xcb2e4e97
 .word 0xf81983b6
 .word 0xd2800006
@@ -4241,12 +2810,12 @@ Label_282:
 .word 0xf85e03ae
 .word 0x910005d8
 .word 0xea18031f
-b.LE Label_284
-Label_285:
+b.LE Label_191
+Label_192:
 .word 0xd1002294
 .word 0xd1000718
-cbnz x24, Label_285
-Label_284:
+cbnz x24, Label_192
+Label_191:
 .word 0xf85983b6
 .word 0xf85c83ba
 .word 0xa97ae3b7
@@ -4254,12 +2823,12 @@ Label_284:
 .word 0xf85903a9
 .word 0x9100013f
 .word 0xf102081f
-b.NE Label_286
+b.NE Label_193
 .word 0x91000ed6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_286:
+Label_193:
 .cfi_endproc
 .word 0xaa0003f9
 .word 0xf85b83b1
@@ -4272,21 +2841,21 @@ Label_286:
 bl _prim_close_var_refs_gc
 .word 0xa8c17ffe
 .word 0xf85c03bb
-Label_288:
+Label_195:
 .word 0xeb1b029f
-b.EQ Label_287
+b.EQ Label_194
 .word 0xf85f8e88
-b Label_288
-Label_287:
+b Label_195
+Label_194:
 .word 0xa9770ba0
-cbnz x0, Label_289
-b Label_290
-Label_289:
+cbnz x0, Label_196
+b Label_197
+Label_196:
 .word 0xaa0203e0
 .word 0xa9bf7ffe
 bl _js_pop_virtual_sp
 .word 0xa8c17ffe
-Label_290:
+Label_197:
 .word 0xf94007be
 .cfi_startproc
 .word 0x910003bf
@@ -4309,17 +2878,17 @@ _dispatch_table_1_38:
 bl _PRIM_JS_NewArray_GC
 .word 0xa8c17ffe
 .word 0xf102081f
-b.NE Label_291
+b.NE Label_198
 .word 0x91000ed6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_291:
+Label_198:
 .word 0x784012d9
 .word 0xaa1903e1
-Label_294:
+Label_201:
 .word 0xea19033f
-b.EQ Label_293
+b.EQ Label_200
 .word 0xcb190028
 .word 0xcb1903e9
 .word 0xf869da83
@@ -4336,55 +2905,23 @@ b.EQ Label_293
 bl _LEPUS_DefinePropertyValue
 .word 0xa8c17ffe
 .word 0xf100001f
-b.LT Label_292
+b.LT Label_199
 .word 0xf85f8e81
 .word 0xf85f8e80
-b Label_294
-Label_293:
+b Label_201
+Label_200:
 .word 0xcb214e94
-.word 0xb9414a69
-cbz w9, Label_295
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb10012c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_295:
 .word 0x38403ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_292:
+Label_199:
 .word 0xf85f8e81
 .word 0xf85f8e80
 .word 0x91000ed6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-.word 0xb9414a69
-cbz w9, Label_296
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb10012c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_296:
 .word 0x38403ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -4403,17 +2940,17 @@ _dispatch_table_0_38:
 bl _PRIM_JS_NewArray_GC
 .word 0xa8c17ffe
 .word 0xf102081f
-b.NE Label_297
+b.NE Label_202
 .word 0x91000ed6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_297:
+Label_202:
 .word 0x784012d9
 .word 0xaa1903e1
-Label_300:
+Label_205:
 .word 0xea19033f
-b.EQ Label_299
+b.EQ Label_204
 .word 0xcb190028
 .word 0xcb1903e9
 .word 0xf869da83
@@ -4430,55 +2967,23 @@ b.EQ Label_299
 bl _LEPUS_DefinePropertyValue
 .word 0xa8c17ffe
 .word 0xf100001f
-b.LT Label_298
+b.LT Label_203
 .word 0xf85f8e81
 .word 0xf85f8e80
-b Label_300
-Label_299:
+b Label_205
+Label_204:
 .word 0xcb214e94
-.word 0xb9414a69
-cbz w9, Label_301
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb10012c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_301:
 .word 0x38403ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_298:
+Label_203:
 .word 0xf85f8e81
 .word 0xf85f8e80
 .word 0x91000ed6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-.word 0xb9414a69
-cbz w9, Label_302
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb10012c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_302:
 .word 0x38403ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -4500,33 +3005,17 @@ _dispatch_table_1_39:
 bl _js_function_apply_gc
 .word 0xa8c17ffe
 .word 0xf102081f
-b.NE Label_303
+b.NE Label_206
 .word 0x91000ed6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_303:
+Label_206:
 .word 0xaa0003f9
 .word 0xf85f8e81
 .word 0xf85f8e81
 .word 0xf85f8e81
 .word 0xaa1903e0
-.word 0xb9414a69
-cbz w9, Label_304
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb10012c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_304:
 .word 0x38403ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -4550,33 +3039,17 @@ _dispatch_table_0_39:
 bl _js_function_apply_gc
 .word 0xa8c17ffe
 .word 0xf102081f
-b.NE Label_305
+b.NE Label_207
 .word 0x91000ed6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_305:
+Label_207:
 .word 0xaa0003f9
 .word 0xf85f8e81
 .word 0xf85f8e81
 .word 0xf85f8e81
 .word 0xaa1903e0
-.word 0xb9414a69
-cbz w9, Label_306
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb10012c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_306:
 .word 0x38403ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -4598,21 +3071,21 @@ _dispatch_table_2_40:
 bl _prim_close_var_refs_gc
 .word 0xa8c17ffe
 .word 0xf85c03bb
-Label_308:
+Label_209:
 .word 0xeb1b029f
-b.EQ Label_307
+b.EQ Label_208
 .word 0xf85f8e88
-b Label_308
-Label_307:
+b Label_209
+Label_208:
 .word 0xa9770ba0
-cbnz x0, Label_309
-b Label_310
-Label_309:
+cbnz x0, Label_210
+b Label_211
+Label_210:
 .word 0xaa0203e0
 .word 0xa9bf7ffe
 bl _js_pop_virtual_sp
 .word 0xa8c17ffe
-Label_310:
+Label_211:
 .word 0xf94007be
 .cfi_startproc
 .word 0x910003bf
@@ -4639,21 +3112,21 @@ _dispatch_table_1_40:
 bl _prim_close_var_refs_gc
 .word 0xa8c17ffe
 .word 0xf85c03bb
-Label_312:
+Label_213:
 .word 0xeb1b029f
-b.EQ Label_311
+b.EQ Label_212
 .word 0xf85f8e88
-b Label_312
-Label_311:
+b Label_213
+Label_212:
 .word 0xa9770ba0
-cbnz x0, Label_313
-b Label_314
-Label_313:
+cbnz x0, Label_214
+b Label_215
+Label_214:
 .word 0xaa0203e0
 .word 0xa9bf7ffe
 bl _js_pop_virtual_sp
 .word 0xa8c17ffe
-Label_314:
+Label_215:
 .word 0xf94007be
 .cfi_startproc
 .word 0x910003bf
@@ -4679,21 +3152,21 @@ _dispatch_table_1_41:
 bl _prim_close_var_refs_gc
 .word 0xa8c17ffe
 .word 0xf85c03bb
-Label_316:
+Label_217:
 .word 0xeb1b029f
-b.EQ Label_315
+b.EQ Label_216
 .word 0xf85f8e88
-b Label_316
-Label_315:
+b Label_217
+Label_216:
 .word 0xa9770ba0
-cbnz x0, Label_317
-b Label_318
-Label_317:
+cbnz x0, Label_218
+b Label_219
+Label_218:
 .word 0xaa0203e0
 .word 0xa9bf7ffe
 bl _js_pop_virtual_sp
 .word 0xa8c17ffe
-Label_318:
+Label_219:
 .word 0xf94007be
 .cfi_startproc
 .word 0x910003bf
@@ -4721,21 +3194,21 @@ _dispatch_table_0_41:
 bl _prim_close_var_refs_gc
 .word 0xa8c17ffe
 .word 0xf85c03bb
-Label_320:
+Label_221:
 .word 0xeb1b029f
-b.EQ Label_319
+b.EQ Label_220
 .word 0xf85f8e88
-b Label_320
-Label_319:
+b Label_221
+Label_220:
 .word 0xa9770ba0
-cbnz x0, Label_321
-b Label_322
-Label_321:
+cbnz x0, Label_222
+b Label_223
+Label_222:
 .word 0xaa0203e0
 .word 0xa9bf7ffe
 bl _js_pop_virtual_sp
 .word 0xa8c17ffe
-Label_322:
+Label_223:
 .word 0xf94007be
 .cfi_startproc
 .word 0x910003bf
@@ -4755,20 +3228,20 @@ _dispatch_table_2_42:
 .word 0xd2800049
 .word 0xf2ffffe9
 .word 0xea090009
-cbnz x9, Label_323
+cbnz x9, Label_224
 .word 0xb27f07e1
-b Label_324
-Label_323:
+b Label_225
+Label_224:
 .word 0xd2800249
 .word 0xeb09001f
-b.EQ Label_325
+b.EQ Label_226
 .word 0xf8008680
-adr x1, Label_326
-b Label_327
-Label_326:
+adr x1, Label_227
+b Label_228
+Label_227:
 .asciz "derived class constructor must return an object or undefined"
 .align 3
-Label_327:
+Label_228:
 .word 0xf85b83b1
 .word 0xf9002234
 .word 0xaa1303e0
@@ -4779,25 +3252,9 @@ bl _LEPUS_ThrowTypeError
 .word 0xf9002234
 .word 0x910006d6
 b __exception_handler_entry
-Label_325:
+Label_226:
 .word 0xb2400be1
-Label_324:
-.word 0xb9414a69
-cbz w9, Label_328
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_328:
+Label_225:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -4810,20 +3267,20 @@ _dispatch_table_1_42:
 .word 0xd2800049
 .word 0xf2ffffe9
 .word 0xea090009
-cbnz x9, Label_329
+cbnz x9, Label_229
 .word 0xb27f07e1
-b Label_330
-Label_329:
+b Label_230
+Label_229:
 .word 0xd2800249
 .word 0xeb09001f
-b.EQ Label_331
+b.EQ Label_231
 .word 0xf8008680
-adr x1, Label_332
-b Label_333
-Label_332:
+adr x1, Label_232
+b Label_233
+Label_232:
 .asciz "derived class constructor must return an object or undefined"
 .align 3
-Label_333:
+Label_233:
 .word 0xf85b83b1
 .word 0xf9002234
 .word 0xaa1303e0
@@ -4834,25 +3291,9 @@ bl _LEPUS_ThrowTypeError
 .word 0xf9002234
 .word 0x910006d6
 b __exception_handler_entry
-Label_331:
+Label_231:
 .word 0xb2400be1
-Label_330:
-.word 0xb9414a69
-cbz w9, Label_334
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_334:
+Label_230:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -4862,13 +3303,13 @@ _dispatch_table_0_43:
 .word 0xf85d03af
 .word 0xd2800248
 .word 0xeb0801ff
-b.NE Label_335
-adr x1, Label_336
-b Label_337
-Label_336:
+b.NE Label_234
+adr x1, Label_235
+b Label_236
+Label_235:
 .asciz "class constructors must be invoked with 'new'"
 .align 3
-Label_337:
+Label_236:
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
@@ -4879,23 +3320,7 @@ bl _LEPUS_ThrowTypeError
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_335:
-.word 0xb9414a69
-cbz w9, Label_338
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_338:
+Label_234:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -4905,13 +3330,13 @@ _dispatch_table_1_43:
 .word 0xf85d03af
 .word 0xd2800248
 .word 0xeb0801ff
-b.NE Label_339
-adr x1, Label_340
-b Label_341
-Label_340:
+b.NE Label_237
+adr x1, Label_238
+b Label_239
+Label_238:
 .asciz "class constructors must be invoked with 'new'"
 .align 3
-Label_341:
+Label_239:
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
@@ -4922,23 +3347,7 @@ bl _LEPUS_ThrowTypeError
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_339:
-.word 0xb9414a69
-cbz w9, Label_342
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_342:
+Label_237:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -4948,13 +3357,13 @@ _dispatch_table_2_43:
 .word 0xf85d03af
 .word 0xd2800248
 .word 0xeb0801ff
-b.NE Label_343
-adr x1, Label_344
-b Label_345
-Label_344:
+b.NE Label_240
+adr x1, Label_241
+b Label_242
+Label_241:
 .asciz "class constructors must be invoked with 'new'"
 .align 3
-Label_345:
+Label_242:
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
@@ -4965,23 +3374,7 @@ bl _LEPUS_ThrowTypeError
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_343:
-.word 0xb9414a69
-cbz w9, Label_346
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_346:
+Label_240:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -5000,28 +3393,12 @@ _dispatch_table_0_44:
 bl _JS_CheckBrand_GC
 .word 0xa8c17ffe
 .word 0x7100001f
-b.GE Label_347
+b.GE Label_243
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_347:
-.word 0xb9414a69
-cbz w9, Label_348
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_348:
+Label_243:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -5043,28 +3420,12 @@ _dispatch_table_2_44:
 bl _JS_CheckBrand_GC
 .word 0xa8c17ffe
 .word 0x7100001f
-b.GE Label_349
+b.GE Label_244
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_349:
-.word 0xb9414a69
-cbz w9, Label_350
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_350:
+Label_244:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -5083,30 +3444,14 @@ _dispatch_table_0_45:
 bl _JS_AddBrand_GC
 .word 0xa8c17ffe
 .word 0x7100001f
-b.GE Label_351
+b.GE Label_245
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_351:
+Label_245:
 .word 0xd1002294
 .word 0xd1002294
-.word 0xb9414a69
-cbz w9, Label_352
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_352:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -5128,30 +3473,14 @@ _dispatch_table_2_45:
 bl _JS_AddBrand_GC
 .word 0xa8c17ffe
 .word 0x7100001f
-b.GE Label_353
+b.GE Label_246
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_353:
+Label_246:
 .word 0xd1002294
 .word 0xd1002294
-.word 0xb9414a69
-cbz w9, Label_354
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_354:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -5178,22 +3507,6 @@ _dispatch_table_1_46:
 .cfi_offset x30, -8
 .cfi_endproc
 .word 0xd65f03c0
-.word 0xb9414a69
-cbz w9, Label_355
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_355:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -5222,22 +3535,6 @@ _dispatch_table_0_46:
 .cfi_offset x30, -8
 .cfi_endproc
 .word 0xd65f03c0
-.word 0xb9414a69
-cbz w9, Label_356
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_356:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -5255,22 +3552,6 @@ bl _LEPUS_Throw
 .word 0xa8c17ffe
 .word 0x910006d6
 b __exception_handler_entry
-.word 0xb9414a69
-cbz w9, Label_357
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_357:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -5287,22 +3568,6 @@ bl _LEPUS_Throw
 .word 0xa8c17ffe
 .word 0x910006d6
 b __exception_handler_entry
-.word 0xb9414a69
-cbz w9, Label_358
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_358:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -5317,7 +3582,7 @@ _dispatch_table_1_48:
 .word 0xf85b83b1
 .word 0xf9002234
 .word 0xf100013f
-b.NE Label_359
+b.NE Label_247
 .word 0xb27203e1
 .word 0xaa0803e2
 .word 0xaa1303e0
@@ -5326,9 +3591,9 @@ bl _JS_ThrowTypeErrorReadOnly
 .word 0xa8c17ffe
 .word 0x91001ad6
 b __exception_handler_entry
-Label_359:
+Label_247:
 .word 0xf100053f
-b.NE Label_360
+b.NE Label_248
 .word 0xaa0803e1
 .word 0xaa1303e0
 .word 0xa9bf7ffe
@@ -5336,9 +3601,9 @@ bl _JS_ThrowSyntaxErrorVarRedeclaration_GC
 .word 0xa8c17ffe
 .word 0x91001ad6
 b __exception_handler_entry
-Label_360:
+Label_248:
 .word 0xf100093f
-b.NE Label_361
+b.NE Label_249
 .word 0xaa0803e1
 .word 0xaa1303e0
 .word 0xa9bf7ffe
@@ -5346,43 +3611,43 @@ bl _JS_ThrowReferenceErrorUninitialized_GC
 .word 0xa8c17ffe
 .word 0x91001ad6
 b __exception_handler_entry
-Label_361:
+Label_249:
 .word 0xf1000d3f
-b.NE Label_362
-adr x1, Label_364
-b Label_365
-Label_364:
+b.NE Label_250
+adr x1, Label_252
+b Label_253
+Label_252:
 .asciz "unsupported reference to 'super'"
 .align 3
-Label_365:
+Label_253:
 .word 0xaa1303e0
 .word 0xa9bf7ffe
 bl _LEPUS_ThrowReferenceError
 .word 0xa8c17ffe
 .word 0x91001ad6
 b __exception_handler_entry
-Label_362:
+Label_250:
 .word 0xf100113f
-b.NE Label_363
-adr x1, Label_366
-b Label_367
-Label_366:
+b.NE Label_251
+adr x1, Label_254
+b Label_255
+Label_254:
 .asciz "iterator does not have a throw method"
 .align 3
-Label_367:
+Label_255:
 .word 0xaa1303e0
 .word 0xa9bf7ffe
 bl _LEPUS_ThrowTypeError
 .word 0xa8c17ffe
 .word 0x91001ad6
 b __exception_handler_entry
-Label_363:
-adr x1, Label_368
-b Label_369
-Label_368:
+Label_251:
+adr x1, Label_256
+b Label_257
+Label_256:
 .asciz "invalid throw var type %d"
 .align 3
-Label_369:
+Label_257:
 .word 0xaa0903e2
 .word 0xaa1303e0
 .word 0xa9bf7ffe
@@ -5390,22 +3655,6 @@ bl _LEPUS_ThrowInternalError
 .word 0xa8c17ffe
 .word 0x91001ad6
 b __exception_handler_entry
-.word 0xb9414a69
-cbz w9, Label_370
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_370:
 .word 0x38406ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -5422,7 +3671,7 @@ _dispatch_table_0_48:
 .word 0xf85b83b1
 .word 0xf9002234
 .word 0xf100013f
-b.NE Label_371
+b.NE Label_258
 .word 0xb27203e1
 .word 0xaa0803e2
 .word 0xaa1303e0
@@ -5431,9 +3680,9 @@ bl _JS_ThrowTypeErrorReadOnly
 .word 0xa8c17ffe
 .word 0x91001ad6
 b __exception_handler_entry
-Label_371:
+Label_258:
 .word 0xf100053f
-b.NE Label_372
+b.NE Label_259
 .word 0xaa0803e1
 .word 0xaa1303e0
 .word 0xa9bf7ffe
@@ -5441,9 +3690,9 @@ bl _JS_ThrowSyntaxErrorVarRedeclaration_GC
 .word 0xa8c17ffe
 .word 0x91001ad6
 b __exception_handler_entry
-Label_372:
+Label_259:
 .word 0xf100093f
-b.NE Label_373
+b.NE Label_260
 .word 0xaa0803e1
 .word 0xaa1303e0
 .word 0xa9bf7ffe
@@ -5451,43 +3700,43 @@ bl _JS_ThrowReferenceErrorUninitialized_GC
 .word 0xa8c17ffe
 .word 0x91001ad6
 b __exception_handler_entry
-Label_373:
+Label_260:
 .word 0xf1000d3f
-b.NE Label_374
-adr x1, Label_376
-b Label_377
-Label_376:
+b.NE Label_261
+adr x1, Label_263
+b Label_264
+Label_263:
 .asciz "unsupported reference to 'super'"
 .align 3
-Label_377:
+Label_264:
 .word 0xaa1303e0
 .word 0xa9bf7ffe
 bl _LEPUS_ThrowReferenceError
 .word 0xa8c17ffe
 .word 0x91001ad6
 b __exception_handler_entry
-Label_374:
+Label_261:
 .word 0xf100113f
-b.NE Label_375
-adr x1, Label_378
-b Label_379
-Label_378:
+b.NE Label_262
+adr x1, Label_265
+b Label_266
+Label_265:
 .asciz "iterator does not have a throw method"
 .align 3
-Label_379:
+Label_266:
 .word 0xaa1303e0
 .word 0xa9bf7ffe
 bl _LEPUS_ThrowTypeError
 .word 0xa8c17ffe
 .word 0x91001ad6
 b __exception_handler_entry
-Label_375:
-adr x1, Label_380
-b Label_381
-Label_380:
+Label_262:
+adr x1, Label_267
+b Label_268
+Label_267:
 .asciz "invalid throw var type %d"
 .align 3
-Label_381:
+Label_268:
 .word 0xaa0903e2
 .word 0xaa1303e0
 .word 0xa9bf7ffe
@@ -5495,22 +3744,6 @@ bl _LEPUS_ThrowInternalError
 .word 0xa8c17ffe
 .word 0x91001ad6
 b __exception_handler_entry
-.word 0xb9414a69
-cbz w9, Label_382
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_382:
 .word 0x38406ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -5533,28 +3766,12 @@ bl _prim_js_op_eval_gc
 .word 0xa8c17ffe
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_383
+b.NE Label_269
 .word 0x91000ed6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_383:
-.word 0xb9414a69
-cbz w9, Label_384
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb10012c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_384:
+Label_269:
 .word 0x38403ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -5576,28 +3793,12 @@ bl _prim_js_op_eval_gc
 .word 0xa8c17ffe
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_385
+b.NE Label_270
 .word 0x91000ed6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_385:
-.word 0xb9414a69
-cbz w9, Label_386
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb10012c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_386:
+Label_270:
 .word 0x38403ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -5619,22 +3820,6 @@ bl _js_regexp_constructor_internal_gc
 .word 0xa8c17ffe
 .word 0xd1002294
 .word 0xd1002294
-.word 0xb9414a69
-cbz w9, Label_387
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_387:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -5659,22 +3844,6 @@ bl _js_regexp_constructor_internal_gc
 .word 0xa8c17ffe
 .word 0xd1002294
 .word 0xd1002294
-.word 0xb9414a69
-cbz w9, Label_388
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_388:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -5695,28 +3864,12 @@ bl _primjs_get_super_ctor_gc
 .word 0xa8c17ffe
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_389
+b.NE Label_271
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_389:
-.word 0xb9414a69
-cbz w9, Label_390
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_390:
+Label_271:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -5736,28 +3889,12 @@ bl _primjs_get_super_ctor_gc
 .word 0xa8c17ffe
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_391
+b.NE Label_272
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_391:
-.word 0xb9414a69
-cbz w9, Label_392
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_392:
+Label_272:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -5779,28 +3916,12 @@ bl _LEPUS_GetPrototype
 .word 0xa8c17ffe
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_393
+b.NE Label_273
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_393:
-.word 0xb9414a69
-cbz w9, Label_394
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_394:
+Label_273:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -5821,28 +3942,12 @@ bl _LEPUS_GetPrototype
 .word 0xa8c17ffe
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_395
+b.NE Label_274
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_395:
-.word 0xb9414a69
-cbz w9, Label_396
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_396:
+Label_274:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -5863,28 +3968,12 @@ bl _js_dynamic_import
 .word 0xa8c17ffe
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_397
+b.NE Label_275
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_397:
-.word 0xb9414a69
-cbz w9, Label_398
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_398:
+Label_275:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -5904,28 +3993,12 @@ bl _js_dynamic_import
 .word 0xa8c17ffe
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_399
+b.NE Label_276
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_399:
-.word 0xb9414a69
-cbz w9, Label_400
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_400:
+Label_276:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -5940,35 +4013,19 @@ _dispatch_table_0_54:
 bl _JS_CheckGlobalVar_GC
 .word 0xa8c17ffe
 .word 0x7100001f
-b.GE Label_401
+b.GE Label_277
 .word 0x910016d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_401:
+Label_277:
 .word 0xf100041f
-b.NE Label_402
+b.NE Label_278
 .word 0xb2400be0
-b Label_403
-Label_402:
+b Label_279
+Label_278:
 .word 0xb27f07e0
-Label_403:
-.word 0xb9414a69
-cbz w9, Label_404
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_404:
+Label_279:
 .word 0x38405ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -5986,38 +4043,22 @@ bl _JS_CheckGlobalVar_GC
 .word 0xa8c17ffe
 .word 0xd1002294
 .word 0x7100001f
-b.GE Label_406
+b.GE Label_281
 .word 0xf8008699
 .word 0x910016d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_406:
+Label_281:
 .word 0xf100041f
-b.NE Label_407
+b.NE Label_282
 .word 0xb2400be0
-b Label_408
-Label_407:
+b Label_283
+Label_282:
 .word 0xb27f07e0
-Label_408:
+Label_283:
 .word 0xaa0003e1
 .word 0xaa1903e0
-.word 0xb9414a69
-cbz w9, Label_409
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_409:
 .word 0x38405ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -6036,38 +4077,22 @@ bl _JS_CheckGlobalVar_GC
 .word 0xa8c17ffe
 .word 0xd1002294
 .word 0x7100001f
-b.GE Label_411
+b.GE Label_285
 .word 0xf8008699
 .word 0x910016d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_411:
+Label_285:
 .word 0xf100041f
-b.NE Label_412
+b.NE Label_286
 .word 0xb2400be0
-b Label_413
-Label_412:
+b Label_287
+Label_286:
 .word 0xb27f07e0
-Label_413:
+Label_287:
 .word 0xaa0003e1
 .word 0xaa1903e0
-.word 0xb9414a69
-cbz w9, Label_414
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_414:
 .word 0x38405ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -6084,28 +4109,12 @@ _dispatch_table_0_55:
 bl _JS_GetGlobalVarImpl_GC
 .word 0xa8c17ffe
 .word 0xf102081f
-b.NE Label_415
+b.NE Label_288
 .word 0x910016d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_415:
-.word 0xb9414a69
-cbz w9, Label_416
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_416:
+Label_288:
 .word 0x38405ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -6123,30 +4132,14 @@ _dispatch_table_1_55:
 bl _JS_GetGlobalVarImpl_GC
 .word 0xa8c17ffe
 .word 0xf102081f
-b.NE Label_417
+b.NE Label_289
 .word 0x910016d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_417:
+Label_289:
 .word 0xaa0003e1
 .word 0xf85f8e80
-.word 0xb9414a69
-cbz w9, Label_418
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_418:
 .word 0x38405ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -6164,30 +4157,14 @@ _dispatch_table_2_55:
 bl _JS_GetGlobalVarImpl_GC
 .word 0xa8c17ffe
 .word 0xf102081f
-b.NE Label_419
+b.NE Label_290
 .word 0x910016d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_419:
+Label_290:
 .word 0xaa0003e1
 .word 0xf85f8e80
-.word 0xb9414a69
-cbz w9, Label_420
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_420:
 .word 0x38405ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -6204,28 +4181,12 @@ _dispatch_table_0_56:
 bl _JS_GetGlobalVarImpl_GC
 .word 0xa8c17ffe
 .word 0xf102081f
-b.NE Label_421
+b.NE Label_291
 .word 0x910016d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_421:
-.word 0xb9414a69
-cbz w9, Label_422
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_422:
+Label_291:
 .word 0x38405ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -6243,30 +4204,14 @@ _dispatch_table_1_56:
 bl _JS_GetGlobalVarImpl_GC
 .word 0xa8c17ffe
 .word 0xf102081f
-b.NE Label_423
+b.NE Label_292
 .word 0x910016d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_423:
+Label_292:
 .word 0xaa0003e1
 .word 0xf85f8e80
-.word 0xb9414a69
-cbz w9, Label_424
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_424:
 .word 0x38405ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -6284,30 +4229,14 @@ _dispatch_table_2_56:
 bl _JS_GetGlobalVarImpl_GC
 .word 0xa8c17ffe
 .word 0xf102081f
-b.NE Label_425
+b.NE Label_293
 .word 0x910016d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_425:
+Label_293:
 .word 0xaa0003e1
 .word 0xf85f8e80
-.word 0xb9414a69
-cbz w9, Label_426
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_426:
 .word 0x38405ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -6327,28 +4256,12 @@ bl _LEPUS_SetGlobalVar
 .word 0xa8c17ffe
 .word 0xd1002294
 .word 0x7100001f
-b.GE Label_427
+b.GE Label_294
 .word 0x910016d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_427:
-.word 0xb9414a69
-cbz w9, Label_428
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_428:
+Label_294:
 .word 0x38405ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -6367,28 +4280,12 @@ bl _LEPUS_SetGlobalVar
 .word 0xa8c17ffe
 .word 0xd1002294
 .word 0x7100001f
-b.GE Label_429
+b.GE Label_295
 .word 0x910016d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_429:
-.word 0xb9414a69
-cbz w9, Label_430
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_430:
+Label_295:
 .word 0x38405ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -6411,30 +4308,14 @@ bl _LEPUS_SetGlobalVar
 .word 0xd1002294
 .word 0xd1002294
 .word 0x7100001f
-b.GE Label_432
+b.GE Label_297
 .word 0xf8008699
 .word 0x910016d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_432:
+Label_297:
 .word 0xaa1903e0
-.word 0xb9414a69
-cbz w9, Label_433
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_433:
 .word 0x38405ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -6452,28 +4333,12 @@ _dispatch_table_0_58:
 bl _LEPUS_SetGlobalVar
 .word 0xa8c17ffe
 .word 0x7100001f
-b.GE Label_434
+b.GE Label_298
 .word 0x910016d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_434:
-.word 0xb9414a69
-cbz w9, Label_435
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_435:
+Label_298:
 .word 0x38405ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -6492,28 +4357,12 @@ bl _LEPUS_SetGlobalVar
 .word 0xa8c17ffe
 .word 0xd1002294
 .word 0x7100001f
-b.GE Label_436
+b.GE Label_299
 .word 0x910016d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_436:
-.word 0xb9414a69
-cbz w9, Label_437
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_437:
+Label_299:
 .word 0x38405ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -6536,30 +4385,14 @@ bl _LEPUS_SetGlobalVar
 .word 0xd1002294
 .word 0xd1002294
 .word 0x7100001f
-b.GE Label_439
+b.GE Label_301
 .word 0xf8008699
 .word 0x910016d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_439:
+Label_301:
 .word 0xaa1903e0
-.word 0xb9414a69
-cbz w9, Label_440
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_440:
 .word 0x38405ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -6570,7 +4403,7 @@ _dispatch_table_0_59:
 .word 0xb84012c8
 .word 0xb27f07e9
 .word 0xeb09001f
-b.NE Label_441
+b.NE Label_302
 .word 0xf8008680
 .word 0xf8008681
 .word 0xf85b83b1
@@ -6586,7 +4419,7 @@ bl _JS_ThrowReferenceErrorNotDefined_GC
 .word 0xf9002234
 .word 0x910016d6
 b __exception_handler_entry
-Label_441:
+Label_302:
 .word 0xb27f03e9
 .word 0xf8008680
 .word 0xf8008681
@@ -6602,28 +4435,12 @@ bl _LEPUS_SetGlobalVar
 .word 0xd1002294
 .word 0xd1002294
 .word 0x7100001f
-b.GE Label_442
+b.GE Label_303
 .word 0x910016d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_442:
-.word 0xb9414a69
-cbz w9, Label_443
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_443:
+Label_303:
 .word 0x38405ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -6637,7 +4454,7 @@ _dispatch_table_2_59:
 .word 0xb84012c8
 .word 0xb27f07e9
 .word 0xeb09001f
-b.NE Label_444
+b.NE Label_304
 .word 0xf8008680
 .word 0xf8008681
 .word 0xf85b83b1
@@ -6653,7 +4470,7 @@ bl _JS_ThrowReferenceErrorNotDefined_GC
 .word 0xf9002234
 .word 0x910016d6
 b __exception_handler_entry
-Label_444:
+Label_304:
 .word 0xb27f03e9
 .word 0xf8008680
 .word 0xf8008681
@@ -6669,28 +4486,12 @@ bl _LEPUS_SetGlobalVar
 .word 0xd1002294
 .word 0xd1002294
 .word 0x7100001f
-b.GE Label_445
+b.GE Label_305
 .word 0x910016d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_445:
-.word 0xb9414a69
-cbz w9, Label_446
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_446:
+Label_305:
 .word 0x38405ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -6699,7 +4500,7 @@ Label_446:
 _dispatch_table_0_60:
 .word 0xa9ff0680
 .word 0xf100481f
-b.NE Label_447
+b.NE Label_306
 .word 0xf8008680
 .word 0xf8008681
 .word 0xf85b83b1
@@ -6709,7 +4510,7 @@ b.NE Label_447
 bl _js_value_to_atom_gc
 .word 0xa8c17ffe
 .word 0xf100001f
-b.EQ Label_448
+b.EQ Label_307
 .word 0xaa0003f9
 .word 0xf85b83b1
 .word 0xf9002234
@@ -6718,12 +4519,12 @@ b.EQ Label_448
 .word 0xa9bf7ffe
 bl _JS_ThrowReferenceErrorNotDefined_GC
 .word 0xa8c17ffe
-Label_448:
+Label_307:
 .word 0xf85b83b1
 .word 0xf9002234
 .word 0x910006d6
 b __exception_handler_entry
-Label_447:
+Label_306:
 .word 0xaa0103f9
 .word 0xf8008680
 .word 0xf8008681
@@ -6737,30 +4538,14 @@ bl _JS_GetPropertyValue_GC
 .word 0xa8c17ffe
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_449
+b.NE Label_308
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_449:
+Label_308:
 .word 0xaa0003e1
 .word 0xaa1903e0
-.word 0xb9414a69
-cbz w9, Label_450
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_450:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -6772,7 +4557,7 @@ _dispatch_table_1_60:
 .global _dispatch_table_2_60
 _dispatch_table_2_60:
 .word 0xf100481f
-b.NE Label_451
+b.NE Label_309
 .word 0xf8008680
 .word 0xf8008681
 .word 0xf85b83b1
@@ -6782,7 +4567,7 @@ b.NE Label_451
 bl _js_value_to_atom_gc
 .word 0xa8c17ffe
 .word 0xf100001f
-b.EQ Label_452
+b.EQ Label_310
 .word 0xaa0003f9
 .word 0xf85b83b1
 .word 0xf9002234
@@ -6791,12 +4576,12 @@ b.EQ Label_452
 .word 0xa9bf7ffe
 bl _JS_ThrowReferenceErrorNotDefined_GC
 .word 0xa8c17ffe
-Label_452:
+Label_310:
 .word 0xf85b83b1
 .word 0xf9002234
 .word 0x910006d6
 b __exception_handler_entry
-Label_451:
+Label_309:
 .word 0xaa0103f9
 .word 0xf8008680
 .word 0xf8008681
@@ -6810,30 +4595,14 @@ bl _JS_GetPropertyValue_GC
 .word 0xa8c17ffe
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_453
+b.NE Label_311
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_453:
+Label_311:
 .word 0xaa0003e1
 .word 0xaa1903e0
-.word 0xb9414a69
-cbz w9, Label_454
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_454:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -6843,12 +4612,12 @@ _dispatch_table_0_61:
 .word 0xa9ff0680
 .word 0xf85f8e99
 .word 0xf1004b3f
-b.NE Label_455
+b.NE Label_312
 .word 0xf85e83ac
 .word 0xf9401988
 .word 0x39401508
 .word 0x7200011f
-b.EQ Label_456
+b.EQ Label_313
 .word 0xf8008699
 .word 0xf8008680
 .word 0xf8008681
@@ -6860,7 +4629,7 @@ b.EQ Label_456
 bl _js_value_to_atom_gc
 .word 0xa8c17ffe
 .word 0xf100001f
-b.EQ Label_458
+b.EQ Label_315
 .word 0xaa0003f9
 .word 0xf85b83b1
 .word 0xf9002234
@@ -6869,16 +4638,16 @@ b.EQ Label_458
 .word 0xa9bf7ffe
 bl _JS_ThrowReferenceErrorNotDefined_GC
 .word 0xa8c17ffe
-Label_458:
+Label_315:
 .word 0xf85b83b1
 .word 0xf9002234
 .word 0x910006d6
 b __exception_handler_entry
-b Label_457
-Label_456:
+b Label_314
+Label_313:
 .word 0xf9406e79
-Label_457:
-Label_455:
+Label_314:
+Label_312:
 .word 0xb27103e4
 .word 0xf8008699
 .word 0xf8008680
@@ -6896,28 +4665,12 @@ bl _JS_SetPropertyValue_GC
 .word 0xd1002294
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_459
+b.NE Label_316
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_459:
-.word 0xb9414a69
-cbz w9, Label_460
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_460:
+Label_316:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -6930,12 +4683,12 @@ _dispatch_table_1_61:
 _dispatch_table_2_61:
 .word 0xf85f8e99
 .word 0xf1004b3f
-b.NE Label_461
+b.NE Label_317
 .word 0xf85e83ac
 .word 0xf9401988
 .word 0x39401508
 .word 0x7200011f
-b.EQ Label_462
+b.EQ Label_318
 .word 0xf8008699
 .word 0xf8008680
 .word 0xf8008681
@@ -6947,7 +4700,7 @@ b.EQ Label_462
 bl _js_value_to_atom_gc
 .word 0xa8c17ffe
 .word 0xf100001f
-b.EQ Label_464
+b.EQ Label_320
 .word 0xaa0003f9
 .word 0xf85b83b1
 .word 0xf9002234
@@ -6956,16 +4709,16 @@ b.EQ Label_464
 .word 0xa9bf7ffe
 bl _JS_ThrowReferenceErrorNotDefined_GC
 .word 0xa8c17ffe
-Label_464:
+Label_320:
 .word 0xf85b83b1
 .word 0xf9002234
 .word 0x910006d6
 b __exception_handler_entry
-b Label_463
-Label_462:
+b Label_319
+Label_318:
 .word 0xf9406e79
-Label_463:
-Label_461:
+Label_319:
+Label_317:
 .word 0xb27103e4
 .word 0xf8008699
 .word 0xf8008680
@@ -6983,28 +4736,12 @@ bl _JS_SetPropertyValue_GC
 .word 0xd1002294
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_465
+b.NE Label_321
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_465:
-.word 0xb9414a69
-cbz w9, Label_466
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_466:
+Label_321:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -7020,28 +4757,12 @@ _dispatch_table_0_62:
 bl _JS_DefineGlobalVar_GC
 .word 0xa8c17ffe
 .word 0x7100001f
-b.GE Label_467
+b.GE Label_322
 .word 0x91001ad6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_467:
-.word 0xb9414a69
-cbz w9, Label_468
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_468:
+Label_322:
 .word 0x38406ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -7060,30 +4781,14 @@ bl _JS_DefineGlobalVar_GC
 .word 0xa8c17ffe
 .word 0xd1002294
 .word 0x7100001f
-b.GE Label_470
+b.GE Label_324
 .word 0xf8008699
 .word 0x91001ad6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_470:
+Label_324:
 .word 0xaa1903e0
-.word 0xb9414a69
-cbz w9, Label_471
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_471:
 .word 0x38406ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -7103,31 +4808,15 @@ bl _JS_DefineGlobalVar_GC
 .word 0xa8c17ffe
 .word 0xd1002294
 .word 0x7100001f
-b.GE Label_473
+b.GE Label_326
 .word 0xf8008699
 .word 0x91001ad6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_473:
+Label_326:
 .word 0xaa1903e1
 .word 0xf85f8e80
-.word 0xb9414a69
-cbz w9, Label_474
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_474:
 .word 0x38406ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -7143,28 +4832,12 @@ _dispatch_table_0_63:
 bl _JS_CheckDefineGlobalVar_GC
 .word 0xa8c17ffe
 .word 0x7100001f
-b.GE Label_475
+b.GE Label_327
 .word 0x91001ad6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_475:
-.word 0xb9414a69
-cbz w9, Label_476
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_476:
+Label_327:
 .word 0x38406ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -7183,30 +4856,14 @@ bl _JS_CheckDefineGlobalVar_GC
 .word 0xa8c17ffe
 .word 0xd1002294
 .word 0x7100001f
-b.GE Label_478
+b.GE Label_329
 .word 0xf8008699
 .word 0x91001ad6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_478:
+Label_329:
 .word 0xaa1903e0
-.word 0xb9414a69
-cbz w9, Label_479
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_479:
 .word 0x38406ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -7226,31 +4883,15 @@ bl _JS_CheckDefineGlobalVar_GC
 .word 0xa8c17ffe
 .word 0xd1002294
 .word 0x7100001f
-b.GE Label_481
+b.GE Label_331
 .word 0xf8008699
 .word 0x91001ad6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_481:
+Label_331:
 .word 0xaa1903e1
 .word 0xf85f8e80
-.word 0xb9414a69
-cbz w9, Label_482
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_482:
 .word 0x38406ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -7273,31 +4914,15 @@ _dispatch_table_2_64:
 bl _JS_DefineGlobalFunction_GC
 .word 0xa8c17ffe
 .word 0xf100001f
-b.GE Label_484
+b.GE Label_333
 .word 0xd1002294
 .word 0xf8008699
 .word 0x91001ad6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_484:
+Label_333:
 .word 0xd1002294
-.word 0xb9414a69
-cbz w9, Label_485
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_485:
 .word 0x38406ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -7319,31 +4944,15 @@ _dispatch_table_1_64:
 bl _JS_DefineGlobalFunction_GC
 .word 0xa8c17ffe
 .word 0xf100001f
-b.GE Label_487
+b.GE Label_335
 .word 0xd1002294
 .word 0xf8008699
 .word 0x91001ad6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_487:
+Label_335:
 .word 0xd1002294
-.word 0xb9414a69
-cbz w9, Label_488
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_488:
 .word 0x38406ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -7368,29 +4977,13 @@ bl _JS_GetPropertyInternalImpl_GC
 .word 0xa8c17ffe
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_490
+b.NE Label_337
 .word 0xf8008699
 .word 0x910016d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_490:
-.word 0xb9414a69
-cbz w9, Label_491
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_491:
+Label_337:
 .word 0x38405ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -7414,29 +5007,13 @@ bl _JS_GetPropertyInternalImpl_GC
 .word 0xa8c17ffe
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_493
+b.NE Label_339
 .word 0xf8008699
 .word 0x910016d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_493:
-.word 0xb9414a69
-cbz w9, Label_494
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_494:
+Label_339:
 .word 0x38405ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -7460,32 +5037,16 @@ bl _JS_GetPropertyInternalImpl_GC
 .word 0xa8c17ffe
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_496
+b.NE Label_341
 .word 0xf8008699
 .word 0x910016d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_496:
+Label_341:
 .word 0xaa0003f9
 .word 0xaa1903e1
 .word 0xf85f8e80
-.word 0xb9414a69
-cbz w9, Label_497
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_497:
 .word 0x38405ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -7511,31 +5072,15 @@ bl _JS_GetPropertyInternalImpl_GC
 .word 0xa8c17ffe
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_499
+b.NE Label_343
 .word 0xf8008699
 .word 0x910016d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_499:
+Label_343:
 .word 0xaa0003e1
 .word 0xaa1903e0
-.word 0xb9414a69
-cbz w9, Label_500
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_500:
 .word 0x38405ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -7560,31 +5105,15 @@ bl _JS_GetPropertyInternalImpl_GC
 .word 0xa8c17ffe
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_502
+b.NE Label_345
 .word 0xf8008699
 .word 0x910016d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_502:
+Label_345:
 .word 0xaa0003e1
 .word 0xaa1903e0
-.word 0xb9414a69
-cbz w9, Label_503
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_503:
 .word 0x38405ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -7609,28 +5138,12 @@ bl _JS_SetPropertyInternalImpl_GC
 .word 0xd1002294
 .word 0xd1002294
 .word 0x7100001f
-b.GE Label_504
+b.GE Label_346
 .word 0x910016d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_504:
-.word 0xb9414a69
-cbz w9, Label_505
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_505:
+Label_346:
 .word 0x38405ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -7658,28 +5171,12 @@ bl _JS_SetPropertyInternalImpl_GC
 .word 0xd1002294
 .word 0xd1002294
 .word 0x7100001f
-b.GE Label_506
+b.GE Label_347
 .word 0x910016d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_506:
-.word 0xb9414a69
-cbz w9, Label_507
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_507:
+Label_347:
 .word 0x38405ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -7702,29 +5199,13 @@ bl _JS_GetPrivateField_GC
 .word 0xf85f8e81
 .word 0xaa1903e0
 .word 0xf102081f
-b.NE Label_509
+b.NE Label_349
 .word 0xf8008680
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_509:
-.word 0xb9414a69
-cbz w9, Label_510
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_510:
+Label_349:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -7750,29 +5231,13 @@ bl _JS_GetPrivateField_GC
 .word 0xf85f8e81
 .word 0xaa1903e0
 .word 0xf102081f
-b.NE Label_512
+b.NE Label_351
 .word 0xf8008680
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_512:
-.word 0xb9414a69
-cbz w9, Label_513
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_513:
+Label_351:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -7799,28 +5264,12 @@ bl _JS_SetPrivateField_GC
 .word 0xf85f8e99
 .word 0xf85f8e81
 .word 0x7100033f
-b.GE Label_514
+b.GE Label_352
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_514:
-.word 0xb9414a69
-cbz w9, Label_515
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_515:
+Label_352:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -7850,28 +5299,12 @@ bl _JS_SetPrivateField_GC
 .word 0xf85f8e99
 .word 0xf85f8e81
 .word 0x7100033f
-b.GE Label_516
+b.GE Label_353
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_516:
-.word 0xb9414a69
-cbz w9, Label_517
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_517:
+Label_353:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -7895,28 +5328,12 @@ bl _JS_DefinePrivateField_GC
 .word 0xd1002294
 .word 0xd1002294
 .word 0x7100001f
-b.GE Label_518
+b.GE Label_354
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_518:
-.word 0xb9414a69
-cbz w9, Label_519
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_519:
+Label_354:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -7943,28 +5360,12 @@ bl _JS_DefinePrivateField_GC
 .word 0xd1002294
 .word 0xd1002294
 .word 0x7100001f
-b.GE Label_520
+b.GE Label_355
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_520:
-.word 0xb9414a69
-cbz w9, Label_521
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_521:
+Label_355:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -7985,28 +5386,12 @@ bl _JS_GetPropertyValue_GC
 .word 0xd1002294
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_522
+b.NE Label_356
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_522:
-.word 0xb9414a69
-cbz w9, Label_523
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_523:
+Label_356:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -8030,28 +5415,12 @@ bl _JS_GetPropertyValue_GC
 .word 0xd1002294
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_524
+b.NE Label_357
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_524:
-.word 0xb9414a69
-cbz w9, Label_525
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_525:
+Label_357:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -8075,30 +5444,14 @@ bl _JS_GetPropertyValue_GC
 .word 0xaa0003e1
 .word 0xaa1903e0
 .word 0xf102083f
-b.NE Label_527
+b.NE Label_359
 .word 0xf8008680
 .word 0xf8008681
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_527:
-.word 0xb9414a69
-cbz w9, Label_528
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_528:
+Label_359:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -8125,30 +5478,14 @@ bl _JS_GetPropertyValue_GC
 .word 0xaa0003e1
 .word 0xaa1903e0
 .word 0xf102083f
-b.NE Label_530
+b.NE Label_361
 .word 0xf8008680
 .word 0xf8008681
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_530:
-.word 0xb9414a69
-cbz w9, Label_531
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_531:
+Label_361:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -8160,17 +5497,17 @@ _dispatch_table_0_73:
 .word 0xd2800049
 .word 0xf2ffffe9
 .word 0xea090329
-cbnz x9, Label_533
+cbnz x9, Label_363
 .word 0x79400f29
 .word 0xf100553f
-b.LT Label_533
+b.LT Label_363
 .word 0xf100753f
-b.GT Label_533
+b.GT Label_363
 .word 0xd2800004
-b Label_532
-Label_533:
+b Label_362
+Label_363:
 .word 0xb27103e4
-Label_532:
+Label_362:
 .word 0xf8008680
 .word 0xf8008681
 .word 0xf8008699
@@ -8187,28 +5524,12 @@ bl _JS_SetPropertyValue_GC
 .word 0xd1002294
 .word 0xd1002294
 .word 0x7100001f
-b.GE Label_534
+b.GE Label_364
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_534:
-.word 0xb9414a69
-cbz w9, Label_535
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_535:
+Label_364:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -8223,17 +5544,17 @@ _dispatch_table_2_73:
 .word 0xd2800049
 .word 0xf2ffffe9
 .word 0xea090329
-cbnz x9, Label_537
+cbnz x9, Label_366
 .word 0x79400f29
 .word 0xf100553f
-b.LT Label_537
+b.LT Label_366
 .word 0xf100753f
-b.GT Label_537
+b.GT Label_366
 .word 0xd2800004
-b Label_536
-Label_537:
+b Label_365
+Label_366:
 .word 0xb27103e4
-Label_536:
+Label_365:
 .word 0xf8008680
 .word 0xf8008681
 .word 0xf8008699
@@ -8250,28 +5571,12 @@ bl _JS_SetPropertyValue_GC
 .word 0xd1002294
 .word 0xd1002294
 .word 0x7100001f
-b.GE Label_538
+b.GE Label_367
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_538:
-.word 0xb9414a69
-cbz w9, Label_539
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_539:
+Label_367:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -8289,12 +5594,12 @@ bl _LEPUS_ValueToAtom
 .word 0xa8c17ffe
 .word 0xd2800008
 .word 0xeb08001f
-b.NE Label_540
+b.NE Label_368
 .word 0xf85b83b1
 .word 0xf9002234
 .word 0x910006d6
 b __exception_handler_entry
-Label_540:
+Label_368:
 .word 0xaa0003f9
 .word 0xf85f0280
 .word 0xf85e8288
@@ -8311,34 +5616,18 @@ Label_540:
 bl _JS_GetPropertyInternalImpl_GC
 .word 0xa8c17ffe
 .word 0xf102081f
-b.NE Label_541
+b.NE Label_369
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_541:
+Label_369:
 .word 0xf8008680
 .word 0xf85f8e99
 .word 0xd1002294
 .word 0xd1002294
 .word 0xd1002294
 .word 0xaa1903e0
-.word 0xb9414a69
-cbz w9, Label_542
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_542:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -8359,12 +5648,12 @@ bl _LEPUS_ValueToAtom
 .word 0xa8c17ffe
 .word 0xd2800008
 .word 0xeb08001f
-b.NE Label_543
+b.NE Label_370
 .word 0xf85b83b1
 .word 0xf9002234
 .word 0x910006d6
 b __exception_handler_entry
-Label_543:
+Label_370:
 .word 0xaa0003f9
 .word 0xf85f0280
 .word 0xf85e8288
@@ -8381,34 +5670,18 @@ Label_543:
 bl _JS_GetPropertyInternalImpl_GC
 .word 0xa8c17ffe
 .word 0xf102081f
-b.NE Label_544
+b.NE Label_371
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_544:
+Label_371:
 .word 0xf8008680
 .word 0xf85f8e99
 .word 0xd1002294
 .word 0xd1002294
 .word 0xd1002294
 .word 0xaa1903e0
-.word 0xb9414a69
-cbz w9, Label_545
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_545:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -8422,7 +5695,7 @@ _dispatch_table_1_75:
 .word 0xd2800049
 .word 0xf2ffffc9
 .word 0xea09011f
-b.EQ Label_547
+b.EQ Label_373
 .word 0xf85b83b1
 .word 0xf9002234
 .word 0xaa1303e0
@@ -8433,7 +5706,7 @@ bl _JS_ThrowTypeErrorNotAnObject
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_547:
+Label_373:
 .word 0xf85f0288
 .word 0xf85b83b1
 .word 0xf9002234
@@ -8443,12 +5716,12 @@ Label_547:
 bl _LEPUS_ValueToAtom
 .word 0xa8c17ffe
 .word 0xf100001f
-b.NE Label_549
+b.NE Label_375
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_549:
+Label_375:
 .word 0xf85e8281
 .word 0xf85f8283
 .word 0xf85e0284
@@ -8463,28 +5736,12 @@ bl _JS_SetPropertyGeneric_GC
 .word 0xa8c17ffe
 .word 0xd1008294
 .word 0x7100001f
-b.GE Label_550
+b.GE Label_376
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_550:
-.word 0xb9414a69
-cbz w9, Label_551
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_551:
+Label_376:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -8500,7 +5757,7 @@ _dispatch_table_0_75:
 .word 0xd2800049
 .word 0xf2ffffc9
 .word 0xea09011f
-b.EQ Label_553
+b.EQ Label_378
 .word 0xf85b83b1
 .word 0xf9002234
 .word 0xaa1303e0
@@ -8511,7 +5768,7 @@ bl _JS_ThrowTypeErrorNotAnObject
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_553:
+Label_378:
 .word 0xf85f0288
 .word 0xf85b83b1
 .word 0xf9002234
@@ -8521,12 +5778,12 @@ Label_553:
 bl _LEPUS_ValueToAtom
 .word 0xa8c17ffe
 .word 0xf100001f
-b.NE Label_555
+b.NE Label_380
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_555:
+Label_380:
 .word 0xf85e8281
 .word 0xf85f8283
 .word 0xf85e0284
@@ -8541,28 +5798,12 @@ bl _JS_SetPropertyGeneric_GC
 .word 0xa8c17ffe
 .word 0xd1008294
 .word 0x7100001f
-b.GE Label_556
+b.GE Label_381
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_556:
-.word 0xb9414a69
-cbz w9, Label_557
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_557:
+Label_381:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -8583,28 +5824,12 @@ bl _LEPUS_DefinePropertyValue
 .word 0xa8c17ffe
 .word 0xd1002294
 .word 0x7100001f
-b.GE Label_558
+b.GE Label_382
 .word 0x910016d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_558:
-.word 0xb9414a69
-cbz w9, Label_559
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_559:
+Label_382:
 .word 0x38405ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -8624,28 +5849,12 @@ bl _LEPUS_DefinePropertyValue
 .word 0xa8c17ffe
 .word 0xd1002294
 .word 0x7100001f
-b.GE Label_560
+b.GE Label_383
 .word 0x910016d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_560:
-.word 0xb9414a69
-cbz w9, Label_561
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_561:
+Label_383:
 .word 0x38405ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -8668,30 +5877,14 @@ bl _LEPUS_DefinePropertyValue
 .word 0xd1002294
 .word 0xd1002294
 .word 0x7100001f
-b.GE Label_563
+b.GE Label_385
 .word 0xf8008699
 .word 0x910016d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_563:
+Label_385:
 .word 0xaa1903e0
-.word 0xb9414a69
-cbz w9, Label_564
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_564:
 .word 0x38405ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -8717,30 +5910,14 @@ bl _JS_DefineObjectName
 .word 0xa8c17ffe
 .word 0xd1002294
 .word 0x7100001f
-b.GE Label_566
+b.GE Label_387
 .word 0xf8008699
 .word 0x910016d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_566:
+Label_387:
 .word 0xaa1903e0
-.word 0xb9414a69
-cbz w9, Label_567
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_567:
 .word 0x38405ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -8765,30 +5942,14 @@ bl _JS_DefineObjectName
 .word 0xa8c17ffe
 .word 0xd1002294
 .word 0x7100001f
-b.GE Label_569
+b.GE Label_389
 .word 0xf8008699
 .word 0x910016d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_569:
+Label_389:
 .word 0xaa1903e0
-.word 0xb9414a69
-cbz w9, Label_570
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_570:
 .word 0x38405ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -8810,31 +5971,15 @@ bl _JS_DefineObjectNameComputed_GC
 .word 0xa8c17ffe
 .word 0xd1002294
 .word 0x7100001f
-b.GE Label_572
+b.GE Label_391
 .word 0xf8008699
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_572:
+Label_391:
 .word 0xf85f8e81
 .word 0xaa1903e0
-.word 0xb9414a69
-cbz w9, Label_573
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_573:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -8859,31 +6004,15 @@ bl _JS_DefineObjectNameComputed_GC
 .word 0xa8c17ffe
 .word 0xd1002294
 .word 0x7100001f
-b.GE Label_575
+b.GE Label_393
 .word 0xf8008699
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_575:
+Label_393:
 .word 0xf85f8e81
 .word 0xaa1903e0
-.word 0xb9414a69
-cbz w9, Label_576
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_576:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -8893,14 +6022,14 @@ _dispatch_table_0_79:
 .word 0xa9ff0680
 .word 0xaa0003f9
 .word 0xf100083f
-b.NE Label_577
-b Label_578
-Label_577:
+b.NE Label_394
+b Label_395
+Label_394:
 .word 0xd2800048
 .word 0xf2ffffe8
 .word 0xea01011f
-b.NE Label_579
-Label_578:
+b.NE Label_396
+Label_395:
 .word 0xb24003e3
 .word 0xf8008681
 .word 0xf8008680
@@ -8914,32 +6043,16 @@ bl _JS_SetPrototypeInternal_GC
 .word 0xa8c17ffe
 .word 0xd1002294
 .word 0x7100001f
-b.GE Label_581
+b.GE Label_398
 .word 0xf8008699
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_581:
+Label_398:
 .word 0xf85f8e81
-Label_579:
+Label_396:
 .word 0xaa1903e0
-.word 0xb9414a69
-cbz w9, Label_582
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_582:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -8952,14 +6065,14 @@ _dispatch_table_1_79:
 _dispatch_table_2_79:
 .word 0xaa0003f9
 .word 0xf100083f
-b.NE Label_583
-b Label_584
-Label_583:
+b.NE Label_399
+b Label_400
+Label_399:
 .word 0xd2800048
 .word 0xf2ffffe8
 .word 0xea01011f
-b.NE Label_585
-Label_584:
+b.NE Label_401
+Label_400:
 .word 0xb24003e3
 .word 0xf8008681
 .word 0xf8008680
@@ -8973,32 +6086,16 @@ bl _JS_SetPrototypeInternal_GC
 .word 0xa8c17ffe
 .word 0xd1002294
 .word 0x7100001f
-b.GE Label_587
+b.GE Label_403
 .word 0xf8008699
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_587:
+Label_403:
 .word 0xf85f8e81
-Label_585:
+Label_401:
 .word 0xaa1903e0
-.word 0xb9414a69
-cbz w9, Label_588
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_588:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -9015,22 +6112,6 @@ bl _js_method_set_home_object_gc
 .word 0xa8c17ffe
 .word 0xaa1903e1
 .word 0xf85f8e80
-.word 0xb9414a69
-cbz w9, Label_589
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_589:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -9050,22 +6131,6 @@ bl _js_method_set_home_object_gc
 .word 0xa8c17ffe
 .word 0xaa1903e1
 .word 0xf85f8e80
-.word 0xb9414a69
-cbz w9, Label_590
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_590:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -9091,31 +6156,15 @@ bl _JS_DefinePropertyValueValue_GC
 .word 0xd1002294
 .word 0xd1002294
 .word 0x7100001f
-b.GE Label_592
+b.GE Label_405
 .word 0xf8008699
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_592:
+Label_405:
 .word 0xf85f8e81
 .word 0xaa1903e0
-.word 0xb9414a69
-cbz w9, Label_593
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_593:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -9144,31 +6193,15 @@ bl _JS_DefinePropertyValueValue_GC
 .word 0xd1002294
 .word 0xd1002294
 .word 0x7100001f
-b.GE Label_595
+b.GE Label_407
 .word 0xf8008699
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_595:
+Label_407:
 .word 0xf85f8e81
 .word 0xaa1903e0
-.word 0xb9414a69
-cbz w9, Label_596
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_596:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -9186,29 +6219,13 @@ _dispatch_table_1_82:
 bl _js_append_enumerate_gc
 .word 0xa8c17ffe
 .word 0x7100001f
-b.GE Label_597
+b.GE Label_408
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_597:
+Label_408:
 .word 0xf85f8e80
-.word 0xb9414a69
-cbz w9, Label_598
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_598:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -9228,29 +6245,13 @@ _dispatch_table_0_82:
 bl _js_append_enumerate_gc
 .word 0xa8c17ffe
 .word 0x7100001f
-b.GE Label_599
+b.GE Label_409
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_599:
+Label_409:
 .word 0xf85f8e80
-.word 0xb9414a69
-cbz w9, Label_600
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_600:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -9269,28 +6270,12 @@ _dispatch_table_1_83:
 bl _prim_js_copy_data_properties_gc
 .word 0xa8c17ffe
 .word 0x7100001f
-b.GE Label_601
+b.GE Label_410
 .word 0x91000ad6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_601:
-.word 0xb9414a69
-cbz w9, Label_602
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_602:
+Label_410:
 .word 0x38402ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -9311,28 +6296,12 @@ _dispatch_table_0_83:
 bl _prim_js_copy_data_properties_gc
 .word 0xa8c17ffe
 .word 0x7100001f
-b.GE Label_603
+b.GE Label_411
 .word 0x91000ad6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_603:
-.word 0xb9414a69
-cbz w9, Label_604
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_604:
+Label_411:
 .word 0x38402ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -9344,23 +6313,23 @@ _dispatch_table_0_84:
 .word 0x394016c9
 .word 0xd288a023
 .word 0xf27e013f
-b.EQ Label_605
+b.EQ Label_412
 .word 0xb27e0063
-Label_605:
+Label_412:
 .word 0x92400529
 .word 0xf100013f
-b.NE Label_606
+b.NE Label_413
 .word 0xd2844044
 .word 0xaa040063
-b Label_608
-Label_606:
+b Label_415
+Label_413:
 .word 0xf100053f
-b.NE Label_607
+b.NE Label_414
 .word 0xb2750063
-b Label_608
-Label_607:
+b Label_415
+Label_414:
 .word 0xb2740063
-Label_608:
+Label_415:
 .word 0xf8008680
 .word 0xf8008681
 .word 0xf85b83b1
@@ -9374,7 +6343,7 @@ bl _js_method_set_properties_gc
 .word 0xa8c17ffe
 .word 0xf85f8e83
 .word 0x7100001f
-b.LT Label_609
+b.LT Label_416
 .word 0xf85f8281
 .word 0xf85f0280
 .word 0xb84012c8
@@ -9388,32 +6357,16 @@ b.LT Label_609
 .word 0xa9bf7ffe
 bl _LEPUS_DefineProperty
 .word 0xa8c17ffe
-Label_609:
+Label_416:
 .word 0xaa0003f9
 .word 0xf85f8e81
 .word 0x7100033f
-b.GE Label_610
+b.GE Label_417
 .word 0x91001ad6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_610:
-.word 0xb9414a69
-cbz w9, Label_611
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_611:
+Label_417:
 .word 0x38406ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -9428,23 +6381,23 @@ _dispatch_table_2_84:
 .word 0x394016c9
 .word 0xd288a023
 .word 0xf27e013f
-b.EQ Label_612
+b.EQ Label_418
 .word 0xb27e0063
-Label_612:
+Label_418:
 .word 0x92400529
 .word 0xf100013f
-b.NE Label_613
+b.NE Label_419
 .word 0xd2844044
 .word 0xaa040063
-b Label_615
-Label_613:
+b Label_421
+Label_419:
 .word 0xf100053f
-b.NE Label_614
+b.NE Label_420
 .word 0xb2750063
-b Label_615
-Label_614:
+b Label_421
+Label_420:
 .word 0xb2740063
-Label_615:
+Label_421:
 .word 0xf8008680
 .word 0xf8008681
 .word 0xf85b83b1
@@ -9458,7 +6411,7 @@ bl _js_method_set_properties_gc
 .word 0xa8c17ffe
 .word 0xf85f8e83
 .word 0x7100001f
-b.LT Label_616
+b.LT Label_422
 .word 0xf85f8281
 .word 0xf85f0280
 .word 0xb84012c8
@@ -9472,32 +6425,16 @@ b.LT Label_616
 .word 0xa9bf7ffe
 bl _LEPUS_DefineProperty
 .word 0xa8c17ffe
-Label_616:
+Label_422:
 .word 0xaa0003f9
 .word 0xf85f8e81
 .word 0x7100033f
-b.GE Label_617
+b.GE Label_423
 .word 0x91001ad6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_617:
-.word 0xb9414a69
-cbz w9, Label_618
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_618:
+Label_423:
 .word 0x38406ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -9515,33 +6452,33 @@ _dispatch_table_0_85:
 bl _LEPUS_ValueToAtom
 .word 0xa8c17ffe
 .word 0xf100001f
-b.NE Label_619
+b.NE Label_424
 .word 0x91000ad6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_619:
+Label_424:
 .word 0xaa0003e8
 .word 0x394006c9
 .word 0xd288a023
 .word 0xf27e013f
-b.EQ Label_620
+b.EQ Label_425
 .word 0xb27e0063
-Label_620:
+Label_425:
 .word 0x92400529
 .word 0xf100013f
-b.NE Label_621
+b.NE Label_426
 .word 0xd2844044
 .word 0xaa040063
-b Label_623
-Label_621:
+b Label_428
+Label_426:
 .word 0xf100053f
-b.NE Label_622
+b.NE Label_427
 .word 0xb2750063
-b Label_623
-Label_622:
+b Label_428
+Label_427:
 .word 0xb2740063
-Label_623:
+Label_428:
 .word 0xaa0303f9
 .word 0xf85f8281
 .word 0xf85f0280
@@ -9557,7 +6494,7 @@ Label_623:
 bl _js_method_set_properties_gc
 .word 0xa8c17ffe
 .word 0x7100001f
-b.LT Label_624
+b.LT Label_429
 .word 0xf85f8288
 .word 0xf85f0281
 .word 0xf85e8280
@@ -9572,34 +6509,18 @@ b.LT Label_624
 .word 0xa9bf7ffe
 bl _LEPUS_DefineProperty
 .word 0xa8c17ffe
-Label_624:
+Label_429:
 .word 0xaa0003f9
 .word 0xf85f8e88
 .word 0xf85f8e81
 .word 0xf85f8e80
 .word 0x7100033f
-b.GE Label_625
+b.GE Label_430
 .word 0x91000ad6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_625:
-.word 0xb9414a69
-cbz w9, Label_626
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_626:
+Label_430:
 .word 0x38402ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -9620,33 +6541,33 @@ _dispatch_table_2_85:
 bl _LEPUS_ValueToAtom
 .word 0xa8c17ffe
 .word 0xf100001f
-b.NE Label_627
+b.NE Label_431
 .word 0x91000ad6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_627:
+Label_431:
 .word 0xaa0003e8
 .word 0x394006c9
 .word 0xd288a023
 .word 0xf27e013f
-b.EQ Label_628
+b.EQ Label_432
 .word 0xb27e0063
-Label_628:
+Label_432:
 .word 0x92400529
 .word 0xf100013f
-b.NE Label_629
+b.NE Label_433
 .word 0xd2844044
 .word 0xaa040063
-b Label_631
-Label_629:
+b Label_435
+Label_433:
 .word 0xf100053f
-b.NE Label_630
+b.NE Label_434
 .word 0xb2750063
-b Label_631
-Label_630:
+b Label_435
+Label_434:
 .word 0xb2740063
-Label_631:
+Label_435:
 .word 0xaa0303f9
 .word 0xf85f8281
 .word 0xf85f0280
@@ -9662,7 +6583,7 @@ Label_631:
 bl _js_method_set_properties_gc
 .word 0xa8c17ffe
 .word 0x7100001f
-b.LT Label_632
+b.LT Label_436
 .word 0xf85f8288
 .word 0xf85f0281
 .word 0xf85e8280
@@ -9677,34 +6598,18 @@ b.LT Label_632
 .word 0xa9bf7ffe
 bl _LEPUS_DefineProperty
 .word 0xa8c17ffe
-Label_632:
+Label_436:
 .word 0xaa0003f9
 .word 0xf85f8e88
 .word 0xf85f8e81
 .word 0xf85f8e80
 .word 0x7100033f
-b.GE Label_633
+b.GE Label_437
 .word 0x91000ad6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_633:
-.word 0xb9414a69
-cbz w9, Label_634
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_634:
+Label_437:
 .word 0x38402ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -9729,28 +6634,12 @@ _dispatch_table_1_86:
 bl _js_op_define_class
 .word 0xa8c17ffe
 .word 0x7100001f
-b.GE Label_635
+b.GE Label_438
 .word 0x91001ad6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_635:
-.word 0xb9414a69
-cbz w9, Label_636
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_636:
+Label_438:
 .word 0x38406ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -9777,28 +6666,12 @@ _dispatch_table_0_86:
 bl _js_op_define_class
 .word 0xa8c17ffe
 .word 0x7100001f
-b.GE Label_637
+b.GE Label_439
 .word 0x91001ad6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_637:
-.word 0xb9414a69
-cbz w9, Label_638
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_638:
+Label_439:
 .word 0x38406ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -9808,22 +6681,6 @@ _dispatch_table_0_87:
 .word 0x784012c8
 .word 0x8b080f08
 .word 0xf9400100
-.word 0xb9414a69
-cbz w9, Label_639
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb10012c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_639:
 .word 0x38403ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -9833,22 +6690,6 @@ _dispatch_table_1_87:
 .word 0x784012c8
 .word 0x8b080f08
 .word 0xf9400101
-.word 0xb9414a69
-cbz w9, Label_640
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb10012c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_640:
 .word 0x38403ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -9860,22 +6701,6 @@ _dispatch_table_2_87:
 .word 0xf8008680
 .word 0xaa0103e0
 .word 0xf9400101
-.word 0xb9414a69
-cbz w9, Label_641
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb10012c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_641:
 .word 0x38403ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -9886,22 +6711,6 @@ _dispatch_table_0_88:
 .word 0x8b080f08
 .word 0xf85f8e80
 .word 0xf9000100
-.word 0xb9414a69
-cbz w9, Label_642
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb10012c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_642:
 .word 0x38403ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -9911,22 +6720,6 @@ _dispatch_table_1_88:
 .word 0x784012c8
 .word 0x8b080f08
 .word 0xf9000100
-.word 0xb9414a69
-cbz w9, Label_643
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb10012c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_643:
 .word 0x38403ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -9938,22 +6731,6 @@ _dispatch_table_2_88:
 .word 0xf9000101
 .word 0xaa0003f9
 .word 0xaa1903e0
-.word 0xb9414a69
-cbz w9, Label_644
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb10012c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_644:
 .word 0x38403ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -9964,22 +6741,6 @@ _dispatch_table_0_89:
 .word 0x8b080f08
 .word 0xf85f8e80
 .word 0xf9000100
-.word 0xb9414a69
-cbz w9, Label_645
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb10012c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_645:
 .word 0x38403ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -9989,22 +6750,6 @@ _dispatch_table_1_89:
 .word 0x784012c8
 .word 0x8b080f08
 .word 0xf9000100
-.word 0xb9414a69
-cbz w9, Label_646
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb10012c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_646:
 .word 0x38403ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -10014,22 +6759,6 @@ _dispatch_table_2_89:
 .word 0x784012c8
 .word 0x8b080f08
 .word 0xf9000101
-.word 0xb9414a69
-cbz w9, Label_647
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb10012c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_647:
 .word 0x38403ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -10039,22 +6768,6 @@ _dispatch_table_0_90:
 .word 0x784012c8
 .word 0x8b080ee8
 .word 0xf9400100
-.word 0xb9414a69
-cbz w9, Label_648
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb10012c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_648:
 .word 0x38403ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -10064,22 +6777,6 @@ _dispatch_table_1_90:
 .word 0x784012c8
 .word 0x8b080ee8
 .word 0xf9400101
-.word 0xb9414a69
-cbz w9, Label_649
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb10012c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_649:
 .word 0x38403ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -10091,22 +6788,6 @@ _dispatch_table_2_90:
 .word 0xf8008680
 .word 0xaa0103e0
 .word 0xf9400101
-.word 0xb9414a69
-cbz w9, Label_650
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb10012c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_650:
 .word 0x38403ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -10117,22 +6798,6 @@ _dispatch_table_0_91:
 .word 0x8b080ee8
 .word 0xf85f8e80
 .word 0xf9000100
-.word 0xb9414a69
-cbz w9, Label_651
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb10012c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_651:
 .word 0x38403ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -10142,22 +6807,6 @@ _dispatch_table_1_91:
 .word 0x784012c8
 .word 0x8b080ee8
 .word 0xf9000100
-.word 0xb9414a69
-cbz w9, Label_652
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb10012c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_652:
 .word 0x38403ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -10167,22 +6816,6 @@ _dispatch_table_2_91:
 .word 0x784012c8
 .word 0x8b080ee8
 .word 0xf9000101
-.word 0xb9414a69
-cbz w9, Label_653
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb10012c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_653:
 .word 0x38403ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -10193,22 +6826,6 @@ _dispatch_table_0_92:
 .word 0x8b080ee8
 .word 0xf85f8e80
 .word 0xf9000100
-.word 0xb9414a69
-cbz w9, Label_654
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb10012c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_654:
 .word 0x38403ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -10218,22 +6835,6 @@ _dispatch_table_1_92:
 .word 0x784012c8
 .word 0x8b080ee8
 .word 0xf9000100
-.word 0xb9414a69
-cbz w9, Label_655
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb10012c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_655:
 .word 0x38403ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -10243,22 +6844,6 @@ _dispatch_table_2_92:
 .word 0x784012c8
 .word 0x8b080ee8
 .word 0xf9000101
-.word 0xb9414a69
-cbz w9, Label_656
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb10012c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_656:
 .word 0x38403ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -10270,22 +6855,6 @@ _dispatch_table_0_93:
 .word 0xf9400108
 .word 0xf9401108
 .word 0xf9400100
-.word 0xb9414a69
-cbz w9, Label_657
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb10012c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_657:
 .word 0x38403ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -10297,22 +6866,6 @@ _dispatch_table_1_93:
 .word 0xf9400108
 .word 0xf9401108
 .word 0xf9400101
-.word 0xb9414a69
-cbz w9, Label_658
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb10012c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_658:
 .word 0x38403ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -10326,22 +6879,6 @@ _dispatch_table_2_93:
 .word 0xf8008680
 .word 0xaa0103e0
 .word 0xf9400101
-.word 0xb9414a69
-cbz w9, Label_659
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb10012c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_659:
 .word 0x38403ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -10360,22 +6897,6 @@ _dispatch_table_0_94:
 bl _prim_WriteBarrierNoStore
 .word 0xa8c17ffe
 .word 0xaa1903e0
-.word 0xb9414a69
-cbz w9, Label_660
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb10012c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_660:
 .word 0x38403ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -10393,22 +6914,6 @@ _dispatch_table_1_94:
 bl _prim_WriteBarrierNoStore
 .word 0xa8c17ffe
 .word 0xaa1903e0
-.word 0xb9414a69
-cbz w9, Label_661
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb10012c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_661:
 .word 0x38403ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -10428,22 +6933,6 @@ _dispatch_table_2_94:
 bl _prim_WriteBarrierNoStore
 .word 0xa8c17ffe
 .word 0xaa1903e0
-.word 0xb9414a69
-cbz w9, Label_662
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb10012c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_662:
 .word 0x38403ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -10462,22 +6951,6 @@ _dispatch_table_0_95:
 bl _prim_WriteBarrierNoStore
 .word 0xa8c17ffe
 .word 0xaa1903e0
-.word 0xb9414a69
-cbz w9, Label_663
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb10012c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_663:
 .word 0x38403ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -10495,22 +6968,6 @@ _dispatch_table_1_95:
 bl _prim_WriteBarrierNoStore
 .word 0xa8c17ffe
 .word 0xaa1903e0
-.word 0xb9414a69
-cbz w9, Label_664
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb10012c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_664:
 .word 0x38403ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -10532,22 +6989,6 @@ bl _prim_WriteBarrierNoStore
 .word 0xa8c17ffe
 .word 0xf85f8e81
 .word 0xf85f8e80
-.word 0xb9414a69
-cbz w9, Label_665
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb10012c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_665:
 .word 0x38403ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -10562,22 +7003,6 @@ _dispatch_table_1_96:
 .word 0xf9400109
 .word 0xd2800440
 .word 0xf9000100
-.word 0xb9414a69
-cbz w9, Label_666
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb10012c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_666:
 .word 0x38403ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -10594,22 +7019,6 @@ _dispatch_table_0_96:
 .word 0xf9400109
 .word 0xd2800440
 .word 0xf9000100
-.word 0xb9414a69
-cbz w9, Label_667
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb10012c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_667:
 .word 0x38403ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -10620,7 +7029,7 @@ _dispatch_table_0_97:
 .word 0x8b080f08
 .word 0xf9400109
 .word 0xf100893f
-b.NE Label_668
+b.NE Label_440
 .word 0xd2800001
 .word 0xf85b83b1
 .word 0xf9002234
@@ -10632,24 +7041,8 @@ bl _JS_ThrowReferenceErrorUninitialized_GC
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_668:
+Label_440:
 .word 0xaa0903e0
-.word 0xb9414a69
-cbz w9, Label_669
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb10012c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_669:
 .word 0x38403ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -10660,7 +7053,7 @@ _dispatch_table_1_97:
 .word 0x8b080f08
 .word 0xf9400109
 .word 0xf100893f
-b.NE Label_670
+b.NE Label_441
 .word 0xf8008680
 .word 0xd2800001
 .word 0xf85b83b1
@@ -10673,24 +7066,8 @@ bl _JS_ThrowReferenceErrorUninitialized_GC
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_670:
+Label_441:
 .word 0xaa0903e1
-.word 0xb9414a69
-cbz w9, Label_671
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb10012c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_671:
 .word 0x38403ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -10701,7 +7078,7 @@ _dispatch_table_2_97:
 .word 0x8b080f08
 .word 0xf9400109
 .word 0xf100893f
-b.NE Label_672
+b.NE Label_442
 .word 0xf8008680
 .word 0xf8008681
 .word 0xd2800001
@@ -10715,26 +7092,10 @@ bl _JS_ThrowReferenceErrorUninitialized_GC
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_672:
+Label_442:
 .word 0xf8008680
 .word 0xaa0103e0
 .word 0xaa0903e1
-.word 0xb9414a69
-cbz w9, Label_673
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb10012c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_673:
 .word 0x38403ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -10749,7 +7110,7 @@ _dispatch_table_2_98:
 .word 0x8b080f08
 .word 0xf9400109
 .word 0xf100893f
-b.NE Label_674
+b.NE Label_443
 .word 0xf8008680
 .word 0xd2800001
 .word 0xaa1303e0
@@ -10758,24 +7119,8 @@ bl _JS_ThrowReferenceErrorUninitialized_GC
 .word 0xa8c17ffe
 .word 0x91000ed6
 b __exception_handler_entry
-Label_674:
+Label_443:
 .word 0xf9000100
-.word 0xb9414a69
-cbz w9, Label_675
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb10012c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_675:
 .word 0x38403ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -10789,7 +7134,7 @@ _dispatch_table_1_98:
 .word 0x8b080f08
 .word 0xf9400109
 .word 0xf100893f
-b.NE Label_676
+b.NE Label_444
 .word 0xf8008680
 .word 0xd2800001
 .word 0xaa1303e0
@@ -10798,24 +7143,8 @@ bl _JS_ThrowReferenceErrorUninitialized_GC
 .word 0xa8c17ffe
 .word 0x91000ed6
 b __exception_handler_entry
-Label_676:
+Label_444:
 .word 0xf9000100
-.word 0xb9414a69
-cbz w9, Label_677
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb10012c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_677:
 .word 0x38403ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -10831,14 +7160,14 @@ _dispatch_table_2_99:
 .word 0xf9400109
 .word 0xd280044a
 .word 0xeb0a013f
-b.EQ Label_678
+b.EQ Label_445
 .word 0xf8008680
-adr x1, Label_679
-b Label_680
-Label_679:
+adr x1, Label_446
+b Label_447
+Label_446:
 .asciz "'this' can be initialized only once"
 .align 3
-Label_680:
+Label_447:
 .word 0xf85b83b1
 .word 0xf9002234
 .word 0xaa1303e0
@@ -10849,24 +7178,8 @@ bl _LEPUS_ThrowReferenceError
 .word 0xf9002234
 .word 0x91000ed6
 b __exception_handler_entry
-Label_678:
+Label_445:
 .word 0xf9000100
-.word 0xb9414a69
-cbz w9, Label_681
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb10012c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_681:
 .word 0x38403ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -10881,14 +7194,14 @@ _dispatch_table_1_99:
 .word 0xf9400109
 .word 0xd280044a
 .word 0xeb0a013f
-b.EQ Label_682
+b.EQ Label_448
 .word 0xf8008680
-adr x1, Label_683
-b Label_684
-Label_683:
+adr x1, Label_449
+b Label_450
+Label_449:
 .asciz "'this' can be initialized only once"
 .align 3
-Label_684:
+Label_450:
 .word 0xf85b83b1
 .word 0xf9002234
 .word 0xaa1303e0
@@ -10899,24 +7212,8 @@ bl _LEPUS_ThrowReferenceError
 .word 0xf9002234
 .word 0x91000ed6
 b __exception_handler_entry
-Label_682:
+Label_448:
 .word 0xf9000100
-.word 0xb9414a69
-cbz w9, Label_685
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb10012c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_685:
 .word 0x38403ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -10933,7 +7230,7 @@ _dispatch_table_1_100:
 .word 0xf9400100
 .word 0xd2800448
 .word 0xeb08001f
-b.NE Label_686
+b.NE Label_451
 .word 0xd2800001
 .word 0xf85b83b1
 .word 0xf9002234
@@ -10945,23 +7242,7 @@ bl _JS_ThrowReferenceErrorUninitialized_GC
 .word 0xf9002234
 .word 0x91000ed6
 b __exception_handler_entry
-Label_686:
-.word 0xb9414a69
-cbz w9, Label_687
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb10012c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_687:
+Label_451:
 .word 0x38403ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -10980,7 +7261,7 @@ _dispatch_table_0_100:
 .word 0xf9400100
 .word 0xd2800448
 .word 0xeb08001f
-b.NE Label_688
+b.NE Label_452
 .word 0xd2800001
 .word 0xf85b83b1
 .word 0xf9002234
@@ -10992,23 +7273,7 @@ bl _JS_ThrowReferenceErrorUninitialized_GC
 .word 0xf9002234
 .word 0x91000ed6
 b __exception_handler_entry
-Label_688:
-.word 0xb9414a69
-cbz w9, Label_689
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb10012c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_689:
+Label_452:
 .word 0x38403ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -11026,7 +7291,7 @@ _dispatch_table_2_101:
 .word 0xf9400109
 .word 0xd280044a
 .word 0xeb0a013f
-b.NE Label_690
+b.NE Label_453
 .word 0xf8008680
 .word 0xd2800001
 .word 0xf85b83b1
@@ -11039,24 +7304,8 @@ bl _JS_ThrowReferenceErrorUninitialized_GC
 .word 0xf9002234
 .word 0x91000ed6
 b __exception_handler_entry
-Label_690:
+Label_453:
 .word 0xf9000100
-.word 0xb9414a69
-cbz w9, Label_691
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb10012c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_691:
 .word 0x38403ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -11073,7 +7322,7 @@ _dispatch_table_1_101:
 .word 0xf9400109
 .word 0xd280044a
 .word 0xeb0a013f
-b.NE Label_692
+b.NE Label_454
 .word 0xf8008680
 .word 0xd2800001
 .word 0xf85b83b1
@@ -11086,24 +7335,8 @@ bl _JS_ThrowReferenceErrorUninitialized_GC
 .word 0xf9002234
 .word 0x91000ed6
 b __exception_handler_entry
-Label_692:
+Label_454:
 .word 0xf9000100
-.word 0xb9414a69
-cbz w9, Label_693
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb10012c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_693:
 .word 0x38403ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -11121,7 +7354,7 @@ _dispatch_table_2_102:
 .word 0xf9400109
 .word 0xd280044a
 .word 0xeb0a013f
-b.EQ Label_694
+b.EQ Label_455
 .word 0xf8008680
 .word 0xd2800001
 .word 0xf85b83b1
@@ -11134,24 +7367,8 @@ bl _JS_ThrowReferenceErrorUninitialized_GC
 .word 0xf9002234
 .word 0x91000ed6
 b __exception_handler_entry
-Label_694:
+Label_455:
 .word 0xf9000100
-.word 0xb9414a69
-cbz w9, Label_695
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb10012c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_695:
 .word 0x38403ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -11168,7 +7385,7 @@ _dispatch_table_1_102:
 .word 0xf9400109
 .word 0xd280044a
 .word 0xeb0a013f
-b.EQ Label_696
+b.EQ Label_456
 .word 0xf8008680
 .word 0xd2800001
 .word 0xf85b83b1
@@ -11181,24 +7398,8 @@ bl _JS_ThrowReferenceErrorUninitialized_GC
 .word 0xf9002234
 .word 0x91000ed6
 b __exception_handler_entry
-Label_696:
+Label_456:
 .word 0xf9000100
-.word 0xb9414a69
-cbz w9, Label_697
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb10012c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_697:
 .word 0x38403ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -11218,22 +7419,6 @@ _dispatch_table_1_103:
 .word 0xa9bf7ffe
 bl _close_lexical_var
 .word 0xa8c17ffe
-.word 0xb9414a69
-cbz w9, Label_698
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb10012c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_698:
 .word 0x38403ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -11255,22 +7440,6 @@ _dispatch_table_0_103:
 .word 0xa9bf7ffe
 bl _close_lexical_var
 .word 0xa8c17ffe
-.word 0xb9414a69
-cbz w9, Label_699
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb10012c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_699:
 .word 0x38403ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -11280,160 +7449,64 @@ _dispatch_table_0_104:
 .word 0xf85f8e84
 .word 0xb2400be9
 .word 0xeb090088
-cbnz x8, Label_700
+cbnz x8, Label_457
 .word 0xb88012c3
 .word 0x91000463
-.word 0xb9414a69
-cbz w9, Label_705
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_705:
 .word 0x38405ec8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_700:
+Label_457:
 .word 0xb27f07e9
 .word 0xeb090088
-cbnz x8, Label_701
+cbnz x8, Label_458
 .word 0xb88012c3
 .word 0x91000463
 .word 0xab0302d6
-.word 0xb9414a69
-cbz w9, Label_706
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_706:
 .word 0x394002c8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_701:
+Label_458:
 .word 0xf2503c88
 .word 0xb24f3be9
 .word 0xeb090108
-cbnz x8, Label_702
+cbnz x8, Label_459
 .word 0x2a0403e8
 .word 0xb88012c3
 .word 0x91000463
-cbnz x8, Label_707
+cbnz x8, Label_462
 .word 0xab0302d6
-.word 0xb9414a69
-cbz w9, Label_709
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_709:
 .word 0x394002c8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_707:
-.word 0xb9414a69
-cbz w9, Label_710
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_710:
+Label_462:
 .word 0x38405ec8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_702:
+Label_459:
 .word 0xf1004888
-cbnz x8, Label_703
+cbnz x8, Label_460
 .word 0xb88012c3
 .word 0x91000463
 .word 0xab0302d6
-.word 0xb9414a69
-cbz w9, Label_711
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_711:
 .word 0x394002c8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_703:
+Label_460:
 .word 0xf1000888
-cbnz x8, Label_704
+cbnz x8, Label_461
 .word 0xb88012c3
 .word 0x91000463
 .word 0xab0302d6
-.word 0xb9414a69
-cbz w9, Label_712
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_712:
 .word 0x394002c8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_704:
+Label_461:
 .word 0xaa0403e1
 .word 0xaa1303e0
 .word 0xa9bf7ffe
@@ -11442,45 +7515,13 @@ bl _JS_ToBoolFree_GC
 .word 0xaa0003e8
 .word 0xb88012c3
 .word 0x91000463
-cbnz x8, Label_713
+cbnz x8, Label_464
 .word 0xab0302d6
-.word 0xb9414a69
-cbz w9, Label_715
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_715:
 .word 0x394002c8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_713:
-.word 0xb9414a69
-cbz w9, Label_716
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_716:
+Label_464:
 .word 0x38405ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -11490,160 +7531,64 @@ _dispatch_table_1_104:
 .word 0xaa0003e4
 .word 0xb2400be9
 .word 0xeb090088
-cbnz x8, Label_717
+cbnz x8, Label_466
 .word 0xb88012c3
 .word 0x91000463
-.word 0xb9414a69
-cbz w9, Label_722
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_722:
 .word 0x38405ec8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_717:
+Label_466:
 .word 0xb27f07e9
 .word 0xeb090088
-cbnz x8, Label_718
+cbnz x8, Label_467
 .word 0xb88012c3
 .word 0x91000463
 .word 0xab0302d6
-.word 0xb9414a69
-cbz w9, Label_723
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_723:
 .word 0x394002c8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_718:
+Label_467:
 .word 0xf2503c88
 .word 0xb24f3be9
 .word 0xeb090108
-cbnz x8, Label_719
+cbnz x8, Label_468
 .word 0x2a0403e8
 .word 0xb88012c3
 .word 0x91000463
-cbnz x8, Label_724
+cbnz x8, Label_471
 .word 0xab0302d6
-.word 0xb9414a69
-cbz w9, Label_726
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_726:
 .word 0x394002c8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_724:
-.word 0xb9414a69
-cbz w9, Label_727
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_727:
+Label_471:
 .word 0x38405ec8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_719:
+Label_468:
 .word 0xf1004888
-cbnz x8, Label_720
+cbnz x8, Label_469
 .word 0xb88012c3
 .word 0x91000463
 .word 0xab0302d6
-.word 0xb9414a69
-cbz w9, Label_728
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_728:
 .word 0x394002c8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_720:
+Label_469:
 .word 0xf1000888
-cbnz x8, Label_721
+cbnz x8, Label_470
 .word 0xb88012c3
 .word 0x91000463
 .word 0xab0302d6
-.word 0xb9414a69
-cbz w9, Label_729
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_729:
 .word 0x394002c8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_721:
+Label_470:
 .word 0xaa0403e1
 .word 0xaa1303e0
 .word 0xa9bf7ffe
@@ -11652,45 +7597,13 @@ bl _JS_ToBoolFree_GC
 .word 0xaa0003e8
 .word 0xb88012c3
 .word 0x91000463
-cbnz x8, Label_730
+cbnz x8, Label_473
 .word 0xab0302d6
-.word 0xb9414a69
-cbz w9, Label_732
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_732:
 .word 0x394002c8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_730:
-.word 0xb9414a69
-cbz w9, Label_733
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_733:
+Label_473:
 .word 0x38405ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -11700,160 +7613,64 @@ _dispatch_table_2_104:
 .word 0xaa0103e4
 .word 0xb2400be9
 .word 0xeb090088
-cbnz x8, Label_734
+cbnz x8, Label_475
 .word 0xb88012c3
 .word 0x91000463
-.word 0xb9414a69
-cbz w9, Label_739
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_739:
 .word 0x38405ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_734:
+Label_475:
 .word 0xb27f07e9
 .word 0xeb090088
-cbnz x8, Label_735
+cbnz x8, Label_476
 .word 0xb88012c3
 .word 0x91000463
 .word 0xab0302d6
-.word 0xb9414a69
-cbz w9, Label_740
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_740:
 .word 0x394002c8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_735:
+Label_476:
 .word 0xf2503c88
 .word 0xb24f3be9
 .word 0xeb090108
-cbnz x8, Label_736
+cbnz x8, Label_477
 .word 0x2a0403e8
 .word 0xb88012c3
 .word 0x91000463
-cbnz x8, Label_741
+cbnz x8, Label_480
 .word 0xab0302d6
-.word 0xb9414a69
-cbz w9, Label_743
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_743:
 .word 0x394002c8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_741:
-.word 0xb9414a69
-cbz w9, Label_744
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_744:
+Label_480:
 .word 0x38405ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_736:
+Label_477:
 .word 0xf1004888
-cbnz x8, Label_737
+cbnz x8, Label_478
 .word 0xb88012c3
 .word 0x91000463
 .word 0xab0302d6
-.word 0xb9414a69
-cbz w9, Label_745
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_745:
 .word 0x394002c8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_737:
+Label_478:
 .word 0xf1000888
-cbnz x8, Label_738
+cbnz x8, Label_479
 .word 0xb88012c3
 .word 0x91000463
 .word 0xab0302d6
-.word 0xb9414a69
-cbz w9, Label_746
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_746:
 .word 0x394002c8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_738:
+Label_479:
 .word 0xaa0003f9
 .word 0xaa0403e1
 .word 0xaa1303e0
@@ -11864,45 +7681,13 @@ bl _JS_ToBoolFree_GC
 .word 0xaa1903e0
 .word 0xb88012c3
 .word 0x91000463
-cbnz x8, Label_747
+cbnz x8, Label_482
 .word 0xab0302d6
-.word 0xb9414a69
-cbz w9, Label_749
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_749:
 .word 0x394002c8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_747:
-.word 0xb9414a69
-cbz w9, Label_750
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_750:
+Label_482:
 .word 0x38405ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -11912,158 +7697,62 @@ _dispatch_table_0_105:
 .word 0xf85f8e84
 .word 0xb2400be9
 .word 0xeb090088
-cbnz x8, Label_751
+cbnz x8, Label_484
 .word 0xb88012c3
 .word 0x91000463
 .word 0xab0302d6
-.word 0xb9414a69
-cbz w9, Label_756
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_756:
 .word 0x394002c8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_751:
+Label_484:
 .word 0xb27f07e9
 .word 0xeb090088
-cbnz x8, Label_752
+cbnz x8, Label_485
 .word 0xb88012c3
 .word 0x91000463
-.word 0xb9414a69
-cbz w9, Label_757
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_757:
 .word 0x38405ec8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_752:
+Label_485:
 .word 0xf2503c88
 .word 0xb24f3be9
 .word 0xeb090108
-cbnz x8, Label_753
+cbnz x8, Label_486
 .word 0x2a0403e8
 .word 0xb88012c3
 .word 0x91000463
-cbz x8, Label_758
+cbz x8, Label_489
 .word 0xab0302d6
-.word 0xb9414a69
-cbz w9, Label_759
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_759:
 .word 0x394002c8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_758:
-.word 0xb9414a69
-cbz w9, Label_760
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_760:
+Label_489:
 .word 0x38405ec8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_753:
+Label_486:
 .word 0xf1004888
-cbnz x8, Label_754
+cbnz x8, Label_487
 .word 0xb88012c3
 .word 0x91000463
-.word 0xb9414a69
-cbz w9, Label_761
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_761:
 .word 0x38405ec8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_754:
+Label_487:
 .word 0xf1000888
-cbnz x8, Label_755
+cbnz x8, Label_488
 .word 0xb88012c3
 .word 0x91000463
-.word 0xb9414a69
-cbz w9, Label_762
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_762:
 .word 0x38405ec8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_755:
+Label_488:
 .word 0xaa0403e1
 .word 0xaa1303e0
 .word 0xa9bf7ffe
@@ -12072,45 +7761,13 @@ bl _JS_ToBoolFree_GC
 .word 0xaa0003e8
 .word 0xb88012c3
 .word 0x91000463
-cbz x8, Label_763
+cbz x8, Label_490
 .word 0xab0302d6
-.word 0xb9414a69
-cbz w9, Label_764
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_764:
 .word 0x394002c8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_763:
-.word 0xb9414a69
-cbz w9, Label_765
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_765:
+Label_490:
 .word 0x38405ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -12120,158 +7777,62 @@ _dispatch_table_1_105:
 .word 0xaa0003e4
 .word 0xb2400be9
 .word 0xeb090088
-cbnz x8, Label_766
+cbnz x8, Label_491
 .word 0xb88012c3
 .word 0x91000463
 .word 0xab0302d6
-.word 0xb9414a69
-cbz w9, Label_771
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_771:
 .word 0x394002c8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_766:
+Label_491:
 .word 0xb27f07e9
 .word 0xeb090088
-cbnz x8, Label_767
+cbnz x8, Label_492
 .word 0xb88012c3
 .word 0x91000463
-.word 0xb9414a69
-cbz w9, Label_772
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_772:
 .word 0x38405ec8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_767:
+Label_492:
 .word 0xf2503c88
 .word 0xb24f3be9
 .word 0xeb090108
-cbnz x8, Label_768
+cbnz x8, Label_493
 .word 0x2a0403e8
 .word 0xb88012c3
 .word 0x91000463
-cbz x8, Label_773
+cbz x8, Label_496
 .word 0xab0302d6
-.word 0xb9414a69
-cbz w9, Label_774
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_774:
 .word 0x394002c8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_773:
-.word 0xb9414a69
-cbz w9, Label_775
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_775:
+Label_496:
 .word 0x38405ec8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_768:
+Label_493:
 .word 0xf1004888
-cbnz x8, Label_769
+cbnz x8, Label_494
 .word 0xb88012c3
 .word 0x91000463
-.word 0xb9414a69
-cbz w9, Label_776
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_776:
 .word 0x38405ec8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_769:
+Label_494:
 .word 0xf1000888
-cbnz x8, Label_770
+cbnz x8, Label_495
 .word 0xb88012c3
 .word 0x91000463
-.word 0xb9414a69
-cbz w9, Label_777
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_777:
 .word 0x38405ec8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_770:
+Label_495:
 .word 0xaa0403e1
 .word 0xaa1303e0
 .word 0xa9bf7ffe
@@ -12280,45 +7841,13 @@ bl _JS_ToBoolFree_GC
 .word 0xaa0003e8
 .word 0xb88012c3
 .word 0x91000463
-cbz x8, Label_778
+cbz x8, Label_497
 .word 0xab0302d6
-.word 0xb9414a69
-cbz w9, Label_779
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_779:
 .word 0x394002c8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_778:
-.word 0xb9414a69
-cbz w9, Label_780
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_780:
+Label_497:
 .word 0x38405ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -12328,158 +7857,62 @@ _dispatch_table_2_105:
 .word 0xaa0103e4
 .word 0xb2400be9
 .word 0xeb090088
-cbnz x8, Label_781
+cbnz x8, Label_498
 .word 0xb88012c3
 .word 0x91000463
 .word 0xab0302d6
-.word 0xb9414a69
-cbz w9, Label_786
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_786:
 .word 0x394002c8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_781:
+Label_498:
 .word 0xb27f07e9
 .word 0xeb090088
-cbnz x8, Label_782
+cbnz x8, Label_499
 .word 0xb88012c3
 .word 0x91000463
-.word 0xb9414a69
-cbz w9, Label_787
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_787:
 .word 0x38405ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_782:
+Label_499:
 .word 0xf2503c88
 .word 0xb24f3be9
 .word 0xeb090108
-cbnz x8, Label_783
+cbnz x8, Label_500
 .word 0x2a0403e8
 .word 0xb88012c3
 .word 0x91000463
-cbz x8, Label_788
+cbz x8, Label_503
 .word 0xab0302d6
-.word 0xb9414a69
-cbz w9, Label_789
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_789:
 .word 0x394002c8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_788:
-.word 0xb9414a69
-cbz w9, Label_790
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_790:
+Label_503:
 .word 0x38405ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_783:
+Label_500:
 .word 0xf1004888
-cbnz x8, Label_784
+cbnz x8, Label_501
 .word 0xb88012c3
 .word 0x91000463
-.word 0xb9414a69
-cbz w9, Label_791
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_791:
 .word 0x38405ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_784:
+Label_501:
 .word 0xf1000888
-cbnz x8, Label_785
+cbnz x8, Label_502
 .word 0xb88012c3
 .word 0x91000463
-.word 0xb9414a69
-cbz w9, Label_792
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_792:
 .word 0x38405ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_785:
+Label_502:
 .word 0xaa0003f9
 .word 0xaa0403e1
 .word 0xaa1303e0
@@ -12490,45 +7923,13 @@ bl _JS_ToBoolFree_GC
 .word 0xaa1903e0
 .word 0xb88012c3
 .word 0x91000463
-cbz x8, Label_793
+cbz x8, Label_504
 .word 0xab0302d6
-.word 0xb9414a69
-cbz w9, Label_794
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_794:
 .word 0x394002c8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_793:
-.word 0xb9414a69
-cbz w9, Label_795
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_795:
+Label_504:
 .word 0x38405ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -12538,22 +7939,6 @@ _dispatch_table_0_106:
 .word 0xb88012c8
 .word 0x91000508
 .word 0xab0802d6
-.word 0xb9414a69
-cbz w9, Label_796
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_796:
 .word 0x394002c8
 .word 0x91000108
 .word 0xf8685aa9
@@ -12563,22 +7948,6 @@ _dispatch_table_1_106:
 .word 0xb88012c8
 .word 0x91000508
 .word 0xab0802d6
-.word 0xb9414a69
-cbz w9, Label_797
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_797:
 .word 0x394002c8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -12588,22 +7957,6 @@ _dispatch_table_2_106:
 .word 0xb88012c8
 .word 0x91000508
 .word 0xab0802d6
-.word 0xb9414a69
-cbz w9, Label_798
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_798:
 .word 0x394002c8
 .word 0x91079108
 .word 0xf8685aa9
@@ -12620,22 +7973,6 @@ _dispatch_table_0_107:
 .word 0xd370bc00
 .word 0xd2800848
 .word 0xaa080000
-.word 0xb9414a69
-cbz w9, Label_799
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_799:
 .word 0x38405ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -12652,22 +7989,6 @@ _dispatch_table_1_107:
 .word 0xd370bc21
 .word 0xd2800848
 .word 0xaa080021
-.word 0xb9414a69
-cbz w9, Label_800
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_800:
 .word 0x38405ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -12686,22 +8007,6 @@ _dispatch_table_2_107:
 .word 0xd370bc21
 .word 0xd2800848
 .word 0xaa080021
-.word 0xb9414a69
-cbz w9, Label_801
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_801:
 .word 0x38405ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -12718,22 +8023,6 @@ _dispatch_table_0_108:
 .word 0xaa1903e0
 .word 0x91000508
 .word 0xab0802d6
-.word 0xb9414a69
-cbz w9, Label_802
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_802:
 .word 0x394002c8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -12750,22 +8039,6 @@ _dispatch_table_1_108:
 .word 0xaa1903e1
 .word 0x91000508
 .word 0xab0802d6
-.word 0xb9414a69
-cbz w9, Label_803
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_803:
 .word 0x394002c8
 .word 0x91079108
 .word 0xf8685aa9
@@ -12784,22 +8057,6 @@ _dispatch_table_2_108:
 .word 0xaa1903e1
 .word 0x91000508
 .word 0xab0802d6
-.word 0xb9414a69
-cbz w9, Label_804
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_804:
 .word 0x394002c8
 .word 0x91079108
 .word 0xf8685aa9
@@ -12810,45 +8067,29 @@ _dispatch_table_0_109:
 .word 0xf2503f28
 .word 0xb24f3be9
 .word 0xeb090108
-cbnz x8, Label_805
+cbnz x8, Label_505
 .word 0x2a1903f9
 .word 0xf85e83ac
 .word 0xf9401989
 .word 0xb9401128
 .word 0x6b08033f
-b.GE Label_805
+b.GE Label_505
 .word 0xf9400529
 .word 0x8b190129
 .word 0xcb160129
 .word 0xab0902d6
-.word 0xb9414a69
-cbz w9, Label_806
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_806:
 .word 0x394002c8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_805:
+Label_505:
 .word 0x910006d6
-adr x1, Label_807
-b Label_808
-Label_807:
+adr x1, Label_506
+b Label_507
+Label_506:
 .asciz "invalid ret value"
 .align 3
-Label_808:
+Label_507:
 .word 0xaa1303e0
 .word 0xa9bf7ffe
 bl _LEPUS_ThrowInternalError
@@ -12860,46 +8101,30 @@ _dispatch_table_1_109:
 .word 0xf2503f28
 .word 0xb24f3be9
 .word 0xeb090108
-cbnz x8, Label_809
+cbnz x8, Label_508
 .word 0x2a1903f9
 .word 0xf85e83ac
 .word 0xf9401989
 .word 0xb9401128
 .word 0x6b08033f
-b.GE Label_809
+b.GE Label_508
 .word 0xf9400529
 .word 0x8b190129
 .word 0xcb160129
 .word 0xab0902d6
-.word 0xb9414a69
-cbz w9, Label_810
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_810:
 .word 0x394002c8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_809:
+Label_508:
 .word 0xf8008680
 .word 0x910006d6
-adr x1, Label_811
-b Label_812
-Label_811:
+adr x1, Label_509
+b Label_510
+Label_509:
 .asciz "invalid ret value"
 .align 3
-Label_812:
+Label_510:
 .word 0xaa1303e0
 .word 0xa9bf7ffe
 bl _LEPUS_ThrowInternalError
@@ -12911,47 +8136,31 @@ _dispatch_table_2_109:
 .word 0xf2503f28
 .word 0xb24f3be9
 .word 0xeb090108
-cbnz x8, Label_813
+cbnz x8, Label_511
 .word 0x2a1903f9
 .word 0xf85e83ac
 .word 0xf9401989
 .word 0xb9401128
 .word 0x6b08033f
-b.GE Label_813
+b.GE Label_511
 .word 0xf9400529
 .word 0x8b190129
 .word 0xcb160129
 .word 0xab0902d6
-.word 0xb9414a69
-cbz w9, Label_814
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_814:
 .word 0x394002c8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_813:
+Label_511:
 .word 0xf8008680
 .word 0xf8008681
 .word 0x910006d6
-adr x1, Label_815
-b Label_816
-Label_815:
+adr x1, Label_512
+b Label_513
+Label_512:
 .asciz "invalid ret value"
 .align 3
-Label_816:
+Label_513:
 .word 0xaa1303e0
 .word 0xa9bf7ffe
 bl _LEPUS_ThrowInternalError
@@ -12964,7 +8173,7 @@ _dispatch_table_0_110:
 .word 0xd2800048
 .word 0xf2ffffc8
 .word 0xea19011f
-b.EQ Label_817
+b.EQ Label_514
 .word 0xf8008699
 .word 0xf85b83b1
 .word 0xf9002234
@@ -12975,30 +8184,14 @@ bl _JS_ToObject_GC
 .word 0xa8c17ffe
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_819
+b.NE Label_516
 .word 0xf8008699
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_819:
-Label_817:
-.word 0xb9414a69
-cbz w9, Label_820
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_820:
+Label_516:
+Label_514:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -13008,7 +8201,7 @@ _dispatch_table_1_110:
 .word 0xd2800048
 .word 0xf2ffffc8
 .word 0xea00011f
-b.EQ Label_821
+b.EQ Label_517
 .word 0xaa0003f9
 .word 0xf8008699
 .word 0xf85b83b1
@@ -13020,30 +8213,14 @@ bl _JS_ToObject_GC
 .word 0xa8c17ffe
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_823
+b.NE Label_519
 .word 0xf8008699
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_823:
-Label_821:
-.word 0xb9414a69
-cbz w9, Label_824
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_824:
+Label_519:
+Label_517:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -13053,7 +8230,7 @@ _dispatch_table_2_110:
 .word 0xd2800048
 .word 0xf2ffffc8
 .word 0xea01011f
-b.EQ Label_825
+b.EQ Label_520
 .word 0xf8008680
 .word 0xaa0103f9
 .word 0xf8008699
@@ -13065,32 +8242,16 @@ bl _JS_ToObject_GC
 .word 0xa8c17ffe
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_827
+b.NE Label_522
 .word 0xf8008699
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_827:
+Label_522:
 .word 0xaa0003e1
 .word 0xf85f8e80
-Label_825:
-.word 0xb9414a69
-cbz w9, Label_828
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_828:
+Label_520:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -13101,32 +8262,32 @@ _dispatch_table_0_111:
 .word 0xf2503c28
 .word 0xb24f3be9
 .word 0xeb090108
-cbnz x8, Label_829
-b Label_833
-Label_829:
+cbnz x8, Label_523
+b Label_527
+Label_523:
 .word 0xb25047e9
 .word 0xea090039
 .word 0xd2800048
 .word 0xf2e00028
 .word 0xeb08033f
-b.NE Label_830
-b Label_833
-Label_830:
+b.NE Label_524
+b Label_527
+Label_524:
 .word 0xb25047e9
 .word 0xea090039
 .word 0xd2800028
 .word 0xf2e00028
 .word 0xeb08033f
-b.NE Label_831
-b Label_833
-Label_831:
+b.NE Label_525
+b Label_527
+Label_525:
 .word 0xb25047e9
 .word 0xea090039
 .word 0xb25047e8
 .word 0xeb08033f
-b.NE Label_834
-b Label_833
-Label_834:
+b.NE Label_528
+b Label_527
+Label_528:
 .word 0xf8008680
 .word 0xaa0103f9
 .word 0xf8008681
@@ -13138,33 +8299,17 @@ bl _LEPUS_ToPropertyKey
 .word 0xa8c17ffe
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_836
+b.NE Label_530
 .word 0xf8008699
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_836:
+Label_530:
 .word 0xf8008680
 .word 0xf85f8e81
 .word 0xf85f8e80
-Label_833:
-.word 0xb9414a69
-cbz w9, Label_837
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_837:
+Label_527:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -13178,32 +8323,32 @@ _dispatch_table_2_111:
 .word 0xf2503c28
 .word 0xb24f3be9
 .word 0xeb090108
-cbnz x8, Label_838
-b Label_842
-Label_838:
+cbnz x8, Label_531
+b Label_535
+Label_531:
 .word 0xb25047e9
 .word 0xea090039
 .word 0xd2800048
 .word 0xf2e00028
 .word 0xeb08033f
-b.NE Label_839
-b Label_842
-Label_839:
+b.NE Label_532
+b Label_535
+Label_532:
 .word 0xb25047e9
 .word 0xea090039
 .word 0xd2800028
 .word 0xf2e00028
 .word 0xeb08033f
-b.NE Label_840
-b Label_842
-Label_840:
+b.NE Label_533
+b Label_535
+Label_533:
 .word 0xb25047e9
 .word 0xea090039
 .word 0xb25047e8
 .word 0xeb08033f
-b.NE Label_843
-b Label_842
-Label_843:
+b.NE Label_536
+b Label_535
+Label_536:
 .word 0xf8008680
 .word 0xaa0103f9
 .word 0xf8008681
@@ -13215,33 +8360,17 @@ bl _LEPUS_ToPropertyKey
 .word 0xa8c17ffe
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_845
+b.NE Label_538
 .word 0xf8008699
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_845:
+Label_538:
 .word 0xf8008680
 .word 0xf85f8e81
 .word 0xf85f8e80
-Label_842:
-.word 0xb9414a69
-cbz w9, Label_846
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_846:
+Label_535:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -13249,19 +8378,19 @@ Label_846:
 .global _dispatch_table_0_112
 _dispatch_table_0_112:
 .word 0xa9ff0680
-Label_847:
+Label_539:
 .word 0xd2800248
 .word 0xeb08001f
-b.NE Label_848
+b.NE Label_540
 .word 0xf8008680
 .word 0xf8008681
 .word 0x910006d6
-adr x1, Label_856
-b Label_857
-Label_856:
+adr x1, Label_548
+b Label_549
+Label_548:
 .asciz "value has no property"
 .align 3
-Label_857:
+Label_549:
 .word 0xf85b83b1
 .word 0xf9002234
 .word 0xaa1303e0
@@ -13271,19 +8400,19 @@ bl _LEPUS_ThrowTypeError
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_848:
+Label_540:
 .word 0xb27f03e8
 .word 0xeb08001f
-b.NE Label_849
+b.NE Label_541
 .word 0xf8008680
 .word 0xf8008681
 .word 0x910006d6
-adr x1, Label_858
-b Label_859
-Label_858:
+adr x1, Label_550
+b Label_551
+Label_550:
 .asciz "value has no property"
 .align 3
-Label_859:
+Label_551:
 .word 0xf85b83b1
 .word 0xf9002234
 .word 0xaa1303e0
@@ -13293,36 +8422,36 @@ bl _LEPUS_ThrowTypeError
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_849:
+Label_541:
 .word 0xf2503c28
 .word 0xb24f3be9
 .word 0xeb090108
-cbnz x8, Label_850
-b Label_855
-Label_850:
+cbnz x8, Label_542
+b Label_547
+Label_542:
 .word 0xb25047e9
 .word 0xea090039
 .word 0xd2800048
 .word 0xf2e00028
 .word 0xeb08033f
-b.NE Label_851
-b Label_855
-Label_851:
+b.NE Label_543
+b Label_547
+Label_543:
 .word 0xb25047e9
 .word 0xea090039
 .word 0xd2800028
 .word 0xf2e00028
 .word 0xeb08033f
-b.NE Label_852
-b Label_855
-Label_852:
+b.NE Label_544
+b Label_547
+Label_544:
 .word 0xb25047e9
 .word 0xea090039
 .word 0xb25047e8
 .word 0xeb08033f
-b.NE Label_854
-b Label_855
-Label_854:
+b.NE Label_546
+b Label_547
+Label_546:
 .word 0xf8008680
 .word 0xaa0103f9
 .word 0xf8008681
@@ -13334,33 +8463,17 @@ bl _LEPUS_ToPropertyKey
 .word 0xa8c17ffe
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_861
+b.NE Label_553
 .word 0xf8008699
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_861:
+Label_553:
 .word 0xf8008680
 .word 0xf85f8e81
 .word 0xf85f8e80
-Label_855:
-.word 0xb9414a69
-cbz w9, Label_862
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_862:
+Label_547:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -13371,19 +8484,19 @@ _dispatch_table_1_112:
 .word 0xf85f8e80
 .global _dispatch_table_2_112
 _dispatch_table_2_112:
-Label_863:
+Label_554:
 .word 0xd2800248
 .word 0xeb08001f
-b.NE Label_864
+b.NE Label_555
 .word 0xf8008680
 .word 0xf8008681
 .word 0x910006d6
-adr x1, Label_872
-b Label_873
-Label_872:
+adr x1, Label_563
+b Label_564
+Label_563:
 .asciz "value has no property"
 .align 3
-Label_873:
+Label_564:
 .word 0xf85b83b1
 .word 0xf9002234
 .word 0xaa1303e0
@@ -13393,19 +8506,19 @@ bl _LEPUS_ThrowTypeError
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_864:
+Label_555:
 .word 0xb27f03e8
 .word 0xeb08001f
-b.NE Label_865
+b.NE Label_556
 .word 0xf8008680
 .word 0xf8008681
 .word 0x910006d6
-adr x1, Label_874
-b Label_875
-Label_874:
+adr x1, Label_565
+b Label_566
+Label_565:
 .asciz "value has no property"
 .align 3
-Label_875:
+Label_566:
 .word 0xf85b83b1
 .word 0xf9002234
 .word 0xaa1303e0
@@ -13415,36 +8528,36 @@ bl _LEPUS_ThrowTypeError
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_865:
+Label_556:
 .word 0xf2503c28
 .word 0xb24f3be9
 .word 0xeb090108
-cbnz x8, Label_866
-b Label_871
-Label_866:
+cbnz x8, Label_557
+b Label_562
+Label_557:
 .word 0xb25047e9
 .word 0xea090039
 .word 0xd2800048
 .word 0xf2e00028
 .word 0xeb08033f
-b.NE Label_867
-b Label_871
-Label_867:
+b.NE Label_558
+b Label_562
+Label_558:
 .word 0xb25047e9
 .word 0xea090039
 .word 0xd2800028
 .word 0xf2e00028
 .word 0xeb08033f
-b.NE Label_868
-b Label_871
-Label_868:
+b.NE Label_559
+b Label_562
+Label_559:
 .word 0xb25047e9
 .word 0xea090039
 .word 0xb25047e8
 .word 0xeb08033f
-b.NE Label_870
-b Label_871
-Label_870:
+b.NE Label_561
+b Label_562
+Label_561:
 .word 0xf8008680
 .word 0xaa0103f9
 .word 0xf8008681
@@ -13456,33 +8569,17 @@ bl _LEPUS_ToPropertyKey
 .word 0xa8c17ffe
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_877
+b.NE Label_568
 .word 0xf8008699
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_877:
+Label_568:
 .word 0xf8008680
 .word 0xf85f8e81
 .word 0xf85f8e80
-Label_871:
-.word 0xb9414a69
-cbz w9, Label_878
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_878:
+Label_562:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -13505,54 +8602,22 @@ _dispatch_table_1_113:
 bl _prim_js_with_op_gc
 .word 0xa8c17ffe
 .word 0x7100001f
-b.GE Label_879
+b.GE Label_569
 .word 0x91002ad6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_879:
-cbz x0, Label_880
+Label_569:
+cbz x0, Label_570
 .word 0xb88052c9
 .word 0x91001529
 .word 0xab0902d6
-.word 0xb9414a69
-cbz w9, Label_881
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_881:
 .word 0x394002c8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_880:
+Label_570:
 .word 0xd1002294
-.word 0xb9414a69
-cbz w9, Label_882
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1002ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_882:
 .word 0x3840aec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -13577,54 +8642,22 @@ _dispatch_table_0_113:
 bl _prim_js_with_op_gc
 .word 0xa8c17ffe
 .word 0x7100001f
-b.GE Label_883
+b.GE Label_571
 .word 0x91002ad6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_883:
-cbz x0, Label_884
+Label_571:
+cbz x0, Label_572
 .word 0xb88052c9
 .word 0x91001529
 .word 0xab0902d6
-.word 0xb9414a69
-cbz w9, Label_885
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_885:
 .word 0x394002c8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_884:
+Label_572:
 .word 0xd1002294
-.word 0xb9414a69
-cbz w9, Label_886
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1002ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_886:
 .word 0x3840aec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -13647,55 +8680,23 @@ _dispatch_table_1_114:
 bl _prim_js_with_op_gc
 .word 0xa8c17ffe
 .word 0x7100001f
-b.GE Label_887
+b.GE Label_573
 .word 0x91002ad6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_887:
-cbz x0, Label_888
+Label_573:
+cbz x0, Label_574
 .word 0xd1004294
 .word 0xb88052c9
 .word 0x91001529
 .word 0xab0902d6
-.word 0xb9414a69
-cbz w9, Label_889
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_889:
 .word 0x394002c8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_888:
+Label_574:
 .word 0xd1002294
-.word 0xb9414a69
-cbz w9, Label_890
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1002ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_890:
 .word 0x3840aec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -13720,55 +8721,23 @@ _dispatch_table_0_114:
 bl _prim_js_with_op_gc
 .word 0xa8c17ffe
 .word 0x7100001f
-b.GE Label_891
+b.GE Label_575
 .word 0x91002ad6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_891:
-cbz x0, Label_892
+Label_575:
+cbz x0, Label_576
 .word 0xd1004294
 .word 0xb88052c9
 .word 0x91001529
 .word 0xab0902d6
-.word 0xb9414a69
-cbz w9, Label_893
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_893:
 .word 0x394002c8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_892:
+Label_576:
 .word 0xd1002294
-.word 0xb9414a69
-cbz w9, Label_894
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1002ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_894:
 .word 0x3840aec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -13791,54 +8760,22 @@ _dispatch_table_1_115:
 bl _prim_js_with_op_gc
 .word 0xa8c17ffe
 .word 0x7100001f
-b.GE Label_895
+b.GE Label_577
 .word 0x91002ad6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_895:
-cbz x0, Label_896
+Label_577:
+cbz x0, Label_578
 .word 0xb88052c9
 .word 0x91001529
 .word 0xab0902d6
-.word 0xb9414a69
-cbz w9, Label_897
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_897:
 .word 0x394002c8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_896:
+Label_578:
 .word 0xd1002294
-.word 0xb9414a69
-cbz w9, Label_898
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1002ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_898:
 .word 0x3840aec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -13863,54 +8800,22 @@ _dispatch_table_0_115:
 bl _prim_js_with_op_gc
 .word 0xa8c17ffe
 .word 0x7100001f
-b.GE Label_899
+b.GE Label_579
 .word 0x91002ad6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_899:
-cbz x0, Label_900
+Label_579:
+cbz x0, Label_580
 .word 0xb88052c9
 .word 0x91001529
 .word 0xab0902d6
-.word 0xb9414a69
-cbz w9, Label_901
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_901:
 .word 0x394002c8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_900:
+Label_580:
 .word 0xd1002294
-.word 0xb9414a69
-cbz w9, Label_902
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1002ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_902:
 .word 0x3840aec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -13933,55 +8838,23 @@ _dispatch_table_1_116:
 bl _prim_js_with_op_gc
 .word 0xa8c17ffe
 .word 0x7100001f
-b.GE Label_903
+b.GE Label_581
 .word 0x91002ad6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_903:
-cbz x0, Label_904
+Label_581:
+cbz x0, Label_582
 .word 0x91002294
 .word 0xb88052c3
 .word 0x91001463
 .word 0xab0302d6
-.word 0xb9414a69
-cbz w9, Label_905
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_905:
 .word 0x394002c8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_904:
+Label_582:
 .word 0xd1002294
-.word 0xb9414a69
-cbz w9, Label_906
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1002ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_906:
 .word 0x3840aec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -14006,55 +8879,23 @@ _dispatch_table_0_116:
 bl _prim_js_with_op_gc
 .word 0xa8c17ffe
 .word 0x7100001f
-b.GE Label_907
+b.GE Label_583
 .word 0x91002ad6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_907:
-cbz x0, Label_908
+Label_583:
+cbz x0, Label_584
 .word 0x91002294
 .word 0xb88052c3
 .word 0x91001463
 .word 0xab0302d6
-.word 0xb9414a69
-cbz w9, Label_909
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_909:
 .word 0x394002c8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_908:
+Label_584:
 .word 0xd1002294
-.word 0xb9414a69
-cbz w9, Label_910
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1002ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_910:
 .word 0x3840aec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -14077,55 +8918,23 @@ _dispatch_table_1_117:
 bl _prim_js_with_op_gc
 .word 0xa8c17ffe
 .word 0x7100001f
-b.GE Label_911
+b.GE Label_585
 .word 0x91002ad6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_911:
-cbz x0, Label_912
+Label_585:
+cbz x0, Label_586
 .word 0x91002294
 .word 0xb88052c9
 .word 0x91001529
 .word 0xab0902d6
-.word 0xb9414a69
-cbz w9, Label_913
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_913:
 .word 0x394002c8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_912:
+Label_586:
 .word 0xd1002294
-.word 0xb9414a69
-cbz w9, Label_914
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1002ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_914:
 .word 0x3840aec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -14150,55 +8959,23 @@ _dispatch_table_0_117:
 bl _prim_js_with_op_gc
 .word 0xa8c17ffe
 .word 0x7100001f
-b.GE Label_915
+b.GE Label_587
 .word 0x91002ad6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_915:
-cbz x0, Label_916
+Label_587:
+cbz x0, Label_588
 .word 0x91002294
 .word 0xb88052c9
 .word 0x91001529
 .word 0xab0902d6
-.word 0xb9414a69
-cbz w9, Label_917
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_917:
 .word 0x394002c8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_916:
+Label_588:
 .word 0xd1002294
-.word 0xb9414a69
-cbz w9, Label_918
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1002ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_918:
 .word 0x3840aec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -14221,55 +8998,23 @@ _dispatch_table_1_118:
 bl _prim_js_with_op_gc
 .word 0xa8c17ffe
 .word 0x7100001f
-b.GE Label_919
+b.GE Label_589
 .word 0x91002ad6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_919:
-cbz x0, Label_920
+Label_589:
+cbz x0, Label_590
 .word 0x91002294
 .word 0xb88052c9
 .word 0x91001529
 .word 0xab0902d6
-.word 0xb9414a69
-cbz w9, Label_921
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_921:
 .word 0x394002c8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_920:
+Label_590:
 .word 0xd1002294
-.word 0xb9414a69
-cbz w9, Label_922
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1002ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_922:
 .word 0x3840aec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -14294,55 +9039,23 @@ _dispatch_table_0_118:
 bl _prim_js_with_op_gc
 .word 0xa8c17ffe
 .word 0x7100001f
-b.GE Label_923
+b.GE Label_591
 .word 0x91002ad6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_923:
-cbz x0, Label_924
+Label_591:
+cbz x0, Label_592
 .word 0x91002294
 .word 0xb88052c9
 .word 0x91001529
 .word 0xab0902d6
-.word 0xb9414a69
-cbz w9, Label_925
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_925:
 .word 0x394002c8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_924:
+Label_592:
 .word 0xd1002294
-.word 0xb9414a69
-cbz w9, Label_926
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1002ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_926:
 .word 0x3840aec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -14361,12 +9074,12 @@ bl _LEPUS_NewObjectProto
 .word 0xa8c17ffe
 .word 0xf8008680
 .word 0xf102081f
-b.NE Label_929
+b.NE Label_595
 .word 0x91001ed6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_929:
+Label_595:
 .word 0x784052c9
 .word 0xf85b83b1
 .word 0xd2800003
@@ -14378,10 +9091,10 @@ Label_929:
 bl _get_var_ref
 .word 0xa8c17ffe
 .word 0xaa0003f9
-cbnz x0, Label_927
+cbnz x0, Label_593
 .word 0x91001ed6
 b __exception_handler_entry
-Label_927:
+Label_593:
 .word 0xf85f8281
 .word 0xb84012c8
 .word 0xd2800443
@@ -14393,7 +9106,7 @@ Label_927:
 .word 0xa9bf7ffe
 bl _add_property_gc
 .word 0xa8c17ffe
-Label_928:
+Label_594:
 .word 0xd2800008
 .word 0xaa1903e2
 .word 0xaa0803e1
@@ -14408,22 +9121,6 @@ bl _LEPUS_AtomToValue
 .word 0xa8c17ffe
 .word 0xd1002294
 .word 0xf8008680
-.word 0xb9414a69
-cbz w9, Label_930
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb10022c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_930:
 .word 0x38407ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -14444,12 +9141,12 @@ bl _LEPUS_NewObjectProto
 .word 0xa8c17ffe
 .word 0xf8008680
 .word 0xf102081f
-b.NE Label_933
+b.NE Label_598
 .word 0x91001ed6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_933:
+Label_598:
 .word 0x784052c9
 .word 0xf85b83b1
 .word 0xd2800003
@@ -14461,10 +9158,10 @@ Label_933:
 bl _get_var_ref
 .word 0xa8c17ffe
 .word 0xaa0003f9
-cbnz x0, Label_931
+cbnz x0, Label_596
 .word 0x91001ed6
 b __exception_handler_entry
-Label_931:
+Label_596:
 .word 0xf85f8281
 .word 0xb84012c8
 .word 0xd2800443
@@ -14476,7 +9173,7 @@ Label_931:
 .word 0xa9bf7ffe
 bl _add_property_gc
 .word 0xa8c17ffe
-Label_932:
+Label_597:
 .word 0xd2800008
 .word 0xaa1903e2
 .word 0xaa0803e1
@@ -14491,22 +9188,6 @@ bl _LEPUS_AtomToValue
 .word 0xa8c17ffe
 .word 0xd1002294
 .word 0xf8008680
-.word 0xb9414a69
-cbz w9, Label_934
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb10022c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_934:
 .word 0x38407ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -14525,12 +9206,12 @@ bl _LEPUS_NewObjectProto
 .word 0xa8c17ffe
 .word 0xf8008680
 .word 0xf102081f
-b.NE Label_937
+b.NE Label_601
 .word 0x91001ed6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_937:
+Label_601:
 .word 0x784052c9
 .word 0xf85b83b1
 .word 0xb24003e3
@@ -14542,10 +9223,10 @@ Label_937:
 bl _get_var_ref
 .word 0xa8c17ffe
 .word 0xaa0003f9
-cbnz x0, Label_935
+cbnz x0, Label_599
 .word 0x91001ed6
 b __exception_handler_entry
-Label_935:
+Label_599:
 .word 0xf85f8281
 .word 0xb84012c8
 .word 0xd2800443
@@ -14557,7 +9238,7 @@ Label_935:
 .word 0xa9bf7ffe
 bl _add_property_gc
 .word 0xa8c17ffe
-Label_936:
+Label_600:
 .word 0xd2800008
 .word 0xaa1903e2
 .word 0xaa0803e1
@@ -14572,22 +9253,6 @@ bl _LEPUS_AtomToValue
 .word 0xa8c17ffe
 .word 0xd1002294
 .word 0xf8008680
-.word 0xb9414a69
-cbz w9, Label_938
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb10022c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_938:
 .word 0x38407ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -14608,12 +9273,12 @@ bl _LEPUS_NewObjectProto
 .word 0xa8c17ffe
 .word 0xf8008680
 .word 0xf102081f
-b.NE Label_941
+b.NE Label_604
 .word 0x91001ed6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_941:
+Label_604:
 .word 0x784052c9
 .word 0xf85b83b1
 .word 0xb24003e3
@@ -14625,10 +9290,10 @@ Label_941:
 bl _get_var_ref
 .word 0xa8c17ffe
 .word 0xaa0003f9
-cbnz x0, Label_939
+cbnz x0, Label_602
 .word 0x91001ed6
 b __exception_handler_entry
-Label_939:
+Label_602:
 .word 0xf85f8281
 .word 0xb84012c8
 .word 0xd2800443
@@ -14640,7 +9305,7 @@ Label_939:
 .word 0xa9bf7ffe
 bl _add_property_gc
 .word 0xa8c17ffe
-Label_940:
+Label_603:
 .word 0xd2800008
 .word 0xaa1903e2
 .word 0xaa0803e1
@@ -14655,22 +9320,6 @@ bl _LEPUS_AtomToValue
 .word 0xa8c17ffe
 .word 0xd1002294
 .word 0xf8008680
-.word 0xb9414a69
-cbz w9, Label_942
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb10022c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_942:
 .word 0x38407ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -14689,12 +9338,12 @@ bl _LEPUS_NewObjectProto
 .word 0xa8c17ffe
 .word 0xf8008680
 .word 0xf102081f
-b.NE Label_944
+b.NE Label_606
 .word 0x91001ed6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_944:
+Label_606:
 .word 0x784052c9
 .word 0xf8697b99
 .word 0xf85f8281
@@ -14707,7 +9356,7 @@ Label_944:
 .word 0xa9bf7ffe
 bl _add_property_gc
 .word 0xa8c17ffe
-Label_943:
+Label_605:
 .word 0xd2800008
 .word 0xaa1903e2
 .word 0xaa0803e1
@@ -14721,22 +9370,6 @@ bl _prim_HeapObjStorePtr
 bl _LEPUS_AtomToValue
 .word 0xa8c17ffe
 .word 0xf8008680
-.word 0xb9414a69
-cbz w9, Label_945
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb10022c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_945:
 .word 0x38407ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -14757,12 +9390,12 @@ bl _LEPUS_NewObjectProto
 .word 0xa8c17ffe
 .word 0xf8008680
 .word 0xf102081f
-b.NE Label_947
+b.NE Label_608
 .word 0x91001ed6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_947:
+Label_608:
 .word 0x784052c9
 .word 0xf8697b99
 .word 0xf85f8281
@@ -14775,7 +9408,7 @@ Label_947:
 .word 0xa9bf7ffe
 bl _add_property_gc
 .word 0xa8c17ffe
-Label_946:
+Label_607:
 .word 0xd2800008
 .word 0xaa1903e2
 .word 0xaa0803e1
@@ -14789,22 +9422,6 @@ bl _prim_HeapObjStorePtr
 bl _LEPUS_AtomToValue
 .word 0xa8c17ffe
 .word 0xf8008680
-.word 0xb9414a69
-cbz w9, Label_948
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb10022c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_948:
 .word 0x38407ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -14824,29 +9441,13 @@ _dispatch_table_1_122:
 bl _JS_GetGlobalVarRef_GC
 .word 0xa8c17ffe
 .word 0x7100001f
-b.GE Label_949
+b.GE Label_609
 .word 0x910016d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_949:
+Label_609:
 .word 0x91004294
-.word 0xb9414a69
-cbz w9, Label_950
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_950:
 .word 0x38405ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -14868,29 +9469,13 @@ _dispatch_table_0_122:
 bl _JS_GetGlobalVarRef_GC
 .word 0xa8c17ffe
 .word 0x7100001f
-b.GE Label_951
+b.GE Label_610
 .word 0x910016d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_951:
+Label_610:
 .word 0x91004294
-.word 0xb9414a69
-cbz w9, Label_952
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_952:
 .word 0x38405ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -14911,28 +9496,12 @@ bl _prim_js_for_in_start_gc
 .word 0xa8c17ffe
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_953
+b.NE Label_611
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_953:
-.word 0xb9414a69
-cbz w9, Label_954
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_954:
+Label_611:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -14952,28 +9521,12 @@ bl _prim_js_for_in_start_gc
 .word 0xa8c17ffe
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_955
+b.NE Label_612
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_955:
-.word 0xb9414a69
-cbz w9, Label_956
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_956:
+Label_612:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -14992,31 +9545,15 @@ _dispatch_table_1_124:
 bl _js_for_of_start_gc
 .word 0xa8c17ffe
 .word 0x7100001f
-b.GE Label_957
+b.GE Label_613
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_957:
+Label_613:
 .word 0x91004294
 .word 0xd2800848
 .word 0xf81f8288
-.word 0xb9414a69
-cbz w9, Label_958
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_958:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -15037,31 +9574,15 @@ _dispatch_table_0_124:
 bl _js_for_of_start_gc
 .word 0xa8c17ffe
 .word 0x7100001f
-b.GE Label_959
+b.GE Label_614
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_959:
+Label_614:
 .word 0x91004294
 .word 0xd2800848
 .word 0xf81f8288
-.word 0xb9414a69
-cbz w9, Label_960
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_960:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -15080,31 +9601,15 @@ _dispatch_table_1_125:
 bl _js_for_of_start_gc
 .word 0xa8c17ffe
 .word 0x7100001f
-b.GE Label_961
+b.GE Label_615
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_961:
+Label_615:
 .word 0x91004294
 .word 0xd2800848
 .word 0xf81f8288
-.word 0xb9414a69
-cbz w9, Label_962
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_962:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -15125,31 +9630,15 @@ _dispatch_table_0_125:
 bl _js_for_of_start_gc
 .word 0xa8c17ffe
 .word 0x7100001f
-b.GE Label_963
+b.GE Label_616
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_963:
+Label_616:
 .word 0x91004294
 .word 0xd2800848
 .word 0xf81f8288
-.word 0xb9414a69
-cbz w9, Label_964
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_964:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -15168,29 +9657,13 @@ _dispatch_table_1_126:
 bl _js_for_in_next_gc
 .word 0xa8c17ffe
 .word 0x7100001f
-b.GE Label_965
+b.GE Label_617
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_965:
+Label_617:
 .word 0x91004294
-.word 0xb9414a69
-cbz w9, Label_966
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_966:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -15211,29 +9684,13 @@ _dispatch_table_0_126:
 bl _js_for_in_next_gc
 .word 0xa8c17ffe
 .word 0x7100001f
-b.GE Label_967
+b.GE Label_618
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_967:
+Label_618:
 .word 0x91004294
-.word 0xb9414a69
-cbz w9, Label_968
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_968:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -15255,29 +9712,13 @@ _dispatch_table_1_127:
 bl _js_for_of_next_gc
 .word 0xa8c17ffe
 .word 0x7100001f
-b.GE Label_969
+b.GE Label_619
 .word 0x91000ad6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_969:
+Label_619:
 .word 0x91004294
-.word 0xb9414a69
-cbz w9, Label_970
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_970:
 .word 0x38402ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -15301,29 +9742,13 @@ _dispatch_table_0_127:
 bl _js_for_of_next_gc
 .word 0xa8c17ffe
 .word 0x7100001f
-b.GE Label_971
+b.GE Label_620
 .word 0x91000ad6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_971:
+Label_620:
 .word 0x91004294
-.word 0xb9414a69
-cbz w9, Label_972
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_972:
 .word 0x38402ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -15341,29 +9766,13 @@ _dispatch_table_1_128:
 bl _js_for_await_of_next_gc
 .word 0xa8c17ffe
 .word 0x7100001f
-b.GE Label_973
+b.GE Label_621
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_973:
+Label_621:
 .word 0x91002294
-.word 0xb9414a69
-cbz w9, Label_974
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_974:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -15383,29 +9792,13 @@ _dispatch_table_0_128:
 bl _js_for_await_of_next_gc
 .word 0xa8c17ffe
 .word 0x7100001f
-b.GE Label_975
+b.GE Label_622
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_975:
+Label_622:
 .word 0x91002294
-.word 0xb9414a69
-cbz w9, Label_976
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_976:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -15423,29 +9816,13 @@ _dispatch_table_1_129:
 bl _js_iterator_get_value_done_gc
 .word 0xa8c17ffe
 .word 0x7100001f
-b.GE Label_977
+b.GE Label_623
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_977:
+Label_623:
 .word 0x91002294
-.word 0xb9414a69
-cbz w9, Label_978
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_978:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -15465,29 +9842,13 @@ _dispatch_table_0_129:
 bl _js_iterator_get_value_done_gc
 .word 0xa8c17ffe
 .word 0x7100001f
-b.GE Label_979
+b.GE Label_624
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_979:
+Label_624:
 .word 0x91002294
-.word 0xb9414a69
-cbz w9, Label_980
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_980:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -15502,7 +9863,7 @@ _dispatch_table_1_130:
 .word 0xf85f8299
 .word 0xd2800248
 .word 0xeb08033f
-b.EQ Label_981
+b.EQ Label_625
 .word 0xd2800002
 .word 0xf85b83b1
 .word 0xf9002234
@@ -15512,30 +9873,14 @@ b.EQ Label_981
 bl _JS_IteratorClose
 .word 0xa8c17ffe
 .word 0x7100001f
-b.GE Label_982
+b.GE Label_626
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_982:
-Label_981:
+Label_626:
+Label_625:
 .word 0xd1002294
-.word 0xb9414a69
-cbz w9, Label_983
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_983:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -15552,7 +9897,7 @@ _dispatch_table_0_130:
 .word 0xf85f8299
 .word 0xd2800248
 .word 0xeb08033f
-b.EQ Label_984
+b.EQ Label_627
 .word 0xd2800002
 .word 0xf85b83b1
 .word 0xf9002234
@@ -15562,30 +9907,14 @@ b.EQ Label_984
 bl _JS_IteratorClose
 .word 0xa8c17ffe
 .word 0x7100001f
-b.GE Label_985
+b.GE Label_628
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_985:
-Label_984:
+Label_628:
+Label_627:
 .word 0xd1002294
-.word 0xb9414a69
-cbz w9, Label_986
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_986:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -15605,26 +9934,10 @@ bl _prim_js_iterator_close_return_gc
 .word 0xaa0003f4
 .word 0x91006339
 .word 0xeb19029f
-b.GE Label_987
+b.GE Label_629
 .word 0x910006d6
 b __exception_handler_entry
-Label_987:
-.word 0xb9414a69
-cbz w9, Label_988
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_988:
+Label_629:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -15646,26 +9959,10 @@ bl _prim_js_iterator_close_return_gc
 .word 0xaa0003f4
 .word 0x91006339
 .word 0xeb19029f
-b.GE Label_989
+b.GE Label_630
 .word 0x910006d6
 b __exception_handler_entry
-Label_989:
-.word 0xb9414a69
-cbz w9, Label_990
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_990:
+Label_630:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -15683,29 +9980,13 @@ _dispatch_table_1_132:
 bl _prim_js_async_iterator_close_gc
 .word 0xa8c17ffe
 .word 0x7100001f
-b.GE Label_991
+b.GE Label_631
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_991:
+Label_631:
 .word 0xd1002294
-.word 0xb9414a69
-cbz w9, Label_992
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_992:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -15725,29 +10006,13 @@ _dispatch_table_0_132:
 bl _prim_js_async_iterator_close_gc
 .word 0xa8c17ffe
 .word 0x7100001f
-b.GE Label_993
+b.GE Label_632
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_993:
+Label_632:
 .word 0xd1002294
-.word 0xb9414a69
-cbz w9, Label_994
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_994:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -15768,29 +10033,13 @@ _dispatch_table_1_133:
 bl _LEPUS_Call
 .word 0xa8c17ffe
 .word 0xf102081f
-b.NE Label_995
+b.NE Label_633
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_995:
+Label_633:
 .word 0xf81f8280
-.word 0xb9414a69
-cbz w9, Label_996
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_996:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -15813,29 +10062,13 @@ _dispatch_table_0_133:
 bl _LEPUS_Call
 .word 0xa8c17ffe
 .word 0xf102081f
-b.NE Label_997
+b.NE Label_634
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_997:
+Label_634:
 .word 0xf81f8280
-.word 0xb9414a69
-cbz w9, Label_998
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_998:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -15854,29 +10087,13 @@ _dispatch_table_1_134:
 bl _prim_js_async_iterator_get_gc
 .word 0xa8c17ffe
 .word 0x7100001f
-b.GE Label_999
+b.GE Label_635
 .word 0x91000ad6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_999:
+Label_635:
 .word 0x91002294
-.word 0xb9414a69
-cbz w9, Label_1000
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1000:
 .word 0x38402ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -15897,29 +10114,13 @@ _dispatch_table_0_134:
 bl _prim_js_async_iterator_get_gc
 .word 0xa8c17ffe
 .word 0x7100001f
-b.GE Label_1001
+b.GE Label_636
 .word 0x91000ad6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1001:
+Label_636:
 .word 0x91002294
-.word 0xb9414a69
-cbz w9, Label_1002
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1002:
 .word 0x38402ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -15946,22 +10147,6 @@ _dispatch_table_1_135:
 .cfi_offset x30, -8
 .cfi_endproc
 .word 0xd65f03c0
-.word 0xb9414a69
-cbz w9, Label_1003
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1003:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -15990,22 +10175,6 @@ _dispatch_table_0_135:
 .cfi_offset x30, -8
 .cfi_endproc
 .word 0xd65f03c0
-.word 0xb9414a69
-cbz w9, Label_1004
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1004:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -16033,22 +10202,6 @@ _dispatch_table_1_136:
 .cfi_offset x30, -8
 .cfi_endproc
 .word 0xd65f03c0
-.word 0xb9414a69
-cbz w9, Label_1005
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1005:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -16078,22 +10231,6 @@ _dispatch_table_0_136:
 .cfi_offset x30, -8
 .cfi_endproc
 .word 0xd65f03c0
-.word 0xb9414a69
-cbz w9, Label_1006
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1006:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -16121,22 +10258,6 @@ _dispatch_table_1_137:
 .cfi_offset x30, -8
 .cfi_endproc
 .word 0xd65f03c0
-.word 0xb9414a69
-cbz w9, Label_1007
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1007:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -16166,22 +10287,6 @@ _dispatch_table_0_137:
 .cfi_offset x30, -8
 .cfi_endproc
 .word 0xd65f03c0
-.word 0xb9414a69
-cbz w9, Label_1008
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1008:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -16209,22 +10314,6 @@ _dispatch_table_1_138:
 .cfi_offset x30, -8
 .cfi_endproc
 .word 0xd65f03c0
-.word 0xb9414a69
-cbz w9, Label_1009
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1009:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -16254,22 +10343,6 @@ _dispatch_table_0_138:
 .cfi_offset x30, -8
 .cfi_endproc
 .word 0xd65f03c0
-.word 0xb9414a69
-cbz w9, Label_1010
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1010:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -16296,22 +10369,6 @@ _dispatch_table_1_139:
 .cfi_offset x30, -8
 .cfi_endproc
 .word 0xd65f03c0
-.word 0xb9414a69
-cbz w9, Label_1011
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1011:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -16340,22 +10397,6 @@ _dispatch_table_0_139:
 .cfi_offset x30, -8
 .cfi_endproc
 .word 0xd65f03c0
-.word 0xb9414a69
-cbz w9, Label_1012
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1012:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -16365,26 +10406,26 @@ _dispatch_table_0_140:
 .word 0xf85f8e80
 .word 0xb2503fe9
 .word 0xeb09001f
-b.HS Label_1015
+b.HS Label_639
 .word 0xb24f3be9
 .word 0xeb09001f
-b.LO Label_1013
+b.LO Label_637
 .word 0x7100001f
-b.EQ Label_1015
+b.EQ Label_639
 .word 0x4b0003e0
 .word 0xb24f3800
-b Label_1014
-Label_1013:
+b Label_638
+Label_637:
 .word 0xf24f381f
-b.EQ Label_1015
+b.EQ Label_639
 .word 0xb24f03e9
 .word 0xcb090000
 .word 0x9e670000
 .word 0x1e614000
 .word 0x9e660000
 .word 0x8b090000
-b Label_1014
-Label_1015:
+b Label_638
+Label_639:
 .word 0xd2801182
 .word 0xf8008680
 .word 0xf85b83b1
@@ -16395,23 +10436,7 @@ Label_1015:
 bl _prim_js_unary_arith_slow_gc
 .word 0xa8c17ffe
 .word 0xd1002294
-Label_1014:
-.word 0xb9414a69
-cbz w9, Label_1017
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1017:
+Label_638:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -16420,26 +10445,26 @@ Label_1017:
 _dispatch_table_1_140:
 .word 0xb2503fe9
 .word 0xeb09001f
-b.HS Label_1020
+b.HS Label_643
 .word 0xb24f3be9
 .word 0xeb09001f
-b.LO Label_1018
+b.LO Label_641
 .word 0x7100001f
-b.EQ Label_1020
+b.EQ Label_643
 .word 0x4b0003e0
 .word 0xb24f3800
-b Label_1019
-Label_1018:
+b Label_642
+Label_641:
 .word 0xf24f381f
-b.EQ Label_1020
+b.EQ Label_643
 .word 0xb24f03e9
 .word 0xcb090000
 .word 0x9e670000
 .word 0x1e614000
 .word 0x9e660000
 .word 0x8b090000
-b Label_1019
-Label_1020:
+b Label_642
+Label_643:
 .word 0xd2801182
 .word 0xf8008680
 .word 0xf85b83b1
@@ -16450,23 +10475,7 @@ Label_1020:
 bl _prim_js_unary_arith_slow_gc
 .word 0xa8c17ffe
 .word 0xd1002294
-Label_1019:
-.word 0xb9414a69
-cbz w9, Label_1022
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1022:
+Label_642:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -16475,26 +10484,26 @@ Label_1022:
 _dispatch_table_2_140:
 .word 0xb2503fe9
 .word 0xeb09003f
-b.HS Label_1025
+b.HS Label_647
 .word 0xb24f3be9
 .word 0xeb09003f
-b.LO Label_1023
+b.LO Label_645
 .word 0x7100003f
-b.EQ Label_1025
+b.EQ Label_647
 .word 0x4b0103e1
 .word 0xb24f3821
-b Label_1024
-Label_1023:
+b Label_646
+Label_645:
 .word 0xf24f383f
-b.EQ Label_1025
+b.EQ Label_647
 .word 0xb24f03e9
 .word 0xcb090021
 .word 0x9e670020
 .word 0x1e614000
 .word 0x9e660001
 .word 0x8b090021
-b Label_1024
-Label_1025:
+b Label_646
+Label_647:
 .word 0xd2801182
 .word 0xaa0003f9
 .word 0xf8008680
@@ -16509,23 +10518,7 @@ bl _prim_js_unary_arith_slow_gc
 .word 0xd1002294
 .word 0xaa0003e1
 .word 0xaa1903e0
-Label_1024:
-.word 0xb9414a69
-cbz w9, Label_1027
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1027:
+Label_646:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -16538,16 +10531,16 @@ _dispatch_table_2_141:
 .word 0xf9002234
 .word 0xb2503fe9
 .word 0xeb09001f
-b.HS Label_1030
+b.HS Label_651
 .word 0xb24f3be8
 .word 0xb24f03e9
 .word 0xeb08001f
-b.LO Label_1028
-b Label_1029
-Label_1028:
+b.LO Label_649
+b Label_650
+Label_649:
 .word 0xea08001f
-b.NE Label_1029
-Label_1030:
+b.NE Label_650
+Label_651:
 .word 0xd28011a2
 .word 0xf8008680
 .word 0xf85b83b1
@@ -16559,29 +10552,13 @@ bl _prim_js_unary_arith_slow_gc
 .word 0xa8c17ffe
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_1031
+b.NE Label_652
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1031:
-Label_1029:
-.word 0xb9414a69
-cbz w9, Label_1032
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1032:
+Label_652:
+Label_650:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -16593,16 +10570,16 @@ _dispatch_table_0_141:
 _dispatch_table_1_141:
 .word 0xb2503fe9
 .word 0xeb09001f
-b.HS Label_1035
+b.HS Label_655
 .word 0xb24f3be8
 .word 0xb24f03e9
 .word 0xeb08001f
-b.LO Label_1033
-b Label_1034
-Label_1033:
+b.LO Label_653
+b Label_654
+Label_653:
 .word 0xea08001f
-b.NE Label_1034
-Label_1035:
+b.NE Label_654
+Label_655:
 .word 0xd28011a2
 .word 0xf8008680
 .word 0xf85b83b1
@@ -16614,29 +10591,13 @@ bl _prim_js_unary_arith_slow_gc
 .word 0xa8c17ffe
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_1036
+b.NE Label_656
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1036:
-Label_1034:
-.word 0xb9414a69
-cbz w9, Label_1037
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1037:
+Label_656:
+Label_654:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -16646,61 +10607,29 @@ _dispatch_table_0_142:
 .word 0xf85f8e80
 .word 0xb2503fe9
 .word 0xeb09001f
-b.HS Label_1038
+b.HS Label_657
 .word 0xb24f3be9
 .word 0xeb09001f
-b.LO Label_1039
+b.LO Label_658
 .word 0x71000400
-b.VS Label_1040
+b.VS Label_659
 .word 0xaa090000
-.word 0xb9414a69
-cbz w9, Label_1041
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1041:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1040:
+Label_659:
 .word 0x9e620000
 .word 0x9e660000
 .word 0xb24f03e9
 .word 0x8b090000
-.word 0xb9414a69
-cbz w9, Label_1042
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1042:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1039:
+Label_658:
 .word 0xea090008
-cbz x8, Label_1038
+cbz x8, Label_657
 .word 0xb24f03e8
 .word 0xcb080000
 .word 0x9e670000
@@ -16711,35 +10640,19 @@ cbz x8, Label_1038
 .word 0x9e660004
 .word 0x9e660045
 .word 0xeb05009f
-b.NE Label_1043
+b.NE Label_660
 .word 0xb24f38c0
-b Label_1044
-Label_1043:
+b Label_661
+Label_660:
 .word 0x9e660000
 .word 0xb24f03e6
 .word 0x8b060000
-Label_1044:
-.word 0xb9414a69
-cbz w9, Label_1045
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1045:
+Label_661:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1038:
+Label_657:
 .word 0xd28011c2
 .word 0xf8008680
 .word 0xf85b83b1
@@ -16751,28 +10664,12 @@ bl _prim_js_unary_arith_slow_gc
 .word 0xa8c17ffe
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_1046
+b.NE Label_662
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1046:
-.word 0xb9414a69
-cbz w9, Label_1047
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1047:
+Label_662:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -16781,61 +10678,29 @@ Label_1047:
 _dispatch_table_1_142:
 .word 0xb2503fe9
 .word 0xeb09001f
-b.HS Label_1048
+b.HS Label_663
 .word 0xb24f3be9
 .word 0xeb09001f
-b.LO Label_1049
+b.LO Label_664
 .word 0x71000400
-b.VS Label_1050
+b.VS Label_665
 .word 0xaa090000
-.word 0xb9414a69
-cbz w9, Label_1051
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1051:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1050:
+Label_665:
 .word 0x9e620000
 .word 0x9e660000
 .word 0xb24f03e9
 .word 0x8b090000
-.word 0xb9414a69
-cbz w9, Label_1052
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1052:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1049:
+Label_664:
 .word 0xea090008
-cbz x8, Label_1048
+cbz x8, Label_663
 .word 0xb24f03e8
 .word 0xcb080000
 .word 0x9e670000
@@ -16846,35 +10711,19 @@ cbz x8, Label_1048
 .word 0x9e660004
 .word 0x9e660045
 .word 0xeb05009f
-b.NE Label_1053
+b.NE Label_666
 .word 0xb24f38c0
-b Label_1054
-Label_1053:
+b Label_667
+Label_666:
 .word 0x9e660000
 .word 0xb24f03e6
 .word 0x8b060000
-Label_1054:
-.word 0xb9414a69
-cbz w9, Label_1055
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1055:
+Label_667:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1048:
+Label_663:
 .word 0xd28011c2
 .word 0xf8008680
 .word 0xf85b83b1
@@ -16886,28 +10735,12 @@ bl _prim_js_unary_arith_slow_gc
 .word 0xa8c17ffe
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_1056
+b.NE Label_668
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1056:
-.word 0xb9414a69
-cbz w9, Label_1057
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1057:
+Label_668:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -16916,23 +10749,23 @@ Label_1057:
 _dispatch_table_2_142:
 .word 0xb2503fe9
 .word 0xeb09003f
-b.HS Label_1058
+b.HS Label_669
 .word 0xb24f3be9
 .word 0xeb09003f
-b.LO Label_1059
+b.LO Label_670
 .word 0x71000421
-b.VS Label_1061
+b.VS Label_672
 .word 0xaa090021
-b Label_1060
-Label_1061:
+b Label_671
+Label_672:
 .word 0x9e620020
 .word 0x9e660001
 .word 0xb24f03e9
 .word 0x8b090021
-b Label_1060
-Label_1059:
+b Label_671
+Label_670:
 .word 0xea090028
-cbz x8, Label_1058
+cbz x8, Label_669
 .word 0xb24f03e8
 .word 0xcb080021
 .word 0x9e670020
@@ -16943,16 +10776,16 @@ cbz x8, Label_1058
 .word 0x9e660004
 .word 0x9e660045
 .word 0xeb05009f
-b.NE Label_1062
+b.NE Label_673
 .word 0xb24f38c1
-b Label_1063
-Label_1062:
+b Label_674
+Label_673:
 .word 0x9e660001
 .word 0xb24f03e6
 .word 0x8b060021
-Label_1063:
-b Label_1060
-Label_1058:
+Label_674:
+b Label_671
+Label_669:
 .word 0xd28011c2
 .word 0xaa0003f9
 .word 0xf8008680
@@ -16966,52 +10799,20 @@ bl _prim_js_unary_arith_slow_gc
 .word 0xd1002294
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_1065
+b.NE Label_676
 .word 0xf8008699
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1065:
+Label_676:
 .word 0xaa0003e1
 .word 0xaa1903e0
-.word 0xb9414a69
-cbz w9, Label_1066
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1066:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1060:
-.word 0xb9414a69
-cbz w9, Label_1067
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1067:
+Label_671:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -17021,23 +10822,23 @@ _dispatch_table_0_143:
 .word 0xf85f8e80
 .word 0xb2503fe9
 .word 0xeb09001f
-b.HS Label_1069
+b.HS Label_678
 .word 0xb24f3be9
 .word 0xeb09001f
-b.LO Label_1068
+b.LO Label_677
 .word 0x31000400
-b.VS Label_1071
+b.VS Label_680
 .word 0xaa090000
-b Label_1070
-Label_1071:
+b Label_679
+Label_680:
 .word 0x9e620000
 .word 0x9e660000
 .word 0xb24f03e9
 .word 0x8b090000
-b Label_1070
-Label_1068:
+b Label_679
+Label_677:
 .word 0xea090008
-cbz x8, Label_1069
+cbz x8, Label_678
 .word 0xb24f03e8
 .word 0xcb080000
 .word 0x9e670000
@@ -17048,16 +10849,16 @@ cbz x8, Label_1069
 .word 0x9e660004
 .word 0x9e660045
 .word 0xeb05009f
-b.NE Label_1072
+b.NE Label_681
 .word 0xb24f38c0
-b Label_1073
-Label_1072:
+b Label_682
+Label_681:
 .word 0x9e660000
 .word 0xb24f03e6
 .word 0x8b060000
-Label_1073:
-b Label_1070
-Label_1069:
+Label_682:
+b Label_679
+Label_678:
 .word 0xd28011e2
 .word 0xf8008680
 .word 0xf85b83b1
@@ -17069,49 +10870,17 @@ bl _prim_js_unary_arith_slow_gc
 .word 0xa8c17ffe
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_1074
+b.NE Label_683
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1074:
-.word 0xb9414a69
-cbz w9, Label_1075
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1075:
+Label_683:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1070:
-.word 0xb9414a69
-cbz w9, Label_1076
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1076:
+Label_679:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -17120,23 +10889,23 @@ Label_1076:
 _dispatch_table_1_143:
 .word 0xb2503fe9
 .word 0xeb09001f
-b.HS Label_1078
+b.HS Label_685
 .word 0xb24f3be9
 .word 0xeb09001f
-b.LO Label_1077
+b.LO Label_684
 .word 0x31000400
-b.VS Label_1080
+b.VS Label_687
 .word 0xaa090000
-b Label_1079
-Label_1080:
+b Label_686
+Label_687:
 .word 0x9e620000
 .word 0x9e660000
 .word 0xb24f03e9
 .word 0x8b090000
-b Label_1079
-Label_1077:
+b Label_686
+Label_684:
 .word 0xea090008
-cbz x8, Label_1078
+cbz x8, Label_685
 .word 0xb24f03e8
 .word 0xcb080000
 .word 0x9e670000
@@ -17147,16 +10916,16 @@ cbz x8, Label_1078
 .word 0x9e660004
 .word 0x9e660045
 .word 0xeb05009f
-b.NE Label_1081
+b.NE Label_688
 .word 0xb24f38c0
-b Label_1082
-Label_1081:
+b Label_689
+Label_688:
 .word 0x9e660000
 .word 0xb24f03e6
 .word 0x8b060000
-Label_1082:
-b Label_1079
-Label_1078:
+Label_689:
+b Label_686
+Label_685:
 .word 0xd28011e2
 .word 0xf8008680
 .word 0xf85b83b1
@@ -17168,49 +10937,17 @@ bl _prim_js_unary_arith_slow_gc
 .word 0xa8c17ffe
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_1083
+b.NE Label_690
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1083:
-.word 0xb9414a69
-cbz w9, Label_1084
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1084:
+Label_690:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1079:
-.word 0xb9414a69
-cbz w9, Label_1085
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1085:
+Label_686:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -17219,23 +10956,23 @@ Label_1085:
 _dispatch_table_2_143:
 .word 0xb2503fe9
 .word 0xeb09003f
-b.HS Label_1087
+b.HS Label_692
 .word 0xb24f3be9
 .word 0xeb09003f
-b.LO Label_1086
+b.LO Label_691
 .word 0x31000421
-b.VS Label_1089
+b.VS Label_694
 .word 0xaa090021
-b Label_1088
-Label_1089:
+b Label_693
+Label_694:
 .word 0x9e620020
 .word 0x9e660001
 .word 0xb24f03e9
 .word 0x8b090021
-b Label_1088
-Label_1086:
+b Label_693
+Label_691:
 .word 0xea090028
-cbz x8, Label_1087
+cbz x8, Label_692
 .word 0xb24f03e8
 .word 0xcb080021
 .word 0x9e670020
@@ -17246,16 +10983,16 @@ cbz x8, Label_1087
 .word 0x9e660004
 .word 0x9e660045
 .word 0xeb05009f
-b.NE Label_1090
+b.NE Label_695
 .word 0xb24f38c1
-b Label_1091
-Label_1090:
+b Label_696
+Label_695:
 .word 0x9e660001
 .word 0xb24f03e6
 .word 0x8b060021
-Label_1091:
-b Label_1088
-Label_1087:
+Label_696:
+b Label_693
+Label_692:
 .word 0xd28011e2
 .word 0xaa0003f9
 .word 0xf8008680
@@ -17269,52 +11006,20 @@ bl _prim_js_unary_arith_slow_gc
 .word 0xd1002294
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_1093
+b.NE Label_698
 .word 0xf8008699
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1093:
+Label_698:
 .word 0xaa0003e1
 .word 0xaa1903e0
-.word 0xb9414a69
-cbz w9, Label_1094
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1094:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1088:
-.word 0xb9414a69
-cbz w9, Label_1095
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1095:
+Label_693:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -17327,23 +11032,23 @@ _dispatch_table_2_144:
 .word 0xf9002234
 .word 0xb2503fe9
 .word 0xeb09001f
-b.HS Label_1098
+b.HS Label_701
 .word 0xb24f3be9
 .word 0xeb09001f
-b.LO Label_1096
+b.LO Label_699
 .word 0x71000401
-b.VS Label_1099
+b.VS Label_702
 .word 0xaa090021
-b Label_1097
-Label_1099:
+b Label_700
+Label_702:
 .word 0x9e620020
 .word 0x9e660001
 .word 0xb24f03e9
 .word 0x8b090021
-b Label_1097
-Label_1096:
+b Label_700
+Label_699:
 .word 0xea090008
-cbz x8, Label_1098
+cbz x8, Label_701
 .word 0xb24f03e8
 .word 0xcb080001
 .word 0x9e670020
@@ -17354,16 +11059,16 @@ cbz x8, Label_1098
 .word 0x9e660004
 .word 0x9e660045
 .word 0xeb05009f
-b.NE Label_1100
+b.NE Label_703
 .word 0xb24f38c1
-b Label_1101
-Label_1100:
+b Label_704
+Label_703:
 .word 0x9e660001
 .word 0xb24f03e6
 .word 0x8b060021
-Label_1101:
-b Label_1097
-Label_1098:
+Label_704:
+b Label_700
+Label_701:
 .word 0xf8008680
 .word 0xd2801202
 .word 0xf85b83b1
@@ -17374,50 +11079,18 @@ Label_1098:
 bl _js_post_inc_slow_gc
 .word 0xa8c17ffe
 .word 0x7100001f
-b.GE Label_1102
+b.GE Label_705
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1102:
+Label_705:
 .word 0x91002294
-.word 0xb9414a69
-cbz w9, Label_1103
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1103:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1097:
-.word 0xb9414a69
-cbz w9, Label_1104
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1104:
+Label_700:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -17429,23 +11102,23 @@ _dispatch_table_0_144:
 _dispatch_table_1_144:
 .word 0xb2503fe9
 .word 0xeb09001f
-b.HS Label_1107
+b.HS Label_708
 .word 0xb24f3be9
 .word 0xeb09001f
-b.LO Label_1105
+b.LO Label_706
 .word 0x71000401
-b.VS Label_1108
+b.VS Label_709
 .word 0xaa090021
-b Label_1106
-Label_1108:
+b Label_707
+Label_709:
 .word 0x9e620020
 .word 0x9e660001
 .word 0xb24f03e9
 .word 0x8b090021
-b Label_1106
-Label_1105:
+b Label_707
+Label_706:
 .word 0xea090008
-cbz x8, Label_1107
+cbz x8, Label_708
 .word 0xb24f03e8
 .word 0xcb080001
 .word 0x9e670020
@@ -17456,16 +11129,16 @@ cbz x8, Label_1107
 .word 0x9e660004
 .word 0x9e660045
 .word 0xeb05009f
-b.NE Label_1109
+b.NE Label_710
 .word 0xb24f38c1
-b Label_1110
-Label_1109:
+b Label_711
+Label_710:
 .word 0x9e660001
 .word 0xb24f03e6
 .word 0x8b060021
-Label_1110:
-b Label_1106
-Label_1107:
+Label_711:
+b Label_707
+Label_708:
 .word 0xf8008680
 .word 0xd2801202
 .word 0xf85b83b1
@@ -17476,50 +11149,18 @@ Label_1107:
 bl _js_post_inc_slow_gc
 .word 0xa8c17ffe
 .word 0x7100001f
-b.GE Label_1111
+b.GE Label_712
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1111:
+Label_712:
 .word 0x91002294
-.word 0xb9414a69
-cbz w9, Label_1112
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1112:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1106:
-.word 0xb9414a69
-cbz w9, Label_1113
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1113:
+Label_707:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -17532,61 +11173,29 @@ _dispatch_table_2_145:
 .word 0xf9002234
 .word 0xb2503fe9
 .word 0xeb09001f
-b.HS Label_1115
+b.HS Label_714
 .word 0xb24f3be9
 .word 0xeb09001f
-b.LO Label_1114
+b.LO Label_713
 .word 0x31000401
-b.VS Label_1116
+b.VS Label_715
 .word 0xb24f3821
-.word 0xb9414a69
-cbz w9, Label_1117
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1117:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1116:
+Label_715:
 .word 0x9e620020
 .word 0x9e660001
 .word 0xb24f03e9
 .word 0x8b090021
-.word 0xb9414a69
-cbz w9, Label_1118
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1118:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1114:
+Label_713:
 .word 0xf24f3808
-cbz x8, Label_1115
+cbz x8, Label_714
 .word 0xb24f03e8
 .word 0xcb080001
 .word 0x9e670020
@@ -17597,35 +11206,19 @@ cbz x8, Label_1115
 .word 0x9e660004
 .word 0x9e660045
 .word 0xeb05009f
-b.NE Label_1119
+b.NE Label_716
 .word 0xb24f38c1
-b Label_1120
-Label_1119:
+b Label_717
+Label_716:
 .word 0x9e660001
 .word 0xb24f03e6
 .word 0x8b060021
-Label_1120:
-.word 0xb9414a69
-cbz w9, Label_1121
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1121:
+Label_717:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1115:
+Label_714:
 .word 0xf8008680
 .word 0xd2801222
 .word 0xf85b83b1
@@ -17636,49 +11229,17 @@ Label_1115:
 bl _js_post_inc_slow_gc
 .word 0xa8c17ffe
 .word 0x7100001f
-b.GE Label_1122
+b.GE Label_718
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1122:
+Label_718:
 .word 0x91002294
-.word 0xb9414a69
-cbz w9, Label_1123
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1123:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-.word 0xb9414a69
-cbz w9, Label_1124
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1124:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -17690,61 +11251,29 @@ _dispatch_table_0_145:
 _dispatch_table_1_145:
 .word 0xb2503fe9
 .word 0xeb09001f
-b.HS Label_1126
+b.HS Label_720
 .word 0xb24f3be9
 .word 0xeb09001f
-b.LO Label_1125
+b.LO Label_719
 .word 0x31000401
-b.VS Label_1127
+b.VS Label_721
 .word 0xb24f3821
-.word 0xb9414a69
-cbz w9, Label_1128
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1128:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1127:
+Label_721:
 .word 0x9e620020
 .word 0x9e660001
 .word 0xb24f03e9
 .word 0x8b090021
-.word 0xb9414a69
-cbz w9, Label_1129
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1129:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1125:
+Label_719:
 .word 0xf24f3808
-cbz x8, Label_1126
+cbz x8, Label_720
 .word 0xb24f03e8
 .word 0xcb080001
 .word 0x9e670020
@@ -17755,35 +11284,19 @@ cbz x8, Label_1126
 .word 0x9e660004
 .word 0x9e660045
 .word 0xeb05009f
-b.NE Label_1130
+b.NE Label_722
 .word 0xb24f38c1
-b Label_1131
-Label_1130:
+b Label_723
+Label_722:
 .word 0x9e660001
 .word 0xb24f03e6
 .word 0x8b060021
-Label_1131:
-.word 0xb9414a69
-cbz w9, Label_1132
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1132:
+Label_723:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1126:
+Label_720:
 .word 0xf8008680
 .word 0xd2801222
 .word 0xf85b83b1
@@ -17794,49 +11307,17 @@ Label_1126:
 bl _js_post_inc_slow_gc
 .word 0xa8c17ffe
 .word 0x7100001f
-b.GE Label_1133
+b.GE Label_724
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1133:
+Label_724:
 .word 0x91002294
-.word 0xb9414a69
-cbz w9, Label_1134
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1134:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-.word 0xb9414a69
-cbz w9, Label_1135
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1135:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -17848,25 +11329,25 @@ _dispatch_table_0_146:
 .word 0xf9400107
 .word 0xb2503fe9
 .word 0xeb0900ff
-b.HS Label_1137
+b.HS Label_726
 .word 0xb24f3be9
 .word 0xeb0900ff
-b.LO Label_1136
+b.LO Label_725
 .word 0x710004e7
-b.VS Label_1139
+b.VS Label_728
 .word 0xaa0900e7
 .word 0xf9000107
-b Label_1138
-Label_1139:
+b Label_727
+Label_728:
 .word 0x9e6200e0
 .word 0x9e660007
 .word 0xb24f03e9
 .word 0x8b0900e7
 .word 0xf9000107
-b Label_1138
-Label_1136:
+b Label_727
+Label_725:
 .word 0xea07013f
-b.EQ Label_1137
+b.EQ Label_726
 .word 0xb24f03e9
 .word 0xcb0900e7
 .word 0x9e6700e0
@@ -17877,17 +11358,17 @@ b.EQ Label_1137
 .word 0x9e660004
 .word 0x9e660045
 .word 0xeb05009f
-b.NE Label_1140
+b.NE Label_729
 .word 0xb24f38c7
-b Label_1141
-Label_1140:
+b Label_730
+Label_729:
 .word 0x9e660007
 .word 0xb24f03e6
 .word 0x8b0600e7
-Label_1141:
+Label_730:
 .word 0xf9000107
-b Label_1138
-Label_1137:
+b Label_727
+Label_726:
 .word 0xd28011c2
 .word 0xaa0703f9
 .word 0xf85b83b1
@@ -17899,54 +11380,22 @@ Label_1137:
 bl _prim_js_unary_arith_slow_gc
 .word 0xa8c17ffe
 .word 0xf102081f
-b.NE Label_1143
+b.NE Label_732
 .word 0xf85f8e88
 .word 0x91000ad6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1143:
+Label_732:
 .word 0xaa1903e1
 .word 0xaa0003f9
 .word 0xf85f8e88
 .word 0xf9000119
-.word 0xb9414a69
-cbz w9, Label_1144
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1144:
 .word 0x38402ec8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1138:
-.word 0xb9414a69
-cbz w9, Label_1145
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1145:
+Label_727:
 .word 0x38402ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -17958,25 +11407,25 @@ _dispatch_table_1_146:
 .word 0xf9400107
 .word 0xb2503fe9
 .word 0xeb0900ff
-b.HS Label_1147
+b.HS Label_734
 .word 0xb24f3be9
 .word 0xeb0900ff
-b.LO Label_1146
+b.LO Label_733
 .word 0x710004e7
-b.VS Label_1149
+b.VS Label_736
 .word 0xaa0900e7
 .word 0xf9000107
-b Label_1148
-Label_1149:
+b Label_735
+Label_736:
 .word 0x9e6200e0
 .word 0x9e660007
 .word 0xb24f03e9
 .word 0x8b0900e7
 .word 0xf9000107
-b Label_1148
-Label_1146:
+b Label_735
+Label_733:
 .word 0xea07013f
-b.EQ Label_1147
+b.EQ Label_734
 .word 0xb24f03e9
 .word 0xcb0900e7
 .word 0x9e6700e0
@@ -17987,17 +11436,17 @@ b.EQ Label_1147
 .word 0x9e660004
 .word 0x9e660045
 .word 0xeb05009f
-b.NE Label_1150
+b.NE Label_737
 .word 0xb24f38c7
-b Label_1151
-Label_1150:
+b Label_738
+Label_737:
 .word 0x9e660007
 .word 0xb24f03e6
 .word 0x8b0600e7
-Label_1151:
+Label_738:
 .word 0xf9000107
-b Label_1148
-Label_1147:
+b Label_735
+Label_734:
 .word 0xd28011c2
 .word 0xaa0703f9
 .word 0xf8008680
@@ -18010,55 +11459,23 @@ Label_1147:
 bl _prim_js_unary_arith_slow_gc
 .word 0xa8c17ffe
 .word 0xf102081f
-b.NE Label_1153
+b.NE Label_740
 .word 0xf85f8e88
 .word 0x91000ad6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1153:
+Label_740:
 .word 0xaa1903e1
 .word 0xaa0003f9
 .word 0xf85f8e88
 .word 0xf9000119
 .word 0xf85f8e80
-.word 0xb9414a69
-cbz w9, Label_1154
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1154:
 .word 0x38402ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1148:
-.word 0xb9414a69
-cbz w9, Label_1155
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1155:
+Label_735:
 .word 0x38402ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -18070,25 +11487,25 @@ _dispatch_table_2_146:
 .word 0xf9400107
 .word 0xb2503fe9
 .word 0xeb0900ff
-b.HS Label_1157
+b.HS Label_742
 .word 0xb24f3be9
 .word 0xeb0900ff
-b.LO Label_1156
+b.LO Label_741
 .word 0x710004e7
-b.VS Label_1159
+b.VS Label_744
 .word 0xaa0900e7
 .word 0xf9000107
-b Label_1158
-Label_1159:
+b Label_743
+Label_744:
 .word 0x9e6200e0
 .word 0x9e660007
 .word 0xb24f03e9
 .word 0x8b0900e7
 .word 0xf9000107
-b Label_1158
-Label_1156:
+b Label_743
+Label_741:
 .word 0xea07013f
-b.EQ Label_1157
+b.EQ Label_742
 .word 0xb24f03e9
 .word 0xcb0900e7
 .word 0x9e6700e0
@@ -18099,17 +11516,17 @@ b.EQ Label_1157
 .word 0x9e660004
 .word 0x9e660045
 .word 0xeb05009f
-b.NE Label_1160
+b.NE Label_745
 .word 0xb24f38c7
-b Label_1161
-Label_1160:
+b Label_746
+Label_745:
 .word 0x9e660007
 .word 0xb24f03e6
 .word 0x8b0600e7
-Label_1161:
+Label_746:
 .word 0xf9000107
-b Label_1158
-Label_1157:
+b Label_743
+Label_742:
 .word 0xd28011c2
 .word 0xaa0703f9
 .word 0xf8008680
@@ -18123,56 +11540,24 @@ Label_1157:
 bl _prim_js_unary_arith_slow_gc
 .word 0xa8c17ffe
 .word 0xf102081f
-b.NE Label_1163
+b.NE Label_748
 .word 0xf85f8e88
 .word 0x91000ad6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1163:
+Label_748:
 .word 0xaa1903e1
 .word 0xaa0003f9
 .word 0xf85f8e88
 .word 0xf9000119
 .word 0xf85f8e81
 .word 0xf85f8e80
-.word 0xb9414a69
-cbz w9, Label_1164
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1164:
 .word 0x38402ec8
 .word 0x91079108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1158:
-.word 0xb9414a69
-cbz w9, Label_1165
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1165:
+Label_743:
 .word 0x38402ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -18184,25 +11569,25 @@ _dispatch_table_0_147:
 .word 0xf9400107
 .word 0xb2503fe9
 .word 0xeb0900ff
-b.HS Label_1167
+b.HS Label_750
 .word 0xb24f3be9
 .word 0xeb0900ff
-b.LO Label_1166
+b.LO Label_749
 .word 0x310004e7
-b.VS Label_1169
+b.VS Label_752
 .word 0xaa0900e7
 .word 0xf9000107
-b Label_1168
-Label_1169:
+b Label_751
+Label_752:
 .word 0x9e6200e0
 .word 0x9e660007
 .word 0xb24f03e9
 .word 0x8b0900e7
 .word 0xf9000107
-b Label_1168
-Label_1166:
+b Label_751
+Label_749:
 .word 0xea07013f
-b.EQ Label_1167
+b.EQ Label_750
 .word 0xb24f03e9
 .word 0xcb0900e7
 .word 0x9e6700e0
@@ -18213,17 +11598,17 @@ b.EQ Label_1167
 .word 0x9e660004
 .word 0x9e660045
 .word 0xeb05009f
-b.NE Label_1170
+b.NE Label_753
 .word 0xb24f38c7
-b Label_1171
-Label_1170:
+b Label_754
+Label_753:
 .word 0x9e660007
 .word 0xb24f03e6
 .word 0x8b0600e7
-Label_1171:
+Label_754:
 .word 0xf9000107
-b Label_1168
-Label_1167:
+b Label_751
+Label_750:
 .word 0xd2801262
 .word 0xaa0703f9
 .word 0xf85b83b1
@@ -18235,54 +11620,22 @@ Label_1167:
 bl _prim_js_unary_arith_slow_gc
 .word 0xa8c17ffe
 .word 0xf102081f
-b.NE Label_1173
+b.NE Label_756
 .word 0xf85f8e88
 .word 0x91000ad6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1173:
+Label_756:
 .word 0xaa1903e1
 .word 0xaa0003f9
 .word 0xf85f8e88
 .word 0xf9000119
-.word 0xb9414a69
-cbz w9, Label_1174
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1174:
 .word 0x38402ec8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1168:
-.word 0xb9414a69
-cbz w9, Label_1175
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1175:
+Label_751:
 .word 0x38402ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -18294,25 +11647,25 @@ _dispatch_table_1_147:
 .word 0xf9400107
 .word 0xb2503fe9
 .word 0xeb0900ff
-b.HS Label_1177
+b.HS Label_758
 .word 0xb24f3be9
 .word 0xeb0900ff
-b.LO Label_1176
+b.LO Label_757
 .word 0x310004e7
-b.VS Label_1179
+b.VS Label_760
 .word 0xaa0900e7
 .word 0xf9000107
-b Label_1178
-Label_1179:
+b Label_759
+Label_760:
 .word 0x9e6200e0
 .word 0x9e660007
 .word 0xb24f03e9
 .word 0x8b0900e7
 .word 0xf9000107
-b Label_1178
-Label_1176:
+b Label_759
+Label_757:
 .word 0xea07013f
-b.EQ Label_1177
+b.EQ Label_758
 .word 0xb24f03e9
 .word 0xcb0900e7
 .word 0x9e6700e0
@@ -18323,17 +11676,17 @@ b.EQ Label_1177
 .word 0x9e660004
 .word 0x9e660045
 .word 0xeb05009f
-b.NE Label_1180
+b.NE Label_761
 .word 0xb24f38c7
-b Label_1181
-Label_1180:
+b Label_762
+Label_761:
 .word 0x9e660007
 .word 0xb24f03e6
 .word 0x8b0600e7
-Label_1181:
+Label_762:
 .word 0xf9000107
-b Label_1178
-Label_1177:
+b Label_759
+Label_758:
 .word 0xd2801262
 .word 0xaa0703f9
 .word 0xf8008680
@@ -18346,55 +11699,23 @@ Label_1177:
 bl _prim_js_unary_arith_slow_gc
 .word 0xa8c17ffe
 .word 0xf102081f
-b.NE Label_1183
+b.NE Label_764
 .word 0xf85f8e88
 .word 0x91000ad6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1183:
+Label_764:
 .word 0xaa1903e1
 .word 0xaa0003f9
 .word 0xf85f8e88
 .word 0xf9000119
 .word 0xf85f8e80
-.word 0xb9414a69
-cbz w9, Label_1184
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1184:
 .word 0x38402ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1178:
-.word 0xb9414a69
-cbz w9, Label_1185
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1185:
+Label_759:
 .word 0x38402ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -18406,25 +11727,25 @@ _dispatch_table_2_147:
 .word 0xf9400107
 .word 0xb2503fe9
 .word 0xeb0900ff
-b.HS Label_1187
+b.HS Label_766
 .word 0xb24f3be9
 .word 0xeb0900ff
-b.LO Label_1186
+b.LO Label_765
 .word 0x310004e7
-b.VS Label_1189
+b.VS Label_768
 .word 0xaa0900e7
 .word 0xf9000107
-b Label_1188
-Label_1189:
+b Label_767
+Label_768:
 .word 0x9e6200e0
 .word 0x9e660007
 .word 0xb24f03e9
 .word 0x8b0900e7
 .word 0xf9000107
-b Label_1188
-Label_1186:
+b Label_767
+Label_765:
 .word 0xea07013f
-b.EQ Label_1187
+b.EQ Label_766
 .word 0xb24f03e9
 .word 0xcb0900e7
 .word 0x9e6700e0
@@ -18435,17 +11756,17 @@ b.EQ Label_1187
 .word 0x9e660004
 .word 0x9e660045
 .word 0xeb05009f
-b.NE Label_1190
+b.NE Label_769
 .word 0xb24f38c7
-b Label_1191
-Label_1190:
+b Label_770
+Label_769:
 .word 0x9e660007
 .word 0xb24f03e6
 .word 0x8b0600e7
-Label_1191:
+Label_770:
 .word 0xf9000107
-b Label_1188
-Label_1187:
+b Label_767
+Label_766:
 .word 0xd2801262
 .word 0xaa0703f9
 .word 0xf8008680
@@ -18459,56 +11780,24 @@ Label_1187:
 bl _prim_js_unary_arith_slow_gc
 .word 0xa8c17ffe
 .word 0xf102081f
-b.NE Label_1193
+b.NE Label_772
 .word 0xf85f8e88
 .word 0x91000ad6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1193:
+Label_772:
 .word 0xaa1903e1
 .word 0xaa0003f9
 .word 0xf85f8e88
 .word 0xf9000119
 .word 0xf85f8e81
 .word 0xf85f8e80
-.word 0xb9414a69
-cbz w9, Label_1194
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1194:
 .word 0x38402ec8
 .word 0x91079108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1188:
-.word 0xb9414a69
-cbz w9, Label_1195
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1195:
+Label_767:
 .word 0x38402ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -18525,36 +11814,36 @@ _dispatch_table_2_148:
 .word 0xf2503c19
 .word 0xb24f3be9
 .word 0xeb090339
-cbnz x25, Label_1196
+cbnz x25, Label_773
 .word 0xf2503c39
 .word 0xeb090339
-cbnz x25, Label_1196
+cbnz x25, Label_773
 .word 0x93407c00
 .word 0x8b21c009
 .word 0xeb29c13f
-b.NE Label_1200
+b.NE Label_777
 .word 0xd3407d29
 .word 0xb24f3929
 .word 0xf9000109
-b Label_1198
-Label_1200:
+b Label_775
+Label_777:
 .word 0x9e620120
 .word 0x9e660009
 .word 0xb24f03e0
 .word 0x8b000129
 .word 0xf9000109
-b Label_1198
-Label_1196:
+b Label_775
+Label_773:
 .word 0xb25047e9
 .word 0x8a090029
 .word 0xd2800059
 .word 0xf2e00039
 .word 0xeb19013f
-b.EQ Label_1199
+b.EQ Label_776
 .word 0xb25047f9
 .word 0xeb19013f
-b.NE Label_1197
-Label_1199:
+b.NE Label_774
+Label_776:
 .word 0xb27f03e9
 .word 0xf8008681
 .word 0xaa0803f9
@@ -18580,8 +11869,8 @@ bl _JS_ConcatString_GC
 .word 0xf85f8e81
 .word 0xaa1903e8
 .word 0xf9000100
-b Label_1198
-Label_1197:
+b Label_775
+Label_774:
 .word 0xf8008688
 .word 0xaa0103f9
 .word 0xf8008680
@@ -18594,53 +11883,21 @@ bl _prim_js_add_slow_gc
 .word 0xa8c17ffe
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_1202
+b.NE Label_779
 .word 0xf85f8e88
 .word 0x91000ad6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1202:
+Label_779:
 .word 0xaa1903e1
 .word 0xf85f8e88
 .word 0xf9000100
-.word 0xb9414a69
-cbz w9, Label_1203
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1203:
 .word 0x38402ec8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1198:
-.word 0xb9414a69
-cbz w9, Label_1204
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1204:
+Label_775:
 .word 0x38402ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -18656,36 +11913,36 @@ _dispatch_table_1_148:
 .word 0xf2503c19
 .word 0xb24f3be9
 .word 0xeb090339
-cbnz x25, Label_1205
+cbnz x25, Label_780
 .word 0xf2503c39
 .word 0xeb090339
-cbnz x25, Label_1205
+cbnz x25, Label_780
 .word 0x93407c00
 .word 0x8b21c009
 .word 0xeb29c13f
-b.NE Label_1209
+b.NE Label_784
 .word 0xd3407d29
 .word 0xb24f3929
 .word 0xf9000109
-b Label_1207
-Label_1209:
+b Label_782
+Label_784:
 .word 0x9e620120
 .word 0x9e660009
 .word 0xb24f03e0
 .word 0x8b000129
 .word 0xf9000109
-b Label_1207
-Label_1205:
+b Label_782
+Label_780:
 .word 0xb25047e9
 .word 0x8a090029
 .word 0xd2800059
 .word 0xf2e00039
 .word 0xeb19013f
-b.EQ Label_1208
+b.EQ Label_783
 .word 0xb25047f9
 .word 0xeb19013f
-b.NE Label_1206
-Label_1208:
+b.NE Label_781
+Label_783:
 .word 0xb27f03e9
 .word 0xf8008681
 .word 0xaa0803f9
@@ -18711,8 +11968,8 @@ bl _JS_ConcatString_GC
 .word 0xf85f8e81
 .word 0xaa1903e8
 .word 0xf9000100
-b Label_1207
-Label_1206:
+b Label_782
+Label_781:
 .word 0xf8008688
 .word 0xaa0103f9
 .word 0xf8008680
@@ -18725,53 +11982,21 @@ bl _prim_js_add_slow_gc
 .word 0xa8c17ffe
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_1211
+b.NE Label_786
 .word 0xf85f8e88
 .word 0x91000ad6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1211:
+Label_786:
 .word 0xaa1903e1
 .word 0xf85f8e88
 .word 0xf9000100
-.word 0xb9414a69
-cbz w9, Label_1212
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1212:
 .word 0x38402ec8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1207:
-.word 0xb9414a69
-cbz w9, Label_1213
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1213:
+Label_782:
 .word 0x38402ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -18785,13 +12010,13 @@ _dispatch_table_2_149:
 .word 0xf2503c08
 .word 0xb24f3be9
 .word 0xeb090108
-cbnz x8, Label_1214
+cbnz x8, Label_787
 .word 0x2a0003e0
 .word 0xb2407fe9
 .word 0x4a090000
 .word 0xb24f3800
-b Label_1215
-Label_1214:
+b Label_788
+Label_787:
 .word 0xf8008680
 .word 0xf85b83b1
 .word 0xf9002234
@@ -18802,29 +12027,13 @@ bl _prim_js_not_slow_gc
 .word 0xa8c17ffe
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_1216
+b.NE Label_789
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1216:
-Label_1215:
-.word 0xb9414a69
-cbz w9, Label_1217
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1217:
+Label_789:
+Label_788:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -18837,13 +12046,13 @@ _dispatch_table_1_149:
 .word 0xf2503c08
 .word 0xb24f3be9
 .word 0xeb090108
-cbnz x8, Label_1218
+cbnz x8, Label_790
 .word 0x2a0003e0
 .word 0xb2407fe9
 .word 0x4a090000
 .word 0xb24f3800
-b Label_1219
-Label_1218:
+b Label_791
+Label_790:
 .word 0xf8008680
 .word 0xf85b83b1
 .word 0xf9002234
@@ -18854,29 +12063,13 @@ bl _prim_js_not_slow_gc
 .word 0xa8c17ffe
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_1220
+b.NE Label_792
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1220:
-Label_1219:
-.word 0xb9414a69
-cbz w9, Label_1221
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1221:
+Label_792:
+Label_791:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -18888,105 +12081,57 @@ _dispatch_table_2_150:
 .word 0xf85b83b1
 .word 0xf9002234
 .word 0xf1001c1f
-b.NE Label_1222
+b.NE Label_793
 .word 0xb27f07e0
-b Label_1224
-Label_1222:
+b Label_795
+Label_793:
 .word 0xf100181f
-b.NE Label_1223
+b.NE Label_794
 .word 0xb2400be0
-b Label_1224
-Label_1223:
+b Label_795
+Label_794:
 .word 0xf2503c08
 .word 0xb24f3be9
 .word 0xeb090108
-cbnz x8, Label_1225
+cbnz x8, Label_796
 .word 0x2a0003e8
-cbz x8, Label_1228
+cbz x8, Label_799
 .word 0xb27f07e0
-b Label_1224
-Label_1228:
+b Label_795
+Label_799:
 .word 0xb2400be0
-b Label_1224
-Label_1225:
+b Label_795
+Label_796:
 .word 0xd2800248
 .word 0xeb08001f
-b.NE Label_1226
+b.NE Label_797
 .word 0xb2400be0
-b Label_1224
-Label_1226:
+b Label_795
+Label_797:
 .word 0xb27f03e8
 .word 0xeb08001f
-b.NE Label_1227
+b.NE Label_798
 .word 0xb2400be0
-b Label_1224
-Label_1227:
+b Label_795
+Label_798:
 .word 0xaa0003e1
 .word 0xaa1303e0
 .word 0xa9bf7ffe
 bl _JS_ToBoolFree_GC
 .word 0xa8c17ffe
-cbz x0, Label_1229
+cbz x0, Label_800
 .word 0xb27f07e0
-.word 0xb9414a69
-cbz w9, Label_1230
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1230:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1229:
+Label_800:
 .word 0xb2400be0
-.word 0xb9414a69
-cbz w9, Label_1231
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1231:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1224:
-.word 0xb9414a69
-cbz w9, Label_1232
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1232:
+Label_795:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -18997,105 +12142,57 @@ _dispatch_table_0_150:
 .global _dispatch_table_1_150
 _dispatch_table_1_150:
 .word 0xf1001c1f
-b.NE Label_1233
+b.NE Label_801
 .word 0xb27f07e0
-b Label_1235
-Label_1233:
+b Label_803
+Label_801:
 .word 0xf100181f
-b.NE Label_1234
+b.NE Label_802
 .word 0xb2400be0
-b Label_1235
-Label_1234:
+b Label_803
+Label_802:
 .word 0xf2503c08
 .word 0xb24f3be9
 .word 0xeb090108
-cbnz x8, Label_1236
+cbnz x8, Label_804
 .word 0x2a0003e8
-cbz x8, Label_1239
+cbz x8, Label_807
 .word 0xb27f07e0
-b Label_1235
-Label_1239:
+b Label_803
+Label_807:
 .word 0xb2400be0
-b Label_1235
-Label_1236:
+b Label_803
+Label_804:
 .word 0xd2800248
 .word 0xeb08001f
-b.NE Label_1237
+b.NE Label_805
 .word 0xb2400be0
-b Label_1235
-Label_1237:
+b Label_803
+Label_805:
 .word 0xb27f03e8
 .word 0xeb08001f
-b.NE Label_1238
+b.NE Label_806
 .word 0xb2400be0
-b Label_1235
-Label_1238:
+b Label_803
+Label_806:
 .word 0xaa0003e1
 .word 0xaa1303e0
 .word 0xa9bf7ffe
 bl _JS_ToBoolFree_GC
 .word 0xa8c17ffe
-cbz x0, Label_1240
+cbz x0, Label_808
 .word 0xb27f07e0
-.word 0xb9414a69
-cbz w9, Label_1241
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1241:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1240:
+Label_808:
 .word 0xb2400be0
-.word 0xb9414a69
-cbz w9, Label_1242
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1242:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1235:
-.word 0xb9414a69
-cbz w9, Label_1243
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1243:
+Label_803:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -19122,22 +12219,6 @@ bl _js_operator_typeof_gc
 bl ___JS_AtomToValue_GC
 .word 0xa8c17ffe
 .word 0xd1002294
-.word 0xb9414a69
-cbz w9, Label_1244
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1244:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -19163,22 +12244,6 @@ bl _js_operator_typeof_gc
 bl ___JS_AtomToValue_GC
 .word 0xa8c17ffe
 .word 0xd1002294
-.word 0xb9414a69
-cbz w9, Label_1245
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1245:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -19199,28 +12264,12 @@ bl _prim_js_operator_delete_gc
 .word 0xd1002294
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_1246
+b.NE Label_809
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1246:
-.word 0xb9414a69
-cbz w9, Label_1247
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1247:
+Label_809:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -19244,28 +12293,12 @@ bl _prim_js_operator_delete_gc
 .word 0xd1002294
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_1248
+b.NE Label_810
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1248:
-.word 0xb9414a69
-cbz w9, Label_1249
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1249:
+Label_810:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -19286,35 +12319,19 @@ _dispatch_table_1_153:
 bl _LEPUS_DeleteProperty
 .word 0xa8c17ffe
 .word 0x7100001f
-b.GE Label_1250
+b.GE Label_811
 .word 0x910016d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1250:
+Label_811:
 .word 0xf100041f
-b.NE Label_1251
+b.NE Label_812
 .word 0xb2400be0
-b Label_1252
-Label_1251:
+b Label_813
+Label_812:
 .word 0xb27f07e0
-Label_1252:
-.word 0xb9414a69
-cbz w9, Label_1253
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1253:
+Label_813:
 .word 0x38405ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -19337,35 +12354,19 @@ _dispatch_table_0_153:
 bl _LEPUS_DeleteProperty
 .word 0xa8c17ffe
 .word 0x7100001f
-b.GE Label_1254
+b.GE Label_814
 .word 0x910016d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1254:
+Label_814:
 .word 0xf100041f
-b.NE Label_1255
+b.NE Label_815
 .word 0xb2400be0
-b Label_1256
-Label_1255:
+b Label_816
+Label_815:
 .word 0xb27f07e0
-Label_1256:
-.word 0xb9414a69
-cbz w9, Label_1257
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1001ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1257:
+Label_816:
 .word 0x38405ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -19375,73 +12376,41 @@ _dispatch_table_0_154:
 .word 0xa9ff0680
 .word 0xb2503fe9
 .word 0xeb09001f
-b.HS Label_1260
+b.HS Label_819
 .word 0xeb09003f
-b.HS Label_1260
+b.HS Label_819
 .word 0xb24f3be8
 .word 0xb24f03e9
 .word 0xeb08001f
-b.LO Label_1258
+b.LO Label_817
 .word 0xeb08003f
-b.LO Label_1259
+b.LO Label_818
 .word 0x2a0003e0
 .word 0x2a0103e1
 .word 0x9b217c00
 .word 0xeb20c01f
-b.NE Label_1262
+b.NE Label_821
 .word 0xb2407fe8
 .word 0x8a080000
 .word 0xb24f3800
-.word 0xb9414a69
-cbz w9, Label_1263
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1263:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1262:
+Label_821:
 .word 0x9e620000
 .word 0x9e660000
 .word 0xb24f03e9
 .word 0x8b090000
-.word 0xb9414a69
-cbz w9, Label_1264
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1264:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1258:
+Label_817:
 .word 0xea08001f
-b.EQ Label_1260
+b.EQ Label_819
 .word 0xeb08003f
-b.LO Label_1261
+b.LO Label_820
 .word 0xcb09000a
 .word 0x9e670140
 .word 0x1e620021
@@ -19451,37 +12420,21 @@ b.LO Label_1261
 .word 0x9e660004
 .word 0x9e660045
 .word 0xeb05009f
-b.NE Label_1265
+b.NE Label_822
 .word 0xb24f38c0
-b Label_1266
-Label_1265:
+b Label_823
+Label_822:
 .word 0x9e660000
 .word 0xb24f03e6
 .word 0x8b060000
-Label_1266:
-.word 0xb9414a69
-cbz w9, Label_1267
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1267:
+Label_823:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1261:
+Label_820:
 .word 0xea08003f
-b.EQ Label_1260
+b.EQ Label_819
 .word 0xcb09000a
 .word 0xcb09002b
 .word 0x9e670140
@@ -19490,29 +12443,13 @@ b.EQ Label_1260
 .word 0x9e660000
 .word 0xb24f03e6
 .word 0x8b060000
-.word 0xb9414a69
-cbz w9, Label_1268
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1268:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1259:
+Label_818:
 .word 0xea08003f
-b.EQ Label_1260
+b.EQ Label_819
 .word 0xcb09002a
 .word 0x1e620000
 .word 0x9e670141
@@ -19522,35 +12459,19 @@ b.EQ Label_1260
 .word 0x9e660004
 .word 0x9e660045
 .word 0xeb05009f
-b.NE Label_1269
+b.NE Label_824
 .word 0xb24f38c0
-b Label_1270
-Label_1269:
+b Label_825
+Label_824:
 .word 0x9e660000
 .word 0xb24f03e6
 .word 0x8b060000
-Label_1270:
-.word 0xb9414a69
-cbz w9, Label_1271
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1271:
+Label_825:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1260:
+Label_819:
 .word 0xd2801343
 .word 0xf8008680
 .word 0xf8008681
@@ -19565,28 +12486,12 @@ bl _prim_js_binary_arith_slow_gc
 .word 0xd1002294
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_1272
+b.NE Label_826
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1272:
-.word 0xb9414a69
-cbz w9, Label_1273
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1273:
+Label_826:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -19599,73 +12504,41 @@ _dispatch_table_1_154:
 _dispatch_table_2_154:
 .word 0xb2503fe9
 .word 0xeb09001f
-b.HS Label_1276
+b.HS Label_829
 .word 0xeb09003f
-b.HS Label_1276
+b.HS Label_829
 .word 0xb24f3be8
 .word 0xb24f03e9
 .word 0xeb08001f
-b.LO Label_1274
+b.LO Label_827
 .word 0xeb08003f
-b.LO Label_1275
+b.LO Label_828
 .word 0x2a0003e0
 .word 0x2a0103e1
 .word 0x9b217c00
 .word 0xeb20c01f
-b.NE Label_1278
+b.NE Label_831
 .word 0xb2407fe8
 .word 0x8a080000
 .word 0xb24f3800
-.word 0xb9414a69
-cbz w9, Label_1279
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1279:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1278:
+Label_831:
 .word 0x9e620000
 .word 0x9e660000
 .word 0xb24f03e9
 .word 0x8b090000
-.word 0xb9414a69
-cbz w9, Label_1280
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1280:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1274:
+Label_827:
 .word 0xea08001f
-b.EQ Label_1276
+b.EQ Label_829
 .word 0xeb08003f
-b.LO Label_1277
+b.LO Label_830
 .word 0xcb09000a
 .word 0x9e670140
 .word 0x1e620021
@@ -19675,37 +12548,21 @@ b.LO Label_1277
 .word 0x9e660004
 .word 0x9e660045
 .word 0xeb05009f
-b.NE Label_1281
+b.NE Label_832
 .word 0xb24f38c0
-b Label_1282
-Label_1281:
+b Label_833
+Label_832:
 .word 0x9e660000
 .word 0xb24f03e6
 .word 0x8b060000
-Label_1282:
-.word 0xb9414a69
-cbz w9, Label_1283
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1283:
+Label_833:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1277:
+Label_830:
 .word 0xea08003f
-b.EQ Label_1276
+b.EQ Label_829
 .word 0xcb09000a
 .word 0xcb09002b
 .word 0x9e670140
@@ -19714,29 +12571,13 @@ b.EQ Label_1276
 .word 0x9e660000
 .word 0xb24f03e6
 .word 0x8b060000
-.word 0xb9414a69
-cbz w9, Label_1284
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1284:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1275:
+Label_828:
 .word 0xea08003f
-b.EQ Label_1276
+b.EQ Label_829
 .word 0xcb09002a
 .word 0x1e620000
 .word 0x9e670141
@@ -19746,35 +12587,19 @@ b.EQ Label_1276
 .word 0x9e660004
 .word 0x9e660045
 .word 0xeb05009f
-b.NE Label_1285
+b.NE Label_834
 .word 0xb24f38c0
-b Label_1286
-Label_1285:
+b Label_835
+Label_834:
 .word 0x9e660000
 .word 0xb24f03e6
 .word 0x8b060000
-Label_1286:
-.word 0xb9414a69
-cbz w9, Label_1287
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1287:
+Label_835:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1276:
+Label_829:
 .word 0xd2801343
 .word 0xf8008680
 .word 0xf8008681
@@ -19789,28 +12614,12 @@ bl _prim_js_binary_arith_slow_gc
 .word 0xd1002294
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_1288
+b.NE Label_836
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1288:
-.word 0xb9414a69
-cbz w9, Label_1289
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1289:
+Label_836:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -19820,15 +12629,15 @@ _dispatch_table_0_155:
 .word 0xa9ff0680
 .word 0xb2503fe9
 .word 0xeb09001f
-b.HS Label_1292
+b.HS Label_839
 .word 0xeb09003f
-b.HS Label_1292
+b.HS Label_839
 .word 0xb24f3be8
 .word 0xb24f03e9
 .word 0xeb08001f
-b.LO Label_1290
+b.LO Label_837
 .word 0xeb08003f
-b.LO Label_1291
+b.LO Label_838
 .word 0x1e620000
 .word 0x1e620021
 .word 0x1e611800
@@ -19837,39 +12646,23 @@ b.LO Label_1291
 .word 0x9e660004
 .word 0x9e660045
 .word 0xeb05009f
-b.NE Label_1294
+b.NE Label_841
 .word 0xb24f38c0
-b Label_1295
-Label_1294:
+b Label_842
+Label_841:
 .word 0x9e660000
 .word 0xb24f03e6
 .word 0x8b060000
-Label_1295:
-.word 0xb9414a69
-cbz w9, Label_1296
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1296:
+Label_842:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1290:
+Label_837:
 .word 0xea08001f
-b.EQ Label_1292
+b.EQ Label_839
 .word 0xeb08003f
-b.LO Label_1293
+b.LO Label_840
 .word 0xcb09000a
 .word 0x9e670140
 .word 0x1e620021
@@ -19879,37 +12672,21 @@ b.LO Label_1293
 .word 0x9e660004
 .word 0x9e660045
 .word 0xeb05009f
-b.NE Label_1297
+b.NE Label_843
 .word 0xb24f38c0
-b Label_1298
-Label_1297:
+b Label_844
+Label_843:
 .word 0x9e660000
 .word 0xb24f03e6
 .word 0x8b060000
-Label_1298:
-.word 0xb9414a69
-cbz w9, Label_1299
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1299:
+Label_844:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1293:
+Label_840:
 .word 0xea08003f
-b.EQ Label_1292
+b.EQ Label_839
 .word 0xcb09000a
 .word 0xcb09002b
 .word 0x9e670140
@@ -19920,37 +12697,21 @@ b.EQ Label_1292
 .word 0x9e660004
 .word 0x9e660045
 .word 0xeb05009f
-b.NE Label_1300
+b.NE Label_845
 .word 0xb24f38c0
-b Label_1301
-Label_1300:
+b Label_846
+Label_845:
 .word 0x9e660000
 .word 0xb24f03e6
 .word 0x8b060000
-Label_1301:
-.word 0xb9414a69
-cbz w9, Label_1302
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1302:
+Label_846:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1291:
+Label_838:
 .word 0xea08003f
-b.EQ Label_1292
+b.EQ Label_839
 .word 0xcb09002a
 .word 0x1e620000
 .word 0x9e670141
@@ -19960,35 +12721,19 @@ b.EQ Label_1292
 .word 0x9e660004
 .word 0x9e660045
 .word 0xeb05009f
-b.NE Label_1303
+b.NE Label_847
 .word 0xb24f38c0
-b Label_1304
-Label_1303:
+b Label_848
+Label_847:
 .word 0x9e660000
 .word 0xb24f03e6
 .word 0x8b060000
-Label_1304:
-.word 0xb9414a69
-cbz w9, Label_1305
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1305:
+Label_848:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1292:
+Label_839:
 .word 0xd2801363
 .word 0xf8008680
 .word 0xf8008681
@@ -20003,28 +12748,12 @@ bl _prim_js_binary_arith_slow_gc
 .word 0xd1002294
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_1306
+b.NE Label_849
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1306:
-.word 0xb9414a69
-cbz w9, Label_1307
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1307:
+Label_849:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -20037,15 +12766,15 @@ _dispatch_table_1_155:
 _dispatch_table_2_155:
 .word 0xb2503fe9
 .word 0xeb09001f
-b.HS Label_1310
+b.HS Label_852
 .word 0xeb09003f
-b.HS Label_1310
+b.HS Label_852
 .word 0xb24f3be8
 .word 0xb24f03e9
 .word 0xeb08001f
-b.LO Label_1308
+b.LO Label_850
 .word 0xeb08003f
-b.LO Label_1309
+b.LO Label_851
 .word 0x1e620000
 .word 0x1e620021
 .word 0x1e611800
@@ -20054,39 +12783,23 @@ b.LO Label_1309
 .word 0x9e660004
 .word 0x9e660045
 .word 0xeb05009f
-b.NE Label_1312
+b.NE Label_854
 .word 0xb24f38c0
-b Label_1313
-Label_1312:
+b Label_855
+Label_854:
 .word 0x9e660000
 .word 0xb24f03e6
 .word 0x8b060000
-Label_1313:
-.word 0xb9414a69
-cbz w9, Label_1314
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1314:
+Label_855:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1308:
+Label_850:
 .word 0xea08001f
-b.EQ Label_1310
+b.EQ Label_852
 .word 0xeb08003f
-b.LO Label_1311
+b.LO Label_853
 .word 0xcb09000a
 .word 0x9e670140
 .word 0x1e620021
@@ -20096,37 +12809,21 @@ b.LO Label_1311
 .word 0x9e660004
 .word 0x9e660045
 .word 0xeb05009f
-b.NE Label_1315
+b.NE Label_856
 .word 0xb24f38c0
-b Label_1316
-Label_1315:
+b Label_857
+Label_856:
 .word 0x9e660000
 .word 0xb24f03e6
 .word 0x8b060000
-Label_1316:
-.word 0xb9414a69
-cbz w9, Label_1317
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1317:
+Label_857:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1311:
+Label_853:
 .word 0xea08003f
-b.EQ Label_1310
+b.EQ Label_852
 .word 0xcb09000a
 .word 0xcb09002b
 .word 0x9e670140
@@ -20137,37 +12834,21 @@ b.EQ Label_1310
 .word 0x9e660004
 .word 0x9e660045
 .word 0xeb05009f
-b.NE Label_1318
+b.NE Label_858
 .word 0xb24f38c0
-b Label_1319
-Label_1318:
+b Label_859
+Label_858:
 .word 0x9e660000
 .word 0xb24f03e6
 .word 0x8b060000
-Label_1319:
-.word 0xb9414a69
-cbz w9, Label_1320
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1320:
+Label_859:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1309:
+Label_851:
 .word 0xea08003f
-b.EQ Label_1310
+b.EQ Label_852
 .word 0xcb09002a
 .word 0x1e620000
 .word 0x9e670141
@@ -20177,35 +12858,19 @@ b.EQ Label_1310
 .word 0x9e660004
 .word 0x9e660045
 .word 0xeb05009f
-b.NE Label_1321
+b.NE Label_860
 .word 0xb24f38c0
-b Label_1322
-Label_1321:
+b Label_861
+Label_860:
 .word 0x9e660000
 .word 0xb24f03e6
 .word 0x8b060000
-Label_1322:
-.word 0xb9414a69
-cbz w9, Label_1323
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1323:
+Label_861:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1310:
+Label_852:
 .word 0xd2801363
 .word 0xf8008680
 .word 0xf8008681
@@ -20220,28 +12885,12 @@ bl _prim_js_binary_arith_slow_gc
 .word 0xd1002294
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_1324
+b.NE Label_862
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1324:
-.word 0xb9414a69
-cbz w9, Label_1325
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1325:
+Label_862:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -20251,24 +12900,24 @@ _dispatch_table_0_156:
 .word 0xa9ff0680
 .word 0xb2503fe9
 .word 0xeb09001f
-b.HS Label_1328
+b.HS Label_865
 .word 0xeb09003f
-b.HS Label_1328
+b.HS Label_865
 .word 0xb24f3be8
 .word 0xb24f03e9
 .word 0xeb08001f
-b.LO Label_1326
+b.LO Label_863
 .word 0xeb08003f
-b.LO Label_1327
+b.LO Label_864
 .word 0xf100001f
-b.LT Label_1330
+b.LT Label_867
 .word 0xf100003f
-b.LT Label_1330
+b.LT Label_867
 .word 0x1ac10c03
 .word 0x1b018060
 .word 0xb24f3800
-b Label_1331
-Label_1330:
+b Label_868
+Label_867:
 .word 0xd2801383
 .word 0xf8008680
 .word 0xf8008681
@@ -20283,38 +12932,22 @@ bl _prim_js_binary_arith_slow_gc
 .word 0xd1002294
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_1332
+b.NE Label_869
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1332:
-Label_1331:
-.word 0xb9414a69
-cbz w9, Label_1333
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1333:
+Label_869:
+Label_868:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1326:
+Label_863:
 .word 0xea08001f
-b.EQ Label_1328
+b.EQ Label_865
 .word 0xeb08003f
-b.LO Label_1329
+b.LO Label_866
 .word 0xcb09000a
 .word 0x9e670140
 .word 0x1e620021
@@ -20326,37 +12959,21 @@ bl _prim_js_fmod_double_gc
 .word 0x9e660004
 .word 0x9e660045
 .word 0xeb05009f
-b.NE Label_1334
+b.NE Label_870
 .word 0xb24f38c0
-b Label_1335
-Label_1334:
+b Label_871
+Label_870:
 .word 0x9e660000
 .word 0xb24f03e6
 .word 0x8b060000
-Label_1335:
-.word 0xb9414a69
-cbz w9, Label_1336
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1336:
+Label_871:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1329:
+Label_866:
 .word 0xea08003f
-b.EQ Label_1328
+b.EQ Label_865
 .word 0xcb09000a
 .word 0xcb09002b
 .word 0x9e670140
@@ -20369,37 +12986,21 @@ bl _prim_js_fmod_double_gc
 .word 0x9e660004
 .word 0x9e660045
 .word 0xeb05009f
-b.NE Label_1337
+b.NE Label_872
 .word 0xb24f38c0
-b Label_1338
-Label_1337:
+b Label_873
+Label_872:
 .word 0x9e660000
 .word 0xb24f03e6
 .word 0x8b060000
-Label_1338:
-.word 0xb9414a69
-cbz w9, Label_1339
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1339:
+Label_873:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1327:
+Label_864:
 .word 0xea08003f
-b.EQ Label_1328
+b.EQ Label_865
 .word 0xcb09002a
 .word 0x1e620000
 .word 0x9e670141
@@ -20411,35 +13012,19 @@ bl _prim_js_fmod_double_gc
 .word 0x9e660004
 .word 0x9e660045
 .word 0xeb05009f
-b.NE Label_1340
+b.NE Label_874
 .word 0xb24f38c0
-b Label_1341
-Label_1340:
+b Label_875
+Label_874:
 .word 0x9e660000
 .word 0xb24f03e6
 .word 0x8b060000
-Label_1341:
-.word 0xb9414a69
-cbz w9, Label_1342
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1342:
+Label_875:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1328:
+Label_865:
 .word 0xd2801383
 .word 0xf8008680
 .word 0xf8008681
@@ -20454,28 +13039,12 @@ bl _prim_js_binary_arith_slow_gc
 .word 0xd1002294
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_1343
+b.NE Label_876
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1343:
-.word 0xb9414a69
-cbz w9, Label_1344
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1344:
+Label_876:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -20488,24 +13057,24 @@ _dispatch_table_1_156:
 _dispatch_table_2_156:
 .word 0xb2503fe9
 .word 0xeb09001f
-b.HS Label_1347
+b.HS Label_879
 .word 0xeb09003f
-b.HS Label_1347
+b.HS Label_879
 .word 0xb24f3be8
 .word 0xb24f03e9
 .word 0xeb08001f
-b.LO Label_1345
+b.LO Label_877
 .word 0xeb08003f
-b.LO Label_1346
+b.LO Label_878
 .word 0xf100001f
-b.LT Label_1349
+b.LT Label_881
 .word 0xf100003f
-b.LT Label_1349
+b.LT Label_881
 .word 0x1ac10c03
 .word 0x1b018060
 .word 0xb24f3800
-b Label_1350
-Label_1349:
+b Label_882
+Label_881:
 .word 0xd2801383
 .word 0xf8008680
 .word 0xf8008681
@@ -20520,38 +13089,22 @@ bl _prim_js_binary_arith_slow_gc
 .word 0xd1002294
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_1351
+b.NE Label_883
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1351:
-Label_1350:
-.word 0xb9414a69
-cbz w9, Label_1352
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1352:
+Label_883:
+Label_882:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1345:
+Label_877:
 .word 0xea08001f
-b.EQ Label_1347
+b.EQ Label_879
 .word 0xeb08003f
-b.LO Label_1348
+b.LO Label_880
 .word 0xcb09000a
 .word 0x9e670140
 .word 0x1e620021
@@ -20563,37 +13116,21 @@ bl _prim_js_fmod_double_gc
 .word 0x9e660004
 .word 0x9e660045
 .word 0xeb05009f
-b.NE Label_1353
+b.NE Label_884
 .word 0xb24f38c0
-b Label_1354
-Label_1353:
+b Label_885
+Label_884:
 .word 0x9e660000
 .word 0xb24f03e6
 .word 0x8b060000
-Label_1354:
-.word 0xb9414a69
-cbz w9, Label_1355
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1355:
+Label_885:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1348:
+Label_880:
 .word 0xea08003f
-b.EQ Label_1347
+b.EQ Label_879
 .word 0xcb09000a
 .word 0xcb09002b
 .word 0x9e670140
@@ -20606,37 +13143,21 @@ bl _prim_js_fmod_double_gc
 .word 0x9e660004
 .word 0x9e660045
 .word 0xeb05009f
-b.NE Label_1356
+b.NE Label_886
 .word 0xb24f38c0
-b Label_1357
-Label_1356:
+b Label_887
+Label_886:
 .word 0x9e660000
 .word 0xb24f03e6
 .word 0x8b060000
-Label_1357:
-.word 0xb9414a69
-cbz w9, Label_1358
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1358:
+Label_887:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1346:
+Label_878:
 .word 0xea08003f
-b.EQ Label_1347
+b.EQ Label_879
 .word 0xcb09002a
 .word 0x1e620000
 .word 0x9e670141
@@ -20648,35 +13169,19 @@ bl _prim_js_fmod_double_gc
 .word 0x9e660004
 .word 0x9e660045
 .word 0xeb05009f
-b.NE Label_1359
+b.NE Label_888
 .word 0xb24f38c0
-b Label_1360
-Label_1359:
+b Label_889
+Label_888:
 .word 0x9e660000
 .word 0xb24f03e6
 .word 0x8b060000
-Label_1360:
-.word 0xb9414a69
-cbz w9, Label_1361
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1361:
+Label_889:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1347:
+Label_879:
 .word 0xd2801383
 .word 0xf8008680
 .word 0xf8008681
@@ -20691,28 +13196,12 @@ bl _prim_js_binary_arith_slow_gc
 .word 0xd1002294
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_1362
+b.NE Label_890
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1362:
-.word 0xb9414a69
-cbz w9, Label_1363
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1363:
+Label_890:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -20722,71 +13211,39 @@ _dispatch_table_0_157:
 .word 0xa9ff0680
 .word 0xb2503fe9
 .word 0xeb09001f
-b.HS Label_1366
+b.HS Label_893
 .word 0xeb09003f
-b.HS Label_1366
+b.HS Label_893
 .word 0xb24f3be8
 .word 0xb24f03e9
 .word 0xeb08001f
-b.LO Label_1364
+b.LO Label_891
 .word 0xeb08003f
-b.LO Label_1365
+b.LO Label_892
 .word 0x93407c00
 .word 0x8b21c000
 .word 0xeb20c01f
-b.NE Label_1368
+b.NE Label_895
 .word 0xd3407c00
 .word 0xb24f3800
-.word 0xb9414a69
-cbz w9, Label_1369
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1369:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1368:
+Label_895:
 .word 0x9e620000
 .word 0x9e660000
 .word 0xb24f03e9
 .word 0x8b090000
-.word 0xb9414a69
-cbz w9, Label_1370
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1370:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1364:
+Label_891:
 .word 0xea08001f
-b.EQ Label_1366
+b.EQ Label_893
 .word 0xeb08003f
-b.LO Label_1367
+b.LO Label_894
 .word 0xcb09000a
 .word 0x9e670140
 .word 0x1e620021
@@ -20796,37 +13253,21 @@ b.LO Label_1367
 .word 0x9e660004
 .word 0x9e660045
 .word 0xeb05009f
-b.NE Label_1371
+b.NE Label_896
 .word 0xb24f38c0
-b Label_1372
-Label_1371:
+b Label_897
+Label_896:
 .word 0x9e660000
 .word 0xb24f03e6
 .word 0x8b060000
-Label_1372:
-.word 0xb9414a69
-cbz w9, Label_1373
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1373:
+Label_897:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1367:
+Label_894:
 .word 0xea08003f
-b.EQ Label_1366
+b.EQ Label_893
 .word 0xcb09000a
 .word 0xcb09002b
 .word 0x9e670140
@@ -20835,29 +13276,13 @@ b.EQ Label_1366
 .word 0x9e660000
 .word 0xb24f03e6
 .word 0x8b060000
-.word 0xb9414a69
-cbz w9, Label_1374
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1374:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1365:
+Label_892:
 .word 0xea08003f
-b.EQ Label_1366
+b.EQ Label_893
 .word 0xcb09002a
 .word 0x1e620000
 .word 0x9e670141
@@ -20867,54 +13292,38 @@ b.EQ Label_1366
 .word 0x9e660004
 .word 0x9e660045
 .word 0xeb05009f
-b.NE Label_1375
+b.NE Label_898
 .word 0xb24f38c0
-b Label_1376
-Label_1375:
+b Label_899
+Label_898:
 .word 0x9e660000
 .word 0xb24f03e6
 .word 0x8b060000
-Label_1376:
-.word 0xb9414a69
-cbz w9, Label_1377
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1377:
+Label_899:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1366:
+Label_893:
 .word 0xb25047e9
 .word 0xea090019
 .word 0xd2800048
 .word 0xf2e00028
 .word 0xeb08033f
-b.EQ Label_1379
+b.EQ Label_901
 .word 0xb25047e8
 .word 0xeb08033f
-b.NE Label_1378
-Label_1379:
+b.NE Label_900
+Label_901:
 .word 0xea090039
 .word 0xd2800048
 .word 0xf2e00028
 .word 0xeb08033f
-b.EQ Label_1380
+b.EQ Label_902
 .word 0xb25047e8
 .word 0xeb08033f
-b.NE Label_1378
-Label_1380:
+b.NE Label_900
+Label_902:
 .word 0xf8008680
 .word 0xf8008681
 .word 0xf85b83b1
@@ -20927,27 +13336,11 @@ bl _JS_ConcatString_GC
 .word 0xa8c17ffe
 .word 0xd1002294
 .word 0xd1002294
-.word 0xb9414a69
-cbz w9, Label_1381
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1381:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1378:
+Label_900:
 .word 0xf8008680
 .word 0xf8008681
 .word 0xf85b83b1
@@ -20961,28 +13354,12 @@ bl _prim_js_add_slow_gc
 .word 0xd1002294
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_1382
+b.NE Label_903
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1382:
-.word 0xb9414a69
-cbz w9, Label_1383
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1383:
+Label_903:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -20995,71 +13372,39 @@ _dispatch_table_1_157:
 _dispatch_table_2_157:
 .word 0xb2503fe9
 .word 0xeb09001f
-b.HS Label_1386
+b.HS Label_906
 .word 0xeb09003f
-b.HS Label_1386
+b.HS Label_906
 .word 0xb24f3be8
 .word 0xb24f03e9
 .word 0xeb08001f
-b.LO Label_1384
+b.LO Label_904
 .word 0xeb08003f
-b.LO Label_1385
+b.LO Label_905
 .word 0x93407c00
 .word 0x8b21c000
 .word 0xeb20c01f
-b.NE Label_1388
+b.NE Label_908
 .word 0xd3407c00
 .word 0xb24f3800
-.word 0xb9414a69
-cbz w9, Label_1389
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1389:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1388:
+Label_908:
 .word 0x9e620000
 .word 0x9e660000
 .word 0xb24f03e9
 .word 0x8b090000
-.word 0xb9414a69
-cbz w9, Label_1390
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1390:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1384:
+Label_904:
 .word 0xea08001f
-b.EQ Label_1386
+b.EQ Label_906
 .word 0xeb08003f
-b.LO Label_1387
+b.LO Label_907
 .word 0xcb09000a
 .word 0x9e670140
 .word 0x1e620021
@@ -21069,37 +13414,21 @@ b.LO Label_1387
 .word 0x9e660004
 .word 0x9e660045
 .word 0xeb05009f
-b.NE Label_1391
+b.NE Label_909
 .word 0xb24f38c0
-b Label_1392
-Label_1391:
+b Label_910
+Label_909:
 .word 0x9e660000
 .word 0xb24f03e6
 .word 0x8b060000
-Label_1392:
-.word 0xb9414a69
-cbz w9, Label_1393
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1393:
+Label_910:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1387:
+Label_907:
 .word 0xea08003f
-b.EQ Label_1386
+b.EQ Label_906
 .word 0xcb09000a
 .word 0xcb09002b
 .word 0x9e670140
@@ -21108,29 +13437,13 @@ b.EQ Label_1386
 .word 0x9e660000
 .word 0xb24f03e6
 .word 0x8b060000
-.word 0xb9414a69
-cbz w9, Label_1394
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1394:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1385:
+Label_905:
 .word 0xea08003f
-b.EQ Label_1386
+b.EQ Label_906
 .word 0xcb09002a
 .word 0x1e620000
 .word 0x9e670141
@@ -21140,54 +13453,38 @@ b.EQ Label_1386
 .word 0x9e660004
 .word 0x9e660045
 .word 0xeb05009f
-b.NE Label_1395
+b.NE Label_911
 .word 0xb24f38c0
-b Label_1396
-Label_1395:
+b Label_912
+Label_911:
 .word 0x9e660000
 .word 0xb24f03e6
 .word 0x8b060000
-Label_1396:
-.word 0xb9414a69
-cbz w9, Label_1397
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1397:
+Label_912:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1386:
+Label_906:
 .word 0xb25047e9
 .word 0xea090019
 .word 0xd2800048
 .word 0xf2e00028
 .word 0xeb08033f
-b.EQ Label_1399
+b.EQ Label_914
 .word 0xb25047e8
 .word 0xeb08033f
-b.NE Label_1398
-Label_1399:
+b.NE Label_913
+Label_914:
 .word 0xea090039
 .word 0xd2800048
 .word 0xf2e00028
 .word 0xeb08033f
-b.EQ Label_1400
+b.EQ Label_915
 .word 0xb25047e8
 .word 0xeb08033f
-b.NE Label_1398
-Label_1400:
+b.NE Label_913
+Label_915:
 .word 0xf8008680
 .word 0xf8008681
 .word 0xf85b83b1
@@ -21200,27 +13497,11 @@ bl _JS_ConcatString_GC
 .word 0xa8c17ffe
 .word 0xd1002294
 .word 0xd1002294
-.word 0xb9414a69
-cbz w9, Label_1401
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1401:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1398:
+Label_913:
 .word 0xf8008680
 .word 0xf8008681
 .word 0xf85b83b1
@@ -21234,28 +13515,12 @@ bl _prim_js_add_slow_gc
 .word 0xd1002294
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_1402
+b.NE Label_916
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1402:
-.word 0xb9414a69
-cbz w9, Label_1403
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1403:
+Label_916:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -21265,71 +13530,39 @@ _dispatch_table_0_158:
 .word 0xa9ff0680
 .word 0xb2503fe9
 .word 0xeb09001f
-b.HS Label_1406
+b.HS Label_919
 .word 0xeb09003f
-b.HS Label_1406
+b.HS Label_919
 .word 0xb24f3be8
 .word 0xb24f03e9
 .word 0xeb08001f
-b.LO Label_1404
+b.LO Label_917
 .word 0xeb08003f
-b.LO Label_1405
+b.LO Label_918
 .word 0x93407c00
 .word 0xeb21c000
 .word 0xeb20c01f
-b.NE Label_1408
+b.NE Label_921
 .word 0xd3407c00
 .word 0xb24f3800
-.word 0xb9414a69
-cbz w9, Label_1409
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1409:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1408:
+Label_921:
 .word 0x9e620000
 .word 0x9e660000
 .word 0xb24f03e9
 .word 0x8b090000
-.word 0xb9414a69
-cbz w9, Label_1410
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1410:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1404:
+Label_917:
 .word 0xea08001f
-b.EQ Label_1406
+b.EQ Label_919
 .word 0xeb08003f
-b.LO Label_1407
+b.LO Label_920
 .word 0xcb09000a
 .word 0x9e670140
 .word 0x1e620021
@@ -21339,37 +13572,21 @@ b.LO Label_1407
 .word 0x9e660004
 .word 0x9e660045
 .word 0xeb05009f
-b.NE Label_1411
+b.NE Label_922
 .word 0xb24f38c0
-b Label_1412
-Label_1411:
+b Label_923
+Label_922:
 .word 0x9e660000
 .word 0xb24f03e6
 .word 0x8b060000
-Label_1412:
-.word 0xb9414a69
-cbz w9, Label_1413
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1413:
+Label_923:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1407:
+Label_920:
 .word 0xea08003f
-b.EQ Label_1406
+b.EQ Label_919
 .word 0xcb09000a
 .word 0xcb09002b
 .word 0x9e670140
@@ -21378,29 +13595,13 @@ b.EQ Label_1406
 .word 0x9e660000
 .word 0xb24f03e6
 .word 0x8b060000
-.word 0xb9414a69
-cbz w9, Label_1414
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1414:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1405:
+Label_918:
 .word 0xea08003f
-b.EQ Label_1406
+b.EQ Label_919
 .word 0xcb09002a
 .word 0x1e620000
 .word 0x9e670141
@@ -21410,35 +13611,19 @@ b.EQ Label_1406
 .word 0x9e660004
 .word 0x9e660045
 .word 0xeb05009f
-b.NE Label_1415
+b.NE Label_924
 .word 0xb24f38c0
-b Label_1416
-Label_1415:
+b Label_925
+Label_924:
 .word 0x9e660000
 .word 0xb24f03e6
 .word 0x8b060000
-Label_1416:
-.word 0xb9414a69
-cbz w9, Label_1417
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1417:
+Label_925:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1406:
+Label_919:
 .word 0xd28013c3
 .word 0xf8008680
 .word 0xf8008681
@@ -21453,28 +13638,12 @@ bl _prim_js_binary_arith_slow_gc
 .word 0xd1002294
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_1418
+b.NE Label_926
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1418:
-.word 0xb9414a69
-cbz w9, Label_1419
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1419:
+Label_926:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -21487,71 +13656,39 @@ _dispatch_table_1_158:
 _dispatch_table_2_158:
 .word 0xb2503fe9
 .word 0xeb09001f
-b.HS Label_1422
+b.HS Label_929
 .word 0xeb09003f
-b.HS Label_1422
+b.HS Label_929
 .word 0xb24f3be8
 .word 0xb24f03e9
 .word 0xeb08001f
-b.LO Label_1420
+b.LO Label_927
 .word 0xeb08003f
-b.LO Label_1421
+b.LO Label_928
 .word 0x93407c00
 .word 0xeb21c000
 .word 0xeb20c01f
-b.NE Label_1424
+b.NE Label_931
 .word 0xd3407c00
 .word 0xb24f3800
-.word 0xb9414a69
-cbz w9, Label_1425
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1425:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1424:
+Label_931:
 .word 0x9e620000
 .word 0x9e660000
 .word 0xb24f03e9
 .word 0x8b090000
-.word 0xb9414a69
-cbz w9, Label_1426
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1426:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1420:
+Label_927:
 .word 0xea08001f
-b.EQ Label_1422
+b.EQ Label_929
 .word 0xeb08003f
-b.LO Label_1423
+b.LO Label_930
 .word 0xcb09000a
 .word 0x9e670140
 .word 0x1e620021
@@ -21561,37 +13698,21 @@ b.LO Label_1423
 .word 0x9e660004
 .word 0x9e660045
 .word 0xeb05009f
-b.NE Label_1427
+b.NE Label_932
 .word 0xb24f38c0
-b Label_1428
-Label_1427:
+b Label_933
+Label_932:
 .word 0x9e660000
 .word 0xb24f03e6
 .word 0x8b060000
-Label_1428:
-.word 0xb9414a69
-cbz w9, Label_1429
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1429:
+Label_933:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1423:
+Label_930:
 .word 0xea08003f
-b.EQ Label_1422
+b.EQ Label_929
 .word 0xcb09000a
 .word 0xcb09002b
 .word 0x9e670140
@@ -21600,29 +13721,13 @@ b.EQ Label_1422
 .word 0x9e660000
 .word 0xb24f03e6
 .word 0x8b060000
-.word 0xb9414a69
-cbz w9, Label_1430
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1430:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1421:
+Label_928:
 .word 0xea08003f
-b.EQ Label_1422
+b.EQ Label_929
 .word 0xcb09002a
 .word 0x1e620000
 .word 0x9e670141
@@ -21632,35 +13737,19 @@ b.EQ Label_1422
 .word 0x9e660004
 .word 0x9e660045
 .word 0xeb05009f
-b.NE Label_1431
+b.NE Label_934
 .word 0xb24f38c0
-b Label_1432
-Label_1431:
+b Label_935
+Label_934:
 .word 0x9e660000
 .word 0xb24f03e6
 .word 0x8b060000
-Label_1432:
-.word 0xb9414a69
-cbz w9, Label_1433
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1433:
+Label_935:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1422:
+Label_929:
 .word 0xd28013c3
 .word 0xf8008680
 .word 0xf8008681
@@ -21675,28 +13764,12 @@ bl _prim_js_binary_arith_slow_gc
 .word 0xd1002294
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_1434
+b.NE Label_936
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1434:
-.word 0xb9414a69
-cbz w9, Label_1435
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1435:
+Label_936:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -21718,28 +13791,12 @@ bl _prim_js_binary_arith_slow_gc
 .word 0xd1002294
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_1436
+b.NE Label_937
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1436:
-.word 0xb9414a69
-cbz w9, Label_1437
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1437:
+Label_937:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -21764,28 +13821,12 @@ bl _prim_js_binary_arith_slow_gc
 .word 0xd1002294
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_1438
+b.NE Label_938
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1438:
-.word 0xb9414a69
-cbz w9, Label_1439
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1439:
+Label_938:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -21796,34 +13837,18 @@ _dispatch_table_0_160:
 .word 0xf2503c08
 .word 0xb24f3be9
 .word 0xeb090108
-cbnz x8, Label_1440
+cbnz x8, Label_939
 .word 0xf2503c28
 .word 0xb24f3be9
 .word 0xeb090108
-cbnz x8, Label_1440
+cbnz x8, Label_939
 .word 0x1ac12000
 .word 0xb24f3800
-.word 0xb9414a69
-cbz w9, Label_1441
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1441:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1440:
+Label_939:
 .word 0xd2801403
 .word 0xf8008680
 .word 0xf8008681
@@ -21838,28 +13863,12 @@ bl _prim_js_binary_logic_slow_gc
 .word 0xd1002294
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_1442
+b.NE Label_940
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1442:
-.word 0xb9414a69
-cbz w9, Label_1443
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1443:
+Label_940:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -21873,34 +13882,18 @@ _dispatch_table_2_160:
 .word 0xf2503c08
 .word 0xb24f3be9
 .word 0xeb090108
-cbnz x8, Label_1444
+cbnz x8, Label_941
 .word 0xf2503c28
 .word 0xb24f3be9
 .word 0xeb090108
-cbnz x8, Label_1444
+cbnz x8, Label_941
 .word 0x1ac12000
 .word 0xb24f3800
-.word 0xb9414a69
-cbz w9, Label_1445
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1445:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1444:
+Label_941:
 .word 0xd2801403
 .word 0xf8008680
 .word 0xf8008681
@@ -21915,28 +13908,12 @@ bl _prim_js_binary_logic_slow_gc
 .word 0xd1002294
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_1446
+b.NE Label_942
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1446:
-.word 0xb9414a69
-cbz w9, Label_1447
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1447:
+Label_942:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -21947,34 +13924,18 @@ _dispatch_table_0_161:
 .word 0xf2503c08
 .word 0xb24f3be9
 .word 0xeb090108
-cbnz x8, Label_1448
+cbnz x8, Label_943
 .word 0xf2503c28
 .word 0xb24f3be9
 .word 0xeb090108
-cbnz x8, Label_1448
+cbnz x8, Label_943
 .word 0x1ac12800
 .word 0xb24f3800
-.word 0xb9414a69
-cbz w9, Label_1449
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1449:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1448:
+Label_943:
 .word 0xd2801423
 .word 0xf8008680
 .word 0xf8008681
@@ -21989,28 +13950,12 @@ bl _prim_js_binary_logic_slow_gc
 .word 0xd1002294
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_1450
+b.NE Label_944
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1450:
-.word 0xb9414a69
-cbz w9, Label_1451
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1451:
+Label_944:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -22024,34 +13969,18 @@ _dispatch_table_2_161:
 .word 0xf2503c08
 .word 0xb24f3be9
 .word 0xeb090108
-cbnz x8, Label_1452
+cbnz x8, Label_945
 .word 0xf2503c28
 .word 0xb24f3be9
 .word 0xeb090108
-cbnz x8, Label_1452
+cbnz x8, Label_945
 .word 0x1ac12800
 .word 0xb24f3800
-.word 0xb9414a69
-cbz w9, Label_1453
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1453:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1452:
+Label_945:
 .word 0xd2801423
 .word 0xf8008680
 .word 0xf8008681
@@ -22066,28 +13995,12 @@ bl _prim_js_binary_logic_slow_gc
 .word 0xd1002294
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_1454
+b.NE Label_946
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1454:
-.word 0xb9414a69
-cbz w9, Label_1455
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1455:
+Label_946:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -22098,15 +14011,15 @@ _dispatch_table_0_162:
 .word 0xf2503c08
 .word 0xb24f3be9
 .word 0xeb090108
-cbnz x8, Label_1456
+cbnz x8, Label_947
 .word 0xf2503c28
 .word 0xb24f3be9
 .word 0xeb090108
-cbnz x8, Label_1456
+cbnz x8, Label_947
 .word 0x1ac12409
 .word 0xb2407be8
 .word 0x6b09011f
-b.HS Label_1457
+b.HS Label_948
 .word 0xf8008680
 .word 0xf8008681
 .word 0xf85b83b1
@@ -22119,31 +14032,15 @@ bl _prim_js_shr_slow_gc
 .word 0xa8c17ffe
 .word 0xd1002294
 .word 0xd1002294
-b Label_1458
-Label_1457:
+b Label_949
+Label_948:
 .word 0xb24f3920
-Label_1458:
-.word 0xb9414a69
-cbz w9, Label_1459
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1459:
+Label_949:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1456:
+Label_947:
 .word 0xf8008680
 .word 0xf8008681
 .word 0xf85b83b1
@@ -22157,28 +14054,12 @@ bl _prim_js_shr_slow_gc
 .word 0xd1002294
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_1460
+b.NE Label_950
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1460:
-.word 0xb9414a69
-cbz w9, Label_1461
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1461:
+Label_950:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -22192,15 +14073,15 @@ _dispatch_table_2_162:
 .word 0xf2503c08
 .word 0xb24f3be9
 .word 0xeb090108
-cbnz x8, Label_1462
+cbnz x8, Label_951
 .word 0xf2503c28
 .word 0xb24f3be9
 .word 0xeb090108
-cbnz x8, Label_1462
+cbnz x8, Label_951
 .word 0x1ac12409
 .word 0xb2407be8
 .word 0x6b09011f
-b.HS Label_1463
+b.HS Label_952
 .word 0xf8008680
 .word 0xf8008681
 .word 0xf85b83b1
@@ -22213,31 +14094,15 @@ bl _prim_js_shr_slow_gc
 .word 0xa8c17ffe
 .word 0xd1002294
 .word 0xd1002294
-b Label_1464
-Label_1463:
+b Label_953
+Label_952:
 .word 0xb24f3920
-Label_1464:
-.word 0xb9414a69
-cbz w9, Label_1465
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1465:
+Label_953:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1462:
+Label_951:
 .word 0xf8008680
 .word 0xf8008681
 .word 0xf85b83b1
@@ -22251,28 +14116,12 @@ bl _prim_js_shr_slow_gc
 .word 0xd1002294
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_1466
+b.NE Label_954
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1466:
-.word 0xb9414a69
-cbz w9, Label_1467
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1467:
+Label_954:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -22282,247 +14131,119 @@ _dispatch_table_0_163:
 .word 0xa9ff0680
 .word 0xb2503fe9
 .word 0xeb09001f
-b.HS Label_1471
+b.HS Label_958
 .word 0xeb09003f
-b.HS Label_1471
+b.HS Label_958
 .word 0xb24f3be8
 .word 0xb24f03e9
 .word 0xeb08001f
-b.LO Label_1468
+b.LO Label_955
 .word 0xeb08003f
-b.LO Label_1469
+b.LO Label_956
 .word 0x6b010000
-b.GE Label_1472
+b.GE Label_959
 .word 0xb2400be0
-.word 0xb9414a69
-cbz w9, Label_1473
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1473:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1472:
+Label_959:
 .word 0xb27f07e0
-.word 0xb9414a69
-cbz w9, Label_1474
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1474:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1468:
+Label_955:
 .word 0xea08001f
-b.EQ Label_1471
+b.EQ Label_958
 .word 0xeb08003f
-b.LO Label_1470
+b.LO Label_957
 .word 0xcb09000a
 .word 0x9e670140
 .word 0x1e620021
 .word 0xd2efff4a
 .word 0xeb0a001f
-b.EQ Label_1471
+b.EQ Label_958
 .word 0xeb0a003f
-b.EQ Label_1471
+b.EQ Label_958
 .word 0xd2ffff4a
 .word 0xeb0a001f
-b.EQ Label_1471
+b.EQ Label_958
 .word 0xeb0a003f
-b.EQ Label_1471
+b.EQ Label_958
 .word 0x1e612000
-b.GE Label_1475
+b.GE Label_960
 .word 0xb2400be0
-.word 0xb9414a69
-cbz w9, Label_1476
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1476:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1475:
+Label_960:
 .word 0xb27f07e0
-.word 0xb9414a69
-cbz w9, Label_1477
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1477:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1470:
+Label_957:
 .word 0xea08003f
-b.EQ Label_1471
+b.EQ Label_958
 .word 0xcb09000a
 .word 0xcb09002b
 .word 0x9e670140
 .word 0x9e670161
 .word 0xd2efff4a
 .word 0xeb0a001f
-b.EQ Label_1471
+b.EQ Label_958
 .word 0xeb0a003f
-b.EQ Label_1471
+b.EQ Label_958
 .word 0xd2ffff4a
 .word 0xeb0a001f
-b.EQ Label_1471
+b.EQ Label_958
 .word 0xeb0a003f
-b.EQ Label_1471
+b.EQ Label_958
 .word 0x1e612000
-b.GE Label_1478
+b.GE Label_961
 .word 0xb2400be0
-.word 0xb9414a69
-cbz w9, Label_1479
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1479:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1478:
+Label_961:
 .word 0xb27f07e0
-.word 0xb9414a69
-cbz w9, Label_1480
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1480:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1469:
+Label_956:
 .word 0xea08003f
-b.EQ Label_1471
+b.EQ Label_958
 .word 0xcb09002a
 .word 0x1e620000
 .word 0x9e670141
 .word 0xd2efff4a
 .word 0xeb0a001f
-b.EQ Label_1471
+b.EQ Label_958
 .word 0xeb0a003f
-b.EQ Label_1471
+b.EQ Label_958
 .word 0xd2ffff4a
 .word 0xeb0a001f
-b.EQ Label_1471
+b.EQ Label_958
 .word 0xeb0a003f
-b.EQ Label_1471
+b.EQ Label_958
 .word 0x1e612000
-b.GE Label_1481
+b.GE Label_962
 .word 0xb2400be0
-.word 0xb9414a69
-cbz w9, Label_1482
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1482:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1481:
+Label_962:
 .word 0xb27f07e0
-.word 0xb9414a69
-cbz w9, Label_1483
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1483:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1471:
+Label_958:
 .word 0xd2801463
 .word 0xf8008680
 .word 0xf8008681
@@ -22537,28 +14258,12 @@ bl _prim_js_relation_slow_gc
 .word 0xd1002294
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_1484
+b.NE Label_963
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1484:
-.word 0xb9414a69
-cbz w9, Label_1485
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1485:
+Label_963:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -22571,247 +14276,119 @@ _dispatch_table_1_163:
 _dispatch_table_2_163:
 .word 0xb2503fe9
 .word 0xeb09001f
-b.HS Label_1489
+b.HS Label_967
 .word 0xeb09003f
-b.HS Label_1489
+b.HS Label_967
 .word 0xb24f3be8
 .word 0xb24f03e9
 .word 0xeb08001f
-b.LO Label_1486
+b.LO Label_964
 .word 0xeb08003f
-b.LO Label_1487
+b.LO Label_965
 .word 0x6b010000
-b.GE Label_1490
+b.GE Label_968
 .word 0xb2400be0
-.word 0xb9414a69
-cbz w9, Label_1491
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1491:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1490:
+Label_968:
 .word 0xb27f07e0
-.word 0xb9414a69
-cbz w9, Label_1492
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1492:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1486:
+Label_964:
 .word 0xea08001f
-b.EQ Label_1489
+b.EQ Label_967
 .word 0xeb08003f
-b.LO Label_1488
+b.LO Label_966
 .word 0xcb09000a
 .word 0x9e670140
 .word 0x1e620021
 .word 0xd2efff4a
 .word 0xeb0a001f
-b.EQ Label_1489
+b.EQ Label_967
 .word 0xeb0a003f
-b.EQ Label_1489
+b.EQ Label_967
 .word 0xd2ffff4a
 .word 0xeb0a001f
-b.EQ Label_1489
+b.EQ Label_967
 .word 0xeb0a003f
-b.EQ Label_1489
+b.EQ Label_967
 .word 0x1e612000
-b.GE Label_1493
+b.GE Label_969
 .word 0xb2400be0
-.word 0xb9414a69
-cbz w9, Label_1494
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1494:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1493:
+Label_969:
 .word 0xb27f07e0
-.word 0xb9414a69
-cbz w9, Label_1495
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1495:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1488:
+Label_966:
 .word 0xea08003f
-b.EQ Label_1489
+b.EQ Label_967
 .word 0xcb09000a
 .word 0xcb09002b
 .word 0x9e670140
 .word 0x9e670161
 .word 0xd2efff4a
 .word 0xeb0a001f
-b.EQ Label_1489
+b.EQ Label_967
 .word 0xeb0a003f
-b.EQ Label_1489
+b.EQ Label_967
 .word 0xd2ffff4a
 .word 0xeb0a001f
-b.EQ Label_1489
+b.EQ Label_967
 .word 0xeb0a003f
-b.EQ Label_1489
+b.EQ Label_967
 .word 0x1e612000
-b.GE Label_1496
+b.GE Label_970
 .word 0xb2400be0
-.word 0xb9414a69
-cbz w9, Label_1497
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1497:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1496:
+Label_970:
 .word 0xb27f07e0
-.word 0xb9414a69
-cbz w9, Label_1498
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1498:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1487:
+Label_965:
 .word 0xea08003f
-b.EQ Label_1489
+b.EQ Label_967
 .word 0xcb09002a
 .word 0x1e620000
 .word 0x9e670141
 .word 0xd2efff4a
 .word 0xeb0a001f
-b.EQ Label_1489
+b.EQ Label_967
 .word 0xeb0a003f
-b.EQ Label_1489
+b.EQ Label_967
 .word 0xd2ffff4a
 .word 0xeb0a001f
-b.EQ Label_1489
+b.EQ Label_967
 .word 0xeb0a003f
-b.EQ Label_1489
+b.EQ Label_967
 .word 0x1e612000
-b.GE Label_1499
+b.GE Label_971
 .word 0xb2400be0
-.word 0xb9414a69
-cbz w9, Label_1500
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1500:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1499:
+Label_971:
 .word 0xb27f07e0
-.word 0xb9414a69
-cbz w9, Label_1501
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1501:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1489:
+Label_967:
 .word 0xd2801463
 .word 0xf8008680
 .word 0xf8008681
@@ -22826,28 +14403,12 @@ bl _prim_js_relation_slow_gc
 .word 0xd1002294
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_1502
+b.NE Label_972
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1502:
-.word 0xb9414a69
-cbz w9, Label_1503
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1503:
+Label_972:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -22857,247 +14418,119 @@ _dispatch_table_0_164:
 .word 0xa9ff0680
 .word 0xb2503fe9
 .word 0xeb09001f
-b.HS Label_1507
+b.HS Label_976
 .word 0xeb09003f
-b.HS Label_1507
+b.HS Label_976
 .word 0xb24f3be8
 .word 0xb24f03e9
 .word 0xeb08001f
-b.LO Label_1504
+b.LO Label_973
 .word 0xeb08003f
-b.LO Label_1505
+b.LO Label_974
 .word 0x6b010000
-b.GT Label_1508
+b.GT Label_977
 .word 0xb2400be0
-.word 0xb9414a69
-cbz w9, Label_1509
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1509:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1508:
+Label_977:
 .word 0xb27f07e0
-.word 0xb9414a69
-cbz w9, Label_1510
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1510:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1504:
+Label_973:
 .word 0xea08001f
-b.EQ Label_1507
+b.EQ Label_976
 .word 0xeb08003f
-b.LO Label_1506
+b.LO Label_975
 .word 0xcb09000a
 .word 0x9e670140
 .word 0x1e620021
 .word 0xd2efff4a
 .word 0xeb0a001f
-b.EQ Label_1507
+b.EQ Label_976
 .word 0xeb0a003f
-b.EQ Label_1507
+b.EQ Label_976
 .word 0xd2ffff4a
 .word 0xeb0a001f
-b.EQ Label_1507
+b.EQ Label_976
 .word 0xeb0a003f
-b.EQ Label_1507
+b.EQ Label_976
 .word 0x1e612000
-b.GT Label_1511
+b.GT Label_978
 .word 0xb2400be0
-.word 0xb9414a69
-cbz w9, Label_1512
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1512:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1511:
+Label_978:
 .word 0xb27f07e0
-.word 0xb9414a69
-cbz w9, Label_1513
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1513:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1506:
+Label_975:
 .word 0xea08003f
-b.EQ Label_1507
+b.EQ Label_976
 .word 0xcb09000a
 .word 0xcb09002b
 .word 0x9e670140
 .word 0x9e670161
 .word 0xd2efff4a
 .word 0xeb0a001f
-b.EQ Label_1507
+b.EQ Label_976
 .word 0xeb0a003f
-b.EQ Label_1507
+b.EQ Label_976
 .word 0xd2ffff4a
 .word 0xeb0a001f
-b.EQ Label_1507
+b.EQ Label_976
 .word 0xeb0a003f
-b.EQ Label_1507
+b.EQ Label_976
 .word 0x1e612000
-b.GT Label_1514
+b.GT Label_979
 .word 0xb2400be0
-.word 0xb9414a69
-cbz w9, Label_1515
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1515:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1514:
+Label_979:
 .word 0xb27f07e0
-.word 0xb9414a69
-cbz w9, Label_1516
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1516:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1505:
+Label_974:
 .word 0xea08003f
-b.EQ Label_1507
+b.EQ Label_976
 .word 0xcb09002a
 .word 0x1e620000
 .word 0x9e670141
 .word 0xd2efff4a
 .word 0xeb0a001f
-b.EQ Label_1507
+b.EQ Label_976
 .word 0xeb0a003f
-b.EQ Label_1507
+b.EQ Label_976
 .word 0xd2ffff4a
 .word 0xeb0a001f
-b.EQ Label_1507
+b.EQ Label_976
 .word 0xeb0a003f
-b.EQ Label_1507
+b.EQ Label_976
 .word 0x1e612000
-b.GT Label_1517
+b.GT Label_980
 .word 0xb2400be0
-.word 0xb9414a69
-cbz w9, Label_1518
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1518:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1517:
+Label_980:
 .word 0xb27f07e0
-.word 0xb9414a69
-cbz w9, Label_1519
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1519:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1507:
+Label_976:
 .word 0xd2801483
 .word 0xf8008680
 .word 0xf8008681
@@ -23112,28 +14545,12 @@ bl _prim_js_relation_slow_gc
 .word 0xd1002294
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_1520
+b.NE Label_981
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1520:
-.word 0xb9414a69
-cbz w9, Label_1521
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1521:
+Label_981:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -23146,247 +14563,119 @@ _dispatch_table_1_164:
 _dispatch_table_2_164:
 .word 0xb2503fe9
 .word 0xeb09001f
-b.HS Label_1525
+b.HS Label_985
 .word 0xeb09003f
-b.HS Label_1525
+b.HS Label_985
 .word 0xb24f3be8
 .word 0xb24f03e9
 .word 0xeb08001f
-b.LO Label_1522
+b.LO Label_982
 .word 0xeb08003f
-b.LO Label_1523
+b.LO Label_983
 .word 0x6b010000
-b.GT Label_1526
+b.GT Label_986
 .word 0xb2400be0
-.word 0xb9414a69
-cbz w9, Label_1527
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1527:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1526:
+Label_986:
 .word 0xb27f07e0
-.word 0xb9414a69
-cbz w9, Label_1528
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1528:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1522:
+Label_982:
 .word 0xea08001f
-b.EQ Label_1525
+b.EQ Label_985
 .word 0xeb08003f
-b.LO Label_1524
+b.LO Label_984
 .word 0xcb09000a
 .word 0x9e670140
 .word 0x1e620021
 .word 0xd2efff4a
 .word 0xeb0a001f
-b.EQ Label_1525
+b.EQ Label_985
 .word 0xeb0a003f
-b.EQ Label_1525
+b.EQ Label_985
 .word 0xd2ffff4a
 .word 0xeb0a001f
-b.EQ Label_1525
+b.EQ Label_985
 .word 0xeb0a003f
-b.EQ Label_1525
+b.EQ Label_985
 .word 0x1e612000
-b.GT Label_1529
+b.GT Label_987
 .word 0xb2400be0
-.word 0xb9414a69
-cbz w9, Label_1530
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1530:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1529:
+Label_987:
 .word 0xb27f07e0
-.word 0xb9414a69
-cbz w9, Label_1531
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1531:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1524:
+Label_984:
 .word 0xea08003f
-b.EQ Label_1525
+b.EQ Label_985
 .word 0xcb09000a
 .word 0xcb09002b
 .word 0x9e670140
 .word 0x9e670161
 .word 0xd2efff4a
 .word 0xeb0a001f
-b.EQ Label_1525
+b.EQ Label_985
 .word 0xeb0a003f
-b.EQ Label_1525
+b.EQ Label_985
 .word 0xd2ffff4a
 .word 0xeb0a001f
-b.EQ Label_1525
+b.EQ Label_985
 .word 0xeb0a003f
-b.EQ Label_1525
+b.EQ Label_985
 .word 0x1e612000
-b.GT Label_1532
+b.GT Label_988
 .word 0xb2400be0
-.word 0xb9414a69
-cbz w9, Label_1533
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1533:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1532:
+Label_988:
 .word 0xb27f07e0
-.word 0xb9414a69
-cbz w9, Label_1534
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1534:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1523:
+Label_983:
 .word 0xea08003f
-b.EQ Label_1525
+b.EQ Label_985
 .word 0xcb09002a
 .word 0x1e620000
 .word 0x9e670141
 .word 0xd2efff4a
 .word 0xeb0a001f
-b.EQ Label_1525
+b.EQ Label_985
 .word 0xeb0a003f
-b.EQ Label_1525
+b.EQ Label_985
 .word 0xd2ffff4a
 .word 0xeb0a001f
-b.EQ Label_1525
+b.EQ Label_985
 .word 0xeb0a003f
-b.EQ Label_1525
+b.EQ Label_985
 .word 0x1e612000
-b.GT Label_1535
+b.GT Label_989
 .word 0xb2400be0
-.word 0xb9414a69
-cbz w9, Label_1536
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1536:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1535:
+Label_989:
 .word 0xb27f07e0
-.word 0xb9414a69
-cbz w9, Label_1537
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1537:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1525:
+Label_985:
 .word 0xd2801483
 .word 0xf8008680
 .word 0xf8008681
@@ -23401,28 +14690,12 @@ bl _prim_js_relation_slow_gc
 .word 0xd1002294
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_1538
+b.NE Label_990
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1538:
-.word 0xb9414a69
-cbz w9, Label_1539
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1539:
+Label_990:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -23432,247 +14705,119 @@ _dispatch_table_0_165:
 .word 0xa9ff0680
 .word 0xb2503fe9
 .word 0xeb09001f
-b.HS Label_1543
+b.HS Label_994
 .word 0xeb09003f
-b.HS Label_1543
+b.HS Label_994
 .word 0xb24f3be8
 .word 0xb24f03e9
 .word 0xeb08001f
-b.LO Label_1540
+b.LO Label_991
 .word 0xeb08003f
-b.LO Label_1541
+b.LO Label_992
 .word 0x6b010000
-b.LE Label_1544
+b.LE Label_995
 .word 0xb2400be0
-.word 0xb9414a69
-cbz w9, Label_1545
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1545:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1544:
+Label_995:
 .word 0xb27f07e0
-.word 0xb9414a69
-cbz w9, Label_1546
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1546:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1540:
+Label_991:
 .word 0xea08001f
-b.EQ Label_1543
+b.EQ Label_994
 .word 0xeb08003f
-b.LO Label_1542
+b.LO Label_993
 .word 0xcb09000a
 .word 0x9e670140
 .word 0x1e620021
 .word 0xd2efff4a
 .word 0xeb0a001f
-b.EQ Label_1543
+b.EQ Label_994
 .word 0xeb0a003f
-b.EQ Label_1543
+b.EQ Label_994
 .word 0xd2ffff4a
 .word 0xeb0a001f
-b.EQ Label_1543
+b.EQ Label_994
 .word 0xeb0a003f
-b.EQ Label_1543
+b.EQ Label_994
 .word 0x1e612000
-b.LE Label_1547
+b.LE Label_996
 .word 0xb2400be0
-.word 0xb9414a69
-cbz w9, Label_1548
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1548:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1547:
+Label_996:
 .word 0xb27f07e0
-.word 0xb9414a69
-cbz w9, Label_1549
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1549:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1542:
+Label_993:
 .word 0xea08003f
-b.EQ Label_1543
+b.EQ Label_994
 .word 0xcb09000a
 .word 0xcb09002b
 .word 0x9e670140
 .word 0x9e670161
 .word 0xd2efff4a
 .word 0xeb0a001f
-b.EQ Label_1543
+b.EQ Label_994
 .word 0xeb0a003f
-b.EQ Label_1543
+b.EQ Label_994
 .word 0xd2ffff4a
 .word 0xeb0a001f
-b.EQ Label_1543
+b.EQ Label_994
 .word 0xeb0a003f
-b.EQ Label_1543
+b.EQ Label_994
 .word 0x1e612000
-b.LE Label_1550
+b.LE Label_997
 .word 0xb2400be0
-.word 0xb9414a69
-cbz w9, Label_1551
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1551:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1550:
+Label_997:
 .word 0xb27f07e0
-.word 0xb9414a69
-cbz w9, Label_1552
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1552:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1541:
+Label_992:
 .word 0xea08003f
-b.EQ Label_1543
+b.EQ Label_994
 .word 0xcb09002a
 .word 0x1e620000
 .word 0x9e670141
 .word 0xd2efff4a
 .word 0xeb0a001f
-b.EQ Label_1543
+b.EQ Label_994
 .word 0xeb0a003f
-b.EQ Label_1543
+b.EQ Label_994
 .word 0xd2ffff4a
 .word 0xeb0a001f
-b.EQ Label_1543
+b.EQ Label_994
 .word 0xeb0a003f
-b.EQ Label_1543
+b.EQ Label_994
 .word 0x1e612000
-b.LE Label_1553
+b.LE Label_998
 .word 0xb2400be0
-.word 0xb9414a69
-cbz w9, Label_1554
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1554:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1553:
+Label_998:
 .word 0xb27f07e0
-.word 0xb9414a69
-cbz w9, Label_1555
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1555:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1543:
+Label_994:
 .word 0xd28014a3
 .word 0xf8008680
 .word 0xf8008681
@@ -23687,28 +14832,12 @@ bl _prim_js_relation_slow_gc
 .word 0xd1002294
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_1556
+b.NE Label_999
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1556:
-.word 0xb9414a69
-cbz w9, Label_1557
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1557:
+Label_999:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -23721,247 +14850,119 @@ _dispatch_table_1_165:
 _dispatch_table_2_165:
 .word 0xb2503fe9
 .word 0xeb09001f
-b.HS Label_1561
+b.HS Label_1003
 .word 0xeb09003f
-b.HS Label_1561
+b.HS Label_1003
 .word 0xb24f3be8
 .word 0xb24f03e9
 .word 0xeb08001f
-b.LO Label_1558
+b.LO Label_1000
 .word 0xeb08003f
-b.LO Label_1559
+b.LO Label_1001
 .word 0x6b010000
-b.LE Label_1562
+b.LE Label_1004
 .word 0xb2400be0
-.word 0xb9414a69
-cbz w9, Label_1563
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1563:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1562:
+Label_1004:
 .word 0xb27f07e0
-.word 0xb9414a69
-cbz w9, Label_1564
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1564:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1558:
+Label_1000:
 .word 0xea08001f
-b.EQ Label_1561
+b.EQ Label_1003
 .word 0xeb08003f
-b.LO Label_1560
+b.LO Label_1002
 .word 0xcb09000a
 .word 0x9e670140
 .word 0x1e620021
 .word 0xd2efff4a
 .word 0xeb0a001f
-b.EQ Label_1561
+b.EQ Label_1003
 .word 0xeb0a003f
-b.EQ Label_1561
+b.EQ Label_1003
 .word 0xd2ffff4a
 .word 0xeb0a001f
-b.EQ Label_1561
+b.EQ Label_1003
 .word 0xeb0a003f
-b.EQ Label_1561
+b.EQ Label_1003
 .word 0x1e612000
-b.LE Label_1565
+b.LE Label_1005
 .word 0xb2400be0
-.word 0xb9414a69
-cbz w9, Label_1566
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1566:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1565:
+Label_1005:
 .word 0xb27f07e0
-.word 0xb9414a69
-cbz w9, Label_1567
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1567:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1560:
+Label_1002:
 .word 0xea08003f
-b.EQ Label_1561
+b.EQ Label_1003
 .word 0xcb09000a
 .word 0xcb09002b
 .word 0x9e670140
 .word 0x9e670161
 .word 0xd2efff4a
 .word 0xeb0a001f
-b.EQ Label_1561
+b.EQ Label_1003
 .word 0xeb0a003f
-b.EQ Label_1561
+b.EQ Label_1003
 .word 0xd2ffff4a
 .word 0xeb0a001f
-b.EQ Label_1561
+b.EQ Label_1003
 .word 0xeb0a003f
-b.EQ Label_1561
+b.EQ Label_1003
 .word 0x1e612000
-b.LE Label_1568
+b.LE Label_1006
 .word 0xb2400be0
-.word 0xb9414a69
-cbz w9, Label_1569
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1569:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1568:
+Label_1006:
 .word 0xb27f07e0
-.word 0xb9414a69
-cbz w9, Label_1570
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1570:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1559:
+Label_1001:
 .word 0xea08003f
-b.EQ Label_1561
+b.EQ Label_1003
 .word 0xcb09002a
 .word 0x1e620000
 .word 0x9e670141
 .word 0xd2efff4a
 .word 0xeb0a001f
-b.EQ Label_1561
+b.EQ Label_1003
 .word 0xeb0a003f
-b.EQ Label_1561
+b.EQ Label_1003
 .word 0xd2ffff4a
 .word 0xeb0a001f
-b.EQ Label_1561
+b.EQ Label_1003
 .word 0xeb0a003f
-b.EQ Label_1561
+b.EQ Label_1003
 .word 0x1e612000
-b.LE Label_1571
+b.LE Label_1007
 .word 0xb2400be0
-.word 0xb9414a69
-cbz w9, Label_1572
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1572:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1571:
+Label_1007:
 .word 0xb27f07e0
-.word 0xb9414a69
-cbz w9, Label_1573
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1573:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1561:
+Label_1003:
 .word 0xd28014a3
 .word 0xf8008680
 .word 0xf8008681
@@ -23976,28 +14977,12 @@ bl _prim_js_relation_slow_gc
 .word 0xd1002294
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_1574
+b.NE Label_1008
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1574:
-.word 0xb9414a69
-cbz w9, Label_1575
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1575:
+Label_1008:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -24007,247 +14992,119 @@ _dispatch_table_0_166:
 .word 0xa9ff0680
 .word 0xb2503fe9
 .word 0xeb09001f
-b.HS Label_1579
+b.HS Label_1012
 .word 0xeb09003f
-b.HS Label_1579
+b.HS Label_1012
 .word 0xb24f3be8
 .word 0xb24f03e9
 .word 0xeb08001f
-b.LO Label_1576
+b.LO Label_1009
 .word 0xeb08003f
-b.LO Label_1577
+b.LO Label_1010
 .word 0x6b010000
-b.LT Label_1580
+b.LT Label_1013
 .word 0xb2400be0
-.word 0xb9414a69
-cbz w9, Label_1581
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1581:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1580:
+Label_1013:
 .word 0xb27f07e0
-.word 0xb9414a69
-cbz w9, Label_1582
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1582:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1576:
+Label_1009:
 .word 0xea08001f
-b.EQ Label_1579
+b.EQ Label_1012
 .word 0xeb08003f
-b.LO Label_1578
+b.LO Label_1011
 .word 0xcb09000a
 .word 0x9e670140
 .word 0x1e620021
 .word 0xd2efff4a
 .word 0xeb0a001f
-b.EQ Label_1579
+b.EQ Label_1012
 .word 0xeb0a003f
-b.EQ Label_1579
+b.EQ Label_1012
 .word 0xd2ffff4a
 .word 0xeb0a001f
-b.EQ Label_1579
+b.EQ Label_1012
 .word 0xeb0a003f
-b.EQ Label_1579
+b.EQ Label_1012
 .word 0x1e612000
-b.LT Label_1583
+b.LT Label_1014
 .word 0xb2400be0
-.word 0xb9414a69
-cbz w9, Label_1584
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1584:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1583:
+Label_1014:
 .word 0xb27f07e0
-.word 0xb9414a69
-cbz w9, Label_1585
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1585:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1578:
+Label_1011:
 .word 0xea08003f
-b.EQ Label_1579
+b.EQ Label_1012
 .word 0xcb09000a
 .word 0xcb09002b
 .word 0x9e670140
 .word 0x9e670161
 .word 0xd2efff4a
 .word 0xeb0a001f
-b.EQ Label_1579
+b.EQ Label_1012
 .word 0xeb0a003f
-b.EQ Label_1579
+b.EQ Label_1012
 .word 0xd2ffff4a
 .word 0xeb0a001f
-b.EQ Label_1579
+b.EQ Label_1012
 .word 0xeb0a003f
-b.EQ Label_1579
+b.EQ Label_1012
 .word 0x1e612000
-b.LT Label_1586
+b.LT Label_1015
 .word 0xb2400be0
-.word 0xb9414a69
-cbz w9, Label_1587
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1587:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1586:
+Label_1015:
 .word 0xb27f07e0
-.word 0xb9414a69
-cbz w9, Label_1588
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1588:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1577:
+Label_1010:
 .word 0xea08003f
-b.EQ Label_1579
+b.EQ Label_1012
 .word 0xcb09002a
 .word 0x1e620000
 .word 0x9e670141
 .word 0xd2efff4a
 .word 0xeb0a001f
-b.EQ Label_1579
+b.EQ Label_1012
 .word 0xeb0a003f
-b.EQ Label_1579
+b.EQ Label_1012
 .word 0xd2ffff4a
 .word 0xeb0a001f
-b.EQ Label_1579
+b.EQ Label_1012
 .word 0xeb0a003f
-b.EQ Label_1579
+b.EQ Label_1012
 .word 0x1e612000
-b.LT Label_1589
+b.LT Label_1016
 .word 0xb2400be0
-.word 0xb9414a69
-cbz w9, Label_1590
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1590:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1589:
+Label_1016:
 .word 0xb27f07e0
-.word 0xb9414a69
-cbz w9, Label_1591
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1591:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1579:
+Label_1012:
 .word 0xd28014c3
 .word 0xf8008680
 .word 0xf8008681
@@ -24262,28 +15119,12 @@ bl _prim_js_relation_slow_gc
 .word 0xd1002294
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_1592
+b.NE Label_1017
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1592:
-.word 0xb9414a69
-cbz w9, Label_1593
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1593:
+Label_1017:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -24296,247 +15137,119 @@ _dispatch_table_1_166:
 _dispatch_table_2_166:
 .word 0xb2503fe9
 .word 0xeb09001f
-b.HS Label_1597
+b.HS Label_1021
 .word 0xeb09003f
-b.HS Label_1597
+b.HS Label_1021
 .word 0xb24f3be8
 .word 0xb24f03e9
 .word 0xeb08001f
-b.LO Label_1594
+b.LO Label_1018
 .word 0xeb08003f
-b.LO Label_1595
+b.LO Label_1019
 .word 0x6b010000
-b.LT Label_1598
+b.LT Label_1022
 .word 0xb2400be0
-.word 0xb9414a69
-cbz w9, Label_1599
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1599:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1598:
+Label_1022:
 .word 0xb27f07e0
-.word 0xb9414a69
-cbz w9, Label_1600
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1600:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1594:
+Label_1018:
 .word 0xea08001f
-b.EQ Label_1597
+b.EQ Label_1021
 .word 0xeb08003f
-b.LO Label_1596
+b.LO Label_1020
 .word 0xcb09000a
 .word 0x9e670140
 .word 0x1e620021
 .word 0xd2efff4a
 .word 0xeb0a001f
-b.EQ Label_1597
+b.EQ Label_1021
 .word 0xeb0a003f
-b.EQ Label_1597
+b.EQ Label_1021
 .word 0xd2ffff4a
 .word 0xeb0a001f
-b.EQ Label_1597
+b.EQ Label_1021
 .word 0xeb0a003f
-b.EQ Label_1597
+b.EQ Label_1021
 .word 0x1e612000
-b.LT Label_1601
+b.LT Label_1023
 .word 0xb2400be0
-.word 0xb9414a69
-cbz w9, Label_1602
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1602:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1601:
+Label_1023:
 .word 0xb27f07e0
-.word 0xb9414a69
-cbz w9, Label_1603
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1603:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1596:
+Label_1020:
 .word 0xea08003f
-b.EQ Label_1597
+b.EQ Label_1021
 .word 0xcb09000a
 .word 0xcb09002b
 .word 0x9e670140
 .word 0x9e670161
 .word 0xd2efff4a
 .word 0xeb0a001f
-b.EQ Label_1597
+b.EQ Label_1021
 .word 0xeb0a003f
-b.EQ Label_1597
+b.EQ Label_1021
 .word 0xd2ffff4a
 .word 0xeb0a001f
-b.EQ Label_1597
+b.EQ Label_1021
 .word 0xeb0a003f
-b.EQ Label_1597
+b.EQ Label_1021
 .word 0x1e612000
-b.LT Label_1604
+b.LT Label_1024
 .word 0xb2400be0
-.word 0xb9414a69
-cbz w9, Label_1605
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1605:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1604:
+Label_1024:
 .word 0xb27f07e0
-.word 0xb9414a69
-cbz w9, Label_1606
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1606:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1595:
+Label_1019:
 .word 0xea08003f
-b.EQ Label_1597
+b.EQ Label_1021
 .word 0xcb09002a
 .word 0x1e620000
 .word 0x9e670141
 .word 0xd2efff4a
 .word 0xeb0a001f
-b.EQ Label_1597
+b.EQ Label_1021
 .word 0xeb0a003f
-b.EQ Label_1597
+b.EQ Label_1021
 .word 0xd2ffff4a
 .word 0xeb0a001f
-b.EQ Label_1597
+b.EQ Label_1021
 .word 0xeb0a003f
-b.EQ Label_1597
+b.EQ Label_1021
 .word 0x1e612000
-b.LT Label_1607
+b.LT Label_1025
 .word 0xb2400be0
-.word 0xb9414a69
-cbz w9, Label_1608
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1608:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1607:
+Label_1025:
 .word 0xb27f07e0
-.word 0xb9414a69
-cbz w9, Label_1609
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1609:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1597:
+Label_1021:
 .word 0xd28014c3
 .word 0xf8008680
 .word 0xf8008681
@@ -24551,28 +15264,12 @@ bl _prim_js_relation_slow_gc
 .word 0xd1002294
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_1610
+b.NE Label_1026
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1610:
-.word 0xb9414a69
-cbz w9, Label_1611
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1611:
+Label_1026:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -24593,28 +15290,12 @@ bl _prim_js_operator_instanceof_gc
 .word 0xd1002294
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_1612
+b.NE Label_1027
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1612:
-.word 0xb9414a69
-cbz w9, Label_1613
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1613:
+Label_1027:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -24638,28 +15319,12 @@ bl _prim_js_operator_instanceof_gc
 .word 0xd1002294
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_1614
+b.NE Label_1028
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1614:
-.word 0xb9414a69
-cbz w9, Label_1615
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1615:
+Label_1028:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -24680,28 +15345,12 @@ bl _prim_js_operator_in_gc
 .word 0xd1002294
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_1616
+b.NE Label_1029
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1616:
-.word 0xb9414a69
-cbz w9, Label_1617
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1617:
+Label_1029:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -24725,28 +15374,12 @@ bl _prim_js_operator_in_gc
 .word 0xd1002294
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_1618
+b.NE Label_1030
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1618:
-.word 0xb9414a69
-cbz w9, Label_1619
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1619:
+Label_1030:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -24756,247 +15389,119 @@ _dispatch_table_0_169:
 .word 0xa9ff0680
 .word 0xb2503fe9
 .word 0xeb09001f
-b.HS Label_1623
+b.HS Label_1034
 .word 0xeb09003f
-b.HS Label_1623
+b.HS Label_1034
 .word 0xb24f3be8
 .word 0xb24f03e9
 .word 0xeb08001f
-b.LO Label_1620
+b.LO Label_1031
 .word 0xeb08003f
-b.LO Label_1621
+b.LO Label_1032
 .word 0x6b010000
-b.NE Label_1624
+b.NE Label_1035
 .word 0xb2400be0
-.word 0xb9414a69
-cbz w9, Label_1625
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1625:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1624:
+Label_1035:
 .word 0xb27f07e0
-.word 0xb9414a69
-cbz w9, Label_1626
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1626:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1620:
+Label_1031:
 .word 0xea08001f
-b.EQ Label_1623
+b.EQ Label_1034
 .word 0xeb08003f
-b.LO Label_1622
+b.LO Label_1033
 .word 0xcb09000a
 .word 0x9e670140
 .word 0x1e620021
 .word 0xd2efff4a
 .word 0xeb0a001f
-b.EQ Label_1623
+b.EQ Label_1034
 .word 0xeb0a003f
-b.EQ Label_1623
+b.EQ Label_1034
 .word 0xd2ffff4a
 .word 0xeb0a001f
-b.EQ Label_1623
+b.EQ Label_1034
 .word 0xeb0a003f
-b.EQ Label_1623
+b.EQ Label_1034
 .word 0x1e612000
-b.NE Label_1627
+b.NE Label_1036
 .word 0xb2400be0
-.word 0xb9414a69
-cbz w9, Label_1628
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1628:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1627:
+Label_1036:
 .word 0xb27f07e0
-.word 0xb9414a69
-cbz w9, Label_1629
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1629:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1622:
+Label_1033:
 .word 0xea08003f
-b.EQ Label_1623
+b.EQ Label_1034
 .word 0xcb09000a
 .word 0xcb09002b
 .word 0x9e670140
 .word 0x9e670161
 .word 0xd2efff4a
 .word 0xeb0a001f
-b.EQ Label_1623
+b.EQ Label_1034
 .word 0xeb0a003f
-b.EQ Label_1623
+b.EQ Label_1034
 .word 0xd2ffff4a
 .word 0xeb0a001f
-b.EQ Label_1623
+b.EQ Label_1034
 .word 0xeb0a003f
-b.EQ Label_1623
+b.EQ Label_1034
 .word 0x1e612000
-b.NE Label_1630
+b.NE Label_1037
 .word 0xb2400be0
-.word 0xb9414a69
-cbz w9, Label_1631
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1631:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1630:
+Label_1037:
 .word 0xb27f07e0
-.word 0xb9414a69
-cbz w9, Label_1632
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1632:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1621:
+Label_1032:
 .word 0xea08003f
-b.EQ Label_1623
+b.EQ Label_1034
 .word 0xcb09002a
 .word 0x1e620000
 .word 0x9e670141
 .word 0xd2efff4a
 .word 0xeb0a001f
-b.EQ Label_1623
+b.EQ Label_1034
 .word 0xeb0a003f
-b.EQ Label_1623
+b.EQ Label_1034
 .word 0xd2ffff4a
 .word 0xeb0a001f
-b.EQ Label_1623
+b.EQ Label_1034
 .word 0xeb0a003f
-b.EQ Label_1623
+b.EQ Label_1034
 .word 0x1e612000
-b.NE Label_1633
+b.NE Label_1038
 .word 0xb2400be0
-.word 0xb9414a69
-cbz w9, Label_1634
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1634:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1633:
+Label_1038:
 .word 0xb27f07e0
-.word 0xb9414a69
-cbz w9, Label_1635
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1635:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1623:
+Label_1034:
 .word 0xd2800008
 .word 0xf8008680
 .word 0xf8008681
@@ -25012,28 +15517,12 @@ bl _prim_js_eq_slow_gc
 .word 0xd1002294
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_1636
+b.NE Label_1039
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1636:
-.word 0xb9414a69
-cbz w9, Label_1637
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1637:
+Label_1039:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -25046,247 +15535,119 @@ _dispatch_table_1_169:
 _dispatch_table_2_169:
 .word 0xb2503fe9
 .word 0xeb09001f
-b.HS Label_1641
+b.HS Label_1043
 .word 0xeb09003f
-b.HS Label_1641
+b.HS Label_1043
 .word 0xb24f3be8
 .word 0xb24f03e9
 .word 0xeb08001f
-b.LO Label_1638
+b.LO Label_1040
 .word 0xeb08003f
-b.LO Label_1639
+b.LO Label_1041
 .word 0x6b010000
-b.NE Label_1642
+b.NE Label_1044
 .word 0xb2400be0
-.word 0xb9414a69
-cbz w9, Label_1643
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1643:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1642:
+Label_1044:
 .word 0xb27f07e0
-.word 0xb9414a69
-cbz w9, Label_1644
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1644:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1638:
+Label_1040:
 .word 0xea08001f
-b.EQ Label_1641
+b.EQ Label_1043
 .word 0xeb08003f
-b.LO Label_1640
+b.LO Label_1042
 .word 0xcb09000a
 .word 0x9e670140
 .word 0x1e620021
 .word 0xd2efff4a
 .word 0xeb0a001f
-b.EQ Label_1641
+b.EQ Label_1043
 .word 0xeb0a003f
-b.EQ Label_1641
+b.EQ Label_1043
 .word 0xd2ffff4a
 .word 0xeb0a001f
-b.EQ Label_1641
+b.EQ Label_1043
 .word 0xeb0a003f
-b.EQ Label_1641
+b.EQ Label_1043
 .word 0x1e612000
-b.NE Label_1645
+b.NE Label_1045
 .word 0xb2400be0
-.word 0xb9414a69
-cbz w9, Label_1646
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1646:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1645:
+Label_1045:
 .word 0xb27f07e0
-.word 0xb9414a69
-cbz w9, Label_1647
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1647:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1640:
+Label_1042:
 .word 0xea08003f
-b.EQ Label_1641
+b.EQ Label_1043
 .word 0xcb09000a
 .word 0xcb09002b
 .word 0x9e670140
 .word 0x9e670161
 .word 0xd2efff4a
 .word 0xeb0a001f
-b.EQ Label_1641
+b.EQ Label_1043
 .word 0xeb0a003f
-b.EQ Label_1641
+b.EQ Label_1043
 .word 0xd2ffff4a
 .word 0xeb0a001f
-b.EQ Label_1641
+b.EQ Label_1043
 .word 0xeb0a003f
-b.EQ Label_1641
+b.EQ Label_1043
 .word 0x1e612000
-b.NE Label_1648
+b.NE Label_1046
 .word 0xb2400be0
-.word 0xb9414a69
-cbz w9, Label_1649
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1649:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1648:
+Label_1046:
 .word 0xb27f07e0
-.word 0xb9414a69
-cbz w9, Label_1650
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1650:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1639:
+Label_1041:
 .word 0xea08003f
-b.EQ Label_1641
+b.EQ Label_1043
 .word 0xcb09002a
 .word 0x1e620000
 .word 0x9e670141
 .word 0xd2efff4a
 .word 0xeb0a001f
-b.EQ Label_1641
+b.EQ Label_1043
 .word 0xeb0a003f
-b.EQ Label_1641
+b.EQ Label_1043
 .word 0xd2ffff4a
 .word 0xeb0a001f
-b.EQ Label_1641
+b.EQ Label_1043
 .word 0xeb0a003f
-b.EQ Label_1641
+b.EQ Label_1043
 .word 0x1e612000
-b.NE Label_1651
+b.NE Label_1047
 .word 0xb2400be0
-.word 0xb9414a69
-cbz w9, Label_1652
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1652:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1651:
+Label_1047:
 .word 0xb27f07e0
-.word 0xb9414a69
-cbz w9, Label_1653
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1653:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1641:
+Label_1043:
 .word 0xd2800008
 .word 0xf8008680
 .word 0xf8008681
@@ -25302,28 +15663,12 @@ bl _prim_js_eq_slow_gc
 .word 0xd1002294
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_1654
+b.NE Label_1048
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1654:
-.word 0xb9414a69
-cbz w9, Label_1655
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1655:
+Label_1048:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -25333,247 +15678,119 @@ _dispatch_table_0_170:
 .word 0xa9ff0680
 .word 0xb2503fe9
 .word 0xeb09001f
-b.HS Label_1659
+b.HS Label_1052
 .word 0xeb09003f
-b.HS Label_1659
+b.HS Label_1052
 .word 0xb24f3be8
 .word 0xb24f03e9
 .word 0xeb08001f
-b.LO Label_1656
+b.LO Label_1049
 .word 0xeb08003f
-b.LO Label_1657
+b.LO Label_1050
 .word 0x6b010000
-b.EQ Label_1660
+b.EQ Label_1053
 .word 0xb2400be0
-.word 0xb9414a69
-cbz w9, Label_1661
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1661:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1660:
+Label_1053:
 .word 0xb27f07e0
-.word 0xb9414a69
-cbz w9, Label_1662
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1662:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1656:
+Label_1049:
 .word 0xea08001f
-b.EQ Label_1659
+b.EQ Label_1052
 .word 0xeb08003f
-b.LO Label_1658
+b.LO Label_1051
 .word 0xcb09000a
 .word 0x9e670140
 .word 0x1e620021
 .word 0xd2efff4a
 .word 0xeb0a001f
-b.EQ Label_1659
+b.EQ Label_1052
 .word 0xeb0a003f
-b.EQ Label_1659
+b.EQ Label_1052
 .word 0xd2ffff4a
 .word 0xeb0a001f
-b.EQ Label_1659
+b.EQ Label_1052
 .word 0xeb0a003f
-b.EQ Label_1659
+b.EQ Label_1052
 .word 0x1e612000
-b.EQ Label_1663
+b.EQ Label_1054
 .word 0xb2400be0
-.word 0xb9414a69
-cbz w9, Label_1664
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1664:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1663:
+Label_1054:
 .word 0xb27f07e0
-.word 0xb9414a69
-cbz w9, Label_1665
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1665:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1658:
+Label_1051:
 .word 0xea08003f
-b.EQ Label_1659
+b.EQ Label_1052
 .word 0xcb09000a
 .word 0xcb09002b
 .word 0x9e670140
 .word 0x9e670161
 .word 0xd2efff4a
 .word 0xeb0a001f
-b.EQ Label_1659
+b.EQ Label_1052
 .word 0xeb0a003f
-b.EQ Label_1659
+b.EQ Label_1052
 .word 0xd2ffff4a
 .word 0xeb0a001f
-b.EQ Label_1659
+b.EQ Label_1052
 .word 0xeb0a003f
-b.EQ Label_1659
+b.EQ Label_1052
 .word 0x1e612000
-b.EQ Label_1666
+b.EQ Label_1055
 .word 0xb2400be0
-.word 0xb9414a69
-cbz w9, Label_1667
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1667:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1666:
+Label_1055:
 .word 0xb27f07e0
-.word 0xb9414a69
-cbz w9, Label_1668
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1668:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1657:
+Label_1050:
 .word 0xea08003f
-b.EQ Label_1659
+b.EQ Label_1052
 .word 0xcb09002a
 .word 0x1e620000
 .word 0x9e670141
 .word 0xd2efff4a
 .word 0xeb0a001f
-b.EQ Label_1659
+b.EQ Label_1052
 .word 0xeb0a003f
-b.EQ Label_1659
+b.EQ Label_1052
 .word 0xd2ffff4a
 .word 0xeb0a001f
-b.EQ Label_1659
+b.EQ Label_1052
 .word 0xeb0a003f
-b.EQ Label_1659
+b.EQ Label_1052
 .word 0x1e612000
-b.EQ Label_1669
+b.EQ Label_1056
 .word 0xb2400be0
-.word 0xb9414a69
-cbz w9, Label_1670
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1670:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1669:
+Label_1056:
 .word 0xb27f07e0
-.word 0xb9414a69
-cbz w9, Label_1671
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1671:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1659:
+Label_1052:
 .word 0xb24003e8
 .word 0xf8008680
 .word 0xf8008681
@@ -25589,28 +15806,12 @@ bl _prim_js_eq_slow_gc
 .word 0xd1002294
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_1672
+b.NE Label_1057
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1672:
-.word 0xb9414a69
-cbz w9, Label_1673
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1673:
+Label_1057:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -25623,247 +15824,119 @@ _dispatch_table_1_170:
 _dispatch_table_2_170:
 .word 0xb2503fe9
 .word 0xeb09001f
-b.HS Label_1677
+b.HS Label_1061
 .word 0xeb09003f
-b.HS Label_1677
+b.HS Label_1061
 .word 0xb24f3be8
 .word 0xb24f03e9
 .word 0xeb08001f
-b.LO Label_1674
+b.LO Label_1058
 .word 0xeb08003f
-b.LO Label_1675
+b.LO Label_1059
 .word 0x6b010000
-b.EQ Label_1678
+b.EQ Label_1062
 .word 0xb2400be0
-.word 0xb9414a69
-cbz w9, Label_1679
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1679:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1678:
+Label_1062:
 .word 0xb27f07e0
-.word 0xb9414a69
-cbz w9, Label_1680
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1680:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1674:
+Label_1058:
 .word 0xea08001f
-b.EQ Label_1677
+b.EQ Label_1061
 .word 0xeb08003f
-b.LO Label_1676
+b.LO Label_1060
 .word 0xcb09000a
 .word 0x9e670140
 .word 0x1e620021
 .word 0xd2efff4a
 .word 0xeb0a001f
-b.EQ Label_1677
+b.EQ Label_1061
 .word 0xeb0a003f
-b.EQ Label_1677
+b.EQ Label_1061
 .word 0xd2ffff4a
 .word 0xeb0a001f
-b.EQ Label_1677
+b.EQ Label_1061
 .word 0xeb0a003f
-b.EQ Label_1677
+b.EQ Label_1061
 .word 0x1e612000
-b.EQ Label_1681
+b.EQ Label_1063
 .word 0xb2400be0
-.word 0xb9414a69
-cbz w9, Label_1682
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1682:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1681:
+Label_1063:
 .word 0xb27f07e0
-.word 0xb9414a69
-cbz w9, Label_1683
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1683:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1676:
+Label_1060:
 .word 0xea08003f
-b.EQ Label_1677
+b.EQ Label_1061
 .word 0xcb09000a
 .word 0xcb09002b
 .word 0x9e670140
 .word 0x9e670161
 .word 0xd2efff4a
 .word 0xeb0a001f
-b.EQ Label_1677
+b.EQ Label_1061
 .word 0xeb0a003f
-b.EQ Label_1677
+b.EQ Label_1061
 .word 0xd2ffff4a
 .word 0xeb0a001f
-b.EQ Label_1677
+b.EQ Label_1061
 .word 0xeb0a003f
-b.EQ Label_1677
+b.EQ Label_1061
 .word 0x1e612000
-b.EQ Label_1684
+b.EQ Label_1064
 .word 0xb2400be0
-.word 0xb9414a69
-cbz w9, Label_1685
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1685:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1684:
+Label_1064:
 .word 0xb27f07e0
-.word 0xb9414a69
-cbz w9, Label_1686
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1686:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1675:
+Label_1059:
 .word 0xea08003f
-b.EQ Label_1677
+b.EQ Label_1061
 .word 0xcb09002a
 .word 0x1e620000
 .word 0x9e670141
 .word 0xd2efff4a
 .word 0xeb0a001f
-b.EQ Label_1677
+b.EQ Label_1061
 .word 0xeb0a003f
-b.EQ Label_1677
+b.EQ Label_1061
 .word 0xd2ffff4a
 .word 0xeb0a001f
-b.EQ Label_1677
+b.EQ Label_1061
 .word 0xeb0a003f
-b.EQ Label_1677
+b.EQ Label_1061
 .word 0x1e612000
-b.EQ Label_1687
+b.EQ Label_1065
 .word 0xb2400be0
-.word 0xb9414a69
-cbz w9, Label_1688
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1688:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1687:
+Label_1065:
 .word 0xb27f07e0
-.word 0xb9414a69
-cbz w9, Label_1689
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1689:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1677:
+Label_1061:
 .word 0xb24003e8
 .word 0xf8008680
 .word 0xf8008681
@@ -25879,28 +15952,12 @@ bl _prim_js_eq_slow_gc
 .word 0xd1002294
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_1690
+b.NE Label_1066
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1690:
-.word 0xb9414a69
-cbz w9, Label_1691
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1691:
+Label_1066:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -25910,247 +15967,119 @@ _dispatch_table_0_171:
 .word 0xa9ff0680
 .word 0xb2503fe9
 .word 0xeb09001f
-b.HS Label_1695
+b.HS Label_1070
 .word 0xeb09003f
-b.HS Label_1695
+b.HS Label_1070
 .word 0xb24f3be8
 .word 0xb24f03e9
 .word 0xeb08001f
-b.LO Label_1692
+b.LO Label_1067
 .word 0xeb08003f
-b.LO Label_1693
+b.LO Label_1068
 .word 0x6b010000
-b.NE Label_1696
+b.NE Label_1071
 .word 0xb2400be0
-.word 0xb9414a69
-cbz w9, Label_1697
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1697:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1696:
+Label_1071:
 .word 0xb27f07e0
-.word 0xb9414a69
-cbz w9, Label_1698
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1698:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1692:
+Label_1067:
 .word 0xea08001f
-b.EQ Label_1695
+b.EQ Label_1070
 .word 0xeb08003f
-b.LO Label_1694
+b.LO Label_1069
 .word 0xcb09000a
 .word 0x9e670140
 .word 0x1e620021
 .word 0xd2efff4a
 .word 0xeb0a001f
-b.EQ Label_1695
+b.EQ Label_1070
 .word 0xeb0a003f
-b.EQ Label_1695
+b.EQ Label_1070
 .word 0xd2ffff4a
 .word 0xeb0a001f
-b.EQ Label_1695
+b.EQ Label_1070
 .word 0xeb0a003f
-b.EQ Label_1695
+b.EQ Label_1070
 .word 0x1e612000
-b.NE Label_1699
+b.NE Label_1072
 .word 0xb2400be0
-.word 0xb9414a69
-cbz w9, Label_1700
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1700:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1699:
+Label_1072:
 .word 0xb27f07e0
-.word 0xb9414a69
-cbz w9, Label_1701
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1701:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1694:
+Label_1069:
 .word 0xea08003f
-b.EQ Label_1695
+b.EQ Label_1070
 .word 0xcb09000a
 .word 0xcb09002b
 .word 0x9e670140
 .word 0x9e670161
 .word 0xd2efff4a
 .word 0xeb0a001f
-b.EQ Label_1695
+b.EQ Label_1070
 .word 0xeb0a003f
-b.EQ Label_1695
+b.EQ Label_1070
 .word 0xd2ffff4a
 .word 0xeb0a001f
-b.EQ Label_1695
+b.EQ Label_1070
 .word 0xeb0a003f
-b.EQ Label_1695
+b.EQ Label_1070
 .word 0x1e612000
-b.NE Label_1702
+b.NE Label_1073
 .word 0xb2400be0
-.word 0xb9414a69
-cbz w9, Label_1703
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1703:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1702:
+Label_1073:
 .word 0xb27f07e0
-.word 0xb9414a69
-cbz w9, Label_1704
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1704:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1693:
+Label_1068:
 .word 0xea08003f
-b.EQ Label_1695
+b.EQ Label_1070
 .word 0xcb09002a
 .word 0x1e620000
 .word 0x9e670141
 .word 0xd2efff4a
 .word 0xeb0a001f
-b.EQ Label_1695
+b.EQ Label_1070
 .word 0xeb0a003f
-b.EQ Label_1695
+b.EQ Label_1070
 .word 0xd2ffff4a
 .word 0xeb0a001f
-b.EQ Label_1695
+b.EQ Label_1070
 .word 0xeb0a003f
-b.EQ Label_1695
+b.EQ Label_1070
 .word 0x1e612000
-b.NE Label_1705
+b.NE Label_1074
 .word 0xb2400be0
-.word 0xb9414a69
-cbz w9, Label_1706
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1706:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1705:
+Label_1074:
 .word 0xb27f07e0
-.word 0xb9414a69
-cbz w9, Label_1707
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1707:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1695:
+Label_1070:
 .word 0xd2800003
 .word 0xf8008680
 .word 0xf8008681
@@ -26164,22 +16093,6 @@ bl _prim_js_strict_eq_slow_gc
 .word 0xa8c17ffe
 .word 0xd1002294
 .word 0xd1002294
-.word 0xb9414a69
-cbz w9, Label_1708
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1708:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -26192,247 +16105,119 @@ _dispatch_table_1_171:
 _dispatch_table_2_171:
 .word 0xb2503fe9
 .word 0xeb09001f
-b.HS Label_1712
+b.HS Label_1078
 .word 0xeb09003f
-b.HS Label_1712
+b.HS Label_1078
 .word 0xb24f3be8
 .word 0xb24f03e9
 .word 0xeb08001f
-b.LO Label_1709
+b.LO Label_1075
 .word 0xeb08003f
-b.LO Label_1710
+b.LO Label_1076
 .word 0x6b010000
-b.NE Label_1713
+b.NE Label_1079
 .word 0xb2400be0
-.word 0xb9414a69
-cbz w9, Label_1714
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1714:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1713:
+Label_1079:
 .word 0xb27f07e0
-.word 0xb9414a69
-cbz w9, Label_1715
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1715:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1709:
+Label_1075:
 .word 0xea08001f
-b.EQ Label_1712
+b.EQ Label_1078
 .word 0xeb08003f
-b.LO Label_1711
+b.LO Label_1077
 .word 0xcb09000a
 .word 0x9e670140
 .word 0x1e620021
 .word 0xd2efff4a
 .word 0xeb0a001f
-b.EQ Label_1712
+b.EQ Label_1078
 .word 0xeb0a003f
-b.EQ Label_1712
+b.EQ Label_1078
 .word 0xd2ffff4a
 .word 0xeb0a001f
-b.EQ Label_1712
+b.EQ Label_1078
 .word 0xeb0a003f
-b.EQ Label_1712
+b.EQ Label_1078
 .word 0x1e612000
-b.NE Label_1716
+b.NE Label_1080
 .word 0xb2400be0
-.word 0xb9414a69
-cbz w9, Label_1717
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1717:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1716:
+Label_1080:
 .word 0xb27f07e0
-.word 0xb9414a69
-cbz w9, Label_1718
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1718:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1711:
+Label_1077:
 .word 0xea08003f
-b.EQ Label_1712
+b.EQ Label_1078
 .word 0xcb09000a
 .word 0xcb09002b
 .word 0x9e670140
 .word 0x9e670161
 .word 0xd2efff4a
 .word 0xeb0a001f
-b.EQ Label_1712
+b.EQ Label_1078
 .word 0xeb0a003f
-b.EQ Label_1712
+b.EQ Label_1078
 .word 0xd2ffff4a
 .word 0xeb0a001f
-b.EQ Label_1712
+b.EQ Label_1078
 .word 0xeb0a003f
-b.EQ Label_1712
+b.EQ Label_1078
 .word 0x1e612000
-b.NE Label_1719
+b.NE Label_1081
 .word 0xb2400be0
-.word 0xb9414a69
-cbz w9, Label_1720
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1720:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1719:
+Label_1081:
 .word 0xb27f07e0
-.word 0xb9414a69
-cbz w9, Label_1721
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1721:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1710:
+Label_1076:
 .word 0xea08003f
-b.EQ Label_1712
+b.EQ Label_1078
 .word 0xcb09002a
 .word 0x1e620000
 .word 0x9e670141
 .word 0xd2efff4a
 .word 0xeb0a001f
-b.EQ Label_1712
+b.EQ Label_1078
 .word 0xeb0a003f
-b.EQ Label_1712
+b.EQ Label_1078
 .word 0xd2ffff4a
 .word 0xeb0a001f
-b.EQ Label_1712
+b.EQ Label_1078
 .word 0xeb0a003f
-b.EQ Label_1712
+b.EQ Label_1078
 .word 0x1e612000
-b.NE Label_1722
+b.NE Label_1082
 .word 0xb2400be0
-.word 0xb9414a69
-cbz w9, Label_1723
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1723:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1722:
+Label_1082:
 .word 0xb27f07e0
-.word 0xb9414a69
-cbz w9, Label_1724
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1724:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1712:
+Label_1078:
 .word 0xd2800003
 .word 0xf8008680
 .word 0xf8008681
@@ -26446,22 +16231,6 @@ bl _prim_js_strict_eq_slow_gc
 .word 0xa8c17ffe
 .word 0xd1002294
 .word 0xd1002294
-.word 0xb9414a69
-cbz w9, Label_1725
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1725:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -26471,247 +16240,119 @@ _dispatch_table_0_172:
 .word 0xa9ff0680
 .word 0xb2503fe9
 .word 0xeb09001f
-b.HS Label_1729
+b.HS Label_1086
 .word 0xeb09003f
-b.HS Label_1729
+b.HS Label_1086
 .word 0xb24f3be8
 .word 0xb24f03e9
 .word 0xeb08001f
-b.LO Label_1726
+b.LO Label_1083
 .word 0xeb08003f
-b.LO Label_1727
+b.LO Label_1084
 .word 0x6b010000
-b.EQ Label_1730
+b.EQ Label_1087
 .word 0xb2400be0
-.word 0xb9414a69
-cbz w9, Label_1731
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1731:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1730:
+Label_1087:
 .word 0xb27f07e0
-.word 0xb9414a69
-cbz w9, Label_1732
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1732:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1726:
+Label_1083:
 .word 0xea08001f
-b.EQ Label_1729
+b.EQ Label_1086
 .word 0xeb08003f
-b.LO Label_1728
+b.LO Label_1085
 .word 0xcb09000a
 .word 0x9e670140
 .word 0x1e620021
 .word 0xd2efff4a
 .word 0xeb0a001f
-b.EQ Label_1729
+b.EQ Label_1086
 .word 0xeb0a003f
-b.EQ Label_1729
+b.EQ Label_1086
 .word 0xd2ffff4a
 .word 0xeb0a001f
-b.EQ Label_1729
+b.EQ Label_1086
 .word 0xeb0a003f
-b.EQ Label_1729
+b.EQ Label_1086
 .word 0x1e612000
-b.EQ Label_1733
+b.EQ Label_1088
 .word 0xb2400be0
-.word 0xb9414a69
-cbz w9, Label_1734
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1734:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1733:
+Label_1088:
 .word 0xb27f07e0
-.word 0xb9414a69
-cbz w9, Label_1735
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1735:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1728:
+Label_1085:
 .word 0xea08003f
-b.EQ Label_1729
+b.EQ Label_1086
 .word 0xcb09000a
 .word 0xcb09002b
 .word 0x9e670140
 .word 0x9e670161
 .word 0xd2efff4a
 .word 0xeb0a001f
-b.EQ Label_1729
+b.EQ Label_1086
 .word 0xeb0a003f
-b.EQ Label_1729
+b.EQ Label_1086
 .word 0xd2ffff4a
 .word 0xeb0a001f
-b.EQ Label_1729
+b.EQ Label_1086
 .word 0xeb0a003f
-b.EQ Label_1729
+b.EQ Label_1086
 .word 0x1e612000
-b.EQ Label_1736
+b.EQ Label_1089
 .word 0xb2400be0
-.word 0xb9414a69
-cbz w9, Label_1737
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1737:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1736:
+Label_1089:
 .word 0xb27f07e0
-.word 0xb9414a69
-cbz w9, Label_1738
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1738:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1727:
+Label_1084:
 .word 0xea08003f
-b.EQ Label_1729
+b.EQ Label_1086
 .word 0xcb09002a
 .word 0x1e620000
 .word 0x9e670141
 .word 0xd2efff4a
 .word 0xeb0a001f
-b.EQ Label_1729
+b.EQ Label_1086
 .word 0xeb0a003f
-b.EQ Label_1729
+b.EQ Label_1086
 .word 0xd2ffff4a
 .word 0xeb0a001f
-b.EQ Label_1729
+b.EQ Label_1086
 .word 0xeb0a003f
-b.EQ Label_1729
+b.EQ Label_1086
 .word 0x1e612000
-b.EQ Label_1739
+b.EQ Label_1090
 .word 0xb2400be0
-.word 0xb9414a69
-cbz w9, Label_1740
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1740:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1739:
+Label_1090:
 .word 0xb27f07e0
-.word 0xb9414a69
-cbz w9, Label_1741
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1741:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1729:
+Label_1086:
 .word 0xb24003e3
 .word 0xf8008680
 .word 0xf8008681
@@ -26725,22 +16366,6 @@ bl _prim_js_strict_eq_slow_gc
 .word 0xa8c17ffe
 .word 0xd1002294
 .word 0xd1002294
-.word 0xb9414a69
-cbz w9, Label_1742
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1742:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -26753,247 +16378,119 @@ _dispatch_table_1_172:
 _dispatch_table_2_172:
 .word 0xb2503fe9
 .word 0xeb09001f
-b.HS Label_1746
+b.HS Label_1094
 .word 0xeb09003f
-b.HS Label_1746
+b.HS Label_1094
 .word 0xb24f3be8
 .word 0xb24f03e9
 .word 0xeb08001f
-b.LO Label_1743
+b.LO Label_1091
 .word 0xeb08003f
-b.LO Label_1744
+b.LO Label_1092
 .word 0x6b010000
-b.EQ Label_1747
+b.EQ Label_1095
 .word 0xb2400be0
-.word 0xb9414a69
-cbz w9, Label_1748
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1748:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1747:
+Label_1095:
 .word 0xb27f07e0
-.word 0xb9414a69
-cbz w9, Label_1749
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1749:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1743:
+Label_1091:
 .word 0xea08001f
-b.EQ Label_1746
+b.EQ Label_1094
 .word 0xeb08003f
-b.LO Label_1745
+b.LO Label_1093
 .word 0xcb09000a
 .word 0x9e670140
 .word 0x1e620021
 .word 0xd2efff4a
 .word 0xeb0a001f
-b.EQ Label_1746
+b.EQ Label_1094
 .word 0xeb0a003f
-b.EQ Label_1746
+b.EQ Label_1094
 .word 0xd2ffff4a
 .word 0xeb0a001f
-b.EQ Label_1746
+b.EQ Label_1094
 .word 0xeb0a003f
-b.EQ Label_1746
+b.EQ Label_1094
 .word 0x1e612000
-b.EQ Label_1750
+b.EQ Label_1096
 .word 0xb2400be0
-.word 0xb9414a69
-cbz w9, Label_1751
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1751:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1750:
+Label_1096:
 .word 0xb27f07e0
-.word 0xb9414a69
-cbz w9, Label_1752
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1752:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1745:
+Label_1093:
 .word 0xea08003f
-b.EQ Label_1746
+b.EQ Label_1094
 .word 0xcb09000a
 .word 0xcb09002b
 .word 0x9e670140
 .word 0x9e670161
 .word 0xd2efff4a
 .word 0xeb0a001f
-b.EQ Label_1746
+b.EQ Label_1094
 .word 0xeb0a003f
-b.EQ Label_1746
+b.EQ Label_1094
 .word 0xd2ffff4a
 .word 0xeb0a001f
-b.EQ Label_1746
+b.EQ Label_1094
 .word 0xeb0a003f
-b.EQ Label_1746
+b.EQ Label_1094
 .word 0x1e612000
-b.EQ Label_1753
+b.EQ Label_1097
 .word 0xb2400be0
-.word 0xb9414a69
-cbz w9, Label_1754
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1754:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1753:
+Label_1097:
 .word 0xb27f07e0
-.word 0xb9414a69
-cbz w9, Label_1755
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1755:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1744:
+Label_1092:
 .word 0xea08003f
-b.EQ Label_1746
+b.EQ Label_1094
 .word 0xcb09002a
 .word 0x1e620000
 .word 0x9e670141
 .word 0xd2efff4a
 .word 0xeb0a001f
-b.EQ Label_1746
+b.EQ Label_1094
 .word 0xeb0a003f
-b.EQ Label_1746
+b.EQ Label_1094
 .word 0xd2ffff4a
 .word 0xeb0a001f
-b.EQ Label_1746
+b.EQ Label_1094
 .word 0xeb0a003f
-b.EQ Label_1746
+b.EQ Label_1094
 .word 0x1e612000
-b.EQ Label_1756
+b.EQ Label_1098
 .word 0xb2400be0
-.word 0xb9414a69
-cbz w9, Label_1757
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1757:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1756:
+Label_1098:
 .word 0xb27f07e0
-.word 0xb9414a69
-cbz w9, Label_1758
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1758:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1746:
+Label_1094:
 .word 0xb24003e3
 .word 0xf8008680
 .word 0xf8008681
@@ -27007,22 +16504,6 @@ bl _prim_js_strict_eq_slow_gc
 .word 0xa8c17ffe
 .word 0xd1002294
 .word 0xd1002294
-.word 0xb9414a69
-cbz w9, Label_1759
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1759:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -27033,34 +16514,18 @@ _dispatch_table_0_173:
 .word 0xf2503c08
 .word 0xb24f3be9
 .word 0xeb090108
-cbnz x8, Label_1760
+cbnz x8, Label_1099
 .word 0xf2503c28
 .word 0xb24f3be9
 .word 0xeb090108
-cbnz x8, Label_1760
+cbnz x8, Label_1099
 .word 0xa000020
 .word 0xb24f3800
-.word 0xb9414a69
-cbz w9, Label_1761
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1761:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1760:
+Label_1099:
 .word 0xd28015a3
 .word 0xf8008680
 .word 0xf8008681
@@ -27075,28 +16540,12 @@ bl _prim_js_binary_logic_slow_gc
 .word 0xd1002294
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_1762
+b.NE Label_1100
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1762:
-.word 0xb9414a69
-cbz w9, Label_1763
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1763:
+Label_1100:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -27110,34 +16559,18 @@ _dispatch_table_2_173:
 .word 0xf2503c08
 .word 0xb24f3be9
 .word 0xeb090108
-cbnz x8, Label_1764
+cbnz x8, Label_1101
 .word 0xf2503c28
 .word 0xb24f3be9
 .word 0xeb090108
-cbnz x8, Label_1764
+cbnz x8, Label_1101
 .word 0xa000020
 .word 0xb24f3800
-.word 0xb9414a69
-cbz w9, Label_1765
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1765:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1764:
+Label_1101:
 .word 0xd28015a3
 .word 0xf8008680
 .word 0xf8008681
@@ -27152,28 +16585,12 @@ bl _prim_js_binary_logic_slow_gc
 .word 0xd1002294
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_1766
+b.NE Label_1102
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1766:
-.word 0xb9414a69
-cbz w9, Label_1767
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1767:
+Label_1102:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -27184,34 +16601,18 @@ _dispatch_table_0_174:
 .word 0xf2503c08
 .word 0xb24f3be9
 .word 0xeb090108
-cbnz x8, Label_1768
+cbnz x8, Label_1103
 .word 0xf2503c28
 .word 0xb24f3be9
 .word 0xeb090108
-cbnz x8, Label_1768
+cbnz x8, Label_1103
 .word 0x4a000020
 .word 0xb24f3800
-.word 0xb9414a69
-cbz w9, Label_1769
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1769:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1768:
+Label_1103:
 .word 0xd28015c3
 .word 0xf8008680
 .word 0xf8008681
@@ -27226,28 +16627,12 @@ bl _prim_js_binary_logic_slow_gc
 .word 0xd1002294
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_1770
+b.NE Label_1104
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1770:
-.word 0xb9414a69
-cbz w9, Label_1771
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1771:
+Label_1104:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -27261,34 +16646,18 @@ _dispatch_table_2_174:
 .word 0xf2503c08
 .word 0xb24f3be9
 .word 0xeb090108
-cbnz x8, Label_1772
+cbnz x8, Label_1105
 .word 0xf2503c28
 .word 0xb24f3be9
 .word 0xeb090108
-cbnz x8, Label_1772
+cbnz x8, Label_1105
 .word 0x4a000020
 .word 0xb24f3800
-.word 0xb9414a69
-cbz w9, Label_1773
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1773:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1772:
+Label_1105:
 .word 0xd28015c3
 .word 0xf8008680
 .word 0xf8008681
@@ -27303,28 +16672,12 @@ bl _prim_js_binary_logic_slow_gc
 .word 0xd1002294
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_1774
+b.NE Label_1106
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1774:
-.word 0xb9414a69
-cbz w9, Label_1775
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1775:
+Label_1106:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -27335,34 +16688,18 @@ _dispatch_table_0_175:
 .word 0xf2503c08
 .word 0xb24f3be9
 .word 0xeb090108
-cbnz x8, Label_1776
+cbnz x8, Label_1107
 .word 0xf2503c28
 .word 0xb24f3be9
 .word 0xeb090108
-cbnz x8, Label_1776
+cbnz x8, Label_1107
 .word 0x2a000020
 .word 0xb24f3800
-.word 0xb9414a69
-cbz w9, Label_1777
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1777:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1776:
+Label_1107:
 .word 0xd28015e3
 .word 0xf8008680
 .word 0xf8008681
@@ -27377,28 +16714,12 @@ bl _prim_js_binary_logic_slow_gc
 .word 0xd1002294
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_1778
+b.NE Label_1108
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1778:
-.word 0xb9414a69
-cbz w9, Label_1779
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1779:
+Label_1108:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -27412,34 +16733,18 @@ _dispatch_table_2_175:
 .word 0xf2503c08
 .word 0xb24f3be9
 .word 0xeb090108
-cbnz x8, Label_1780
+cbnz x8, Label_1109
 .word 0xf2503c28
 .word 0xb24f3be9
 .word 0xeb090108
-cbnz x8, Label_1780
+cbnz x8, Label_1109
 .word 0x2a000020
 .word 0xb24f3800
-.word 0xb9414a69
-cbz w9, Label_1781
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1781:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1780:
+Label_1109:
 .word 0xd28015e3
 .word 0xf8008680
 .word 0xf8008681
@@ -27454,28 +16759,12 @@ bl _prim_js_binary_logic_slow_gc
 .word 0xd1002294
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_1782
+b.NE Label_1110
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1782:
-.word 0xb9414a69
-cbz w9, Label_1783
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1783:
+Label_1110:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -27485,22 +16774,6 @@ _dispatch_table_1_176:
 .word 0xf8008680
 .word 0xf85b83b1
 .word 0xf9002234
-.word 0xb9414a69
-cbz w9, Label_1784
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1784:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -27512,22 +16785,6 @@ _dispatch_table_2_176:
 .word 0xf9002234
 .global _dispatch_table_0_176
 _dispatch_table_0_176:
-.word 0xb9414a69
-cbz w9, Label_1785
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1785:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -27535,22 +16792,6 @@ Label_1785:
 .global _dispatch_table_0_177
 _dispatch_table_0_177:
 .word 0xb24fbbe0
-.word 0xb9414a69
-cbz w9, Label_1786
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1786:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -27558,22 +16799,6 @@ Label_1786:
 .global _dispatch_table_1_177
 _dispatch_table_1_177:
 .word 0xb24fbbe1
-.word 0xb9414a69
-cbz w9, Label_1787
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1787:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -27583,22 +16808,6 @@ _dispatch_table_2_177:
 .word 0xf8008680
 .word 0xaa0103e0
 .word 0xb24fbbe1
-.word 0xb9414a69
-cbz w9, Label_1788
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1788:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -27606,22 +16815,6 @@ Label_1788:
 .global _dispatch_table_0_178
 _dispatch_table_0_178:
 .word 0xb24f3be0
-.word 0xb9414a69
-cbz w9, Label_1789
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1789:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -27629,22 +16822,6 @@ Label_1789:
 .global _dispatch_table_1_178
 _dispatch_table_1_178:
 .word 0xb24f3be1
-.word 0xb9414a69
-cbz w9, Label_1790
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1790:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -27654,22 +16831,6 @@ _dispatch_table_2_178:
 .word 0xf8008680
 .word 0xaa0103e0
 .word 0xb24f3be1
-.word 0xb9414a69
-cbz w9, Label_1791
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1791:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -27677,22 +16838,6 @@ Label_1791:
 .global _dispatch_table_0_179
 _dispatch_table_0_179:
 .word 0xb24f3fe0
-.word 0xb9414a69
-cbz w9, Label_1792
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1792:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -27700,22 +16845,6 @@ Label_1792:
 .global _dispatch_table_1_179
 _dispatch_table_1_179:
 .word 0xb24f3fe1
-.word 0xb9414a69
-cbz w9, Label_1793
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1793:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -27725,22 +16854,6 @@ _dispatch_table_2_179:
 .word 0xf8008680
 .word 0xaa0103e0
 .word 0xb24f3fe1
-.word 0xb9414a69
-cbz w9, Label_1794
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1794:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -27749,22 +16862,6 @@ Label_1794:
 _dispatch_table_0_180:
 .word 0xd2800040
 .word 0xf2ffffc0
-.word 0xb9414a69
-cbz w9, Label_1795
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1795:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -27773,22 +16870,6 @@ Label_1795:
 _dispatch_table_1_180:
 .word 0xd2800041
 .word 0xf2ffffc1
-.word 0xb9414a69
-cbz w9, Label_1796
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1796:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -27799,22 +16880,6 @@ _dispatch_table_2_180:
 .word 0xaa0103e0
 .word 0xd2800041
 .word 0xf2ffffc1
-.word 0xb9414a69
-cbz w9, Label_1797
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1797:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -27822,22 +16887,6 @@ Label_1797:
 .global _dispatch_table_0_181
 _dispatch_table_0_181:
 .word 0xb24f43e0
-.word 0xb9414a69
-cbz w9, Label_1798
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1798:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -27845,22 +16894,6 @@ Label_1798:
 .global _dispatch_table_1_181
 _dispatch_table_1_181:
 .word 0xb24f43e1
-.word 0xb9414a69
-cbz w9, Label_1799
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1799:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -27870,22 +16903,6 @@ _dispatch_table_2_181:
 .word 0xf8008680
 .word 0xaa0103e0
 .word 0xb24f43e1
-.word 0xb9414a69
-cbz w9, Label_1800
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1800:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -27894,22 +16911,6 @@ Label_1800:
 _dispatch_table_0_182:
 .word 0xd2800080
 .word 0xf2ffffc0
-.word 0xb9414a69
-cbz w9, Label_1801
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1801:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -27918,22 +16919,6 @@ Label_1801:
 _dispatch_table_1_182:
 .word 0xd2800081
 .word 0xf2ffffc1
-.word 0xb9414a69
-cbz w9, Label_1802
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1802:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -27944,22 +16929,6 @@ _dispatch_table_2_182:
 .word 0xaa0103e0
 .word 0xd2800081
 .word 0xf2ffffc1
-.word 0xb9414a69
-cbz w9, Label_1803
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1803:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -27968,22 +16937,6 @@ Label_1803:
 _dispatch_table_0_183:
 .word 0xd28000a0
 .word 0xf2ffffc0
-.word 0xb9414a69
-cbz w9, Label_1804
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1804:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -27992,22 +16945,6 @@ Label_1804:
 _dispatch_table_1_183:
 .word 0xd28000a1
 .word 0xf2ffffc1
-.word 0xb9414a69
-cbz w9, Label_1805
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1805:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -28018,22 +16955,6 @@ _dispatch_table_2_183:
 .word 0xaa0103e0
 .word 0xd28000a1
 .word 0xf2ffffc1
-.word 0xb9414a69
-cbz w9, Label_1806
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1806:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -28042,22 +16963,6 @@ Label_1806:
 _dispatch_table_0_184:
 .word 0xd28000c0
 .word 0xf2ffffc0
-.word 0xb9414a69
-cbz w9, Label_1807
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1807:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -28066,22 +16971,6 @@ Label_1807:
 _dispatch_table_1_184:
 .word 0xd28000c1
 .word 0xf2ffffc1
-.word 0xb9414a69
-cbz w9, Label_1808
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1808:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -28092,22 +16981,6 @@ _dispatch_table_2_184:
 .word 0xaa0103e0
 .word 0xd28000c1
 .word 0xf2ffffc1
-.word 0xb9414a69
-cbz w9, Label_1809
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1809:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -28115,22 +16988,6 @@ Label_1809:
 .global _dispatch_table_0_185
 _dispatch_table_0_185:
 .word 0xb24f47e0
-.word 0xb9414a69
-cbz w9, Label_1810
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1810:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -28138,22 +16995,6 @@ Label_1810:
 .global _dispatch_table_1_185
 _dispatch_table_1_185:
 .word 0xb24f47e1
-.word 0xb9414a69
-cbz w9, Label_1811
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1811:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -28163,22 +17004,6 @@ _dispatch_table_2_185:
 .word 0xf8008680
 .word 0xaa0103e0
 .word 0xb24f47e1
-.word 0xb9414a69
-cbz w9, Label_1812
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1812:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -28189,22 +17014,6 @@ _dispatch_table_0_186:
 .word 0xb2407fe8
 .word 0x8a080000
 .word 0xb24f3800
-.word 0xb9414a69
-cbz w9, Label_1813
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1813:
 .word 0x38402ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -28215,22 +17024,6 @@ _dispatch_table_1_186:
 .word 0xb2407fe8
 .word 0x8a080021
 .word 0xb24f3821
-.word 0xb9414a69
-cbz w9, Label_1814
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1814:
 .word 0x38402ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -28243,22 +17036,6 @@ _dispatch_table_2_186:
 .word 0xb2407fe8
 .word 0x8a080021
 .word 0xb24f3821
-.word 0xb9414a69
-cbz w9, Label_1815
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1815:
 .word 0x38402ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -28269,22 +17046,6 @@ _dispatch_table_0_187:
 .word 0xb2407fe8
 .word 0x8a080000
 .word 0xb24f3800
-.word 0xb9414a69
-cbz w9, Label_1816
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb10012c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1816:
 .word 0x38403ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -28295,22 +17056,6 @@ _dispatch_table_1_187:
 .word 0xb2407fe8
 .word 0x8a080021
 .word 0xb24f3821
-.word 0xb9414a69
-cbz w9, Label_1817
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb10012c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1817:
 .word 0x38403ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -28323,22 +17068,6 @@ _dispatch_table_2_187:
 .word 0xb2407fe8
 .word 0x8a080021
 .word 0xb24f3821
-.word 0xb9414a69
-cbz w9, Label_1818
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb10012c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1818:
 .word 0x38403ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -28348,7 +17077,7 @@ _dispatch_table_0_188:
 .word 0x394006c0
 .word 0xf8607b40
 .word 0xb9414a68
-cbz w8, Label_1819
+cbz w8, Label_1111
 .word 0xf8008680
 .word 0xf85b83b1
 .word 0xf9002234
@@ -28359,23 +17088,7 @@ cbz w8, Label_1819
 bl _DebuggerPause
 .word 0xa8c17ffe
 .word 0xf85f8e80
-Label_1819:
-.word 0xb9414a69
-cbz w9, Label_1820
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1820:
+Label_1111:
 .word 0x38402ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -28385,7 +17098,7 @@ _dispatch_table_1_188:
 .word 0x394006c1
 .word 0xf8617b41
 .word 0xb9414a68
-cbz w8, Label_1821
+cbz w8, Label_1112
 .word 0xf8008680
 .word 0xf8008681
 .word 0xf85b83b1
@@ -28397,23 +17110,7 @@ bl _DebuggerPause
 .word 0xa8c17ffe
 .word 0xf85f8e81
 .word 0xf85f8e80
-Label_1821:
-.word 0xb9414a69
-cbz w9, Label_1822
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1822:
+Label_1112:
 .word 0x38402ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -28425,7 +17122,7 @@ _dispatch_table_2_188:
 .word 0x394006c1
 .word 0xf8617b41
 .word 0xb9414a68
-cbz w8, Label_1823
+cbz w8, Label_1113
 .word 0xf8008680
 .word 0xf8008681
 .word 0xf85b83b1
@@ -28437,23 +17134,7 @@ bl _DebuggerPause
 .word 0xa8c17ffe
 .word 0xf85f8e81
 .word 0xf85f8e80
-Label_1823:
-.word 0xb9414a69
-cbz w9, Label_1824
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1824:
+Label_1113:
 .word 0x38402ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -28472,28 +17153,12 @@ _dispatch_table_0_189:
 bl _js_closure_gc
 .word 0xa8c17ffe
 .word 0xf102081f
-b.NE Label_1825
+b.NE Label_1114
 .word 0x91000ad6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1825:
-.word 0xb9414a69
-cbz w9, Label_1826
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1826:
+Label_1114:
 .word 0x38402ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -28515,31 +17180,15 @@ bl _js_closure_gc
 .word 0xa8c17ffe
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_1828
+b.NE Label_1116
 .word 0xf8008699
 .word 0x91000ad6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1828:
+Label_1116:
 .word 0xaa0003e1
 .word 0xaa1903e0
-.word 0xb9414a69
-cbz w9, Label_1829
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1829:
 .word 0x38402ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -28562,31 +17211,15 @@ bl _js_closure_gc
 .word 0xa8c17ffe
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_1831
+b.NE Label_1118
 .word 0xf8008699
 .word 0x91000ad6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1831:
+Label_1118:
 .word 0xaa0003e1
 .word 0xaa1903e0
-.word 0xb9414a69
-cbz w9, Label_1832
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1832:
 .word 0x38402ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -28602,22 +17235,6 @@ _dispatch_table_0_190:
 .word 0xa9bf7ffe
 bl ___JS_AtomToValue_GC
 .word 0xa8c17ffe
-.word 0xb9414a69
-cbz w9, Label_1833
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1833:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -28638,22 +17255,6 @@ bl ___JS_AtomToValue_GC
 .word 0xd1002294
 .word 0xaa0003e1
 .word 0xaa1903e0
-.word 0xb9414a69
-cbz w9, Label_1834
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1834:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -28675,22 +17276,6 @@ bl ___JS_AtomToValue_GC
 .word 0xd1002294
 .word 0xaa0003e1
 .word 0xaa1903e0
-.word 0xb9414a69
-cbz w9, Label_1835
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1835:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -28700,22 +17285,6 @@ _dispatch_table_0_191:
 .word 0x394006c8
 .word 0x8b080f08
 .word 0xf9400100
-.word 0xb9414a69
-cbz w9, Label_1836
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1836:
 .word 0x38402ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -28725,22 +17294,6 @@ _dispatch_table_1_191:
 .word 0x394006c8
 .word 0x8b080f08
 .word 0xf9400101
-.word 0xb9414a69
-cbz w9, Label_1837
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1837:
 .word 0x38402ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -28752,22 +17305,6 @@ _dispatch_table_2_191:
 .word 0xf8008680
 .word 0xaa0103e0
 .word 0xf9400101
-.word 0xb9414a69
-cbz w9, Label_1838
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1838:
 .word 0x38402ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -28778,22 +17315,6 @@ _dispatch_table_0_192:
 .word 0x8b080f08
 .word 0xf85f8e80
 .word 0xf9000100
-.word 0xb9414a69
-cbz w9, Label_1839
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1839:
 .word 0x38402ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -28803,22 +17324,6 @@ _dispatch_table_1_192:
 .word 0x394006c8
 .word 0x8b080f08
 .word 0xf9000100
-.word 0xb9414a69
-cbz w9, Label_1840
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1840:
 .word 0x38402ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -28828,22 +17333,6 @@ _dispatch_table_2_192:
 .word 0x394006c8
 .word 0x8b080f08
 .word 0xf9000101
-.word 0xb9414a69
-cbz w9, Label_1841
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1841:
 .word 0x38402ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -28854,22 +17343,6 @@ _dispatch_table_0_193:
 .word 0x8b080f08
 .word 0xf85f8e80
 .word 0xf9000100
-.word 0xb9414a69
-cbz w9, Label_1842
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1842:
 .word 0x38402ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -28879,22 +17352,6 @@ _dispatch_table_1_193:
 .word 0x394006c8
 .word 0x8b080f08
 .word 0xf9000100
-.word 0xb9414a69
-cbz w9, Label_1843
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1843:
 .word 0x38402ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -28904,22 +17361,6 @@ _dispatch_table_2_193:
 .word 0x394006c8
 .word 0x8b080f08
 .word 0xf9000101
-.word 0xb9414a69
-cbz w9, Label_1844
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1844:
 .word 0x38402ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -28927,22 +17368,6 @@ Label_1844:
 .global _dispatch_table_0_194
 _dispatch_table_0_194:
 .word 0xf9400300
-.word 0xb9414a69
-cbz w9, Label_1845
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1845:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -28950,22 +17375,6 @@ Label_1845:
 .global _dispatch_table_1_194
 _dispatch_table_1_194:
 .word 0xf9400301
-.word 0xb9414a69
-cbz w9, Label_1846
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1846:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -28975,22 +17384,6 @@ _dispatch_table_2_194:
 .word 0xf8008680
 .word 0xaa0103e0
 .word 0xf9400301
-.word 0xb9414a69
-cbz w9, Label_1847
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1847:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -28998,22 +17391,6 @@ Label_1847:
 .global _dispatch_table_0_195
 _dispatch_table_0_195:
 .word 0xf9400700
-.word 0xb9414a69
-cbz w9, Label_1848
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1848:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -29021,22 +17398,6 @@ Label_1848:
 .global _dispatch_table_1_195
 _dispatch_table_1_195:
 .word 0xf9400701
-.word 0xb9414a69
-cbz w9, Label_1849
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1849:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -29046,22 +17407,6 @@ _dispatch_table_2_195:
 .word 0xf8008680
 .word 0xaa0103e0
 .word 0xf9400701
-.word 0xb9414a69
-cbz w9, Label_1850
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1850:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -29069,22 +17414,6 @@ Label_1850:
 .global _dispatch_table_0_196
 _dispatch_table_0_196:
 .word 0xf9400b00
-.word 0xb9414a69
-cbz w9, Label_1851
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1851:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -29092,22 +17421,6 @@ Label_1851:
 .global _dispatch_table_1_196
 _dispatch_table_1_196:
 .word 0xf9400b01
-.word 0xb9414a69
-cbz w9, Label_1852
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1852:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -29117,22 +17430,6 @@ _dispatch_table_2_196:
 .word 0xf8008680
 .word 0xaa0103e0
 .word 0xf9400b01
-.word 0xb9414a69
-cbz w9, Label_1853
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1853:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -29140,22 +17437,6 @@ Label_1853:
 .global _dispatch_table_0_197
 _dispatch_table_0_197:
 .word 0xf9400f00
-.word 0xb9414a69
-cbz w9, Label_1854
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1854:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -29163,22 +17444,6 @@ Label_1854:
 .global _dispatch_table_1_197
 _dispatch_table_1_197:
 .word 0xf9400f01
-.word 0xb9414a69
-cbz w9, Label_1855
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1855:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -29188,22 +17453,6 @@ _dispatch_table_2_197:
 .word 0xf8008680
 .word 0xaa0103e0
 .word 0xf9400f01
-.word 0xb9414a69
-cbz w9, Label_1856
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1856:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -29212,22 +17461,6 @@ Label_1856:
 _dispatch_table_0_198:
 .word 0xf85f8e80
 .word 0xf9000300
-.word 0xb9414a69
-cbz w9, Label_1857
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1857:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -29235,22 +17468,6 @@ Label_1857:
 .global _dispatch_table_1_198
 _dispatch_table_1_198:
 .word 0xf9000300
-.word 0xb9414a69
-cbz w9, Label_1858
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1858:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -29258,22 +17475,6 @@ Label_1858:
 .global _dispatch_table_2_198
 _dispatch_table_2_198:
 .word 0xf9000301
-.word 0xb9414a69
-cbz w9, Label_1859
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1859:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -29282,22 +17483,6 @@ Label_1859:
 _dispatch_table_0_199:
 .word 0xf85f8e80
 .word 0xf9000700
-.word 0xb9414a69
-cbz w9, Label_1860
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1860:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -29305,22 +17490,6 @@ Label_1860:
 .global _dispatch_table_1_199
 _dispatch_table_1_199:
 .word 0xf9000700
-.word 0xb9414a69
-cbz w9, Label_1861
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1861:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -29328,22 +17497,6 @@ Label_1861:
 .global _dispatch_table_2_199
 _dispatch_table_2_199:
 .word 0xf9000701
-.word 0xb9414a69
-cbz w9, Label_1862
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1862:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -29352,22 +17505,6 @@ Label_1862:
 _dispatch_table_0_200:
 .word 0xf85f8e80
 .word 0xf9000b00
-.word 0xb9414a69
-cbz w9, Label_1863
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1863:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -29375,22 +17512,6 @@ Label_1863:
 .global _dispatch_table_1_200
 _dispatch_table_1_200:
 .word 0xf9000b00
-.word 0xb9414a69
-cbz w9, Label_1864
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1864:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -29398,22 +17519,6 @@ Label_1864:
 .global _dispatch_table_2_200
 _dispatch_table_2_200:
 .word 0xf9000b01
-.word 0xb9414a69
-cbz w9, Label_1865
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1865:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -29422,22 +17527,6 @@ Label_1865:
 _dispatch_table_0_201:
 .word 0xf85f8e80
 .word 0xf9000f00
-.word 0xb9414a69
-cbz w9, Label_1866
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1866:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -29445,22 +17534,6 @@ Label_1866:
 .global _dispatch_table_1_201
 _dispatch_table_1_201:
 .word 0xf9000f00
-.word 0xb9414a69
-cbz w9, Label_1867
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1867:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -29468,22 +17541,6 @@ Label_1867:
 .global _dispatch_table_2_201
 _dispatch_table_2_201:
 .word 0xf9000f01
-.word 0xb9414a69
-cbz w9, Label_1868
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1868:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -29492,22 +17549,6 @@ Label_1868:
 _dispatch_table_0_202:
 .word 0xf85f8e80
 .word 0xf9000300
-.word 0xb9414a69
-cbz w9, Label_1869
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1869:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -29515,22 +17556,6 @@ Label_1869:
 .global _dispatch_table_1_202
 _dispatch_table_1_202:
 .word 0xf9000300
-.word 0xb9414a69
-cbz w9, Label_1870
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1870:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -29538,22 +17563,6 @@ Label_1870:
 .global _dispatch_table_2_202
 _dispatch_table_2_202:
 .word 0xf9000301
-.word 0xb9414a69
-cbz w9, Label_1871
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1871:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -29562,22 +17571,6 @@ Label_1871:
 _dispatch_table_0_203:
 .word 0xf85f8e80
 .word 0xf9000700
-.word 0xb9414a69
-cbz w9, Label_1872
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1872:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -29585,22 +17578,6 @@ Label_1872:
 .global _dispatch_table_1_203
 _dispatch_table_1_203:
 .word 0xf9000700
-.word 0xb9414a69
-cbz w9, Label_1873
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1873:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -29608,22 +17585,6 @@ Label_1873:
 .global _dispatch_table_2_203
 _dispatch_table_2_203:
 .word 0xf9000701
-.word 0xb9414a69
-cbz w9, Label_1874
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1874:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -29632,22 +17593,6 @@ Label_1874:
 _dispatch_table_0_204:
 .word 0xf85f8e80
 .word 0xf9000b00
-.word 0xb9414a69
-cbz w9, Label_1875
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1875:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -29655,22 +17600,6 @@ Label_1875:
 .global _dispatch_table_1_204
 _dispatch_table_1_204:
 .word 0xf9000b00
-.word 0xb9414a69
-cbz w9, Label_1876
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1876:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -29678,22 +17607,6 @@ Label_1876:
 .global _dispatch_table_2_204
 _dispatch_table_2_204:
 .word 0xf9000b01
-.word 0xb9414a69
-cbz w9, Label_1877
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1877:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -29702,22 +17615,6 @@ Label_1877:
 _dispatch_table_0_205:
 .word 0xf85f8e80
 .word 0xf9000f00
-.word 0xb9414a69
-cbz w9, Label_1878
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1878:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -29725,22 +17622,6 @@ Label_1878:
 .global _dispatch_table_1_205
 _dispatch_table_1_205:
 .word 0xf9000f00
-.word 0xb9414a69
-cbz w9, Label_1879
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1879:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -29748,22 +17629,6 @@ Label_1879:
 .global _dispatch_table_2_205
 _dispatch_table_2_205:
 .word 0xf9000f01
-.word 0xb9414a69
-cbz w9, Label_1880
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1880:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -29771,22 +17636,6 @@ Label_1880:
 .global _dispatch_table_0_206
 _dispatch_table_0_206:
 .word 0xf94002e0
-.word 0xb9414a69
-cbz w9, Label_1881
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1881:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -29794,22 +17643,6 @@ Label_1881:
 .global _dispatch_table_1_206
 _dispatch_table_1_206:
 .word 0xf94002e1
-.word 0xb9414a69
-cbz w9, Label_1882
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1882:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -29819,22 +17652,6 @@ _dispatch_table_2_206:
 .word 0xf8008680
 .word 0xaa0103e0
 .word 0xf94002e1
-.word 0xb9414a69
-cbz w9, Label_1883
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1883:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -29842,22 +17659,6 @@ Label_1883:
 .global _dispatch_table_0_207
 _dispatch_table_0_207:
 .word 0xf94006e0
-.word 0xb9414a69
-cbz w9, Label_1884
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1884:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -29865,22 +17666,6 @@ Label_1884:
 .global _dispatch_table_1_207
 _dispatch_table_1_207:
 .word 0xf94006e1
-.word 0xb9414a69
-cbz w9, Label_1885
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1885:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -29890,22 +17675,6 @@ _dispatch_table_2_207:
 .word 0xf8008680
 .word 0xaa0103e0
 .word 0xf94006e1
-.word 0xb9414a69
-cbz w9, Label_1886
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1886:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -29913,22 +17682,6 @@ Label_1886:
 .global _dispatch_table_0_208
 _dispatch_table_0_208:
 .word 0xf9400ae0
-.word 0xb9414a69
-cbz w9, Label_1887
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1887:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -29936,22 +17689,6 @@ Label_1887:
 .global _dispatch_table_1_208
 _dispatch_table_1_208:
 .word 0xf9400ae1
-.word 0xb9414a69
-cbz w9, Label_1888
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1888:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -29961,22 +17698,6 @@ _dispatch_table_2_208:
 .word 0xf8008680
 .word 0xaa0103e0
 .word 0xf9400ae1
-.word 0xb9414a69
-cbz w9, Label_1889
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1889:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -29984,22 +17705,6 @@ Label_1889:
 .global _dispatch_table_0_209
 _dispatch_table_0_209:
 .word 0xf9400ee0
-.word 0xb9414a69
-cbz w9, Label_1890
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1890:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -30007,22 +17712,6 @@ Label_1890:
 .global _dispatch_table_1_209
 _dispatch_table_1_209:
 .word 0xf9400ee1
-.word 0xb9414a69
-cbz w9, Label_1891
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1891:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -30032,22 +17721,6 @@ _dispatch_table_2_209:
 .word 0xf8008680
 .word 0xaa0103e0
 .word 0xf9400ee1
-.word 0xb9414a69
-cbz w9, Label_1892
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1892:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -30056,22 +17729,6 @@ Label_1892:
 _dispatch_table_0_210:
 .word 0xf85f8e80
 .word 0xf90002e0
-.word 0xb9414a69
-cbz w9, Label_1893
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1893:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -30079,22 +17736,6 @@ Label_1893:
 .global _dispatch_table_1_210
 _dispatch_table_1_210:
 .word 0xf90002e0
-.word 0xb9414a69
-cbz w9, Label_1894
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1894:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -30102,22 +17743,6 @@ Label_1894:
 .global _dispatch_table_2_210
 _dispatch_table_2_210:
 .word 0xf90002e1
-.word 0xb9414a69
-cbz w9, Label_1895
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1895:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -30126,22 +17751,6 @@ Label_1895:
 _dispatch_table_0_211:
 .word 0xf85f8e80
 .word 0xf90006e0
-.word 0xb9414a69
-cbz w9, Label_1896
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1896:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -30149,22 +17758,6 @@ Label_1896:
 .global _dispatch_table_1_211
 _dispatch_table_1_211:
 .word 0xf90006e0
-.word 0xb9414a69
-cbz w9, Label_1897
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1897:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -30172,22 +17765,6 @@ Label_1897:
 .global _dispatch_table_2_211
 _dispatch_table_2_211:
 .word 0xf90006e1
-.word 0xb9414a69
-cbz w9, Label_1898
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1898:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -30196,22 +17773,6 @@ Label_1898:
 _dispatch_table_0_212:
 .word 0xf85f8e80
 .word 0xf9000ae0
-.word 0xb9414a69
-cbz w9, Label_1899
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1899:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -30219,22 +17780,6 @@ Label_1899:
 .global _dispatch_table_1_212
 _dispatch_table_1_212:
 .word 0xf9000ae0
-.word 0xb9414a69
-cbz w9, Label_1900
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1900:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -30242,22 +17787,6 @@ Label_1900:
 .global _dispatch_table_2_212
 _dispatch_table_2_212:
 .word 0xf9000ae1
-.word 0xb9414a69
-cbz w9, Label_1901
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1901:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -30266,22 +17795,6 @@ Label_1901:
 _dispatch_table_0_213:
 .word 0xf85f8e80
 .word 0xf9000ee0
-.word 0xb9414a69
-cbz w9, Label_1902
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1902:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -30289,22 +17802,6 @@ Label_1902:
 .global _dispatch_table_1_213
 _dispatch_table_1_213:
 .word 0xf9000ee0
-.word 0xb9414a69
-cbz w9, Label_1903
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1903:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -30312,22 +17809,6 @@ Label_1903:
 .global _dispatch_table_2_213
 _dispatch_table_2_213:
 .word 0xf9000ee1
-.word 0xb9414a69
-cbz w9, Label_1904
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1904:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -30336,22 +17817,6 @@ Label_1904:
 _dispatch_table_0_214:
 .word 0xf85f8e80
 .word 0xf90002e0
-.word 0xb9414a69
-cbz w9, Label_1905
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1905:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -30359,22 +17824,6 @@ Label_1905:
 .global _dispatch_table_1_214
 _dispatch_table_1_214:
 .word 0xf90002e0
-.word 0xb9414a69
-cbz w9, Label_1906
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1906:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -30382,22 +17831,6 @@ Label_1906:
 .global _dispatch_table_2_214
 _dispatch_table_2_214:
 .word 0xf90002e1
-.word 0xb9414a69
-cbz w9, Label_1907
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1907:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -30406,22 +17839,6 @@ Label_1907:
 _dispatch_table_0_215:
 .word 0xf85f8e80
 .word 0xf90006e0
-.word 0xb9414a69
-cbz w9, Label_1908
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1908:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -30429,22 +17846,6 @@ Label_1908:
 .global _dispatch_table_1_215
 _dispatch_table_1_215:
 .word 0xf90006e0
-.word 0xb9414a69
-cbz w9, Label_1909
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1909:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -30452,22 +17853,6 @@ Label_1909:
 .global _dispatch_table_2_215
 _dispatch_table_2_215:
 .word 0xf90006e1
-.word 0xb9414a69
-cbz w9, Label_1910
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1910:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -30476,22 +17861,6 @@ Label_1910:
 _dispatch_table_0_216:
 .word 0xf85f8e80
 .word 0xf9000ae0
-.word 0xb9414a69
-cbz w9, Label_1911
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1911:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -30499,22 +17868,6 @@ Label_1911:
 .global _dispatch_table_1_216
 _dispatch_table_1_216:
 .word 0xf9000ae0
-.word 0xb9414a69
-cbz w9, Label_1912
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1912:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -30522,22 +17875,6 @@ Label_1912:
 .global _dispatch_table_2_216
 _dispatch_table_2_216:
 .word 0xf9000ae1
-.word 0xb9414a69
-cbz w9, Label_1913
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1913:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -30546,22 +17883,6 @@ Label_1913:
 _dispatch_table_0_217:
 .word 0xf85f8e80
 .word 0xf9000ee0
-.word 0xb9414a69
-cbz w9, Label_1914
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1914:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -30569,22 +17890,6 @@ Label_1914:
 .global _dispatch_table_1_217
 _dispatch_table_1_217:
 .word 0xf9000ee0
-.word 0xb9414a69
-cbz w9, Label_1915
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1915:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -30592,22 +17897,6 @@ Label_1915:
 .global _dispatch_table_2_217
 _dispatch_table_2_217:
 .word 0xf9000ee1
-.word 0xb9414a69
-cbz w9, Label_1916
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1916:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -30617,22 +17906,6 @@ _dispatch_table_0_218:
 .word 0xf9400388
 .word 0xf9401108
 .word 0xf9400100
-.word 0xb9414a69
-cbz w9, Label_1917
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1917:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -30642,22 +17915,6 @@ _dispatch_table_1_218:
 .word 0xf9400388
 .word 0xf9401108
 .word 0xf9400101
-.word 0xb9414a69
-cbz w9, Label_1918
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1918:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -30669,22 +17926,6 @@ _dispatch_table_2_218:
 .word 0xf9400388
 .word 0xf9401108
 .word 0xf9400101
-.word 0xb9414a69
-cbz w9, Label_1919
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1919:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -30694,22 +17935,6 @@ _dispatch_table_0_219:
 .word 0xf9400788
 .word 0xf9401108
 .word 0xf9400100
-.word 0xb9414a69
-cbz w9, Label_1920
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1920:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -30719,22 +17944,6 @@ _dispatch_table_1_219:
 .word 0xf9400788
 .word 0xf9401108
 .word 0xf9400101
-.word 0xb9414a69
-cbz w9, Label_1921
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1921:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -30746,22 +17955,6 @@ _dispatch_table_2_219:
 .word 0xf9400788
 .word 0xf9401108
 .word 0xf9400101
-.word 0xb9414a69
-cbz w9, Label_1922
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1922:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -30771,22 +17964,6 @@ _dispatch_table_0_220:
 .word 0xf9400b88
 .word 0xf9401108
 .word 0xf9400100
-.word 0xb9414a69
-cbz w9, Label_1923
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1923:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -30796,22 +17973,6 @@ _dispatch_table_1_220:
 .word 0xf9400b88
 .word 0xf9401108
 .word 0xf9400101
-.word 0xb9414a69
-cbz w9, Label_1924
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1924:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -30823,22 +17984,6 @@ _dispatch_table_2_220:
 .word 0xf9400b88
 .word 0xf9401108
 .word 0xf9400101
-.word 0xb9414a69
-cbz w9, Label_1925
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1925:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -30848,22 +17993,6 @@ _dispatch_table_0_221:
 .word 0xf9400f88
 .word 0xf9401108
 .word 0xf9400100
-.word 0xb9414a69
-cbz w9, Label_1926
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1926:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -30873,22 +18002,6 @@ _dispatch_table_1_221:
 .word 0xf9400f88
 .word 0xf9401108
 .word 0xf9400101
-.word 0xb9414a69
-cbz w9, Label_1927
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1927:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -30900,22 +18013,6 @@ _dispatch_table_2_221:
 .word 0xf9400f88
 .word 0xf9401108
 .word 0xf9400101
-.word 0xb9414a69
-cbz w9, Label_1928
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1928:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -30932,22 +18029,6 @@ _dispatch_table_0_222:
 bl _prim_WriteBarrierNoStore
 .word 0xa8c17ffe
 .word 0xaa1903e0
-.word 0xb9414a69
-cbz w9, Label_1929
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1929:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -30963,22 +18044,6 @@ _dispatch_table_1_222:
 bl _prim_WriteBarrierNoStore
 .word 0xa8c17ffe
 .word 0xaa1903e0
-.word 0xb9414a69
-cbz w9, Label_1930
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1930:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -30996,22 +18061,6 @@ _dispatch_table_2_222:
 bl _prim_WriteBarrierNoStore
 .word 0xa8c17ffe
 .word 0xaa1903e0
-.word 0xb9414a69
-cbz w9, Label_1931
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1931:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -31028,22 +18077,6 @@ _dispatch_table_0_223:
 bl _prim_WriteBarrierNoStore
 .word 0xa8c17ffe
 .word 0xaa1903e0
-.word 0xb9414a69
-cbz w9, Label_1932
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1932:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -31059,22 +18092,6 @@ _dispatch_table_1_223:
 bl _prim_WriteBarrierNoStore
 .word 0xa8c17ffe
 .word 0xaa1903e0
-.word 0xb9414a69
-cbz w9, Label_1933
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1933:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -31092,22 +18109,6 @@ _dispatch_table_2_223:
 bl _prim_WriteBarrierNoStore
 .word 0xa8c17ffe
 .word 0xaa1903e0
-.word 0xb9414a69
-cbz w9, Label_1934
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1934:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -31124,22 +18125,6 @@ _dispatch_table_0_224:
 bl _prim_WriteBarrierNoStore
 .word 0xa8c17ffe
 .word 0xaa1903e0
-.word 0xb9414a69
-cbz w9, Label_1935
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1935:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -31155,22 +18140,6 @@ _dispatch_table_1_224:
 bl _prim_WriteBarrierNoStore
 .word 0xa8c17ffe
 .word 0xaa1903e0
-.word 0xb9414a69
-cbz w9, Label_1936
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1936:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -31188,22 +18157,6 @@ _dispatch_table_2_224:
 bl _prim_WriteBarrierNoStore
 .word 0xa8c17ffe
 .word 0xaa1903e0
-.word 0xb9414a69
-cbz w9, Label_1937
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1937:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -31220,22 +18173,6 @@ _dispatch_table_0_225:
 bl _prim_WriteBarrierNoStore
 .word 0xa8c17ffe
 .word 0xaa1903e0
-.word 0xb9414a69
-cbz w9, Label_1938
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1938:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -31251,22 +18188,6 @@ _dispatch_table_1_225:
 bl _prim_WriteBarrierNoStore
 .word 0xa8c17ffe
 .word 0xaa1903e0
-.word 0xb9414a69
-cbz w9, Label_1939
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1939:
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -31284,22 +18205,6 @@ _dispatch_table_2_225:
 bl _prim_WriteBarrierNoStore
 .word 0xa8c17ffe
 .word 0xaa1903e0
-.word 0xb9414a69
-cbz w9, Label_1940
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1940:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -31316,22 +18221,6 @@ _dispatch_table_0_226:
 bl _prim_WriteBarrierNoStore
 .word 0xa8c17ffe
 .word 0xaa1903e0
-.word 0xb9414a69
-cbz w9, Label_1941
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1941:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -31347,22 +18236,6 @@ _dispatch_table_1_226:
 bl _prim_WriteBarrierNoStore
 .word 0xa8c17ffe
 .word 0xaa1903e0
-.word 0xb9414a69
-cbz w9, Label_1942
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1942:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -31382,22 +18255,6 @@ bl _prim_WriteBarrierNoStore
 .word 0xa8c17ffe
 .word 0xf85f8e81
 .word 0xf85f8e80
-.word 0xb9414a69
-cbz w9, Label_1943
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1943:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -31414,22 +18271,6 @@ _dispatch_table_0_227:
 bl _prim_WriteBarrierNoStore
 .word 0xa8c17ffe
 .word 0xaa1903e0
-.word 0xb9414a69
-cbz w9, Label_1944
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1944:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -31445,22 +18286,6 @@ _dispatch_table_1_227:
 bl _prim_WriteBarrierNoStore
 .word 0xa8c17ffe
 .word 0xaa1903e0
-.word 0xb9414a69
-cbz w9, Label_1945
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1945:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -31480,22 +18305,6 @@ bl _prim_WriteBarrierNoStore
 .word 0xa8c17ffe
 .word 0xf85f8e81
 .word 0xf85f8e80
-.word 0xb9414a69
-cbz w9, Label_1946
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1946:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -31512,22 +18321,6 @@ _dispatch_table_0_228:
 bl _prim_WriteBarrierNoStore
 .word 0xa8c17ffe
 .word 0xaa1903e0
-.word 0xb9414a69
-cbz w9, Label_1947
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1947:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -31543,22 +18336,6 @@ _dispatch_table_1_228:
 bl _prim_WriteBarrierNoStore
 .word 0xa8c17ffe
 .word 0xaa1903e0
-.word 0xb9414a69
-cbz w9, Label_1948
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1948:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -31578,22 +18355,6 @@ bl _prim_WriteBarrierNoStore
 .word 0xa8c17ffe
 .word 0xf85f8e81
 .word 0xf85f8e80
-.word 0xb9414a69
-cbz w9, Label_1949
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1949:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -31610,22 +18371,6 @@ _dispatch_table_0_229:
 bl _prim_WriteBarrierNoStore
 .word 0xa8c17ffe
 .word 0xaa1903e0
-.word 0xb9414a69
-cbz w9, Label_1950
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1950:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -31641,22 +18386,6 @@ _dispatch_table_1_229:
 bl _prim_WriteBarrierNoStore
 .word 0xa8c17ffe
 .word 0xaa1903e0
-.word 0xb9414a69
-cbz w9, Label_1951
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1951:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -31676,22 +18405,6 @@ bl _prim_WriteBarrierNoStore
 .word 0xa8c17ffe
 .word 0xf85f8e81
 .word 0xf85f8e80
-.word 0xb9414a69
-cbz w9, Label_1952
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1952:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -31713,29 +18426,13 @@ bl _js_get_length
 .word 0xa8c17ffe
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_1954
+b.NE Label_1120
 .word 0xf8008699
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1954:
-.word 0xb9414a69
-cbz w9, Label_1955
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1955:
+Label_1120:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -31756,29 +18453,13 @@ bl _js_get_length
 .word 0xa8c17ffe
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_1957
+b.NE Label_1122
 .word 0xf8008699
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1957:
-.word 0xb9414a69
-cbz w9, Label_1958
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1958:
+Label_1122:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -31799,31 +18480,15 @@ bl _js_get_length
 .word 0xa8c17ffe
 .word 0xd1002294
 .word 0xf102081f
-b.NE Label_1960
+b.NE Label_1124
 .word 0xf8008699
 .word 0x910006d6
 .word 0xf85b83b1
 .word 0xf9002234
 b __exception_handler_entry
-Label_1960:
+Label_1124:
 .word 0xaa0003e1
 .word 0xf85f8e80
-.word 0xb9414a69
-cbz w9, Label_1961
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1961:
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -31833,160 +18498,64 @@ _dispatch_table_0_231:
 .word 0xf85f8e84
 .word 0xb2400be9
 .word 0xeb090088
-cbnz x8, Label_1962
+cbnz x8, Label_1125
 .word 0x398006c3
 .word 0x91000463
-.word 0xb9414a69
-cbz w9, Label_1967
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1967:
 .word 0x38402ec8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1962:
+Label_1125:
 .word 0xb27f07e9
 .word 0xeb090088
-cbnz x8, Label_1963
+cbnz x8, Label_1126
 .word 0x398006c3
 .word 0x91000463
 .word 0xab0302d6
-.word 0xb9414a69
-cbz w9, Label_1968
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1968:
 .word 0x394002c8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1963:
+Label_1126:
 .word 0xf2503c88
 .word 0xb24f3be9
 .word 0xeb090108
-cbnz x8, Label_1964
+cbnz x8, Label_1127
 .word 0x2a0403e8
 .word 0x398006c3
 .word 0x91000463
-cbnz x8, Label_1969
+cbnz x8, Label_1130
 .word 0xab0302d6
-.word 0xb9414a69
-cbz w9, Label_1970
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1970:
 .word 0x394002c8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1969:
-.word 0xb9414a69
-cbz w9, Label_1971
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1971:
+Label_1130:
 .word 0x38402ec8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1964:
+Label_1127:
 .word 0xf1004888
-cbnz x8, Label_1965
+cbnz x8, Label_1128
 .word 0x398006c3
 .word 0x91000463
 .word 0xab0302d6
-.word 0xb9414a69
-cbz w9, Label_1972
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1972:
 .word 0x394002c8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1965:
+Label_1128:
 .word 0xf1000888
-cbnz x8, Label_1966
+cbnz x8, Label_1129
 .word 0x398006c3
 .word 0x91000463
 .word 0xab0302d6
-.word 0xb9414a69
-cbz w9, Label_1973
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1973:
 .word 0x394002c8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1966:
+Label_1129:
 .word 0xaa0403e1
 .word 0xaa1303e0
 .word 0xa9bf7ffe
@@ -31995,66 +18564,18 @@ bl _JS_ToBoolFree_GC
 .word 0xaa0003e8
 .word 0x398006c3
 .word 0x91000463
-cbnz x8, Label_1974
+cbnz x8, Label_1131
 .word 0xab0302d6
-.word 0xb9414a69
-cbz w9, Label_1976
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1976:
 .word 0x394002c8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1974:
-.word 0xb9414a69
-cbz w9, Label_1977
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1977:
+Label_1131:
 .word 0x38402ec8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1975:
-.word 0xb9414a69
-cbz w9, Label_1978
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1978:
+Label_1132:
 .word 0x38402ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -32064,160 +18585,64 @@ _dispatch_table_1_231:
 .word 0xaa0003e4
 .word 0xb2400be9
 .word 0xeb090088
-cbnz x8, Label_1979
+cbnz x8, Label_1133
 .word 0x398006c3
 .word 0x91000463
-.word 0xb9414a69
-cbz w9, Label_1984
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1984:
 .word 0x38402ec8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1979:
+Label_1133:
 .word 0xb27f07e9
 .word 0xeb090088
-cbnz x8, Label_1980
+cbnz x8, Label_1134
 .word 0x398006c3
 .word 0x91000463
 .word 0xab0302d6
-.word 0xb9414a69
-cbz w9, Label_1985
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1985:
 .word 0x394002c8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1980:
+Label_1134:
 .word 0xf2503c88
 .word 0xb24f3be9
 .word 0xeb090108
-cbnz x8, Label_1981
+cbnz x8, Label_1135
 .word 0x2a0403e8
 .word 0x398006c3
 .word 0x91000463
-cbnz x8, Label_1986
+cbnz x8, Label_1138
 .word 0xab0302d6
-.word 0xb9414a69
-cbz w9, Label_1987
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1987:
 .word 0x394002c8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1986:
-.word 0xb9414a69
-cbz w9, Label_1988
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1988:
+Label_1138:
 .word 0x38402ec8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1981:
+Label_1135:
 .word 0xf1004888
-cbnz x8, Label_1982
+cbnz x8, Label_1136
 .word 0x398006c3
 .word 0x91000463
 .word 0xab0302d6
-.word 0xb9414a69
-cbz w9, Label_1989
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1989:
 .word 0x394002c8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1982:
+Label_1136:
 .word 0xf1000888
-cbnz x8, Label_1983
+cbnz x8, Label_1137
 .word 0x398006c3
 .word 0x91000463
 .word 0xab0302d6
-.word 0xb9414a69
-cbz w9, Label_1990
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1990:
 .word 0x394002c8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1983:
+Label_1137:
 .word 0xaa0403e1
 .word 0xaa1303e0
 .word 0xa9bf7ffe
@@ -32226,66 +18651,18 @@ bl _JS_ToBoolFree_GC
 .word 0xaa0003e8
 .word 0x398006c3
 .word 0x91000463
-cbnz x8, Label_1991
+cbnz x8, Label_1139
 .word 0xab0302d6
-.word 0xb9414a69
-cbz w9, Label_1993
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1993:
 .word 0x394002c8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1991:
-.word 0xb9414a69
-cbz w9, Label_1994
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1994:
+Label_1139:
 .word 0x38402ec8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1992:
-.word 0xb9414a69
-cbz w9, Label_1995
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_1995:
+Label_1140:
 .word 0x38402ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -32295,160 +18672,64 @@ _dispatch_table_2_231:
 .word 0xaa0103e4
 .word 0xb2400be9
 .word 0xeb090088
-cbnz x8, Label_1996
+cbnz x8, Label_1141
 .word 0x398006c3
 .word 0x91000463
-.word 0xb9414a69
-cbz w9, Label_2001
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_2001:
 .word 0x38402ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1996:
+Label_1141:
 .word 0xb27f07e9
 .word 0xeb090088
-cbnz x8, Label_1997
+cbnz x8, Label_1142
 .word 0x398006c3
 .word 0x91000463
 .word 0xab0302d6
-.word 0xb9414a69
-cbz w9, Label_2002
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_2002:
 .word 0x394002c8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1997:
+Label_1142:
 .word 0xf2503c88
 .word 0xb24f3be9
 .word 0xeb090108
-cbnz x8, Label_1998
+cbnz x8, Label_1143
 .word 0x2a0403e8
 .word 0x398006c3
 .word 0x91000463
-cbnz x8, Label_2003
+cbnz x8, Label_1146
 .word 0xab0302d6
-.word 0xb9414a69
-cbz w9, Label_2004
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_2004:
 .word 0x394002c8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_2003:
-.word 0xb9414a69
-cbz w9, Label_2005
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_2005:
+Label_1146:
 .word 0x38402ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1998:
+Label_1143:
 .word 0xf1004888
-cbnz x8, Label_1999
+cbnz x8, Label_1144
 .word 0x398006c3
 .word 0x91000463
 .word 0xab0302d6
-.word 0xb9414a69
-cbz w9, Label_2006
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_2006:
 .word 0x394002c8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_1999:
+Label_1144:
 .word 0xf1000888
-cbnz x8, Label_2000
+cbnz x8, Label_1145
 .word 0x398006c3
 .word 0x91000463
 .word 0xab0302d6
-.word 0xb9414a69
-cbz w9, Label_2007
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_2007:
 .word 0x394002c8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_2000:
+Label_1145:
 .word 0xaa0003f9
 .word 0xaa0403e1
 .word 0xaa1303e0
@@ -32459,66 +18740,18 @@ bl _JS_ToBoolFree_GC
 .word 0xaa1903e0
 .word 0x398006c3
 .word 0x91000463
-cbnz x8, Label_2008
+cbnz x8, Label_1147
 .word 0xab0302d6
-.word 0xb9414a69
-cbz w9, Label_2010
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_2010:
 .word 0x394002c8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_2008:
-.word 0xb9414a69
-cbz w9, Label_2011
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_2011:
+Label_1147:
 .word 0x38402ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_2009:
-.word 0xb9414a69
-cbz w9, Label_2012
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_2012:
+Label_1148:
 .word 0x38402ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -32528,158 +18761,62 @@ _dispatch_table_0_232:
 .word 0xf85f8e84
 .word 0xb2400be9
 .word 0xeb090088
-cbnz x8, Label_2013
+cbnz x8, Label_1149
 .word 0x398006c3
 .word 0x91000463
 .word 0xab0302d6
-.word 0xb9414a69
-cbz w9, Label_2018
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_2018:
 .word 0x394002c8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_2013:
+Label_1149:
 .word 0xb27f07e9
 .word 0xeb090088
-cbnz x8, Label_2014
+cbnz x8, Label_1150
 .word 0x398006c3
 .word 0x91000463
-.word 0xb9414a69
-cbz w9, Label_2019
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_2019:
 .word 0x38402ec8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_2014:
+Label_1150:
 .word 0xf2503c88
 .word 0xb24f3be9
 .word 0xeb090108
-cbnz x8, Label_2015
+cbnz x8, Label_1151
 .word 0x2a0403e8
 .word 0x398006c3
 .word 0x91000463
-cbz x8, Label_2020
+cbz x8, Label_1154
 .word 0xab0302d6
-.word 0xb9414a69
-cbz w9, Label_2021
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_2021:
 .word 0x394002c8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_2020:
-.word 0xb9414a69
-cbz w9, Label_2022
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_2022:
+Label_1154:
 .word 0x38402ec8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_2015:
+Label_1151:
 .word 0xf1004888
-cbnz x8, Label_2016
+cbnz x8, Label_1152
 .word 0x398006c3
 .word 0x91000463
-.word 0xb9414a69
-cbz w9, Label_2023
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_2023:
 .word 0x38402ec8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_2016:
+Label_1152:
 .word 0xf1000888
-cbnz x8, Label_2017
+cbnz x8, Label_1153
 .word 0x398006c3
 .word 0x91000463
-.word 0xb9414a69
-cbz w9, Label_2024
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_2024:
 .word 0x38402ec8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_2017:
+Label_1153:
 .word 0xaa0403e1
 .word 0xaa1303e0
 .word 0xa9bf7ffe
@@ -32688,67 +18825,19 @@ bl _JS_ToBoolFree_GC
 .word 0xaa0003e8
 .word 0x398006c3
 .word 0x91000463
-cbz x8, Label_2025
+cbz x8, Label_1155
 .word 0xab0302d6
-.word 0xb9414a69
-cbz w9, Label_2027
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_2027:
 .word 0x394002c8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-b Label_2026
-Label_2025:
-.word 0xb9414a69
-cbz w9, Label_2028
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_2028:
+b Label_1156
+Label_1155:
 .word 0x38402ec8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_2026:
-.word 0xb9414a69
-cbz w9, Label_2029
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_2029:
+Label_1156:
 .word 0x38402ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -32758,158 +18847,62 @@ _dispatch_table_1_232:
 .word 0xaa0003e4
 .word 0xb2400be9
 .word 0xeb090088
-cbnz x8, Label_2030
+cbnz x8, Label_1157
 .word 0x398006c3
 .word 0x91000463
 .word 0xab0302d6
-.word 0xb9414a69
-cbz w9, Label_2035
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_2035:
 .word 0x394002c8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_2030:
+Label_1157:
 .word 0xb27f07e9
 .word 0xeb090088
-cbnz x8, Label_2031
+cbnz x8, Label_1158
 .word 0x398006c3
 .word 0x91000463
-.word 0xb9414a69
-cbz w9, Label_2036
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_2036:
 .word 0x38402ec8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_2031:
+Label_1158:
 .word 0xf2503c88
 .word 0xb24f3be9
 .word 0xeb090108
-cbnz x8, Label_2032
+cbnz x8, Label_1159
 .word 0x2a0403e8
 .word 0x398006c3
 .word 0x91000463
-cbz x8, Label_2037
+cbz x8, Label_1162
 .word 0xab0302d6
-.word 0xb9414a69
-cbz w9, Label_2038
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_2038:
 .word 0x394002c8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_2037:
-.word 0xb9414a69
-cbz w9, Label_2039
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_2039:
+Label_1162:
 .word 0x38402ec8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_2032:
+Label_1159:
 .word 0xf1004888
-cbnz x8, Label_2033
+cbnz x8, Label_1160
 .word 0x398006c3
 .word 0x91000463
-.word 0xb9414a69
-cbz w9, Label_2040
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_2040:
 .word 0x38402ec8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_2033:
+Label_1160:
 .word 0xf1000888
-cbnz x8, Label_2034
+cbnz x8, Label_1161
 .word 0x398006c3
 .word 0x91000463
-.word 0xb9414a69
-cbz w9, Label_2041
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_2041:
 .word 0x38402ec8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_2034:
+Label_1161:
 .word 0xaa0403e1
 .word 0xaa1303e0
 .word 0xa9bf7ffe
@@ -32918,67 +18911,19 @@ bl _JS_ToBoolFree_GC
 .word 0xaa0003e8
 .word 0x398006c3
 .word 0x91000463
-cbz x8, Label_2042
+cbz x8, Label_1163
 .word 0xab0302d6
-.word 0xb9414a69
-cbz w9, Label_2044
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_2044:
 .word 0x394002c8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-b Label_2043
-Label_2042:
-.word 0xb9414a69
-cbz w9, Label_2045
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_2045:
+b Label_1164
+Label_1163:
 .word 0x38402ec8
 .word 0x91000108
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_2043:
-.word 0xb9414a69
-cbz w9, Label_2046
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_2046:
+Label_1164:
 .word 0x38402ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -32988,158 +18933,62 @@ _dispatch_table_2_232:
 .word 0xaa0103e4
 .word 0xb2400be9
 .word 0xeb090088
-cbnz x8, Label_2047
+cbnz x8, Label_1165
 .word 0x398006c3
 .word 0x91000463
 .word 0xab0302d6
-.word 0xb9414a69
-cbz w9, Label_2052
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_2052:
 .word 0x394002c8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_2047:
+Label_1165:
 .word 0xb27f07e9
 .word 0xeb090088
-cbnz x8, Label_2048
+cbnz x8, Label_1166
 .word 0x398006c3
 .word 0x91000463
-.word 0xb9414a69
-cbz w9, Label_2053
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_2053:
 .word 0x38402ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_2048:
+Label_1166:
 .word 0xf2503c88
 .word 0xb24f3be9
 .word 0xeb090108
-cbnz x8, Label_2049
+cbnz x8, Label_1167
 .word 0x2a0403e8
 .word 0x398006c3
 .word 0x91000463
-cbz x8, Label_2054
+cbz x8, Label_1170
 .word 0xab0302d6
-.word 0xb9414a69
-cbz w9, Label_2055
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_2055:
 .word 0x394002c8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_2054:
-.word 0xb9414a69
-cbz w9, Label_2056
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_2056:
+Label_1170:
 .word 0x38402ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_2049:
+Label_1167:
 .word 0xf1004888
-cbnz x8, Label_2050
+cbnz x8, Label_1168
 .word 0x398006c3
 .word 0x91000463
-.word 0xb9414a69
-cbz w9, Label_2057
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_2057:
 .word 0x38402ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_2050:
+Label_1168:
 .word 0xf1000888
-cbnz x8, Label_2051
+cbnz x8, Label_1169
 .word 0x398006c3
 .word 0x91000463
-.word 0xb9414a69
-cbz w9, Label_2058
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_2058:
 .word 0x38402ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_2051:
+Label_1169:
 .word 0xaa0003f9
 .word 0xaa0403e1
 .word 0xaa1303e0
@@ -33150,67 +18999,19 @@ bl _JS_ToBoolFree_GC
 .word 0xaa1903e0
 .word 0x398006c3
 .word 0x91000463
-cbz x8, Label_2059
+cbz x8, Label_1171
 .word 0xab0302d6
-.word 0xb9414a69
-cbz w9, Label_2061
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_2061:
 .word 0x394002c8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-b Label_2060
-Label_2059:
-.word 0xb9414a69
-cbz w9, Label_2062
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_2062:
+b Label_1172
+Label_1171:
 .word 0x38402ec8
 .word 0x9103c908
 .word 0xf8685aa9
 .word 0xd61f0120
-Label_2060:
-.word 0xb9414a69
-cbz w9, Label_2063
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ec8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_2063:
+Label_1172:
 .word 0x38402ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -33220,22 +19021,6 @@ _dispatch_table_0_233:
 .word 0x398006c8
 .word 0x91000508
 .word 0xab0802d6
-.word 0xb9414a69
-cbz w9, Label_2064
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_2064:
 .word 0x394002c8
 .word 0x91000108
 .word 0xf8685aa9
@@ -33245,22 +19030,6 @@ _dispatch_table_1_233:
 .word 0x398006c8
 .word 0x91000508
 .word 0xab0802d6
-.word 0xb9414a69
-cbz w9, Label_2065
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_2065:
 .word 0x394002c8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -33270,22 +19039,6 @@ _dispatch_table_2_233:
 .word 0x398006c8
 .word 0x91000508
 .word 0xab0802d6
-.word 0xb9414a69
-cbz w9, Label_2066
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_2066:
 .word 0x394002c8
 .word 0x91079108
 .word 0xf8685aa9
@@ -33295,22 +19048,6 @@ _dispatch_table_0_234:
 .word 0x788012c8
 .word 0x91000508
 .word 0xab0802d6
-.word 0xb9414a69
-cbz w9, Label_2067
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_2067:
 .word 0x394002c8
 .word 0x91000108
 .word 0xf8685aa9
@@ -33320,22 +19057,6 @@ _dispatch_table_1_234:
 .word 0x788012c8
 .word 0x91000508
 .word 0xab0802d6
-.word 0xb9414a69
-cbz w9, Label_2068
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_2068:
 .word 0x394002c8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -33345,22 +19066,6 @@ _dispatch_table_2_234:
 .word 0x788012c8
 .word 0x91000508
 .word 0xab0802d6
-.word 0xb9414a69
-cbz w9, Label_2069
-.word 0xf8008680
-.word 0xf8008681
-.word 0x910006c8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_2069:
 .word 0x394002c8
 .word 0x91079108
 .word 0xf8685aa9
@@ -33384,31 +19089,31 @@ _dispatch_table_1_235:
 .word 0xd2800048
 .word 0xf2ffffe8
 .word 0xea08019f
-b.NE Label_2073
+b.NE Label_1176
 .word 0x79400d88
 .word 0xf1003508
-b.NE Label_2071
+b.NE Label_1174
 .word 0xaa1e03e1
 adrp x30, _normal_entry@PAGE
 add x30, x30, _normal_entry@PAGEOFF
 .word 0xaa1e03e0
 .word 0xaa0103fe
-b Label_2072
-Label_2071:
+b Label_1175
+Label_1174:
 .word 0xaa1e03e1
 adrp x30, _native_entry@PAGE
 add x30, x30, _native_entry@PAGEOFF
 .word 0xaa1e03e0
 .word 0xaa0103fe
-b Label_2072
-Label_2073:
+b Label_1175
+Label_1176:
 .word 0xaa1303e0
 .word 0xa9bf7ffe
 bl _JS_ThrowTypeErrorNotFunction
 .word 0xa8c17ffe
 .word 0x910006d6
 b __exception_handler_entry
-Label_2072:
+Label_1175:
 .word 0xd1000297
 .word 0xf81983b6
 .word 0xd2800006
@@ -33436,31 +19141,31 @@ _dispatch_table_0_235:
 .word 0xd2800048
 .word 0xf2ffffe8
 .word 0xea08019f
-b.NE Label_2077
+b.NE Label_1180
 .word 0x79400d88
 .word 0xf1003508
-b.NE Label_2075
+b.NE Label_1178
 .word 0xaa1e03e1
 adrp x30, _normal_entry@PAGE
 add x30, x30, _normal_entry@PAGEOFF
 .word 0xaa1e03e0
 .word 0xaa0103fe
-b Label_2076
-Label_2075:
+b Label_1179
+Label_1178:
 .word 0xaa1e03e1
 adrp x30, _native_entry@PAGE
 add x30, x30, _native_entry@PAGEOFF
 .word 0xaa1e03e0
 .word 0xaa0103fe
-b Label_2076
-Label_2077:
+b Label_1179
+Label_1180:
 .word 0xaa1303e0
 .word 0xa9bf7ffe
 bl _JS_ThrowTypeErrorNotFunction
 .word 0xa8c17ffe
 .word 0x910006d6
 b __exception_handler_entry
-Label_2076:
+Label_1179:
 .word 0xd1000297
 .word 0xf81983b6
 .word 0xd2800006
@@ -33486,31 +19191,31 @@ _dispatch_table_1_236:
 .word 0xd2800048
 .word 0xf2ffffe8
 .word 0xea08019f
-b.NE Label_2081
+b.NE Label_1184
 .word 0x79400d88
 .word 0xf1003508
-b.NE Label_2079
+b.NE Label_1182
 .word 0xaa1e03e1
 adrp x30, _normal_entry@PAGE
 add x30, x30, _normal_entry@PAGEOFF
 .word 0xaa1e03e0
 .word 0xaa0103fe
-b Label_2080
-Label_2079:
+b Label_1183
+Label_1182:
 .word 0xaa1e03e1
 adrp x30, _native_entry@PAGE
 add x30, x30, _native_entry@PAGEOFF
 .word 0xaa1e03e0
 .word 0xaa0103fe
-b Label_2080
-Label_2081:
+b Label_1183
+Label_1184:
 .word 0xaa1303e0
 .word 0xa9bf7ffe
 bl _JS_ThrowTypeErrorNotFunction
 .word 0xa8c17ffe
 .word 0x910006d6
 b __exception_handler_entry
-Label_2080:
+Label_1183:
 .word 0xd1002297
 .word 0xf81983b6
 .word 0xd2800006
@@ -33538,31 +19243,31 @@ _dispatch_table_0_236:
 .word 0xd2800048
 .word 0xf2ffffe8
 .word 0xea08019f
-b.NE Label_2085
+b.NE Label_1188
 .word 0x79400d88
 .word 0xf1003508
-b.NE Label_2083
+b.NE Label_1186
 .word 0xaa1e03e1
 adrp x30, _normal_entry@PAGE
 add x30, x30, _normal_entry@PAGEOFF
 .word 0xaa1e03e0
 .word 0xaa0103fe
-b Label_2084
-Label_2083:
+b Label_1187
+Label_1186:
 .word 0xaa1e03e1
 adrp x30, _native_entry@PAGE
 add x30, x30, _native_entry@PAGEOFF
 .word 0xaa1e03e0
 .word 0xaa0103fe
-b Label_2084
-Label_2085:
+b Label_1187
+Label_1188:
 .word 0xaa1303e0
 .word 0xa9bf7ffe
 bl _JS_ThrowTypeErrorNotFunction
 .word 0xa8c17ffe
 .word 0x910006d6
 b __exception_handler_entry
-Label_2084:
+Label_1187:
 .word 0xd1002297
 .word 0xf81983b6
 .word 0xd2800006
@@ -33588,31 +19293,31 @@ _dispatch_table_1_237:
 .word 0xd2800048
 .word 0xf2ffffe8
 .word 0xea08019f
-b.NE Label_2089
+b.NE Label_1192
 .word 0x79400d88
 .word 0xf1003508
-b.NE Label_2087
+b.NE Label_1190
 .word 0xaa1e03e1
 adrp x30, _normal_entry@PAGE
 add x30, x30, _normal_entry@PAGEOFF
 .word 0xaa1e03e0
 .word 0xaa0103fe
-b Label_2088
-Label_2087:
+b Label_1191
+Label_1190:
 .word 0xaa1e03e1
 adrp x30, _native_entry@PAGE
 add x30, x30, _native_entry@PAGEOFF
 .word 0xaa1e03e0
 .word 0xaa0103fe
-b Label_2088
-Label_2089:
+b Label_1191
+Label_1192:
 .word 0xaa1303e0
 .word 0xa9bf7ffe
 bl _JS_ThrowTypeErrorNotFunction
 .word 0xa8c17ffe
 .word 0x910006d6
 b __exception_handler_entry
-Label_2088:
+Label_1191:
 .word 0xd1004297
 .word 0xf81983b6
 .word 0xd2800006
@@ -33640,31 +19345,31 @@ _dispatch_table_0_237:
 .word 0xd2800048
 .word 0xf2ffffe8
 .word 0xea08019f
-b.NE Label_2093
+b.NE Label_1196
 .word 0x79400d88
 .word 0xf1003508
-b.NE Label_2091
+b.NE Label_1194
 .word 0xaa1e03e1
 adrp x30, _normal_entry@PAGE
 add x30, x30, _normal_entry@PAGEOFF
 .word 0xaa1e03e0
 .word 0xaa0103fe
-b Label_2092
-Label_2091:
+b Label_1195
+Label_1194:
 .word 0xaa1e03e1
 adrp x30, _native_entry@PAGE
 add x30, x30, _native_entry@PAGEOFF
 .word 0xaa1e03e0
 .word 0xaa0103fe
-b Label_2092
-Label_2093:
+b Label_1195
+Label_1196:
 .word 0xaa1303e0
 .word 0xa9bf7ffe
 bl _JS_ThrowTypeErrorNotFunction
 .word 0xa8c17ffe
 .word 0x910006d6
 b __exception_handler_entry
-Label_2092:
+Label_1195:
 .word 0xd1004297
 .word 0xf81983b6
 .word 0xd2800006
@@ -33690,31 +19395,31 @@ _dispatch_table_1_238:
 .word 0xd2800048
 .word 0xf2ffffe8
 .word 0xea08019f
-b.NE Label_2097
+b.NE Label_1200
 .word 0x79400d88
 .word 0xf1003508
-b.NE Label_2095
+b.NE Label_1198
 .word 0xaa1e03e1
 adrp x30, _normal_entry@PAGE
 add x30, x30, _normal_entry@PAGEOFF
 .word 0xaa1e03e0
 .word 0xaa0103fe
-b Label_2096
-Label_2095:
+b Label_1199
+Label_1198:
 .word 0xaa1e03e1
 adrp x30, _native_entry@PAGE
 add x30, x30, _native_entry@PAGEOFF
 .word 0xaa1e03e0
 .word 0xaa0103fe
-b Label_2096
-Label_2097:
+b Label_1199
+Label_1200:
 .word 0xaa1303e0
 .word 0xa9bf7ffe
 bl _JS_ThrowTypeErrorNotFunction
 .word 0xa8c17ffe
 .word 0x910006d6
 b __exception_handler_entry
-Label_2096:
+Label_1199:
 .word 0xd1006297
 .word 0xf81983b6
 .word 0xd2800006
@@ -33742,31 +19447,31 @@ _dispatch_table_0_238:
 .word 0xd2800048
 .word 0xf2ffffe8
 .word 0xea08019f
-b.NE Label_2101
+b.NE Label_1204
 .word 0x79400d88
 .word 0xf1003508
-b.NE Label_2099
+b.NE Label_1202
 .word 0xaa1e03e1
 adrp x30, _normal_entry@PAGE
 add x30, x30, _normal_entry@PAGEOFF
 .word 0xaa1e03e0
 .word 0xaa0103fe
-b Label_2100
-Label_2099:
+b Label_1203
+Label_1202:
 .word 0xaa1e03e1
 adrp x30, _native_entry@PAGE
 add x30, x30, _native_entry@PAGEOFF
 .word 0xaa1e03e0
 .word 0xaa0103fe
-b Label_2100
-Label_2101:
+b Label_1203
+Label_1204:
 .word 0xaa1303e0
 .word 0xa9bf7ffe
 bl _JS_ThrowTypeErrorNotFunction
 .word 0xa8c17ffe
 .word 0x910006d6
 b __exception_handler_entry
-Label_2100:
+Label_1203:
 .word 0xd1006297
 .word 0xf81983b6
 .word 0xd2800006
@@ -33780,28 +19485,12 @@ _dispatch_table_2_239:
 .word 0xf85b83b1
 .word 0xf9002234
 .word 0xf1004808
-b.NE Label_2102
+b.NE Label_1205
 .word 0xb2400be0
-b Label_2103
-Label_2102:
+b Label_1206
+Label_1205:
 .word 0xb27f07e0
-Label_2103:
-.word 0xb9414a69
-cbz w9, Label_2104
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_2104:
+Label_1206:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -33812,28 +19501,12 @@ _dispatch_table_0_239:
 .global _dispatch_table_1_239
 _dispatch_table_1_239:
 .word 0xf1004808
-b.NE Label_2105
+b.NE Label_1207
 .word 0xb2400be0
-b Label_2106
-Label_2105:
+b Label_1208
+Label_1207:
 .word 0xb27f07e0
-Label_2106:
-.word 0xb9414a69
-cbz w9, Label_2107
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_2107:
+Label_1208:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -33845,28 +19518,12 @@ _dispatch_table_2_240:
 .word 0xf85b83b1
 .word 0xf9002234
 .word 0xf1000808
-b.NE Label_2108
+b.NE Label_1209
 .word 0xb2400be0
-b Label_2109
-Label_2108:
+b Label_1210
+Label_1209:
 .word 0xb27f07e0
-Label_2109:
-.word 0xb9414a69
-cbz w9, Label_2110
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_2110:
+Label_1210:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -33877,28 +19534,12 @@ _dispatch_table_0_240:
 .global _dispatch_table_1_240
 _dispatch_table_1_240:
 .word 0xf1000808
-b.NE Label_2111
+b.NE Label_1211
 .word 0xb2400be0
-b Label_2112
-Label_2111:
+b Label_1212
+Label_1211:
 .word 0xb27f07e0
-Label_2112:
-.word 0xb9414a69
-cbz w9, Label_2113
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_2113:
+Label_1212:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -33917,28 +19558,12 @@ bl _js_operator_typeof_gc
 .word 0xa8c17ffe
 .word 0xd1006c19
 .word 0xf85f8e80
-cbnz x25, Label_2114
+cbnz x25, Label_1213
 .word 0xb2400be0
-b Label_2115
-Label_2114:
+b Label_1214
+Label_1213:
 .word 0xb27f07e0
-Label_2115:
-.word 0xb9414a69
-cbz w9, Label_2116
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_2116:
+Label_1214:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -33956,28 +19581,12 @@ bl _js_operator_typeof_gc
 .word 0xa8c17ffe
 .word 0xd1006c19
 .word 0xf85f8e80
-cbnz x25, Label_2117
+cbnz x25, Label_1215
 .word 0xb2400be0
-b Label_2118
-Label_2117:
+b Label_1216
+Label_1215:
 .word 0xb27f07e0
-Label_2118:
-.word 0xb9414a69
-cbz w9, Label_2119
-.word 0xf8008680
-.word 0xf8008681
-.word 0xb1000ac8
-.word 0xf85e83ac
-.word 0xf9401989
-.word 0xaa0903e2
-.word 0xaa0803e1
-.word 0xaa1303e0
-.word 0xa9bf7ffe
-bl _DebuggerCallEachOp
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
-Label_2119:
+Label_1216:
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -34005,44 +19614,44 @@ __call_stub_entry:
 .word 0xaa0503f7
 .word 0x910003ed
 .word 0xf27e00df
-b.NE Label_2120
+b.NE Label_1217
 .word 0xd2800048
 .word 0xf2ffffe8
 .word 0xea08019f
-b.NE Label_2123
+b.NE Label_1220
 .word 0x79400d88
 .word 0xf1003508
-b.NE Label_2121
+b.NE Label_1218
 .word 0xaa1e03e1
 adrp x30, _normal_entry@PAGE
 add x30, x30, _normal_entry@PAGEOFF
 .word 0xaa1e03e0
 .word 0xaa0103fe
-b Label_2122
-Label_2121:
+b Label_1219
+Label_1218:
 .word 0xaa1e03e1
 adrp x30, _native_entry@PAGE
 add x30, x30, _native_entry@PAGEOFF
 .word 0xaa1e03e0
 .word 0xaa0103fe
-b Label_2122
-Label_2120:
+b Label_1219
+Label_1217:
 .word 0xaa1e03e1
 adrp x30, _async_entry@PAGE
 add x30, x30, _async_entry@PAGEOFF
 .word 0xaa1e03e0
 .word 0xaa0103fe
-b Label_2122
-Label_2123:
+b Label_1219
+Label_1220:
 .word 0xaa1303e0
 .word 0xa9bf7ffe
 bl _JS_ThrowTypeErrorNotFunction
 .word 0xa8c17ffe
-Label_2122:
+Label_1219:
 .word 0xf102081f
-b.EQ Label_2124
+b.EQ Label_1221
 .word 0xd63f0000
-Label_2124:
+Label_1221:
 .word 0xa97b6fbc
 .word 0xa97c67ba
 .word 0xa97d5fb8

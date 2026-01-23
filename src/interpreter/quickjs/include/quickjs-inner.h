@@ -666,7 +666,7 @@ constexpr size_t kFunctionShapeSize = 2;
 struct LEPUSContext {
   // <primjs begin>
 #ifdef ENABLE_PRIMJS_SNAPSHOT
-  address (*dispatch_table)[OP_COUNT];
+  address *dispatch_table;
 #endif
 // <primjs end>
 #ifndef ALLOCATE_WINDOWS
@@ -3213,5 +3213,8 @@ inline const LEPUSCFunctionListEntry js_native_error_proto_funcs[] = {
                           LEPUS_PROP_WRITABLE | LEPUS_PROP_CONFIGURABLE),
 #undef DEF
 };
+
+void JS_AttachDebuggerDispatchTable(LEPUSContext *ctx);
+void JS_DetachDebuggerDispatchTable(LEPUSContext *ctx);
 
 #endif  // SRC_INTERPRETER_QUICKJS_INCLUDE_QUICKJS_INNER_H_
