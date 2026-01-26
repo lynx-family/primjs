@@ -149,6 +149,7 @@ LEPUSValue CpuProfileJSONSerialize::SerializeChildren(LEPUSContext* ctx,
 LEPUSValue CpuProfileJSONSerialize::SerializeCallFrame(
     LEPUSContext* ctx, const ProfileNode& node) {
   LEPUSValue call_frame, func_name, script_id, url;
+  call_frame = func_name = script_id = url = LEPUS_UNDEFINED;
   HandleScope func_scope{ctx, &call_frame, HANDLE_TYPE_LEPUS_VALUE};
   func_scope.PushHandle(&func_name, HANDLE_TYPE_LEPUS_VALUE);
   func_scope.PushHandle(&script_id, HANDLE_TYPE_LEPUS_VALUE);
@@ -192,6 +193,7 @@ LEPUSValue CpuProfileJSONSerialize::SerializeNode(LEPUSContext* ctx,
                                                   const ProfileNode& node) {
   LEPUSValue profile_node = LEPUS_NewObject(ctx);
   LEPUSValue call_frame, children;
+  call_frame = children = LEPUS_UNDEFINED;
   HandleScope func_scope{ctx, &profile_node, HANDLE_TYPE_LEPUS_VALUE};
   func_scope.PushHandle(&call_frame, HANDLE_TYPE_LEPUS_VALUE);
   func_scope.PushHandle(&children, HANDLE_TYPE_LEPUS_VALUE);
@@ -238,6 +240,7 @@ LEPUSValue CpuProfileJSONSerialize::SerializeNodes(LEPUSContext* ctx) {
 std::pair<LEPUSValue, LEPUSValue>
 CpuProfileJSONSerialize::SerializeSamplesAndDeltas(LEPUSContext* ctx) {
   LEPUSValue samples, deltas;
+  samples = deltas = LEPUS_UNDEFINED;
   HandleScope func_scope{ctx, &samples, HANDLE_TYPE_LEPUS_VALUE};
   func_scope.PushHandle(&deltas, HANDLE_TYPE_LEPUS_VALUE);
   samples = LEPUS_NewArray(ctx);
@@ -265,6 +268,8 @@ LEPUSValue CpuProfileJSONSerialize::Serialize(LEPUSContext* ctx) {
   LEPUSValue samples, deltas, nodes, profile_obj, ret, start_time, end_time;
   ret = LEPUS_NewObject(ctx);
   HandleScope func_scope{ctx, &ret, HANDLE_TYPE_LEPUS_VALUE};
+  samples = deltas = nodes = profile_obj = start_time = end_time =
+      LEPUS_UNDEFINED;
   profile_obj = LEPUS_NewObject(ctx);
   func_scope.PushHandle(&profile_obj, HANDLE_TYPE_LEPUS_VALUE);
   func_scope.PushHandle(&samples, HANDLE_TYPE_LEPUS_VALUE);

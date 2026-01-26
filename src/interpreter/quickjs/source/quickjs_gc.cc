@@ -24930,7 +24930,7 @@ QJS_STATIC void JS_AddIntrinsicBasicObjects_GC(LEPUSContext *ctx) {
                            countof(js_error_proto_funcs), 0);
 
   for (i = 0; i < JS_NATIVE_ERROR_COUNT; i++) {
-    LEPUSValue func_obj;
+    LEPUSValue func_obj = LEPUS_UNDEFINED;
     const LEPUSCFunctionListEntry *funcs;
     int n_args;
     char buf[ATOM_GET_STR_BUF_SIZE];
