@@ -7294,7 +7294,7 @@ QJS_STATIC int JS_AutoInitProperty(LEPUSContext *ctx, LEPUSObject *p,
   JSAutoInitFunc *func;
 
   if (js_shape_prepare_update(ctx, p, &prs)) return -1;
-  func = pr->u.init.init_func;
+  func = js_autoinit_get_func(pr);
   /* 'func' shall not modify the object properties 'pr' */
   val = func(ctx, p, prop, pr->u.init.opaque);
   prs->flags &= ~LEPUS_PROP_TMASK;
@@ -9568,7 +9568,7 @@ QJS_STATIC int JS_DefineAutoInitProperty(
   pr = add_property(ctx, p, prop,
                     (flags & LEPUS_PROP_C_W_E) | LEPUS_PROP_AUTOINIT);
   if (unlikely(!pr)) return -1;
-  pr->u.init.init_func = init_func;
+  set_js_autoinit_func(pr, init_func);
   pr->u.init.opaque = opaque;
   return TRUE;
 }
@@ -11137,7 +11137,7 @@ static __attribute__((unused)) void JS_DumpObject(LEPUSRuntime *rt,
         } else if ((prs->flags & LEPUS_PROP_TMASK) == LEPUS_PROP_VARREF) {
           write("[varref %p]", (void *)pr->u.var_ref);
         } else if ((prs->flags & LEPUS_PROP_TMASK) == LEPUS_PROP_AUTOINIT) {
-          write("[autoinit %p %p]", (void *)pr->u.init.init_func,
+          write("[autoinit %p %p]", (void *)js_autoinit_get_func(pr),
                 (void *)pr->u.init.opaque);
         } else {
           JS_DumpValueShortNoPrint(rt, pr->u.value, dump_buf);
@@ -13502,7 +13502,7 @@ LEPUSValue js_closure(LEPUSContext *ctx, LEPUSValue bfunc,
     pr = add_property(ctx, p, JS_ATOM_prototype,
                       LEPUS_PROP_WRITABLE | LEPUS_PROP_AUTOINIT);
     if (pr) {
-      pr->u.init.init_func = js_instantiate_prototype;
+      set_js_autoinit_func(pr, js_instantiate_prototype);
       pr->u.init.opaque = nullptr;
     }
   }
