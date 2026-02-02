@@ -251,7 +251,7 @@ void GetMessagesCB(LEPUSContext* ctx) {
     while (!QjsDebugQueue::GetSendMessageQueue().empty()) {
       std::string m = QjsDebugQueue::GetSendMessageQueue().front();
       if (m.length()) {
-        PushBackQueue(GetDebuggerMessageQueue(info), m.c_str());
+        PushBackQueue(ctx, m.c_str());
       }
       QjsDebugQueue::GetSendMessageQueue().pop();
       ProcessProtocolMessages(info);

@@ -14,7 +14,6 @@ primjs_source_set("inspector") {
     "debugger/debugger_breakpoint.cc",
     "debugger/debugger_callframe.cc",
     "debugger/debugger_properties.cc",
-    "debugger/debugger_queue.cc",
     "heapprofiler/edge.cc",
     "heapprofiler/entry.cc",
     "heapprofiler/gen.cc",

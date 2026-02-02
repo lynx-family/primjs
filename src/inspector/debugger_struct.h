@@ -40,6 +40,7 @@
 #include <condition_variable>
 #include <map>
 #include <memory>
+#include <queue>
 #include <string>
 #include <unordered_map>
 
@@ -230,8 +231,8 @@ struct LEPUSDebuggerInfo {
   LEPUSValue debugger_name{LEPUS_UNDEFINED};
   void *opaque{nullptr};
   char *source_code{nullptr};
-  struct qjs_queue *message_queue;  // protocol messages queue
-  LEPUSBreakpoint *bps{nullptr};    // This is a dynamic array of JSBreakPoint.
+  std::queue<std::string> message_queue;  // protocol messages queue
+  LEPUSBreakpoint *bps{nullptr};  // This is a dynamic array of JSBreakPoint.
   const uint8_t *debugger_current_pc;  // current pc
   struct list_head script_list;        // for debugger: all the debugger scripts
   struct list_head
