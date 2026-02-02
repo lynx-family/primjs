@@ -24972,6 +24972,7 @@ void JS_AddIntrinsicBaseObjects_GC(LEPUSContext *ctx) {
   LEPUSValueConst number_obj;
   LEPUSValue obj1;
   LEPUSCFunctionType ft;
+  HandleScope func_scope(ctx);
 
   ctx->throw_type_error = LEPUS_NewCFunction(ctx, js_throw_type_error, NULL, 0);
 
@@ -25089,6 +25090,9 @@ void JS_AddIntrinsicBaseObjects_GC(LEPUSContext *ctx) {
   JS_DefinePropertyValueStr_GC(ctx, ctx->global_obj, "globalThis",
                                ctx->global_obj,
                                LEPUS_PROP_CONFIGURABLE | LEPUS_PROP_WRITABLE);
+  auto cfunc = LEPUS_NewCFunction(ctx, gc, "lepusng_gc", 0);
+  func_scope.PushHandle(&cfunc, HANDLE_TYPE_LEPUS_VALUE);
+  LEPUS_SetPropertyStr(ctx, ctx->global_obj, "lepusng_gc", cfunc);
   JS_AddIntrinsicBigInt(ctx);
 }
 
