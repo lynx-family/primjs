@@ -10,7 +10,6 @@ extern "C" {
 #include <stdint.h>
 #include <string.h>
 
-#include "inspector/debugger/debugger_queue.h"
 #include "inspector/interface.h"
 #include "quickjs/include/quickjs-libc.h"
 

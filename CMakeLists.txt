@@ -180,7 +180,6 @@ if(${ENABLE_QUICKJS_DEBUGGER})
       ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/debugger/debugger_breakpoint.cc
       ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/debugger/debugger_callframe.cc
       ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/debugger/debugger_properties.cc
-      ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/debugger/debugger_queue.cc
       ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/debugger/debugger.cc
       ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/heapprofiler/edge.cc
       ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/heapprofiler/entry.cc
