@@ -23,7 +23,8 @@ void VersionInit(struct Version* v, const char* version) {
   if (v->build < 0) v->build = 0;
 }
 
-static uint8_t VersionLess(struct Version v1, struct Version other) {
+static uint8_t VersionLess(const struct Version& v1,
+                           const struct Version& other) {
   if (v1.major < other.major)
     return 1;
   else if (v1.major > other.major)
@@ -50,12 +51,12 @@ static uint8_t VersionLess(struct Version v1, struct Version other) {
   return 0;
 }
 
-static uint8_t VersionEqual(Version v1, Version other) {
+static uint8_t VersionEqual(const Version& v1, const Version& other) {
   return (v1.major == other.major && v1.minor == other.minor &&
           v1.revision == other.revision && v1.build == other.build);
 }
 
-uint8_t VersionLessOrEqual(Version v1, Version other) {
+uint8_t VersionLessOrEqual(const Version& v1, const Version& other) {
   return VersionEqual(v1, other) || VersionLess(v1, other);
 }
 

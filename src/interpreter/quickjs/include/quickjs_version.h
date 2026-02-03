@@ -15,7 +15,7 @@ typedef struct Version {
 } Version;
 
 void VersionInit(Version* v, const char* version);
-uint8_t VersionLessOrEqual(Version v1, Version other);
+uint8_t VersionLessOrEqual(const Version& v1, const Version& other);
 uint8_t IsHigherOrEqual(const char* targetV, const char* baseV);
 
 #endif  // SRC_INTERPRETER_QUICKJS_INCLUDE_QUICKJS_VERSION_H_
