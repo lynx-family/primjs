@@ -95,82 +95,87 @@
 
 EXTERN_C_START
 
-napi_status napi_get_version(napi_env env, uint32_t* result) {
+napi_status napi_get_version_primjs(napi_env env, uint32_t* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, result);
   return env->napi_get_version(env, result);
 }
 
-napi_status napi_get_undefined(napi_env env, napi_value* result) {
+napi_status napi_get_undefined_primjs(napi_env env, napi_value* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, result);
   return env->napi_get_undefined(env, result);
 }
 
-napi_status napi_get_null(napi_env env, napi_value* result) {
+napi_status napi_get_null_primjs(napi_env env, napi_value* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, result);
   return env->napi_get_null(env, result);
 }
 
-napi_status napi_get_global(napi_env env, napi_value* result) {
+napi_status napi_get_global_primjs(napi_env env, napi_value* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, result);
   return env->napi_get_global(env, result);
 }
 
-napi_status napi_get_boolean(napi_env env, bool value, napi_value* result) {
+napi_status napi_get_boolean_primjs(napi_env env, bool value,
+                                    napi_value* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, result);
   return env->napi_get_boolean(env, value, result);
 }
 
-napi_status napi_create_object(napi_env env, napi_value* result) {
+napi_status napi_create_object_primjs(napi_env env, napi_value* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, result);
   return env->napi_create_object(env, result);
 }
 
-napi_status napi_create_array(napi_env env, napi_value* result) {
+napi_status napi_create_array_primjs(napi_env env, napi_value* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, result);
   return env->napi_create_array(env, result);
 }
 
-napi_status napi_create_array_with_length(napi_env env, size_t length,
-                                          napi_value* result) {
+napi_status napi_create_array_with_length_primjs(napi_env env, size_t length,
+                                                 napi_value* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, result);
   return env->napi_create_array_with_length(env, length, result);
 }
 
-napi_status napi_create_double(napi_env env, double value, napi_value* result) {
+napi_status napi_create_double_primjs(napi_env env, double value,
+                                      napi_value* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, result);
   return env->napi_create_double(env, value, result);
 }
 
-napi_status napi_create_int32(napi_env env, int32_t value, napi_value* result) {
+napi_status napi_create_int32_primjs(napi_env env, int32_t value,
+                                     napi_value* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, result);
   return env->napi_create_int32(env, value, result);
 }
 
-napi_status napi_create_uint32(napi_env env, uint32_t value,
-                               napi_value* result) {
+napi_status napi_create_uint32_primjs(napi_env env, uint32_t value,
+                                      napi_value* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, result);
   return env->napi_create_uint32(env, value, result);
 }
 
-napi_status napi_create_int64(napi_env env, int64_t value, napi_value* result) {
+napi_status napi_create_int64_primjs(napi_env env, int64_t value,
+                                     napi_value* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, result);
   return env->napi_create_int64(env, value, result);
 }
 
-napi_status napi_create_string_latin1(napi_env env, const char* str,
-                                      size_t length, napi_value* result) {
+napi_status napi_create_string_latin1_primjs(napi_env env, const char* str,
+                                             size_t length,
+                                             napi_value* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, result);
   RETURN_STATUS_IF_FALSE(env, (length == NAPI_AUTO_LENGTH) || length <= INT_MAX,
@@ -178,8 +183,8 @@ napi_status napi_create_string_latin1(napi_env env, const char* str,
   return env->napi_create_string_latin1(env, str, length, result);
 }
 
-napi_status napi_create_string_utf8(napi_env env, const char* str,
-                                    size_t length, napi_value* result) {
+napi_status napi_create_string_utf8_primjs(napi_env env, const char* str,
+                                           size_t length, napi_value* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, result);
   RETURN_STATUS_IF_FALSE(env, (length == NAPI_AUTO_LENGTH) || length <= INT_MAX,
@@ -187,8 +192,8 @@ napi_status napi_create_string_utf8(napi_env env, const char* str,
   return env->napi_create_string_utf8(env, str, length, result);
 }
 
-napi_status napi_create_string_utf16(napi_env env, const char16_t* str,
-                                     size_t length, napi_value* result) {
+napi_status napi_create_string_utf16_primjs(napi_env env, const char16_t* str,
+                                            size_t length, napi_value* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, result);
   RETURN_STATUS_IF_FALSE(env, (length == NAPI_AUTO_LENGTH) || length <= INT_MAX,
@@ -196,16 +201,16 @@ napi_status napi_create_string_utf16(napi_env env, const char16_t* str,
   return env->napi_create_string_utf16(env, str, length, result);
 }
 
-napi_status napi_create_symbol(napi_env env, napi_value description,
-                               napi_value* result) {
+napi_status napi_create_symbol_primjs(napi_env env, napi_value description,
+                                      napi_value* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, result);
   return env->napi_create_symbol(env, description, result);
 }
 
-napi_status napi_create_function(napi_env env, const char* utf8name,
-                                 size_t length, napi_callback cb, void* data,
-                                 napi_value* result) {
+napi_status napi_create_function_primjs(napi_env env, const char* utf8name,
+                                        size_t length, napi_callback cb,
+                                        void* data, napi_value* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, result);
   CHECK_ARG(env, cb);
@@ -216,40 +221,40 @@ napi_status napi_create_function(napi_env env, const char* utf8name,
   return env->napi_create_function(env, utf8name, length, cb, data, result);
 }
 
-napi_status napi_create_error(napi_env env, napi_value code, napi_value msg,
-                              napi_value* result) {
+napi_status napi_create_error_primjs(napi_env env, napi_value code,
+                                     napi_value msg, napi_value* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, msg);
   CHECK_ARG(env, result);
   return env->napi_create_error(env, code, msg, result);
 }
 
-napi_status napi_create_type_error(napi_env env, napi_value code,
-                                   napi_value msg, napi_value* result) {
+napi_status napi_create_type_error_primjs(napi_env env, napi_value code,
+                                          napi_value msg, napi_value* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, msg);
   CHECK_ARG(env, result);
   return env->napi_create_type_error(env, code, msg, result);
 }
 
-napi_status napi_create_range_error(napi_env env, napi_value code,
-                                    napi_value msg, napi_value* result) {
+napi_status napi_create_range_error_primjs(napi_env env, napi_value code,
+                                           napi_value msg, napi_value* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, msg);
   CHECK_ARG(env, result);
   return env->napi_create_range_error(env, code, msg, result);
 }
 
-napi_status napi_typeof(napi_env env, napi_value value,
-                        napi_valuetype* result) {
+napi_status napi_typeof_primjs(napi_env env, napi_value value,
+                               napi_valuetype* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, value);
   CHECK_ARG(env, result);
   return env->napi_typeof(env, value, result);
 }
 
-napi_status napi_get_value_double(napi_env env, napi_value value,
-                                  double* result) {
+napi_status napi_get_value_double_primjs(napi_env env, napi_value value,
+                                         double* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, value);
   CHECK_ARG(env, result);
@@ -257,8 +262,8 @@ napi_status napi_get_value_double(napi_env env, napi_value value,
   return env->napi_get_value_double(env, value, result);
 }
 
-napi_status napi_get_value_int32(napi_env env, napi_value value,
-                                 int32_t* result) {
+napi_status napi_get_value_int32_primjs(napi_env env, napi_value value,
+                                        int32_t* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, value);
   CHECK_ARG(env, result);
@@ -266,8 +271,8 @@ napi_status napi_get_value_int32(napi_env env, napi_value value,
   return env->napi_get_value_int32(env, value, result);
 }
 
-napi_status napi_get_value_uint32(napi_env env, napi_value value,
-                                  uint32_t* result) {
+napi_status napi_get_value_uint32_primjs(napi_env env, napi_value value,
+                                         uint32_t* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, value);
   CHECK_ARG(env, result);
@@ -275,8 +280,8 @@ napi_status napi_get_value_uint32(napi_env env, napi_value value,
   return env->napi_get_value_uint32(env, value, result);
 }
 
-napi_status napi_get_value_int64(napi_env env, napi_value value,
-                                 int64_t* result) {
+napi_status napi_get_value_int64_primjs(napi_env env, napi_value value,
+                                        int64_t* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, value);
   CHECK_ARG(env, result);
@@ -284,7 +289,8 @@ napi_status napi_get_value_int64(napi_env env, napi_value value,
   return env->napi_get_value_int64(env, value, result);
 }
 
-napi_status napi_get_value_bool(napi_env env, napi_value value, bool* result) {
+napi_status napi_get_value_bool_primjs(napi_env env, napi_value value,
+                                       bool* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, value);
   CHECK_ARG(env, result);
@@ -292,67 +298,67 @@ napi_status napi_get_value_bool(napi_env env, napi_value value, bool* result) {
   return env->napi_get_value_bool(env, value, result);
 }
 
-napi_status napi_get_value_string_latin1(napi_env env, napi_value value,
-                                         char* buf, size_t bufsize,
-                                         size_t* result) {
+napi_status napi_get_value_string_latin1_primjs(napi_env env, napi_value value,
+                                                char* buf, size_t bufsize,
+                                                size_t* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, value);
   CHECK_TO_TYPE(env, value, napi_string, napi_string_expected);
   return env->napi_get_value_string_latin1(env, value, buf, bufsize, result);
 }
 
-napi_status napi_get_value_string_utf8(napi_env env, napi_value value,
-                                       char* buf, size_t bufsize,
-                                       size_t* result) {
+napi_status napi_get_value_string_utf8_primjs(napi_env env, napi_value value,
+                                              char* buf, size_t bufsize,
+                                              size_t* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, value);
   CHECK_TO_TYPE(env, value, napi_string, napi_string_expected);
   return env->napi_get_value_string_utf8(env, value, buf, bufsize, result);
 }
 
-napi_status napi_get_value_string_utf16(napi_env env, napi_value value,
-                                        char16_t* buf, size_t bufsize,
-                                        size_t* result) {
+napi_status napi_get_value_string_utf16_primjs(napi_env env, napi_value value,
+                                               char16_t* buf, size_t bufsize,
+                                               size_t* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, value);
   CHECK_TO_TYPE(env, value, napi_string, napi_string_expected);
   return env->napi_get_value_string_utf16(env, value, buf, bufsize, result);
 }
 
-napi_status napi_coerce_to_bool(napi_env env, napi_value value,
-                                napi_value* result) {
+napi_status napi_coerce_to_bool_primjs(napi_env env, napi_value value,
+                                       napi_value* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, value);
   CHECK_ARG(env, result);
   return env->napi_coerce_to_bool(env, value, result);
 }
 
-napi_status napi_coerce_to_number(napi_env env, napi_value value,
-                                  napi_value* result) {
+napi_status napi_coerce_to_number_primjs(napi_env env, napi_value value,
+                                         napi_value* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, value);
   CHECK_ARG(env, result);
   return env->napi_coerce_to_number(env, value, result);
 }
 
-napi_status napi_coerce_to_object(napi_env env, napi_value value,
-                                  napi_value* result) {
+napi_status napi_coerce_to_object_primjs(napi_env env, napi_value value,
+                                         napi_value* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, value);
   CHECK_ARG(env, result);
   return env->napi_coerce_to_object(env, value, result);
 }
 
-napi_status napi_coerce_to_string(napi_env env, napi_value value,
-                                  napi_value* result) {
+napi_status napi_coerce_to_string_primjs(napi_env env, napi_value value,
+                                         napi_value* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, value);
   CHECK_ARG(env, result);
   return env->napi_coerce_to_string(env, value, result);
 }
 
-napi_status napi_get_prototype(napi_env env, napi_value object,
-                               napi_value* result) {
+napi_status napi_get_prototype_primjs(napi_env env, napi_value object,
+                                      napi_value* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, object);
   CHECK_ARG(env, result);
@@ -360,8 +366,8 @@ napi_status napi_get_prototype(napi_env env, napi_value object,
   return env->napi_get_prototype(env, object, result);
 }
 
-napi_status napi_get_property_names(napi_env env, napi_value object,
-                                    napi_value* result) {
+napi_status napi_get_property_names_primjs(napi_env env, napi_value object,
+                                           napi_value* result) {
   CHECK_ENV(env);
   return env->napi_get_all_property_names(
       env, object, napi_key_include_prototypes,
@@ -369,8 +375,8 @@ napi_status napi_get_property_names(napi_env env, napi_value object,
       napi_key_numbers_to_strings, result);
 }
 
-napi_status napi_set_property(napi_env env, napi_value object, napi_value key,
-                              napi_value value) {
+napi_status napi_set_property_primjs(napi_env env, napi_value object,
+                                     napi_value key, napi_value value) {
   CHECK_ENV(env);
   CHECK_ARG(env, object);
   CHECK_ARG(env, key);
@@ -379,8 +385,8 @@ napi_status napi_set_property(napi_env env, napi_value object, napi_value key,
   return env->napi_set_property(env, object, key, value);
 }
 
-napi_status napi_has_property(napi_env env, napi_value object, napi_value key,
-                              bool* result) {
+napi_status napi_has_property_primjs(napi_env env, napi_value object,
+                                     napi_value key, bool* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, object);
   CHECK_ARG(env, result);
@@ -389,8 +395,8 @@ napi_status napi_has_property(napi_env env, napi_value object, napi_value key,
   return env->napi_has_property(env, object, key, result);
 }
 
-napi_status napi_get_property(napi_env env, napi_value object, napi_value key,
-                              napi_value* result) {
+napi_status napi_get_property_primjs(napi_env env, napi_value object,
+                                     napi_value key, napi_value* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, object);
   CHECK_ARG(env, key);
@@ -399,8 +405,8 @@ napi_status napi_get_property(napi_env env, napi_value object, napi_value key,
   return env->napi_get_property(env, object, key, result);
 }
 
-napi_status napi_delete_property(napi_env env, napi_value object,
-                                 napi_value key, bool* result) {
+napi_status napi_delete_property_primjs(napi_env env, napi_value object,
+                                        napi_value key, bool* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, object);
   CHECK_ARG(env, key);
@@ -408,8 +414,8 @@ napi_status napi_delete_property(napi_env env, napi_value object,
   return env->napi_delete_property(env, object, key, result);
 }
 
-napi_status napi_has_own_property(napi_env env, napi_value object,
-                                  napi_value key, bool* result) {
+napi_status napi_has_own_property_primjs(napi_env env, napi_value object,
+                                         napi_value key, bool* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, object);
   CHECK_ARG(env, key);
@@ -424,8 +430,9 @@ napi_status napi_has_own_property(napi_env env, napi_value object,
   return env->napi_has_own_property(env, object, key, result);
 }
 
-napi_status napi_set_named_property(napi_env env, napi_value object,
-                                    const char* utf8name, napi_value value) {
+napi_status napi_set_named_property_primjs(napi_env env, napi_value object,
+                                           const char* utf8name,
+                                           napi_value value) {
   CHECK_ENV(env);
   CHECK_ARG(env, object);
   CHECK_ARG(env, value);
@@ -434,8 +441,8 @@ napi_status napi_set_named_property(napi_env env, napi_value object,
   return env->napi_set_named_property(env, object, utf8name, value);
 }
 
-napi_status napi_has_named_property(napi_env env, napi_value object,
-                                    const char* utf8name, bool* result) {
+napi_status napi_has_named_property_primjs(napi_env env, napi_value object,
+                                           const char* utf8name, bool* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, object);
   CHECK_ARG(env, result);
@@ -444,8 +451,9 @@ napi_status napi_has_named_property(napi_env env, napi_value object,
   return env->napi_has_named_property(env, object, utf8name, result);
 }
 
-napi_status napi_get_named_property(napi_env env, napi_value object,
-                                    const char* utf8name, napi_value* result) {
+napi_status napi_get_named_property_primjs(napi_env env, napi_value object,
+                                           const char* utf8name,
+                                           napi_value* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, object);
   CHECK_ARG(env, result);
@@ -454,8 +462,8 @@ napi_status napi_get_named_property(napi_env env, napi_value object,
   return env->napi_get_named_property(env, object, utf8name, result);
 }
 
-napi_status napi_set_element(napi_env env, napi_value object, uint32_t index,
-                             napi_value value) {
+napi_status napi_set_element_primjs(napi_env env, napi_value object,
+                                    uint32_t index, napi_value value) {
   CHECK_ENV(env);
   CHECK_ARG(env, object);
   CHECK_ARG(env, value);
@@ -463,8 +471,8 @@ napi_status napi_set_element(napi_env env, napi_value object, uint32_t index,
   return env->napi_set_element(env, object, index, value);
 }
 
-napi_status napi_has_element(napi_env env, napi_value object, uint32_t index,
-                             bool* result) {
+napi_status napi_has_element_primjs(napi_env env, napi_value object,
+                                    uint32_t index, bool* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, object);
   CHECK_ARG(env, result);
@@ -472,8 +480,8 @@ napi_status napi_has_element(napi_env env, napi_value object, uint32_t index,
   return env->napi_has_element(env, object, index, result);
 }
 
-napi_status napi_get_element(napi_env env, napi_value object, uint32_t index,
-                             napi_value* result) {
+napi_status napi_get_element_primjs(napi_env env, napi_value object,
+                                    uint32_t index, napi_value* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, object);
   CHECK_ARG(env, result);
@@ -481,17 +489,17 @@ napi_status napi_get_element(napi_env env, napi_value object, uint32_t index,
   return env->napi_get_element(env, object, index, result);
 }
 
-napi_status napi_delete_element(napi_env env, napi_value object, uint32_t index,
-                                bool* result) {
+napi_status napi_delete_element_primjs(napi_env env, napi_value object,
+                                       uint32_t index, bool* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, object);
   CHECK_TO_OBJECT(env, object, napi_object_expected);
   return env->napi_delete_element(env, object, index, result);
 }
 
-napi_status napi_define_properties(napi_env env, napi_value object,
-                                   size_t property_count,
-                                   const napi_property_descriptor* properties) {
+napi_status napi_define_properties_primjs(
+    napi_env env, napi_value object, size_t property_count,
+    const napi_property_descriptor* properties) {
   CHECK_ENV(env);
   if (property_count > 0) {
     CHECK_ARG(env, properties);
@@ -502,23 +510,23 @@ napi_status napi_define_properties(napi_env env, napi_value object,
                                                     properties);
 }
 
-napi_status napi_is_array(napi_env env, napi_value value, bool* result) {
+napi_status napi_is_array_primjs(napi_env env, napi_value value, bool* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, value);
   CHECK_ARG(env, result);
   return env->napi_is_array(env, value, result);
 }
 
-napi_status napi_get_array_length(napi_env env, napi_value value,
-                                  uint32_t* result) {
+napi_status napi_get_array_length_primjs(napi_env env, napi_value value,
+                                         uint32_t* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, value);
   CHECK_ARG(env, result);
   return env->napi_get_array_length(env, value, result);
 }
 
-napi_status napi_strict_equals(napi_env env, napi_value lhs, napi_value rhs,
-                               bool* result) {
+napi_status napi_strict_equals_primjs(napi_env env, napi_value lhs,
+                                      napi_value rhs, bool* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, lhs);
   CHECK_ARG(env, rhs);
@@ -526,9 +534,10 @@ napi_status napi_strict_equals(napi_env env, napi_value lhs, napi_value rhs,
   return env->napi_strict_equals(env, lhs, rhs, result);
 }
 
-napi_status napi_call_function(napi_env env, napi_value recv, napi_value func,
-                               size_t argc, const napi_value* argv,
-                               napi_value* result) {
+napi_status napi_call_function_primjs(napi_env env, napi_value recv,
+                                      napi_value func, size_t argc,
+                                      const napi_value* argv,
+                                      napi_value* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, recv);
   if (argc > 0) {
@@ -540,8 +549,9 @@ napi_status napi_call_function(napi_env env, napi_value recv, napi_value func,
                                                 result);
 }
 
-napi_status napi_new_instance(napi_env env, napi_value constructor, size_t argc,
-                              const napi_value* argv, napi_value* result) {
+napi_status napi_new_instance_primjs(napi_env env, napi_value constructor,
+                                     size_t argc, const napi_value* argv,
+                                     napi_value* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, constructor);
   if (argc > 0) {
@@ -552,8 +562,8 @@ napi_status napi_new_instance(napi_env env, napi_value constructor, size_t argc,
   return env->napi_new_instance(env, constructor, argc, argv, result);
 }
 
-napi_status napi_instanceof(napi_env env, napi_value object,
-                            napi_value constructor, bool* result) {
+napi_status napi_instanceof_primjs(napi_env env, napi_value object,
+                                   napi_value constructor, bool* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, object);
   CHECK_ARG(env, result);
@@ -561,27 +571,27 @@ napi_status napi_instanceof(napi_env env, napi_value object,
   return env->napi_instanceof(env, object, constructor, result);
 }
 
-napi_status napi_get_cb_info(napi_env env, napi_callback_info cbinfo,
-                             size_t* argc, napi_value* argv,
-                             napi_value* this_arg, void** data) {
+napi_status napi_get_cb_info_primjs(napi_env env, napi_callback_info cbinfo,
+                                    size_t* argc, napi_value* argv,
+                                    napi_value* this_arg, void** data) {
   CHECK_ENV(env);
   CHECK_ARG(env, cbinfo);
   return env->napi_get_cb_info(env, cbinfo, argc, argv, this_arg, data);
 }
 
-napi_status napi_get_new_target(napi_env env, napi_callback_info cbinfo,
-                                napi_value* result) {
+napi_status napi_get_new_target_primjs(napi_env env, napi_callback_info cbinfo,
+                                       napi_value* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, cbinfo);
   CHECK_ARG(env, result);
   return env->napi_get_new_target(env, cbinfo, result);
 }
 
-napi_status napi_define_class(napi_env env, const char* utf8name, size_t length,
-                              napi_callback constructor, void* data,
-                              size_t property_count,
-                              const napi_property_descriptor* properties,
-                              napi_value* result) {
+napi_status napi_define_class_primjs(napi_env env, const char* utf8name,
+                                     size_t length, napi_callback constructor,
+                                     void* data, size_t property_count,
+                                     const napi_property_descriptor* properties,
+                                     napi_value* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, result);
   CHECK_ARG(env, constructor);
@@ -608,36 +618,38 @@ napi_status napi_define_class(napi_env env, const char* utf8name, size_t length,
   return status;
 }
 
-napi_status napi_wrap(napi_env env, napi_value js_object, void* native_object,
-                      napi_finalize finalize_cb, void* finalize_hint,
-                      napi_ref* result) {
+napi_status napi_wrap_primjs(napi_env env, napi_value js_object,
+                             void* native_object, napi_finalize finalize_cb,
+                             void* finalize_hint, napi_ref* result) {
   CHECK_ENV(env);
   return env->napi_wrap_spec_compliant(env, js_object, native_object,
                                        finalize_cb, finalize_hint, result);
 }
 
-napi_status napi_unwrap(napi_env env, napi_value js_object, void** result) {
+napi_status napi_unwrap_primjs(napi_env env, napi_value js_object,
+                               void** result) {
   CHECK_ENV(env);
   return env->napi_unwrap_spec_compliant(env, js_object, result);
 }
 
-napi_status napi_remove_wrap(napi_env env, napi_value js_object,
-                             void** result) {
+napi_status napi_remove_wrap_primjs(napi_env env, napi_value js_object,
+                                    void** result) {
   CHECK_ENV(env);
   return env->napi_remove_wrap_spec_compliant(env, js_object, result);
 }
 
-napi_status napi_create_external(napi_env env, void* data,
-                                 napi_finalize finalize_cb, void* finalize_hint,
-                                 napi_value* result) {
+napi_status napi_create_external_primjs(napi_env env, void* data,
+                                        napi_finalize finalize_cb,
+                                        void* finalize_hint,
+                                        napi_value* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, result);
   return env->napi_create_external(env, data, finalize_cb, finalize_hint,
                                    result);
 }
 
-napi_status napi_get_value_external(napi_env env, napi_value value,
-                                    void** result) {
+napi_status napi_get_value_external_primjs(napi_env env, napi_value value,
+                                           void** result) {
   CHECK_ENV(env);
   CHECK_ARG(env, value);
   CHECK_ARG(env, result);
@@ -645,68 +657,74 @@ napi_status napi_get_value_external(napi_env env, napi_value value,
   return env->napi_get_value_external(env, value, result);
 }
 
-napi_status napi_create_reference(napi_env env, napi_value value,
-                                  uint32_t initial_refcount, napi_ref* result) {
+napi_status napi_create_reference_primjs(napi_env env, napi_value value,
+                                         uint32_t initial_refcount,
+                                         napi_ref* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, value);
   CHECK_ARG(env, result);
   return env->napi_create_reference(env, value, initial_refcount, result);
 }
 
-napi_status napi_delete_reference(napi_env env, napi_ref ref) {
+napi_status napi_delete_reference_primjs(napi_env env, napi_ref ref) {
   CHECK_ENV(env);
   CHECK_ARG(env, ref);
   return env->napi_delete_reference(env, ref);
 }
 
-napi_status napi_reference_ref(napi_env env, napi_ref ref, uint32_t* result) {
+napi_status napi_reference_ref_primjs(napi_env env, napi_ref ref,
+                                      uint32_t* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, ref);
   return env->napi_reference_ref(env, ref, result);
 }
 
-napi_status napi_reference_unref(napi_env env, napi_ref ref, uint32_t* result) {
+napi_status napi_reference_unref_primjs(napi_env env, napi_ref ref,
+                                        uint32_t* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, ref);
   return env->napi_reference_unref(env, ref, result);
 }
 
-napi_status napi_get_reference_value(napi_env env, napi_ref ref,
-                                     napi_value* result) {
+napi_status napi_get_reference_value_primjs(napi_env env, napi_ref ref,
+                                            napi_value* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, ref);
   CHECK_ARG(env, result);
   return env->napi_get_reference_value(env, ref, result);
 }
 
-napi_status napi_open_handle_scope(napi_env env, napi_handle_scope* result) {
+napi_status napi_open_handle_scope_primjs(napi_env env,
+                                          napi_handle_scope* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, result);
   return env->napi_open_handle_scope(env, result);
 }
 
-napi_status napi_close_handle_scope(napi_env env, napi_handle_scope scope) {
+napi_status napi_close_handle_scope_primjs(napi_env env,
+                                           napi_handle_scope scope) {
   CHECK_ENV(env);
   CHECK_ARG(env, scope);
   return env->napi_close_handle_scope(env, scope);
 }
 
-napi_status napi_open_escapable_handle_scope(
+napi_status napi_open_escapable_handle_scope_primjs(
     napi_env env, napi_escapable_handle_scope* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, result);
   return env->napi_open_escapable_handle_scope(env, result);
 }
 
-napi_status napi_close_escapable_handle_scope(
+napi_status napi_close_escapable_handle_scope_primjs(
     napi_env env, napi_escapable_handle_scope scope) {
   CHECK_ENV(env);
   CHECK_ARG(env, scope);
   return env->napi_close_escapable_handle_scope(env, scope);
 }
 
-napi_status napi_escape_handle(napi_env env, napi_escapable_handle_scope scope,
-                               napi_value escapee, napi_value* result) {
+napi_status napi_escape_handle_primjs(napi_env env,
+                                      napi_escapable_handle_scope scope,
+                                      napi_value escapee, napi_value* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, scope);
   CHECK_ARG(env, escapee);
@@ -714,92 +732,96 @@ napi_status napi_escape_handle(napi_env env, napi_escapable_handle_scope scope,
   return env->napi_escape_handle(env, scope, escapee, result);
 }
 
-napi_status napi_throw(napi_env env, napi_value error) {
+napi_status napi_throw_primjs(napi_env env, napi_value error) {
   CHECK_ENV(env);
   CHECK_ARG(env, error);
   return env->napi_throw_(env, error);
 }
 
-napi_status napi_throw_error(napi_env env, const char* code, const char* msg) {
+napi_status napi_throw_error_primjs(napi_env env, const char* code,
+                                    const char* msg) {
   CHECK_ENV(env);
   CHECK_ARG(env, msg);
   return env->napi_throw_error(env, code, msg);
 }
 
-napi_status napi_throw_type_error(napi_env env, const char* code,
-                                  const char* msg) {
+napi_status napi_throw_type_error_primjs(napi_env env, const char* code,
+                                         const char* msg) {
   CHECK_ENV(env);
   CHECK_ARG(env, msg);
   return env->napi_throw_type_error(env, code, msg);
 }
 
-napi_status napi_throw_range_error(napi_env env, const char* code,
-                                   const char* msg) {
+napi_status napi_throw_range_error_primjs(napi_env env, const char* code,
+                                          const char* msg) {
   CHECK_ENV(env);
   CHECK_ARG(env, msg);
   return env->napi_throw_range_error(env, code, msg);
 }
 
-napi_status napi_is_error(napi_env env, napi_value value, bool* result) {
+napi_status napi_is_error_primjs(napi_env env, napi_value value, bool* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, value);
   CHECK_ARG(env, result);
   return env->napi_is_error(env, value, result);
 }
 
-napi_status napi_is_exception_pending(napi_env env, bool* result) {
+napi_status napi_is_exception_pending_primjs(napi_env env, bool* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, result);
   return env->napi_is_exception_pending(env, result);
 }
 
-napi_status napi_get_and_clear_last_exception(napi_env env,
-                                              napi_value* result) {
+napi_status napi_get_and_clear_last_exception_primjs(napi_env env,
+                                                     napi_value* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, result);
   return env->napi_get_and_clear_last_exception(env, result);
 }
 
-napi_status napi_is_arraybuffer(napi_env env, napi_value value, bool* result) {
+napi_status napi_is_arraybuffer_primjs(napi_env env, napi_value value,
+                                       bool* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, value);
   CHECK_ARG(env, result);
   return env->napi_is_arraybuffer(env, value, result);
 }
-napi_status napi_create_arraybuffer(napi_env env, size_t byte_length,
-                                    void** data, napi_value* result) {
+napi_status napi_create_arraybuffer_primjs(napi_env env, size_t byte_length,
+                                           void** data, napi_value* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, result);
   return env->napi_create_arraybuffer(env, byte_length, data, result);
 }
-napi_status napi_create_external_arraybuffer(napi_env env, void* external_data,
-                                             size_t byte_length,
-                                             napi_finalize finalize_cb,
-                                             void* finalize_hint,
-                                             napi_value* result) {
+napi_status napi_create_external_arraybuffer_primjs(
+    napi_env env, void* external_data, size_t byte_length,
+    napi_finalize finalize_cb, void* finalize_hint, napi_value* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, result);
   return env->napi_create_external_arraybuffer(
       env, external_data, byte_length, finalize_cb, finalize_hint, result);
 }
-napi_status napi_get_arraybuffer_info(napi_env env, napi_value arraybuffer,
-                                      void** data, size_t* byte_length) {
+napi_status napi_get_arraybuffer_info_primjs(napi_env env,
+                                             napi_value arraybuffer,
+                                             void** data, size_t* byte_length) {
   CHECK_ENV(env);
   CHECK_ARG(env, arraybuffer);
   CHECK_TO_ARRAYBUFFER(env, arraybuffer, napi_invalid_arg);
   return env->napi_get_arraybuffer_info(env, arraybuffer, data, byte_length);
 }
 
-napi_status napi_is_typedarray(napi_env env, napi_value value, bool* result) {
+napi_status napi_is_typedarray_primjs(napi_env env, napi_value value,
+                                      bool* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, value);
   CHECK_ARG(env, result);
   return env->napi_is_typedarray(env, value, result);
 }
 
-napi_status napi_create_typedarray(napi_env env, napi_typedarray_type type,
-                                   size_t length, napi_value arraybuffer,
-                                   size_t byte_offset, napi_value* result) {
+napi_status napi_create_typedarray_primjs(napi_env env,
+                                          napi_typedarray_type type,
+                                          size_t length, napi_value arraybuffer,
+                                          size_t byte_offset,
+                                          napi_value* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, arraybuffer);
   CHECK_ARG(env, result);
@@ -808,19 +830,21 @@ napi_status napi_create_typedarray(napi_env env, napi_typedarray_type type,
                                      byte_offset, result);
 }
 
-napi_status napi_get_typedarray_info(napi_env env, napi_value typedarray,
-                                     napi_typedarray_type* type, size_t* length,
-                                     void** data, napi_value* arraybuffer,
-                                     size_t* byte_offset) {
+napi_status napi_get_typedarray_info_primjs(napi_env env, napi_value typedarray,
+                                            napi_typedarray_type* type,
+                                            size_t* length, void** data,
+                                            napi_value* arraybuffer,
+                                            size_t* byte_offset) {
   CHECK_ENV(env);
   CHECK_TO_TYPEARRAY(env, typedarray, napi_invalid_arg);
   return env->napi_get_typedarray_info(env, typedarray, type, length, data,
                                        arraybuffer, byte_offset);
 }
 
-napi_status napi_create_dataview(napi_env env, size_t length,
-                                 napi_value arraybuffer, size_t byte_offset,
-                                 napi_value* result) {
+napi_status napi_create_dataview_primjs(napi_env env, size_t length,
+                                        napi_value arraybuffer,
+                                        size_t byte_offset,
+                                        napi_value* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, arraybuffer);
   CHECK_ARG(env, result);
@@ -829,17 +853,18 @@ napi_status napi_create_dataview(napi_env env, size_t length,
                                    result);
 }
 
-napi_status napi_is_dataview(napi_env env, napi_value value, bool* result) {
+napi_status napi_is_dataview_primjs(napi_env env, napi_value value,
+                                    bool* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, value);
   CHECK_ARG(env, result);
   return env->napi_is_dataview(env, value, result);
 }
 
-napi_status napi_get_dataview_info(napi_env env, napi_value dataview,
-                                   size_t* bytelength, void** data,
-                                   napi_value* arraybuffer,
-                                   size_t* byte_offset) {
+napi_status napi_get_dataview_info_primjs(napi_env env, napi_value dataview,
+                                          size_t* bytelength, void** data,
+                                          napi_value* arraybuffer,
+                                          size_t* byte_offset) {
   CHECK_ENV(env);
   CHECK_ARG(env, dataview);
   CHECK_TO_DATAVIEW(env, dataview, napi_invalid_arg);
@@ -847,23 +872,24 @@ napi_status napi_get_dataview_info(napi_env env, napi_value dataview,
                                      arraybuffer, byte_offset);
 }
 
-napi_status napi_create_promise(napi_env env, napi_deferred* deferred,
-                                napi_value* promise) {
+napi_status napi_create_promise_primjs(napi_env env, napi_deferred* deferred,
+                                       napi_value* promise) {
   CHECK_ENV(env);
   CHECK_ARG(env, deferred);
   CHECK_ARG(env, promise);
   return env->napi_create_promise(env, deferred, promise);
 }
 
-napi_status napi_is_promise(napi_env env, napi_value value, bool* is_promise) {
+napi_status napi_is_promise_primjs(napi_env env, napi_value value,
+                                   bool* is_promise) {
   CHECK_ENV(env);
   CHECK_ARG(env, value);
   CHECK_ARG(env, is_promise);
   return env->napi_is_promise(env, value, is_promise);
 }
 
-napi_status napi_resolve_deferred(napi_env env, napi_deferred deferred,
-                                  napi_value resolution) {
+napi_status napi_resolve_deferred_primjs(napi_env env, napi_deferred deferred,
+                                         napi_value resolution) {
   CHECK_ENV(env);
   CHECK_ARG(env, deferred);
   CHECK_ARG(env, resolution);
@@ -871,8 +897,8 @@ napi_status napi_resolve_deferred(napi_env env, napi_deferred deferred,
                                     napi_deferred_resolve);
 }
 
-napi_status napi_reject_deferred(napi_env env, napi_deferred deferred,
-                                 napi_value rejection) {
+napi_status napi_reject_deferred_primjs(napi_env env, napi_deferred deferred,
+                                        napi_value rejection) {
   CHECK_ENV(env);
   CHECK_ARG(env, deferred);
   CHECK_ARG(env, rejection);
@@ -880,8 +906,8 @@ napi_status napi_reject_deferred(napi_env env, napi_deferred deferred,
                                     napi_deferred_reject);
 }
 
-napi_status napi_run_script(napi_env env, napi_value script,
-                            napi_value* result) {
+napi_status napi_run_script_primjs(napi_env env, napi_value script,
+                                   napi_value* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, script);
   CHECK_ARG(env, result);
@@ -896,16 +922,18 @@ napi_status napi_run_script(napi_env env, napi_value script,
   return env->napi_run_script(env, script_str.data(), length, nullptr, result);
 }
 
-napi_status napi_adjust_external_memory(napi_env env, int64_t change_in_bytes,
-                                        int64_t* adjusted_value) {
+napi_status napi_adjust_external_memory_primjs(napi_env env,
+                                               int64_t change_in_bytes,
+                                               int64_t* adjusted_value) {
   CHECK_ENV(env);
   CHECK_ARG(env, adjusted_value);
   return env->napi_adjust_external_memory(env, change_in_bytes, adjusted_value);
 }
 
-napi_status napi_add_finalizer(napi_env env, napi_value js_object,
-                               void* native_object, napi_finalize finalize_cb,
-                               void* finalize_hint, napi_ref* result) {
+napi_status napi_add_finalizer_primjs(napi_env env, napi_value js_object,
+                                      void* native_object,
+                                      napi_finalize finalize_cb,
+                                      void* finalize_hint, napi_ref* result) {
   CHECK_ENV(env);
   return env->napi_add_finalizer(env, js_object, native_object, finalize_cb,
                                  finalize_hint, result);
@@ -913,64 +941,67 @@ napi_status napi_add_finalizer(napi_env env, napi_value js_object,
 
 static const uint64_t kNapiAdapterInstanceDataKey =
     reinterpret_cast<uint64_t>(&kNapiAdapterInstanceDataKey);
-napi_status napi_set_instance_data(napi_env env, void* data,
-                                   napi_finalize finalize_cb,
-                                   void* finalize_hint) {
+napi_status napi_set_instance_data_primjs(napi_env env, void* data,
+                                          napi_finalize finalize_cb,
+                                          void* finalize_hint) {
   CHECK_ENV(env);
   return env->napi_set_instance_data_spec_compliant(
       env, kNapiAdapterInstanceDataKey, data, finalize_cb, finalize_hint);
 }
 
-napi_status napi_get_instance_data(napi_env env, void** data) {
+napi_status napi_get_instance_data_primjs(napi_env env, void** data) {
   CHECK_ENV(env);
   CHECK_ARG(env, data);
   return env->napi_get_instance_data(env, kNapiAdapterInstanceDataKey, data);
 }
 
-napi_status napi_get_last_error_info(napi_env env,
-                                     const napi_extended_error_info** result) {
+napi_status napi_get_last_error_info_primjs(
+    napi_env env, const napi_extended_error_info** result) {
   CHECK_ENV(env);
   CHECK_ARG(env, result);
   return env->napi_get_last_error_info(env, result);
 }
 
-napi_status napi_add_env_cleanup_hook(napi_env env, void (*fun)(void* arg),
-                                      void* arg) {
+napi_status napi_add_env_cleanup_hook_primjs(napi_env env,
+                                             void (*fun)(void* arg),
+                                             void* arg) {
   CHECK_ENV(env);
   CHECK_ARG(env, fun);
   return env->napi_add_env_cleanup_hook(env, fun, arg);
 }
 
-napi_status napi_remove_env_cleanup_hook(napi_env env, void (*fun)(void* arg),
-                                         void* arg) {
+napi_status napi_remove_env_cleanup_hook_primjs(napi_env env,
+                                                void (*fun)(void* arg),
+                                                void* arg) {
   CHECK_ENV(env);
   CHECK_ARG(env, fun);
   return env->napi_remove_env_cleanup_hook(env, fun, arg);
 }
 
-napi_status napi_create_async_work(napi_env env, napi_value async_resource,
-                                   napi_value async_resource_name,
-                                   napi_async_execute_callback execute,
-                                   napi_async_complete_callback complete,
-                                   void* data, napi_async_work* result) {
+napi_status napi_create_async_work_primjs(napi_env env,
+                                          napi_value async_resource,
+                                          napi_value async_resource_name,
+                                          napi_async_execute_callback execute,
+                                          napi_async_complete_callback complete,
+                                          void* data, napi_async_work* result) {
   return env->napi_create_async_work(env, async_resource, async_resource_name,
                                      execute, complete, data, result);
 }
 
-napi_status napi_delete_async_work(napi_env env, napi_async_work work) {
+napi_status napi_delete_async_work_primjs(napi_env env, napi_async_work work) {
   return env->napi_delete_async_work(env, work);
 }
 
-napi_status napi_queue_async_work(napi_env env, napi_async_work work) {
+napi_status napi_queue_async_work_primjs(napi_env env, napi_async_work work) {
   return env->napi_queue_async_work(env, work);
 }
 
-napi_status napi_cancel_async_work(napi_env env, napi_async_work work) {
+napi_status napi_cancel_async_work_primjs(napi_env env, napi_async_work work) {
   return env->napi_cancel_async_work(env, work);
 }
 
-void napi_fatal_error(const char* location, size_t location_len,
-                      const char* message, size_t message_len) {
+void napi_fatal_error_primjs(const char* location, size_t location_len,
+                             const char* message, size_t message_len) {
   if (location && location_len > 0) {
     int print_len =
         (location_len > INT_MAX) ? INT_MAX : static_cast<int>(location_len);
@@ -999,7 +1030,7 @@ class ThreadSafeFunctionAdaptor {
         context_(context),
         call_js_cb_(call_js_cb) {
     if (func) {
-      napi_create_reference(env, func, 1, &func_ref_);
+      napi_create_reference_primjs(env, func, 1, &func_ref_);
     }
   }
   ~ThreadSafeFunctionAdaptor() {
@@ -1007,7 +1038,7 @@ class ThreadSafeFunctionAdaptor {
       thread_finalize_cb_(env_, thread_finalize_data_, context_);
     }
     if (func_ref_) {
-      napi_delete_reference(env_, func_ref_);
+      napi_delete_reference_primjs(env_, func_ref_);
     }
   }
 
@@ -1018,7 +1049,7 @@ class ThreadSafeFunctionAdaptor {
         static_cast<ThreadSafeFunctionAdaptor*>(context);
     napi_value func{nullptr};
     if (adaptor->func_ref_) {
-      napi_get_reference_value(env, adaptor->func_ref_, &func);
+      napi_get_reference_value_primjs(env, adaptor->func_ref_, &func);
     }
     if (adaptor->call_js_cb_) {
       adaptor->call_js_cb_(env, func, adaptor->context_, data);
@@ -1026,17 +1057,17 @@ class ThreadSafeFunctionAdaptor {
       napi_value recv;
       napi_status status;
 
-      status = napi_get_undefined(env, &recv);
+      status = napi_get_undefined_primjs(env, &recv);
       if (status != napi_ok) {
-        napi_throw_error(env, "ERR_NAPI_TSFN_GET_UNDEFINED",
-                         "Failed to retrieve undefined value");
+        napi_throw_error_primjs(env, "ERR_NAPI_TSFN_GET_UNDEFINED",
+                                "Failed to retrieve undefined value");
         return;
       }
 
-      status = napi_call_function(env, recv, func, 0, nullptr, nullptr);
+      status = napi_call_function_primjs(env, recv, func, 0, nullptr, nullptr);
       if (status != napi_ok && status != napi_pending_exception) {
-        napi_throw_error(env, "ERR_NAPI_TSFN_CALL_JS",
-                         "Failed to call JS callback");
+        napi_throw_error_primjs(env, "ERR_NAPI_TSFN_CALL_JS",
+                                "Failed to call JS callback");
         return;
       }
     }
@@ -1057,7 +1088,7 @@ class ThreadSafeFunctionAdaptor {
   napi_threadsafe_function_call_js_spec_compl call_js_cb_{nullptr};
 };
 
-napi_status napi_create_threadsafe_function(
+napi_status napi_create_threadsafe_function_primjs(
     napi_env env, napi_value func, napi_value async_resource,
     napi_value async_resource_name, size_t max_queue_size,
     size_t initial_thread_count, void* thread_finalize_data,
@@ -1080,7 +1111,7 @@ napi_status napi_create_threadsafe_function(
       result);
 }
 
-napi_status napi_call_threadsafe_function(
+napi_status napi_call_threadsafe_function_primjs(
     napi_threadsafe_function func, void* data,
     napi_threadsafe_function_call_mode is_blocking) {
   if (func == nullptr) {
@@ -1090,7 +1121,7 @@ napi_status napi_call_threadsafe_function(
   return napi_runtime_call_threadsafe_function(func, data, is_blocking);
 }
 
-napi_status napi_release_threadsafe_function(
+napi_status napi_release_threadsafe_function_primjs(
     napi_threadsafe_function func, napi_threadsafe_function_release_mode mode) {
   if (func == nullptr) {
     return napi_invalid_arg;
@@ -1099,7 +1130,8 @@ napi_status napi_release_threadsafe_function(
   return napi_runtime_release_threadsafe_function(func, mode);
 }
 
-napi_status napi_acquire_threadsafe_function(napi_threadsafe_function func) {
+napi_status napi_acquire_threadsafe_function_primjs(
+    napi_threadsafe_function func) {
   if (func == nullptr) {
     return napi_invalid_arg;
   }
@@ -1107,8 +1139,8 @@ napi_status napi_acquire_threadsafe_function(napi_threadsafe_function func) {
   return napi_runtime_acquire_threadsafe_function(func);
 }
 
-napi_status napi_get_threadsafe_function_context(napi_threadsafe_function func,
-                                                 void** result) {
+napi_status napi_get_threadsafe_function_context_primjs(
+    napi_threadsafe_function func, void** result) {
   if (func == nullptr) {
     return napi_invalid_arg;
   }
@@ -1124,79 +1156,100 @@ napi_status napi_get_threadsafe_function_context(napi_threadsafe_function func,
   return napi_ok;
 }
 
-napi_status napi_unref_threadsafe_function(napi_env env,
-                                           napi_threadsafe_function func) {
+napi_status napi_unref_threadsafe_function_primjs(
+    napi_env env, napi_threadsafe_function func) {
   return napi_ok;
 }
-napi_status napi_ref_threadsafe_function(napi_env env,
-                                         napi_threadsafe_function func) {
+napi_status napi_ref_threadsafe_function_primjs(napi_env env,
+                                                napi_threadsafe_function func) {
   return napi_ok;
 }
 
-napi_status napi_create_date(napi_env env, double time, napi_value* result) {
+napi_status napi_create_date_primjs(napi_env env, double time,
+                                    napi_value* result) {
   CHECK_ENV(env);
   return env->napi_create_date(env, time, result);
 }
 
-napi_status napi_is_date(napi_env env, napi_value value, bool* is_date) {
+napi_status napi_is_date_primjs(napi_env env, napi_value value, bool* is_date) {
   CHECK_ENV(env);
   return env->napi_is_date(env, value, is_date);
 }
 
-napi_status napi_get_date_value(napi_env env, napi_value value,
-                                double* result) {
+napi_status napi_get_date_value_primjs(napi_env env, napi_value value,
+                                       double* result) {
   CHECK_ENV(env);
   return env->napi_get_date_value(env, value, result);
 }
 
-napi_status napi_get_all_property_names(napi_env env, napi_value object,
-                                        napi_key_collection_mode key_mode,
-                                        napi_key_filter key_filter,
-                                        napi_key_conversion key_conversion,
-                                        napi_value* result) {
+napi_status napi_get_all_property_names_primjs(
+    napi_env env, napi_value object, napi_key_collection_mode key_mode,
+    napi_key_filter key_filter, napi_key_conversion key_conversion,
+    napi_value* result) {
   CHECK_ENV(env);
   return env->napi_get_all_property_names(env, object, key_mode, key_filter,
                                           key_conversion, result);
 }
 
-void napi_module_register(napi_module_spec_compl* mod) {
+void napi_module_register_primjs(napi_module_spec_compl* mod) {
   // Since napi_module_register_xx does not copy the contents of `napi_module`,
   // it only stores its pointer. To align with the NAPI standard, we copy the
   // contents of the napi module here. As napi module registration is global and
   // its lifetime follows that of the process, the newly created napi module
   // object here does not need to be explicitly freed.
-  napi_module* new_mod = new napi_module;
-  new_mod->nm_version = mod->nm_version;
-  new_mod->nm_filename = mod->nm_filename;
-  new_mod->nm_register_func = mod->nm_register_func;
-  new_mod->nm_modname = mod->nm_modname;
-  new_mod->nm_link = static_cast<struct napi_module*>(mod->nm_link);
+  napi_module* internal_mod = new napi_module{
+      .nm_version = mod->nm_version,
+      .nm_filename = mod->nm_filename,
+      .nm_register_func = mod->nm_register_func,
+      .nm_modname = mod->nm_modname,
+      .nm_link = nullptr,
+  };
 
-  napi_module_register_xx(new_mod);
+  napi_module_register_xx(internal_mod);
 }
 
-napi_status napi_create_bigint_int64(napi_env env, int64_t value,
-                                     napi_value* result) {
+napi_module_spec_compl* napi_find_module_primjs(const char* name) {
+  const napi_module* mod = napi_find_module(name);
+  if (!mod) {
+    return nullptr;
+  }
+  // The user is responsible for freeing the memory of this object
+  return new napi_module_spec_compl{
+      .nm_version = mod->nm_version,
+      // The 'flags' field is lost when converting napi_module_spec_compl to
+      // napi_module, so its value cannot be obtained here.
+      .nm_flags = 0,
+      .nm_filename = mod->nm_filename,
+      .nm_register_func = mod->nm_register_func,
+      .nm_modname = mod->nm_modname,
+      .nm_link = nullptr,
+  };
+}
+
+napi_status napi_create_bigint_int64_primjs(napi_env env, int64_t value,
+                                            napi_value* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, result);
   return env->napi_create_bigint_int64(env, value, result);
 }
-napi_status napi_create_bigint_uint64(napi_env env, uint64_t value,
-                                      napi_value* result) {
+napi_status napi_create_bigint_uint64_primjs(napi_env env, uint64_t value,
+                                             napi_value* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, result);
   return env->napi_create_bigint_uint64(env, value, result);
 }
 
-napi_status napi_create_bigint_words(napi_env env, int sign_bit,
-                                     size_t word_count, const uint64_t* words,
-                                     napi_value* result) {
+napi_status napi_create_bigint_words_primjs(napi_env env, int sign_bit,
+                                            size_t word_count,
+                                            const uint64_t* words,
+                                            napi_value* result) {
   CHECK_ENV(env);
   return env->napi_create_bigint_words(env, sign_bit, word_count, words,
                                        result);
 }
-napi_status napi_get_value_bigint_int64(napi_env env, napi_value value,
-                                        int64_t* result, bool* lossless) {
+napi_status napi_get_value_bigint_int64_primjs(napi_env env, napi_value value,
+                                               int64_t* result,
+                                               bool* lossless) {
   CHECK_ENV(env);
   CHECK_ARG(env, value);
   CHECK_ARG(env, result);
@@ -1204,8 +1257,9 @@ napi_status napi_get_value_bigint_int64(napi_env env, napi_value value,
   CHECK_TO_TYPE(env, value, napi_bigint, napi_bigint_expected);
   return env->napi_get_value_bigint_int64(env, value, result, lossless);
 }
-napi_status napi_get_value_bigint_uint64(napi_env env, napi_value value,
-                                         uint64_t* result, bool* lossless) {
+napi_status napi_get_value_bigint_uint64_primjs(napi_env env, napi_value value,
+                                                uint64_t* result,
+                                                bool* lossless) {
   CHECK_ENV(env);
   CHECK_ARG(env, value);
   CHECK_ARG(env, result);
@@ -1213,9 +1267,10 @@ napi_status napi_get_value_bigint_uint64(napi_env env, napi_value value,
   CHECK_TO_TYPE(env, value, napi_bigint, napi_bigint_expected);
   return env->napi_get_value_bigint_uint64(env, value, result, lossless);
 }
-napi_status napi_get_value_bigint_words(napi_env env, napi_value value,
-                                        int* sign_bit, size_t* word_count,
-                                        uint64_t* words) {
+napi_status napi_get_value_bigint_words_primjs(napi_env env, napi_value value,
+                                               int* sign_bit,
+                                               size_t* word_count,
+                                               uint64_t* words) {
   CHECK_ENV(env);
   return env->napi_get_value_bigint_words(env, value, sign_bit, word_count,
                                           words);
