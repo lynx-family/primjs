@@ -1317,12 +1317,25 @@ static napi_status napi_get_instance_data(napi_env env, uint64_t key,
 
 static napi_status napi_open_context_scope(napi_env env,
                                            napi_context_scope *result) {
-  *result = reinterpret_cast<napi_context_scope>(1);
+  // Omit NAPI_PREAMBLE because JSVM calls here cannot throw JS exceptions.
+  RETURN_STATUS_IF_FALSE(env, result != nullptr, napi_invalid_arg);
+
+  *result = harmonyimpl::JSContextScopeToNapi(
+      new harmonyimpl::ContextScopeWrapper(env->ctx->vm_env_));
+  env->ctx->open_context_scopes_++;
   return napi_clear_last_error(env);
 }
 
 static napi_status_legacy napi_close_context_scope(napi_env env,
-                                                   napi_context_scope result) {
+                                                   napi_context_scope scope) {
+  // Omit NAPI_PREAMBLE because JSVM calls here cannot throw JS exceptions.
+
+  if (env->ctx->open_context_scopes_ == 0) {
+    return napi_context_scope_mismatch_legacy;
+  }
+
+  env->ctx->open_context_scopes_--;
+  delete harmonyimpl::NapiContextScopeToJS(scope);
   napi_clear_last_error(env);
   return napi_ok_legacy;
 }
