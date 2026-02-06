@@ -57,6 +57,24 @@ struct napi_class__harmony {
 
 namespace harmonyimpl {
 
+class ContextScopeWrapper {
+ public:
+  explicit ContextScopeWrapper(JSVM_Env env) : jsvm_env_{env} {
+    OH_JSVM_OpenEnvScope(env, &jsvm_env_scope);
+  }
+
+  ~ContextScopeWrapper() { OH_JSVM_CloseEnvScope(jsvm_env_, jsvm_env_scope); }
+
+  ContextScopeWrapper(const ContextScopeWrapper&) = delete;
+  ContextScopeWrapper& operator=(const ContextScopeWrapper&) = delete;
+  ContextScopeWrapper(ContextScopeWrapper&&) = delete;
+  ContextScopeWrapper& operator=(ContextScopeWrapper&) = delete;
+
+ private:
+  JSVM_Env jsvm_env_;
+  JSVM_EnvScope jsvm_env_scope;
+};
+
 class HandleScopeWrapper {
  public:
   explicit HandleScopeWrapper(JSVM_Env env) : jsvm_env{env} {
@@ -136,6 +154,14 @@ inline const JSVM_Value* ConstNapiValuePointerToJS(const napi_value* result) {
 
 inline napi_value* JSvaluePointerToNapi(JSVM_Value* result) {
   return reinterpret_cast<napi_value*>(result);
+}
+
+inline napi_context_scope JSContextScopeToNapi(ContextScopeWrapper* scope) {
+  return reinterpret_cast<napi_context_scope>(scope);
+}
+
+inline ContextScopeWrapper* NapiContextScopeToJS(napi_context_scope scope) {
+  return reinterpret_cast<ContextScopeWrapper*>(scope);
 }
 
 inline napi_handle_scope JSHandleScopeToNapi(JSVM_HandleScope handle) {
@@ -348,12 +374,11 @@ struct napi_context__harmony {
   napi_env env_;
   JSVM_Env vm_env_;
   int32_t open_handle_scopes_ = 0;
+  int32_t open_context_scopes_ = 0;
   std::unordered_map<uint64_t, harmonyimpl::ExternalNativeInfo*> instance_data_;
   std::list<harmonyimpl::ExternalNativeInfo*> finalizer_list_;
   std::list<harmonyimpl::Reference*> ref_list_;
 };
-
-namespace harmonyimpl {}  // namespace harmonyimpl
 
 #ifdef USE_PRIMJS_NAPI
 #include "primjs_napi_undefs.h"
