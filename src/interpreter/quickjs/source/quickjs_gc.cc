@@ -638,6 +638,7 @@ LEPUSRuntime *JS_NewRuntime2_GC(const LEPUSMallocFunctions *mf, void *opaque,
   rt->malloc_gc_threshold = 256 * 1024;
 
   init_list_head(&rt->context_list);
+  init_list_head(&rt->lynx_obj_list);
 #ifdef DUMP_LEAKS
   init_list_head(&rt->string_list);
 #endif
@@ -29949,10 +29950,10 @@ void Finalizer::free_atom(LEPUSRuntime *rt, JSAtomStruct *p) noexcept {
 
 #ifdef ENABLE_LEPUSNG
 void Finalizer::JSLepusRefFinalizer(void *ptr) noexcept {
-  if (rt_->js_callbacks_.free_value) {
-    LEPUSLepusRef *pref = static_cast<LEPUSLepusRef *>(ptr);
-    rt_->js_callbacks_.free_value(rt_, LEPUS_MKPTR(LEPUS_TAG_LEPUS_REF, pref));
-  }
+  LEPUSLepusRef *pref = static_cast<LEPUSLepusRef *>(ptr);
+  auto *p = pref->p;
+  pref->p = nullptr;
+  if (p) rt_->js_callbacks_.free_value(p);
 }
 #endif
 

@@ -977,6 +977,7 @@ LEPUSRuntime *LEPUS_NewRuntime2(const LEPUSMallocFunctions *mf, void *opaque,
   init_list_head(&rt->job_list);
   init_list_head(&rt->unhandled_rejections);
   init_list_head(&rt->async_func_sf);
+  init_list_head(&rt->lynx_obj_list);
   rt->ptr_handles = new PtrHandles(rt);
 
   if (JS_InitAtoms(rt)) goto fail;
@@ -1422,6 +1423,16 @@ void LEPUS_FreeRuntime(LEPUSRuntime *rt) {
     delete rt->qjsvaluevalue_allocator;
     rt->qjsvaluevalue_allocator = nullptr;
   }
+
+#ifdef ENABLE_LEPUSNG
+  list_for_each_safe(el, el1, &rt->lynx_obj_list) {
+    LEPUSLepusRef *e = list_entry(el, LEPUSLepusRef, link);
+    if (auto *p = e->p) {
+      rt->js_callbacks_.free_value(p);
+      e->p = nullptr;
+    }
+  }
+#endif
 
   LEPUS_RunGC(rt);
 
@@ -5155,7 +5166,18 @@ bool LEPUS_IsGCMode(LEPUSContext *ctx) { return ctx->gc_enable; }
 bool LEPUS_IsGCModeRT(LEPUSRuntime *rt) { return rt->gc_enable; }
 
 #ifdef ENABLE_LEPUSNG
-QJS_STATIC void JSRefFinalizer(LEPUSRuntime *rt, LEPUSValue val) {
+QJS_STATIC void LynxRefFinalizer(LEPUSRuntime *rt, LEPUSValue val) {
+  auto *pref = static_cast<LEPUSLepusRef *>(LEPUS_VALUE_GET_PTR(val));
+  if (auto *p = pref->p) {
+    rt->js_callbacks_.free_value(p);
+  }
+  LEPUS_FreeValueRT(rt, pref->lepus_val);
+  list_del(&pref->link);
+  lepus_free_rt(rt, pref);
+  return;
+}
+
+QJS_STATIC void FreeLynxRefInGC(LEPUSRuntime *rt, LEPUSValue val) {
   auto &lepus_val =
       reinterpret_cast<LEPUSLepusRef *>(LEPUS_VALUE_GET_PTR(val))->lepus_val;
   if (LEPUS_IsObject(lepus_val)) {
@@ -5165,7 +5187,7 @@ QJS_STATIC void JSRefFinalizer(LEPUSRuntime *rt, LEPUSValue val) {
     }
   }
   rt->in_gc_sweep = FALSE;
-  rt->js_callbacks_.free_value(rt, val);
+  LynxRefFinalizer(rt, val);
   rt->in_gc_sweep = TRUE;
 }
 #endif
@@ -5230,12 +5252,10 @@ void __JS_FreeValueRT(LEPUSRuntime *rt, LEPUSValue v) {
 #ifdef ENABLE_LEPUSNG
     // <Primjs begin>
     case LEPUS_TAG_LEPUS_REF: {
-      if (rt->js_callbacks_.free_value) {
-        if (rt->in_gc_sweep) {
-          JSRefFinalizer(rt, v);
-          break;
-        }
-        rt->js_callbacks_.free_value(rt, v);
+      if (rt->in_gc_sweep) {
+        FreeLynxRefInGC(rt, v);
+      } else {
+        LynxRefFinalizer(rt, v);
       }
       break;
     }
@@ -12078,6 +12098,7 @@ LEPUSValue LEPUS_NewLepusWrap(LEPUSContext *ctx, void *p, int tag) {
   pref->tag = tag;
   pref->p = p;
   pref->lepus_val = LEPUS_UNDEFINED;
+  list_add_tail(&pref->link, &ctx->rt->lynx_obj_list);
 
   return LEPUS_MKPTR(LEPUS_TAG_LEPUS_REF, pref);
 }
