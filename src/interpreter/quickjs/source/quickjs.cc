@@ -17777,9 +17777,11 @@ __exception int next_token(JSParseState *s) {
   // <Primjs begin>
   int utf8_parsed = 0;
   // <Primjs end>
+#ifdef QJS_UNITTEST
   if (unlikely(js_check_stack_overflow(s->ctx, 0))) {
     return js_parse_error(s, "stack overflow");
   }
+#endif
 #ifdef ENABLE_COMPATIBLE_MM
   if (!s->ctx->gc_enable)
 #endif
