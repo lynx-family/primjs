@@ -1,0 +1,10 @@
+# Ignore synced vendor content
+vendor/
+vendor/**
+*.zip
+node_modules/
+package-lock.json
+build/
+generated/
+headers/
+prebuilt/
