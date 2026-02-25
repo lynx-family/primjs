@@ -1,0 +1,55 @@
+{
+  "name": "@lynx-js/weak-node-api",
+  "version": "0.3.0",
+  "license": "Apache-2.0",
+  "private": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "type": "module",
+  "description": "A universal Node API add-ons integration library with Node API C & C++ headers and prebuilt dynamic libraries for all platforms",
+  "homepage": "https://github.com/lynx-family/primjs",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lynx-family/primjs.git",
+    "directory": "third_party/weak-node-api"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "packageManager": "pnpm@9.12.0",
+  "bugs": "https://github.com/lynx-family/primjs/issues",
+
+  "author": "Lynx Team <46469310+RobinWuu@users.noreply.github.com>",
+  "contributors": [
+    "RobinWuu <46469310+RobinWuu@users.noreply.github.com>"
+  ],
+  "scripts": {
+    "prepare:headers": "node scripts/prepare-headers.mjs",
+    "bootstrap": "npm run prepare:headers",
+    "build:cmake:macos": "bash tools/cmake/build_macos_dylib.sh",
+    "build:cmake:win": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/cmake/build_windows_msvc.ps1",
+    "clean": "npx rimraf headers generated build dist prebuilt out vendor --glob *.tgz",
+  },
+  "files": [
+    "headers/**",
+    "generated/**",
+    "prebuilt/**",
+    "CMakeLists.txt",
+    "weak-node-api-config.cmake",
+    "LICENSE",
+    "NOTICE.md",
+    "THIRD-PARTY-NOTICES.md",
+    "UPSTREAM.md",
+    "README.md",
+    "licenses/**",
+    "CHANGELOG.md"
+  ],
+  "dependencies": {
+    "node-addon-api": "7.1.0",
+    "weak-node-api": "0.1.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.0"
+  }
+}
