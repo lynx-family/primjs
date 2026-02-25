@@ -73,3 +73,192 @@ jobs:
         run: |
           source tools/envsetup.sh
           bash testing/wasm/wasm_run.sh
+
+  check-version-change:
+    runs-on: ubuntu-latest
+    outputs:
+      version_changed: ${{ steps.check.outputs.version_changed }}
+    steps:
+      - name: Download Source
+        uses: actions/checkout@v4.2.2
+        with:
+          path: primjs
+          # We only need the last 2 commits to compare package.json versions
+          fetch-depth: 2
+
+      - name: Check version field change or skip on manual trigger
+        id: check
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "Manual trigger detected, skip version check."
+            echo "version_changed=true" >> "$GITHUB_OUTPUT"
+          else
+            cd $GITHUB_WORKSPACE/primjs
+            pkg_path="packages/weak-node-api/package.json"
+            version_current=$(jq -r '.version' "$pkg_path")
+
+            if git rev-parse HEAD~1 >/dev/null 2>&1; then
+              if git cat-file -e "HEAD~1:$pkg_path" 2>/dev/null; then
+                version_before=$(git show HEAD~1:"$pkg_path" | jq -r '.version')
+              else
+                echo "File $pkg_path is new in this commit"
+                version_before=""
+              fi
+            else
+              version_before=""
+            fi
+
+            echo "Current version: $version_current"
+            echo "Previous version: $version_before"
+
+            if [ "$version_current" != "$version_before" ]; then
+              echo "version_changed=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "version_changed=false" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+
+  weak-node-api-darwin-build:
+    if: needs.check-version-change.outputs.version_changed == 'true'
+    runs-on: macOS-latest
+    needs: check-version-change
+    steps:
+      - name: Download Source
+        uses: actions/checkout@v4.2.2
+        with:
+          path: primjs
+
+      - name: Python Setup
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Node Setup
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install CMake
+        uses: jwlawson/actions-setup-cmake@v2
+        with:
+          cmake-version: '3.30.x'
+
+      - name: Build Darwin weak-node-api
+        run: |
+          # macOS CMake-based build, produces prebuilt/macos/**/* dylibs
+          cd $GITHUB_WORKSPACE/primjs/packages/weak-node-api
+          npm install
+          npm run build:cmake:macos
+
+      - name: Upload Darwin Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: weak_node_api_darwin
+          # Upload the macOS prebuilt layout expected by the package
+          path: primjs/packages/weak-node-api/prebuilt/macos
+
+  weak-node-api-windows-build:
+    if: needs.check-version-change.outputs.version_changed == 'true'
+    runs-on: lynx-windows-2022-large
+    strategy:
+      matrix:
+        arch: [x64]
+    needs: check-version-change
+    steps:
+      - name: Configure Git
+        shell: pwsh
+        run: |
+          git config --global core.autocrlf false
+          git config --global core.eol lf
+          git config --global http.sslBackend "schannel"
+        working-directory: ./
+      - name: Download Source
+        uses: actions/checkout@v4.2.2
+        with:
+          path: primjs
+
+      - name: Python Setup
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Node Setup
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install CMake
+        uses: jwlawson/actions-setup-cmake@v2
+        with:
+          cmake-version: '3.30.x'
+
+      - name: Build Windows weak-node-api
+        shell: pwsh
+        run: |
+          # Windows MSVC + CMake build, produces prebuilt/win/**/* DLLs
+          cd $env:GITHUB_WORKSPACE/primjs/packages/weak-node-api
+          npm install
+          npm run build:cmake:win
+
+      - name: Upload Windows Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: weak_node_api_win
+          # Upload the Windows prebuilt layout expected by the package
+          path: primjs/packages/weak-node-api/prebuilt/win
+
+  weak-node-api-publish:
+    if: needs.check-version-change.outputs.version_changed == 'true'
+    runs-on: macOS-latest
+    needs: [check-version-change, weak-node-api-darwin-build, weak-node-api-windows-build]
+    permissions:
+      contents: read
+      id-token: write
+    environment: npm
+    steps:
+      - name: Download Source
+        uses: actions/checkout@v4.2.2
+        with:
+          path: primjs
+
+      - name: Python Setup
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Node Setup
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Setup Package Managers
+        run: |
+          npm install -g npm@latest
+          npm --version
+
+      - name: Install dependencies and prepare headers
+        run: |
+          cd $GITHUB_WORKSPACE/primjs/packages/weak-node-api
+          npm install
+          npm run prepare:headers
+
+      - name: Download Darwin Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: weak_node_api_darwin
+          path: primjs/packages/weak-node-api/prebuilt/macos
+
+      - name: Download Windows Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: weak_node_api_win
+          path: primjs/packages/weak-node-api/prebuilt/win
+
+      - name: List Prebuilt Artifacts
+        run: |
+          echo "Prebuilt directory contents:"
+          ls -la $GITHUB_WORKSPACE/primjs/packages/weak-node-api/prebuilt
+          echo ""
+          echo "Detailed file paths:"
+          find $GITHUB_WORKSPACE/primjs/packages/weak-node-api -type f
