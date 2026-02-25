@@ -94,11 +94,6 @@ extern "C" {
 #include <iostream>
 #endif
 
-#if !defined(BAZEL_TEST) && !defined(__WASI_SDK__) && \
-    defined(ENABLE_QUICKJS_DEBUGGER)
-#include "inspector/interface.h"
-#endif  // BAZEL_TEST
-
 #if defined(ANDROID) || defined(__ANDROID__)
 #include <android/log.h>
 #endif

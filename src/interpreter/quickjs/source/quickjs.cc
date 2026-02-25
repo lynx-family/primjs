@@ -96,11 +96,6 @@ int64_t HEAP_TAG_INNER = 0;
 }
 #endif
 
-#if !defined(BAZEL_TEST) && !defined(__WASI_SDK__) && \
-    defined(ENABLE_QUICKJS_DEBUGGER)
-#include "inspector/interface.h"
-#endif  // BAZEL_TEST
-
 #if defined(ANDROID) || defined(__ANDROID__)
 #include <android/log.h>
 #include <pthread.h>
@@ -4743,7 +4738,7 @@ int js_method_set_properties(LEPUSContext *ctx, LEPUSValueConst func_obj,
   js_method_set_home_object(ctx, func_obj, home_obj);
 
 #ifdef ENABLE_QUICKJS_DEBUGGER
-  if (js_is_bytecode_function(func_obj)) {
+  if (ctx->debugger_mode && js_is_bytecode_function(func_obj)) {
     js_bytecode_function_set_name(ctx, JS_GetFunctionBytecode(func_obj),
                                   LEPUS_ToString(ctx, name_str));
   }
@@ -13523,8 +13518,9 @@ int js_op_define_class(LEPUSContext *ctx, LEPUSValue *sp, JSAtom class_name,
     if (JS_DefineObjectName(ctx, ctor, class_name, LEPUS_PROP_CONFIGURABLE) < 0)
       goto fail;
 #ifdef ENABLE_QUICKJS_DEBUGGER
-    js_bytecode_function_set_name(ctx, JS_GetFunctionBytecode(ctor),
-                                  LEPUS_AtomToString(ctx, class_name));
+    if (ctx->debugger_mode)
+      js_bytecode_function_set_name(ctx, JS_GetFunctionBytecode(ctor),
+                                    LEPUS_AtomToString(ctx, class_name));
 #endif
   }
 

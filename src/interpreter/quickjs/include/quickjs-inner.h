@@ -79,6 +79,11 @@ typedef int BOOL;
 
 #ifdef ENABLE_QUICKJS_DEBUGGER
 #include "inspector/debugger_inner.h"
+extern "C" {
+void HandleDebuggerException(LEPUSContext *ctx);
+void DoInspectorCheck(LEPUSContext *ctx);
+void ComputeLineCol(int64_t line_col_num, int32_t *line, int64_t *column);
+}
 #endif
 
 #include "gc/qjsvaluevalue-space.h"
