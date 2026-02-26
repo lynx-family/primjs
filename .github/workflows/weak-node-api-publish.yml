@@ -196,4 +196,9 @@ jobs:
           ls -la $GITHUB_WORKSPACE/primjs/packages/weak-node-api/prebuilt
           echo ""
           echo "Detailed file paths:"
-          find $GITHUB_WORKSPACE/primjs/packages/weak-node-api -type f
+          find $GITHUB_WORKSPACE/primjs/packages/weak-node-api -path "*/node_modules" -prune -o -type f -print
+
+      - name: Publish
+        run: |-
+          cd $GITHUB_WORKSPACE/primjs/packages/weak-node-api
+          npm publish --access public --provenance
