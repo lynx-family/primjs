@@ -451,9 +451,11 @@ QJS_STATIC bool IsBreakpointEqual(LEPUSContext *ctx, LEPUSBreakpoint *a,
 
 static void SetBps(LEPUSDebuggerInfo *debugger_info, int32_t capacity) {
   debugger_info->breakpoints_capacity = capacity;
-  debugger_info->bps = static_cast<LEPUSBreakpoint *>(
-      lepus_realloc(debugger_info->ctx, debugger_info->bps,
-                    capacity * sizeof(LEPUSBreakpoint), ALLOC_TAG_WITHOUT_PTR));
+  LEPUS_HeapObjStore(
+      debugger_info->ctx, &debugger_info->bps,
+      static_cast<LEPUSBreakpoint *>(lepus_realloc(
+          debugger_info->ctx, debugger_info->bps,
+          capacity * sizeof(LEPUSBreakpoint), ALLOC_TAG_LEPUSBreakpointArray)));
   return;
 }
 
@@ -502,7 +504,7 @@ QJS_STATIC LEPUSBreakpoint *AddBreakpoint(
 
   bp = info->bps + bp_num;
   bp->breakpoint_id = LEPUS_UNDEFINED;
-  bp->script_url = bp_url;
+  LEPUS_HeapObjStore(ctx, &bp->script_url, bp_url);
   bp->line = line_number;
   bp->column = column_number;
   bp->script_id = script_id;
@@ -516,13 +518,13 @@ QJS_STATIC LEPUSBreakpoint *AddBreakpoint(
     LEPUSValue breakpoint_id = LEPUS_NewString(ctx, gen_breakpoint_id);
     if (!ctx->rt->gc_enable) lepus_free(ctx, gen_breakpoint_id);
     if (!LEPUS_IsException(breakpoint_id)) {
-      bp->breakpoint_id = breakpoint_id;
+      LEPUS_HeapObjStore(ctx, &bp->breakpoint_id, breakpoint_id);
     }
   }
 
   bp->specific_location = specific_location;
   bp->pc = NULL;
-  bp->condition = condition_val;
+  LEPUS_HeapObjStore(ctx, &bp->condition, condition_val);
   ++info->breakpoints_num;
   ++info->next_breakpoint_id;
   return bp;
@@ -600,6 +602,7 @@ static void GetSetBpByURLParams(LEPUSContext *ctx, LEPUSValue params,
   LEPUSValue param_url = LEPUS_GetPropertyStr(ctx, params, "url");
   if (!LEPUS_IsUndefined(param_url)) {
     const char *script_url_cstr = LEPUS_ToCString(ctx, param_url);
+    HandleScope block_scope{ctx, &script_url_cstr, HANDLE_TYPE_CSTRING};
     *script_url = lepus_strdup(ctx, script_url_cstr, ALLOC_TAG_WITHOUT_PTR);
     if (!ctx->rt->gc_enable) LEPUS_FreeCString(ctx, script_url_cstr);
   }

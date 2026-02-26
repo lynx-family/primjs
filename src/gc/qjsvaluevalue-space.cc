@@ -194,9 +194,6 @@ QJSValueValueSpace::QJSValueValueSpace(LEPUSRuntime* runtime)
 QJSValueValueSpace::~QJSValueValueSpace() { delete regular_nodes_; }
 void* QJSValueValueSpace::Create() {
   Element* node = regular_nodes_->Allocate();
-#ifdef ENABLE_GC_DEBUG_TOOLS
-  AddCurNode(runtime_, reinterpret_cast<void*>(node), 2);
-#endif
   node->set_state(State::NORMAL);
   return node->mem;
 }
@@ -205,12 +202,12 @@ void QJSValueValueSpace::Destroy(void* location) {
   NodeSpace::Release(Element::FromLocation(reinterpret_cast<Addr*>(location)));
 }
 
-void QJSValueValueSpace::IterateAllRoots(int local_idx) {
+void QJSValueValueSpace::CollectAllRoots(GCWorkStack& workStack) {
   for (Element* node : *regular_nodes_) {
     if (node->IsStrongRetainer()) {
-      LEPUSValue* val = reinterpret_cast<LEPUSValue*>(
-          reinterpret_cast<uint8_t*>(node->location()) + 8);
-      LEPUS_VisitLEPUSValue(runtime(), val, local_idx);
+      LEPUSValue* val = (LEPUSValue*)((uint8_t*)(node->location()) + 8);
+      void* ret = LEPUS_VisitLEPUSValue(runtime(), val);
+      if (ret) workStack.push_back((address_t)ret);
     }
   }
 }

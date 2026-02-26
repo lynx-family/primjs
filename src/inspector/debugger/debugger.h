@@ -173,6 +173,7 @@ class PauseStateScope {
     info_ = info;
     auto &state = info_->pause_state;
     state.get_properties_array = LEPUS_NewArray(info->ctx);
+    prim_WriteBarrierNoStore(state.get_properties_array, info->ctx);
     state.get_properties_array_len = 0;
   }
   ~PauseStateScope() {

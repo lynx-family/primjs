@@ -3,7 +3,7 @@
 .align 2
 .global _exception_handler_entry
 _exception_handler_entry:
-.word 0xf9400a68
+.word 0xf9400668
 .word 0xf9407909
 .word 0xb940f903
 cbz w3, Label_3
@@ -49,12 +49,12 @@ bl JS_IteratorClose
 b Label_4
 Label_5:
 .word 0xf85e83ac
-.word 0xf9400a68
+.word 0xf9400668
 .word 0xf9407909
 .word 0xf8008689
 .word 0xb27f03e9
 .word 0xf9007909
-.word 0xf9401988
+.word 0xf9401188
 .word 0xf9400508
 .word 0x8b190116
 .word 0x38400ec8
@@ -63,13 +63,13 @@ Label_5:
 .word 0xd61f0120
 Label_1:
 .word 0xf85e83ac
-.word 0xf9401988
+.word 0xf9401188
 .word 0x39401908
 .word 0x121c0508
 .word 0xf100011f
 b.NE Label_6
 .word 0xf85b83b1
-.word 0xf9400a69
+.word 0xf9400669
 .word 0xf940022a
 .word 0xf900812a
 .word 0xaa1103e1
@@ -98,7 +98,7 @@ Label_6:
 .word 0xf9001a36
 .word 0xf9002234
 .word 0xf9400228
-.word 0xf9400a69
+.word 0xf9400669
 .word 0xf9008128
 .word 0xf94007be
 .cfi_startproc
@@ -423,7 +423,7 @@ Label_36:
 _normal_entry:
 .cfi_startproc
 .word 0xd10283ff
-.word 0xf9401983
+.word 0xf9401183
 .word 0x79405062
 .word 0x79405463
 .word 0xeb0201df
@@ -442,7 +442,7 @@ Label_37:
 .cfi_offset x30, -8
 .word 0xd10183f1
 .word 0xd2800001
-.word 0xf9401989
+.word 0xf9401189
 .word 0x79405d29
 .word 0xb294c29
 .word 0xb284d29
@@ -518,13 +518,13 @@ Label_50:
 .word 0xd1000463
 cbnz x3, Label_50
 Label_49:
-.word 0xf9401988
+.word 0xf9401188
 .word 0xf9400516
 .word 0xa9386fb4
 .word 0xa9395bb0
 .word 0xa93e33ae
 .word 0xf940191a
-.word 0xf9401d9c
+.word 0xf940159c
 .word 0xa93c6bb0
 .word 0xa93f37bf
 .word 0xa93d67af
@@ -544,7 +544,7 @@ Label_49:
 .word 0x91008229
 .word 0xa9002529
 .word 0xf9002234
-.word 0xf9400a69
+.word 0xf9400669
 .word 0xf940812a
 .word 0xf900022a
 .word 0xf9008131
@@ -564,7 +564,7 @@ _native_entry:
 .word 0xaa0c03e1
 .word 0xaa1903e2
 .word 0xaa0e03e3
-.word 0xf9400a69
+.word 0xf9400669
 .word 0x79400d88
 .word 0xf9402929
 .word 0xd280050a
@@ -585,8 +585,8 @@ _async_entry:
 .word 0x927eb58b
 .word 0x91004171
 .word 0xf9400628
-.word 0xf9401909
-.word 0xf9401d1c
+.word 0xf9401109
+.word 0xf940151c
 .word 0xf9400a37
 .word 0xaa1703f0
 .word 0xf9400e38
@@ -596,7 +596,7 @@ _async_entry:
 .word 0xf9002634
 .word 0xf900223f
 .word 0xf9401a36
-.word 0xf9400a68
+.word 0xf9400668
 .word 0xf9408109
 .word 0xf9000229
 .word 0xf9008111
@@ -611,10 +611,10 @@ _async_entry:
 .word 0xa9395ba8
 .word 0xa9386faa
 .word 0xf9400628
-.word 0xf9401909
+.word 0xf9401109
 .word 0xa93e23ae
 .word 0xf940193a
-.word 0xf9401d1c
+.word 0xf940151c
 .word 0xa93c6bb0
 .word 0xa93f37bf
 .word 0xa93d67af
@@ -968,7 +968,7 @@ _dispatch_table_1_8:
 .word 0xf85b83b1
 .word 0xf9002234
 .word 0xf85e83ac
-.word 0xf9401988
+.word 0xf9401188
 .word 0x39401508
 .word 0x7200011f
 b.NE Label_76
@@ -987,7 +987,7 @@ b.EQ Label_78
 .word 0xf1004b3f
 b.NE Label_79
 Label_78:
-.word 0xf9406e60
+.word 0xf9406a60
 b Label_80
 Label_79:
 .word 0xf85b83b1
@@ -1022,7 +1022,7 @@ _dispatch_table_2_8:
 .global _dispatch_table_0_8
 _dispatch_table_0_8:
 .word 0xf85e83ac
-.word 0xf9401988
+.word 0xf9401188
 .word 0x39401508
 .word 0x7200011f
 b.NE Label_83
@@ -1041,7 +1041,7 @@ b.EQ Label_85
 .word 0xf1004b3f
 b.NE Label_86
 Label_85:
-.word 0xf9406e60
+.word 0xf9406a60
 b Label_87
 Label_86:
 .word 0xf85b83b1
@@ -1206,7 +1206,7 @@ Label_92:
 .word 0xf100051f
 b.NE Label_93
 .word 0xf85e83ac
-.word 0xf9401989
+.word 0xf9401189
 .word 0x79405129
 .word 0xeb0e013f
 b.LT Label_101
@@ -1246,7 +1246,7 @@ Label_95:
 .word 0xf100111f
 b.NE Label_96
 .word 0xf85e83ac
-.word 0xf9402189
+.word 0xf9401989
 cbz x9, Label_103
 .word 0xaa0903e0
 b Label_104
@@ -1310,7 +1310,7 @@ Label_106:
 .word 0xf100051f
 b.NE Label_107
 .word 0xf85e83ac
-.word 0xf9401989
+.word 0xf9401189
 .word 0x79405129
 .word 0xeb0e013f
 b.LT Label_115
@@ -1350,7 +1350,7 @@ Label_109:
 .word 0xf100111f
 b.NE Label_110
 .word 0xf85e83ac
-.word 0xf9402189
+.word 0xf9401989
 cbz x9, Label_117
 .word 0xaa0903e0
 b Label_118
@@ -2233,7 +2233,7 @@ Label_143:
 .cfi_endproc
 .word 0xaa0003f9
 .word 0xf85b83b1
-.word 0xf9400a69
+.word 0xf9400669
 .word 0xf940022a
 .word 0xf900812a
 .word 0xaa1103e1
@@ -2340,7 +2340,7 @@ Label_152:
 .cfi_endproc
 .word 0xaa0003f9
 .word 0xf85b83b1
-.word 0xf9400a69
+.word 0xf9400669
 .word 0xf940022a
 .word 0xf900812a
 .word 0xaa1103e1
@@ -2560,7 +2560,7 @@ Label_169:
 .cfi_endproc
 .word 0xaa0003f9
 .word 0xf85b83b1
-.word 0xf9400a69
+.word 0xf9400669
 .word 0xf940022a
 .word 0xf900812a
 .word 0xaa1103e1
@@ -2670,7 +2670,7 @@ Label_178:
 .cfi_endproc
 .word 0xaa0003f9
 .word 0xf85b83b1
-.word 0xf9400a69
+.word 0xf9400669
 .word 0xf940022a
 .word 0xf900812a
 .word 0xaa1103e1
@@ -2891,7 +2891,7 @@ _dispatch_table_2_40:
 .word 0xf9002234
 .word 0xaa0003f9
 .word 0xf85b83b1
-.word 0xf9400a69
+.word 0xf9400669
 .word 0xf940022a
 .word 0xf900812a
 .word 0xaa1103e1
@@ -2923,7 +2923,7 @@ _dispatch_table_0_40:
 _dispatch_table_1_40:
 .word 0xaa0003f9
 .word 0xf85b83b1
-.word 0xf9400a69
+.word 0xf9400669
 .word 0xf940022a
 .word 0xf900812a
 .word 0xaa1103e1
@@ -2954,7 +2954,7 @@ _dispatch_table_1_41:
 .word 0xf85b83b1
 .word 0xf9002234
 .word 0xf85b83b1
-.word 0xf9400a69
+.word 0xf9400669
 .word 0xf940022a
 .word 0xf900812a
 .word 0xaa1103e1
@@ -2987,7 +2987,7 @@ _dispatch_table_2_41:
 .global _dispatch_table_0_41
 _dispatch_table_0_41:
 .word 0xf85b83b1
-.word 0xf9400a69
+.word 0xf9400669
 .word 0xf940022a
 .word 0xf900812a
 .word 0xaa1103e1
@@ -3289,7 +3289,7 @@ _dispatch_table_1_46:
 .word 0xf9001a36
 .word 0xf9002234
 .word 0xf9400228
-.word 0xf9400a69
+.word 0xf9400669
 .word 0xf9008128
 .word 0xf94007be
 .cfi_startproc
@@ -3317,7 +3317,7 @@ _dispatch_table_0_46:
 .word 0xf9001a36
 .word 0xf9002234
 .word 0xf9400228
-.word 0xf9400a69
+.word 0xf9400669
 .word 0xf9008128
 .word 0xf94007be
 .cfi_startproc
@@ -4407,7 +4407,7 @@ _dispatch_table_0_61:
 .word 0xf1004b3f
 b.NE Label_287
 .word 0xf85e83ac
-.word 0xf9401988
+.word 0xf9401188
 .word 0x39401508
 .word 0x7200011f
 b.EQ Label_288
@@ -4438,7 +4438,7 @@ Label_290:
 b _exception_handler_entry
 b Label_289
 Label_288:
-.word 0xf9406e79
+.word 0xf9406a79
 Label_289:
 Label_287:
 .word 0xb27103e4
@@ -4478,7 +4478,7 @@ _dispatch_table_2_61:
 .word 0xf1004b3f
 b.NE Label_292
 .word 0xf85e83ac
-.word 0xf9401988
+.word 0xf9401188
 .word 0x39401508
 .word 0x7200011f
 b.EQ Label_293
@@ -4509,7 +4509,7 @@ Label_295:
 b _exception_handler_entry
 b Label_294
 Label_293:
-.word 0xf9406e79
+.word 0xf9406a79
 Label_294:
 Label_292:
 .word 0xb27103e4
@@ -6684,12 +6684,6 @@ _dispatch_table_0_94:
 .word 0xf9401108
 .word 0xf85f8e80
 .word 0xf9000100
-.word 0xaa0003f9
-.word 0xaa1303e1
-.word 0xa9bf7ffe
-bl prim_WriteBarrierNoStore
-.word 0xa8c17ffe
-.word 0xaa1903e0
 .word 0x38403ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -6701,12 +6695,6 @@ _dispatch_table_1_94:
 .word 0xf9400108
 .word 0xf9401108
 .word 0xf9000100
-.word 0xaa0003f9
-.word 0xaa1303e1
-.word 0xa9bf7ffe
-bl prim_WriteBarrierNoStore
-.word 0xa8c17ffe
-.word 0xaa1903e0
 .word 0x38403ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -6718,14 +6706,6 @@ _dispatch_table_2_94:
 .word 0xf9400108
 .word 0xf9401108
 .word 0xf9000101
-.word 0xaa0103e8
-.word 0xaa0003f9
-.word 0xaa1303e1
-.word 0xaa0803e0
-.word 0xa9bf7ffe
-bl prim_WriteBarrierNoStore
-.word 0xa8c17ffe
-.word 0xaa1903e0
 .word 0x38403ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -6738,12 +6718,6 @@ _dispatch_table_0_95:
 .word 0xf9401108
 .word 0xf85f8e80
 .word 0xf9000100
-.word 0xaa0003f9
-.word 0xaa1303e1
-.word 0xa9bf7ffe
-bl prim_WriteBarrierNoStore
-.word 0xa8c17ffe
-.word 0xaa1903e0
 .word 0x38403ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -6755,12 +6729,6 @@ _dispatch_table_1_95:
 .word 0xf9400108
 .word 0xf9401108
 .word 0xf9000100
-.word 0xaa0003f9
-.word 0xaa1303e1
-.word 0xa9bf7ffe
-bl prim_WriteBarrierNoStore
-.word 0xa8c17ffe
-.word 0xaa1903e0
 .word 0x38403ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -6772,16 +6740,6 @@ _dispatch_table_2_95:
 .word 0xf9400108
 .word 0xf9401108
 .word 0xf9000101
-.word 0xaa0103e8
-.word 0xf8008680
-.word 0xf8008681
-.word 0xaa1303e1
-.word 0xaa0803e0
-.word 0xa9bf7ffe
-bl prim_WriteBarrierNoStore
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
 .word 0x38403ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -7760,7 +7718,7 @@ _dispatch_table_0_107:
 .word 0x910006c0
 .word 0x8b080000
 .word 0xf85e83ac
-.word 0xf9401983
+.word 0xf9401183
 .word 0xf9400463
 .word 0xcb030000
 .word 0xd370bc00
@@ -7776,7 +7734,7 @@ _dispatch_table_1_107:
 .word 0x910006c1
 .word 0x8b080021
 .word 0xf85e83ac
-.word 0xf9401983
+.word 0xf9401183
 .word 0xf9400463
 .word 0xcb030021
 .word 0xd370bc21
@@ -7794,7 +7752,7 @@ _dispatch_table_2_107:
 .word 0x910006c1
 .word 0x8b080021
 .word 0xf85e83ac
-.word 0xf9401983
+.word 0xf9401183
 .word 0xf9400463
 .word 0xcb030021
 .word 0xd370bc21
@@ -7808,7 +7766,7 @@ _dispatch_table_2_107:
 _dispatch_table_0_108:
 .word 0xb84012c8
 .word 0xf85e83ac
-.word 0xf9401989
+.word 0xf9401189
 .word 0xf9400529
 .word 0x910016d9
 .word 0xcb090339
@@ -7824,7 +7782,7 @@ _dispatch_table_0_108:
 _dispatch_table_1_108:
 .word 0xb84012c8
 .word 0xf85e83ac
-.word 0xf9401989
+.word 0xf9401189
 .word 0xf9400529
 .word 0x910016d9
 .word 0xcb090339
@@ -7840,7 +7798,7 @@ _dispatch_table_1_108:
 _dispatch_table_2_108:
 .word 0xb84012c8
 .word 0xf85e83ac
-.word 0xf9401989
+.word 0xf9401189
 .word 0xf9400529
 .word 0x910016d9
 .word 0xcb090339
@@ -7863,7 +7821,7 @@ _dispatch_table_0_109:
 cbnz x8, Label_480
 .word 0x2a1903f9
 .word 0xf85e83ac
-.word 0xf9401989
+.word 0xf9401189
 .word 0xb9401128
 .word 0x6b08033f
 b.GE Label_480
@@ -7897,7 +7855,7 @@ _dispatch_table_1_109:
 cbnz x8, Label_483
 .word 0x2a1903f9
 .word 0xf85e83ac
-.word 0xf9401989
+.word 0xf9401189
 .word 0xb9401128
 .word 0x6b08033f
 b.GE Label_483
@@ -7932,7 +7890,7 @@ _dispatch_table_2_109:
 cbnz x8, Label_486
 .word 0x2a1903f9
 .word 0xf85e83ac
-.word 0xf9401989
+.word 0xf9401189
 .word 0xb9401128
 .word 0x6b08033f
 b.GE Label_486
@@ -9929,7 +9887,7 @@ _dispatch_table_1_135:
 .word 0xf9001a36
 .word 0xf9002234
 .word 0xf9400228
-.word 0xf9400a69
+.word 0xf9400669
 .word 0xf9008128
 .word 0xf94007be
 .cfi_startproc
@@ -9957,7 +9915,7 @@ _dispatch_table_0_135:
 .word 0xf9001a36
 .word 0xf9002234
 .word 0xf9400228
-.word 0xf9400a69
+.word 0xf9400669
 .word 0xf9008128
 .word 0xf94007be
 .cfi_startproc
@@ -9984,7 +9942,7 @@ _dispatch_table_1_136:
 .word 0xf9001a36
 .word 0xf9002234
 .word 0xf9400228
-.word 0xf9400a69
+.word 0xf9400669
 .word 0xf9008128
 .word 0xf94007be
 .cfi_startproc
@@ -10013,7 +9971,7 @@ _dispatch_table_0_136:
 .word 0xf9001a36
 .word 0xf9002234
 .word 0xf9400228
-.word 0xf9400a69
+.word 0xf9400669
 .word 0xf9008128
 .word 0xf94007be
 .cfi_startproc
@@ -10040,7 +9998,7 @@ _dispatch_table_1_137:
 .word 0xf9001a36
 .word 0xf9002234
 .word 0xf9400228
-.word 0xf9400a69
+.word 0xf9400669
 .word 0xf9008128
 .word 0xf94007be
 .cfi_startproc
@@ -10069,7 +10027,7 @@ _dispatch_table_0_137:
 .word 0xf9001a36
 .word 0xf9002234
 .word 0xf9400228
-.word 0xf9400a69
+.word 0xf9400669
 .word 0xf9008128
 .word 0xf94007be
 .cfi_startproc
@@ -10096,7 +10054,7 @@ _dispatch_table_1_138:
 .word 0xf9001a36
 .word 0xf9002234
 .word 0xf9400228
-.word 0xf9400a69
+.word 0xf9400669
 .word 0xf9008128
 .word 0xf94007be
 .cfi_startproc
@@ -10125,7 +10083,7 @@ _dispatch_table_0_138:
 .word 0xf9001a36
 .word 0xf9002234
 .word 0xf9400228
-.word 0xf9400a69
+.word 0xf9400669
 .word 0xf9008128
 .word 0xf94007be
 .cfi_startproc
@@ -10151,7 +10109,7 @@ _dispatch_table_1_139:
 .word 0xf9001a36
 .word 0xf9002234
 .word 0xf9400228
-.word 0xf9400a69
+.word 0xf9400669
 .word 0xf9008128
 .word 0xf94007be
 .cfi_startproc
@@ -10179,7 +10137,7 @@ _dispatch_table_0_139:
 .word 0xf9001a36
 .word 0xf9002234
 .word 0xf9400228
-.word 0xf9400a69
+.word 0xf9400669
 .word 0xf9008128
 .word 0xf94007be
 .cfi_startproc
@@ -11664,27 +11622,27 @@ bl JS_ConcatString_GC
 .word 0xf9000100
 b Label_750
 Label_749:
-.word 0xf8008688
 .word 0xaa0103f9
 .word 0xf8008680
 .word 0xf85b83b1
 .word 0xf9002234
+.word 0xf8008688
 .word 0xaa0003e2
 .word 0xaa1303e0
 .word 0xa9bf7ffe
 bl prim_js_add_slow_gc
 .word 0xa8c17ffe
-.word 0xd1002294
+.word 0xf85f8e88
 .word 0xf102081f
 b.NE Label_754
-.word 0xf85f8e88
+.word 0xd1002294
 .word 0x91000ad6
 .word 0xf85b83b1
 .word 0xf9002234
 b _exception_handler_entry
 Label_754:
 .word 0xaa1903e1
-.word 0xf85f8e88
+.word 0xd1002294
 .word 0xf9000100
 .word 0x38402ec8
 .word 0x91000108
@@ -11763,27 +11721,27 @@ bl JS_ConcatString_GC
 .word 0xf9000100
 b Label_757
 Label_756:
-.word 0xf8008688
 .word 0xaa0103f9
 .word 0xf8008680
 .word 0xf85b83b1
 .word 0xf9002234
+.word 0xf8008688
 .word 0xaa0003e2
 .word 0xaa1303e0
 .word 0xa9bf7ffe
 bl prim_js_add_slow_gc
 .word 0xa8c17ffe
-.word 0xd1002294
+.word 0xf85f8e88
 .word 0xf102081f
 b.NE Label_761
-.word 0xf85f8e88
+.word 0xd1002294
 .word 0x91000ad6
 .word 0xf85b83b1
 .word 0xf9002234
 b _exception_handler_entry
 Label_761:
 .word 0xaa1903e1
-.word 0xf85f8e88
+.word 0xd1002294
 .word 0xf9000100
 .word 0x38402ec8
 .word 0x91000108
@@ -12102,7 +12060,7 @@ _dispatch_table_1_153:
 .word 0xf85b83b1
 .word 0xf9002234
 .word 0xb84012c8
-.word 0xf9406e61
+.word 0xf9406a61
 .word 0xd2800003
 .word 0xf85b83b1
 .word 0xf9002234
@@ -12137,7 +12095,7 @@ _dispatch_table_2_153:
 .global _dispatch_table_0_153
 _dispatch_table_0_153:
 .word 0xb84012c8
-.word 0xf9406e61
+.word 0xf9406a61
 .word 0xd2800003
 .word 0xf85b83b1
 .word 0xf9002234
@@ -17778,12 +17736,6 @@ _dispatch_table_0_222:
 .word 0xf9401108
 .word 0xf85f8e80
 .word 0xf9000100
-.word 0xaa0003f9
-.word 0xaa1303e1
-.word 0xa9bf7ffe
-bl prim_WriteBarrierNoStore
-.word 0xa8c17ffe
-.word 0xaa1903e0
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -17793,12 +17745,6 @@ _dispatch_table_1_222:
 .word 0xf9400388
 .word 0xf9401108
 .word 0xf9000100
-.word 0xaa0003f9
-.word 0xaa1303e1
-.word 0xa9bf7ffe
-bl prim_WriteBarrierNoStore
-.word 0xa8c17ffe
-.word 0xaa1903e0
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -17808,14 +17754,6 @@ _dispatch_table_2_222:
 .word 0xf9400388
 .word 0xf9401108
 .word 0xf9000101
-.word 0xaa0103e8
-.word 0xaa0003f9
-.word 0xaa1303e1
-.word 0xaa0803e0
-.word 0xa9bf7ffe
-bl prim_WriteBarrierNoStore
-.word 0xa8c17ffe
-.word 0xaa1903e0
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -17826,12 +17764,6 @@ _dispatch_table_0_223:
 .word 0xf9401108
 .word 0xf85f8e80
 .word 0xf9000100
-.word 0xaa0003f9
-.word 0xaa1303e1
-.word 0xa9bf7ffe
-bl prim_WriteBarrierNoStore
-.word 0xa8c17ffe
-.word 0xaa1903e0
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -17841,12 +17773,6 @@ _dispatch_table_1_223:
 .word 0xf9400788
 .word 0xf9401108
 .word 0xf9000100
-.word 0xaa0003f9
-.word 0xaa1303e1
-.word 0xa9bf7ffe
-bl prim_WriteBarrierNoStore
-.word 0xa8c17ffe
-.word 0xaa1903e0
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -17856,14 +17782,6 @@ _dispatch_table_2_223:
 .word 0xf9400788
 .word 0xf9401108
 .word 0xf9000101
-.word 0xaa0103e8
-.word 0xaa0003f9
-.word 0xaa1303e1
-.word 0xaa0803e0
-.word 0xa9bf7ffe
-bl prim_WriteBarrierNoStore
-.word 0xa8c17ffe
-.word 0xaa1903e0
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -17874,12 +17792,6 @@ _dispatch_table_0_224:
 .word 0xf9401108
 .word 0xf85f8e80
 .word 0xf9000100
-.word 0xaa0003f9
-.word 0xaa1303e1
-.word 0xa9bf7ffe
-bl prim_WriteBarrierNoStore
-.word 0xa8c17ffe
-.word 0xaa1903e0
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -17889,12 +17801,6 @@ _dispatch_table_1_224:
 .word 0xf9400b88
 .word 0xf9401108
 .word 0xf9000100
-.word 0xaa0003f9
-.word 0xaa1303e1
-.word 0xa9bf7ffe
-bl prim_WriteBarrierNoStore
-.word 0xa8c17ffe
-.word 0xaa1903e0
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -17904,14 +17810,6 @@ _dispatch_table_2_224:
 .word 0xf9400b88
 .word 0xf9401108
 .word 0xf9000101
-.word 0xaa0103e8
-.word 0xaa0003f9
-.word 0xaa1303e1
-.word 0xaa0803e0
-.word 0xa9bf7ffe
-bl prim_WriteBarrierNoStore
-.word 0xa8c17ffe
-.word 0xaa1903e0
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -17922,12 +17820,6 @@ _dispatch_table_0_225:
 .word 0xf9401108
 .word 0xf85f8e80
 .word 0xf9000100
-.word 0xaa0003f9
-.word 0xaa1303e1
-.word 0xa9bf7ffe
-bl prim_WriteBarrierNoStore
-.word 0xa8c17ffe
-.word 0xaa1903e0
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -17937,12 +17829,6 @@ _dispatch_table_1_225:
 .word 0xf9400f88
 .word 0xf9401108
 .word 0xf9000100
-.word 0xaa0003f9
-.word 0xaa1303e1
-.word 0xa9bf7ffe
-bl prim_WriteBarrierNoStore
-.word 0xa8c17ffe
-.word 0xaa1903e0
 .word 0x38401ec8
 .word 0x91000108
 .word 0xf8685aa9
@@ -17952,14 +17838,6 @@ _dispatch_table_2_225:
 .word 0xf9400f88
 .word 0xf9401108
 .word 0xf9000101
-.word 0xaa0103e8
-.word 0xaa0003f9
-.word 0xaa1303e1
-.word 0xaa0803e0
-.word 0xa9bf7ffe
-bl prim_WriteBarrierNoStore
-.word 0xa8c17ffe
-.word 0xaa1903e0
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -17970,12 +17848,6 @@ _dispatch_table_0_226:
 .word 0xf9401108
 .word 0xf85f8e80
 .word 0xf9000100
-.word 0xaa0003f9
-.word 0xaa1303e1
-.word 0xa9bf7ffe
-bl prim_WriteBarrierNoStore
-.word 0xa8c17ffe
-.word 0xaa1903e0
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -17985,12 +17857,6 @@ _dispatch_table_1_226:
 .word 0xf9400388
 .word 0xf9401108
 .word 0xf9000100
-.word 0xaa0003f9
-.word 0xaa1303e1
-.word 0xa9bf7ffe
-bl prim_WriteBarrierNoStore
-.word 0xa8c17ffe
-.word 0xaa1903e0
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -18000,16 +17866,6 @@ _dispatch_table_2_226:
 .word 0xf9400388
 .word 0xf9401108
 .word 0xf9000101
-.word 0xaa0103e8
-.word 0xf8008680
-.word 0xf8008681
-.word 0xaa1303e1
-.word 0xaa0803e0
-.word 0xa9bf7ffe
-bl prim_WriteBarrierNoStore
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -18020,12 +17876,6 @@ _dispatch_table_0_227:
 .word 0xf9401108
 .word 0xf85f8e80
 .word 0xf9000100
-.word 0xaa0003f9
-.word 0xaa1303e1
-.word 0xa9bf7ffe
-bl prim_WriteBarrierNoStore
-.word 0xa8c17ffe
-.word 0xaa1903e0
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -18035,12 +17885,6 @@ _dispatch_table_1_227:
 .word 0xf9400788
 .word 0xf9401108
 .word 0xf9000100
-.word 0xaa0003f9
-.word 0xaa1303e1
-.word 0xa9bf7ffe
-bl prim_WriteBarrierNoStore
-.word 0xa8c17ffe
-.word 0xaa1903e0
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -18050,16 +17894,6 @@ _dispatch_table_2_227:
 .word 0xf9400788
 .word 0xf9401108
 .word 0xf9000101
-.word 0xaa0103e8
-.word 0xf8008680
-.word 0xf8008681
-.word 0xaa1303e1
-.word 0xaa0803e0
-.word 0xa9bf7ffe
-bl prim_WriteBarrierNoStore
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -18070,12 +17904,6 @@ _dispatch_table_0_228:
 .word 0xf9401108
 .word 0xf85f8e80
 .word 0xf9000100
-.word 0xaa0003f9
-.word 0xaa1303e1
-.word 0xa9bf7ffe
-bl prim_WriteBarrierNoStore
-.word 0xa8c17ffe
-.word 0xaa1903e0
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -18085,12 +17913,6 @@ _dispatch_table_1_228:
 .word 0xf9400b88
 .word 0xf9401108
 .word 0xf9000100
-.word 0xaa0003f9
-.word 0xaa1303e1
-.word 0xa9bf7ffe
-bl prim_WriteBarrierNoStore
-.word 0xa8c17ffe
-.word 0xaa1903e0
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -18100,16 +17922,6 @@ _dispatch_table_2_228:
 .word 0xf9400b88
 .word 0xf9401108
 .word 0xf9000101
-.word 0xaa0103e8
-.word 0xf8008680
-.word 0xf8008681
-.word 0xaa1303e1
-.word 0xaa0803e0
-.word 0xa9bf7ffe
-bl prim_WriteBarrierNoStore
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
@@ -18120,12 +17932,6 @@ _dispatch_table_0_229:
 .word 0xf9401108
 .word 0xf85f8e80
 .word 0xf9000100
-.word 0xaa0003f9
-.word 0xaa1303e1
-.word 0xa9bf7ffe
-bl prim_WriteBarrierNoStore
-.word 0xa8c17ffe
-.word 0xaa1903e0
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -18135,12 +17941,6 @@ _dispatch_table_1_229:
 .word 0xf9400f88
 .word 0xf9401108
 .word 0xf9000100
-.word 0xaa0003f9
-.word 0xaa1303e1
-.word 0xa9bf7ffe
-bl prim_WriteBarrierNoStore
-.word 0xa8c17ffe
-.word 0xaa1903e0
 .word 0x38401ec8
 .word 0x9103c908
 .word 0xf8685aa9
@@ -18150,16 +17950,6 @@ _dispatch_table_2_229:
 .word 0xf9400f88
 .word 0xf9401108
 .word 0xf9000101
-.word 0xaa0103e8
-.word 0xf8008680
-.word 0xf8008681
-.word 0xaa1303e1
-.word 0xaa0803e0
-.word 0xa9bf7ffe
-bl prim_WriteBarrierNoStore
-.word 0xa8c17ffe
-.word 0xf85f8e81
-.word 0xf85f8e80
 .word 0x38401ec8
 .word 0x91079108
 .word 0xf8685aa9
