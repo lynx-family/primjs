@@ -18,3 +18,14 @@ napi_source_set("adapter") {
   public_configs = [ ":napi_adapter_config" ]
   public_deps = [ "../..:napi_lib" ]
 }
+
+napi_source_set("weak_node_api_host") {
+  sources = [
+    "weak_napi_host_generator.cc",
+    "weak_napi_host_injector.cc",
+  ]
+  public_deps = [
+    ":adapter",
+  ]
+}
+

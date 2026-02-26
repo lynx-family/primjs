@@ -121,7 +121,10 @@ Pod::Spec.new do |s|
     end
 
     sp.subspec "adapter" do |ssp|
-      ssp.source_files = "src/napi/adapter/*.{h,cc}"
+      ssp.source_files = [
+        "src/napi/adapter/js_native_api_adapter.cc",
+        "src/napi/adapter/js_native_api_adapter.h",
+      ]
       ssp.public_header_files = "src/napi/adapter/js_native_api_adapter.h"
       ssp.dependency "PrimJS/napi/core"
       ssp.dependency "PrimJS/napi/env"
