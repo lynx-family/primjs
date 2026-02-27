@@ -1042,6 +1042,7 @@ LEPUSRuntime *LEPUS_NewRuntime2(const LEPUSMallocFunctions *mf, void *opaque,
   // <Primjs begin>
   init_list_head(&rt->gc_bytecode_list);
   init_list_head(&rt->gc_obj_list);
+  init_list_head(&rt->weak_ref_target_list);
   // <Primjs end>
 #ifdef DUMP_LEAKS
   init_list_head(&rt->string_list);
@@ -1123,6 +1124,7 @@ void JS_ResetRuntimeForEffect(LEPUSRuntime *rt, const LEPUSMallocFunctions *mf,
   // <Primjs begin>
   init_list_head(&rt->gc_bytecode_list);
   init_list_head(&rt->gc_obj_list);
+  init_list_head(&rt->weak_ref_target_list);
   // <Primjs end>
   init_list_head(&rt->async_func_sf);
 
@@ -5227,7 +5229,18 @@ QJS_STATIC void free_object2(LEPUSRuntime *rt, LEPUSObject *p) {
 
 QJS_STATIC void free_object(LEPUSRuntime *rt, LEPUSObject *p) {
   assert(p->header.ref_count == 0);
-  if (!rt->in_gc_sweep) free_object2(rt, p);
+  if (!rt->in_gc_sweep) {
+    // First remove from obj_list, then add to weak_ref_target_list
+    if (unlikely((p->first_weak_ref != NULL ||
+                  p->class_id == JS_CLASS_FinalizationRegistry) &&
+                 !p->free_mark)) {
+      p->free_mark = 1;    // mark as pending release during GC
+      list_del(&p->link);  // remove from obj_list
+      list_add_tail(&p->link, &rt->weak_ref_target_list);
+      return;
+    }
+    free_object2(rt, p);
+  }
 }
 
 bool LEPUS_IsGCMode(LEPUSContext *ctx) { return ctx->gc_enable; }
@@ -5971,6 +5984,18 @@ void LEPUS_RunGC(LEPUSRuntime *rt) {
    */
   gc_detach_async_var_refs(rt);
   // <Primjs end>
+
+  if (!list_empty(&rt->weak_ref_target_list)) {
+    struct list_head *el, *el1;
+    LEPUSObject *p;
+    list_for_each_safe(el, el1, &rt->weak_ref_target_list) {
+      p = list_entry(el, LEPUSObject, link);
+      free_object_struct(rt, p);
+      lepus_free_rt(rt, p);
+    }
+    init_list_head(&rt->weak_ref_target_list);
+  }
+
   gc_decref(rt);
 
   /* keep the GC objects with a non zero refcount and their childs */
@@ -5978,7 +6003,7 @@ void LEPUS_RunGC(LEPUSRuntime *rt) {
   // <Primjs begin>
   /*
    * After the marking phase is complete, restore the closure variable reference
-  of async funtions.
+   * of async funtions.
    */
   gc_reset_async_var_refs(rt);
   // <Primjs end>
