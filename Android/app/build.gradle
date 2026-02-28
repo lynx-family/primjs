@@ -38,6 +38,7 @@ android {
                         '-DENABLE_PRIMJS_SNAPSHOT='+enable_primjs_snapshot,
                         '-DDISABLE_NANBOX='+disable_nanbox,
                         '-DENABLE_COMPATIBLE_MM='+enable_compatible_mm,
+                        '-DENABLE_GC_LOG='+enable_gc_log,
                         '-DJS_V8_LIBRARY='+"${projectDir}/build/jniLibs/v8so/jni/",
                         '-DENABLE_BUILD_AAR=TRUE', 
                         '-LH'

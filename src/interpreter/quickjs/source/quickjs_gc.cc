@@ -36,8 +36,6 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "gc/trace-gc.h"
-
 #if defined(_WIN32)
 #if defined(_MSC_VER)
 #include <BaseTsd.h>
@@ -53,19 +51,8 @@ extern "C" {
 #include <sys/time.h>
 #endif
 
-#ifdef ENABLE_TRACING_GC_LOG
-#include <time.h>
-#endif
-
-#include <errno.h>
-#ifndef _WIN32
-#include <pthread.h>
-#include <unistd.h>
-#endif
-
 #include <cstdint>
 #include <cstdlib>
-#include <sstream>
 
 #if defined(__APPLE__)
 #include <malloc/malloc.h>
@@ -83,20 +70,10 @@ extern "C" {
 #endif
 
 #include "gc/collector.h"
+#include "gc/gc_safe_list.h"
 #include "gc/global-handles.h"
-#include "gc/sweeper.h"
-#include "gc/thread_pool.h"
 #include "quickjs/include/bignum.h"
 #include "quickjs/include/quickjs-inner.h"
-
-#if defined(ENABLE_TRACING_GC_LOG) || defined(ENABLE_GC_DEBUG_TOOLS) || \
-    defined(ENABLE_FORCE_GC)
-#include <iostream>
-#endif
-
-#if defined(ANDROID) || defined(__ANDROID__)
-#include <android/log.h>
-#endif
 
 #ifndef EMSCRIPTEN
 #define EMSCRIPTEN
@@ -125,6 +102,8 @@ extern "C" {
 /* define it if printf uses the RNDN rounding mode instead of RNDNA */
 #define CONFIG_PRINTF_RNDN
 #endif
+
+static constexpr uint64_t kHeaderSize = ROS_GC::kHeaderSize;
 
 /* define to include Atomics.* operations which depend on the OS
    threads */
@@ -181,102 +160,10 @@ static uint8_t const typed_array_size_log2[JS_TYPED_ARRAY_COUNT] = {
 #define JS_STACK_SIZE_MAX 65535
 #define JS_STRING_LEN_MAX ((1 << 30) - 1)
 
-#ifdef ENABLE_GC_DEBUG_TOOLS
-void add_cur_node(LEPUSRuntime *rt, void *node, int type) {
-  if (!node) return;
-  if (type == 1) {  // handle
-    rt->gc->handle_order_cnt++;
-    rt->gc->cur_handles[node] = rt->gc->handle_order_cnt;
-  } else if (type == 2) {  // qjsvaluevalue
-    rt->gc->qjsvalue_order_cnt++;
-    rt->gc->cur_qjsvalues[node] = rt->gc->qjsvalue_order_cnt;
-  }
-}
+// heap obj length
+void set_heap_obj_len(void *ptr, int len) {}
 
-void delete_cur_node(LEPUSRuntime *rt, void *node, int type) {
-  if (!node) return;
-  if (type == 1) {  // handle
-    rt->gc->cur_handles.erase(node);
-  } else if (type == 2) {  // qjsvaluevalue
-    rt->gc->cur_qjsvalues.erase(node);
-  }
-}
-
-size_t get_cur_node_cnt(LEPUSRuntime *rt, void *node, int type) {
-  if (!node) return 0;
-  std::unordered_map<void *, size_t>::iterator it;
-  if (type == 1) {
-    it = rt->gc->cur_handles.find(node);
-    if (it != rt->gc->cur_handles.end()) {
-      return it->second;
-    }
-  } else if (type == 2) {
-    it = rt->gc->cur_qjsvalues.find(node);
-    if (it != rt->gc->cur_qjsvalues.end()) {
-      return it->second;
-    }
-  }
-  return 0;
-}
-
-size_t get_del_cnt(void *runtime, void *ptr) {
-  LEPUSRuntime *rt = static_cast<LEPUSRuntime *>(runtime);
-  std::unordered_map<void *, size_t>::iterator it = rt->gc->del_mems.find(ptr);
-  if (it != rt->gc->del_mems.end()) {
-    return it->second;
-  }
-  return 0;
-}
-
-void add_cur_mems(void *runtime, void *ptr) {
-  if (!ptr) return;
-  LEPUSRuntime *rt = static_cast<LEPUSRuntime *>(runtime);
-  rt->gc->mem_order_cnt++;
-  rt->gc->cur_mems[ptr] = rt->gc->mem_order_cnt;
-  if (rt->gc->mem_order_cnt == INT_MAX) {
-    std::cout << "add_cur_mems, ptr: " << ptr
-              << " del_cnt: " << get_del_cnt(runtime, ptr) << std::endl;
-  }
-}
-
-void delete_cur_mems(void *runtime, void *ptr) {
-  LEPUSRuntime *rt = static_cast<LEPUSRuntime *>(runtime);
-  rt->gc->del_mems[ptr] = get_cur_cnt(runtime, ptr);
-  rt->gc->cur_mems.erase(ptr);
-}
-
-void multi_delete_cur_mems(void *runtime, void *ptr, int local_idx) {
-  LEPUSRuntime *rt = static_cast<LEPUSRuntime *>(runtime);
-  rt->gc->delete_mems[local_idx].insert(ptr);
-}
-
-void merge_mems(void *runtime) {
-  LEPUSRuntime *rt = static_cast<LEPUSRuntime *>(runtime);
-  for (int i = 0; i < THREAD_NUM; i++) {
-    for (auto it : rt->gc->delete_mems[i]) {
-      rt->gc->del_mems[it] = get_cur_cnt(runtime, it);
-      rt->gc->cur_mems.erase(it);
-    }
-    rt->gc->delete_mems[i].clear();
-  }
-}
-
-__attribute__((unused)) size_t get_cur_cnt(void *runtime, void *ptr) {
-  LEPUSRuntime *rt = static_cast<LEPUSRuntime *>(runtime);
-  std::unordered_map<void *, size_t>::iterator it = rt->gc->cur_mems.find(ptr);
-  if (it != rt->gc->cur_mems.end()) {
-    return it->second;
-  }
-  return 0;
-}
-
-bool check_valid_ptr(void *runtime, void *ptr) {
-  if (get_cur_cnt(runtime, ptr) != 0) {
-    return true;
-  }
-  return false;
-}
-#endif
+int32_t get_heap_obj_len(void *ptr) { return -1; }
 
 QJS_STATIC inline BOOL __JS_AtomIsConst(JSAtom v) {
 #if defined(DUMP_LEAKS) && DUMP_LEAKS > 1
@@ -287,7 +174,6 @@ QJS_STATIC inline BOOL __JS_AtomIsConst(JSAtom v) {
 }
 #ifdef ENABLE_COMPATIBLE_MM
 static const int NUM_OF_LEPUSREF = 20000;
-static const int UPDATE_GC_INFO_TIMES = 1;
 static pthread_mutex_t runtime_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 static std::unordered_set<LEPUSRuntime *> *js_get_rt_set() {
@@ -341,14 +227,9 @@ static __attribute__((unused)) void JS_DumpShapes(LEPUSRuntime *rt);
 #endif  // DUMP_QJS_VALUE
 // <Primjs end>
 
-static void js_proxy_finalizer(LEPUSRuntime *rt, LEPUSValue val);
 static void js_proxy_mark(LEPUSRuntime *rt, LEPUSValueConst val,
-                          LEPUS_MarkFunc *mark_func, int local_idx);
+                          LEPUS_MarkFunc *mark_func, void *workStack);
 static void js_weakref_finalizer(LEPUSRuntime *rt, LEPUSValue val);
-static void js_finalizationRegistry_finalizer(LEPUSRuntime *rt, LEPUSValue val);
-static void js_finalizationRegistry_mark(LEPUSRuntime *rt, LEPUSValueConst val,
-                                         LEPUS_MarkFunc *mark_func,
-                                         int local_idx);
 static LEPUSValue js_promise_resolve_function_call(
     LEPUSContext *ctx, LEPUSValueConst func_obj, LEPUSValueConst this_val,
     int argc, LEPUSValueConst *argv, int flags);
@@ -418,8 +299,8 @@ static int JS_GetOwnPropertyInternal(LEPUSContext *ctx,
                                      LEPUSPropertyDescriptor *desc,
                                      LEPUSObject *p, JSAtom prop);
 QJS_STATIC void JS_AddIntrinsicBasicObjects_GC(LEPUSContext *ctx);
-static void js_free_shape(LEPUSRuntime *rt, JSShape *sh);
-static void js_free_shape_null(LEPUSRuntime *rt, JSShape *sh);
+static void js_free_shape(JSShape *sh);
+static void js_free_shape_null(JSShape *sh);
 static int js_shape_prepare_update(LEPUSContext *ctx, LEPUSObject *p,
                                    JSShapeProperty **pprs);
 static int init_shape_hash(LEPUSRuntime *rt);
@@ -511,11 +392,13 @@ static LEPUSValue JSRef2Value(LEPUSContext *ctx, LEPUSValue ref) {
 #ifdef ENABLE_LEPUSNG
   if (LEPUS_IsLepusRef(ref)) {
     auto *js_ref = static_cast<LEPUSLepusRef *>(LEPUS_VALUE_GET_PTR(ref));
-    auto &obj = js_ref->lepus_val;
+    auto obj = js_ref->lepus_val;
     if (LEPUS_VALUE_IS_OBJECT(obj)) {
       return obj;
     }
-    return obj = ctx->rt->js_callbacks_.convert_to_object(ctx, ref);
+    HeapObjStore(ctx, &js_ref->lepus_val,
+                 ctx->rt->js_callbacks_.convert_to_object(ctx, ref));
+    return js_ref->lepus_val;
   }
 #endif
   return ref;
@@ -527,7 +410,7 @@ static size_t js_malloc_usable_size_unknown(const void *ptr) { return 0; }
 
 QJS_STATIC inline void js_dbuf_init(LEPUSContext *ctx, DynBuf *s) {
   dbuf_init2(s, ctx->rt,
-             reinterpret_cast<DynBufReallocFunc *>(lepus_realloc_rt));
+             reinterpret_cast<DynBufReallocFunc *>(lepus_dbuf_realloc_rt));
 }
 
 static JSClassShortDef const js_std_class_def[] = {
@@ -576,6 +459,23 @@ static JSClassShortDef const js_std_class_def[] = {
     {JS_ATOM_Generator, NULL, NULL},              /* JS_CLASS_GENERATOR */
 };
 
+bool concurrent_disabled() {
+#ifdef ENABLE_COMPATIBLE_MM
+  return CONCURRENT_DISABLE & settingsFlag;
+#else
+  return false;
+#endif
+}
+
+void InitRosGC(LEPUSRuntime *rt) {
+  rt->ros_ = new ROS_GC::RosAllocImpl(rt, !concurrent_disabled());
+  rt->collector_ = new ROS_GC::MarkSweepCollector(rt->ros_);
+  rt->ros_->SetCollector(rt->collector_);
+  ROS_GC::VMHeapParam param = {2 * ROS_GC::kRosDefaultPageGroupSize,
+                               static_cast<size_t>(8192) * MB};
+  rt->ros_->Init(param);
+}
+
 static inline uint8_t *js_get_stack_pointer(void);
 LEPUSRuntime *JS_NewRuntime2_GC(const LEPUSMallocFunctions *mf, void *opaque,
                                 uint32_t mode) {
@@ -594,43 +494,26 @@ LEPUSRuntime *JS_NewRuntime2_GC(const LEPUSMallocFunctions *mf, void *opaque,
   memset(rt, 0, sizeof(*rt));
   rt->gc_enable = true;
   rt->use_primjs = true;
-  rt->init_time = get_daytime();
   rt->mf = *mf;
   if (!rt->mf.lepus_malloc_usable_size) {
     /* use dummy function if none provided */
     rt->mf.lepus_malloc_usable_size = js_malloc_usable_size_unknown;
   }
   rt->malloc_state = ms;
-  rt->workerThreadPool = nullptr;
-  rt->malloc_state.allocate_state.mflags = 1;
-  rt->malloc_state.allocate_state.runtime = static_cast<void *>(rt);
-  rt->malloc_state.allocate_state.mtx = PTHREAD_MUTEX_INITIALIZER;
-  rt->malloc_state.allocate_state.smallbins = static_cast<mchunkptr *>(
-      system_mallocz(sizeof(mchunkptr) * ((NSMALLBINS + 1) * 2)));
-  rt->malloc_state.allocate_state.treebins =
-      static_cast<tbinptr *>(system_mallocz(sizeof(tbinptr) * NTREEBINS));
-  for (int i = 0; i < THREAD_NUM; i++) {
-    rt->malloc_state.allocate_state.local_smallbins[i] =
-        static_cast<mchunkptr *>(
-            system_mallocz(sizeof(mchunkptr) * ((NSMALLBINS + 1) * 2)));
-    rt->malloc_state.allocate_state.local_treebins[i] =
-        static_cast<tbinptr *>(system_mallocz(sizeof(tbinptr) * NTREEBINS));
-  }
-#if defined(ANDROID) || defined(__ANDROID__) || defined(OS_IOS)
-  rt->malloc_state.allocate_state.footprint_limit = 8 * MB;
-  strcpy(rt->malloc_state.allocate_state.mem_name, "quickjs_heap_");
-#else
-  rt->malloc_state.allocate_state.footprint_limit = 64 * MB;
-#endif
-  set_gc_info_threshold(&rt->malloc_state.allocate_state, mode);
+  rt->js_malloc_rt = js_malloc_rt_gc;
+  rt->js_realloc_rt = js_realloc_rt_gc;
+  rt->malloc_gc_threshold = 256 * 1024;
+  InitRosGC(rt);
+  set_gc_info_threshold(rt, mode);
 
   /* for trace gc */
+  rt->collector_->SetForbidGC();
+  rt->malloc_state.runtime = rt;
   rt->ptr_handles = new PtrHandles(rt);
-  rt->gc = new GarbageCollector(rt, &(rt->malloc_state.allocate_state));
   rt->global_handles_ = new GlobalHandles(rt);
   rt->qjsvaluevalue_allocator = new QJSValueValueSpace(rt);
-  rt->gc_cnt = 0;
-  rt->malloc_gc_threshold = 256 * 1024;
+  rt->finalizerSet = new std::unordered_set<void *>();
+  rt->async_obj_recoder = new std::unordered_set<void *>();
 
   init_list_head(&rt->context_list);
   init_list_head(&rt->lynx_obj_list);
@@ -648,12 +531,6 @@ LEPUSRuntime *JS_NewRuntime2_GC(const LEPUSMallocFunctions *mf, void *opaque,
   LOGI("GC: HEAP_TAG_OUTER: %p, HEAP_TAG_INNER: %p",
        reinterpret_cast<void *>(HEAP_TAG_OUTER),
        reinterpret_cast<void *>(HEAP_TAG_INNER));
-#endif
-
-#ifndef ENABLE_FORCE_GC
-  rt->mem_for_oom = nullptr;
-#else
-  rt->mem_for_oom = lepus_malloc_rt(rt, 16 * KB, ALLOC_TAG_WITHOUT_PTR);
 #endif
 
   if (JS_InitAtoms(rt)) goto fail;
@@ -691,29 +568,19 @@ LEPUSRuntime *JS_NewRuntime2_GC(const LEPUSMallocFunctions *mf, void *opaque,
   js_get_rt_set()->insert(rt);
   pthread_mutex_unlock(&runtime_mutex);
 
+  rt->collector_->ResetForbidGC();
   return rt;
 fail:
   JS_FreeRuntime_GC(rt);
   return NULL;
 }
 
-void add_footprint_limit(struct malloc_state *m, size_t size) {
-  LEPUSRuntime *rt = static_cast<LEPUSRuntime *>(m->runtime);
-  size_t max_limit = rt->gc->GetMaxLimit();
-  size_t new_limit = m->footprint_limit + size;
-  if (max_limit != 0 && max_limit < new_limit) {
-    m->footprint_limit = max_limit;
-  } else {
-    m->footprint_limit = new_limit;
-  }
-}
-
 void JS_SetGCPauseSuppressionMode_GC(LEPUSRuntime *rt, bool mode) {
-  rt->gc->SetGCPauseSuppressionMode(mode);
+  rt->ros_->SetGCPauseSuppressionMode(mode);
 }
 
 bool JS_GetGCPauseSuppressionMode_GC(LEPUSRuntime *rt) {
-  return rt->gc->GetGCPauseSuppressionMode();
+  return rt->ros_->GetGCPauseSuppressionMode();
 }
 
 /* default memory allocation functions with memory limitation */
@@ -749,132 +616,9 @@ static void *js_def_malloc(JSMallocState *s, size_t size, int alloc_tag) {
   return ptr;
 }
 
-static __attribute__((unused)) void change_to_local_idx(struct malloc_state *m,
-                                                        int local_idx) {
-  // smallmap
-  binmap_t tmp_map = m->smallmap;
-  m->smallmap = m->local_smallmap[local_idx];
-  m->local_smallmap[local_idx] = tmp_map;
-  // treemap
-  tmp_map = m->treemap;
-  m->treemap = m->local_treemap[local_idx];
-  m->local_treemap[local_idx] = tmp_map;
-  // smallbins
-  mchunkptr *tmp_smallbins = m->smallbins;
-  m->smallbins = m->local_smallbins[local_idx];
-  m->local_smallbins[local_idx] = tmp_smallbins;
-  // treebins
-  tbinptr *tmp_tbins = m->treebins;
-  m->treebins = m->local_treebins[local_idx];
-  m->local_treebins[local_idx] = tmp_tbins;
-}
-
-bool switch_local_idx(struct malloc_state *m, size_t size) {
-  for (int i = 0; i < THREAD_NUM; i++) {
-    if (m->gc_flag[i] == 1) {
-      change_to_local_idx(m, i);
-      m->gc_flag[i] = 0;
-#if defined(ANDROID) || defined(__ANDROID__)
-      void *ptr = allocate(m, size);
-      if (ptr) {
-        gcfree(m, ptr);
-        return true;
-      } else {
-        add_footprint_limit(m, size * 1.5);
-      }
-#else
-      add_footprint_limit(m, size * 1.5);
-      return true;
-#endif
-    }
-  }
-  return false;
-}
-
-void trig_gc(JSMallocState *s, size_t size, bool is_outer) {
-  struct malloc_state *m = &s->allocate_state;
-  LEPUSRuntime *rt = static_cast<LEPUSRuntime *>(m->runtime);
-  if (is_outer) {
-    rt->gc->CollectGarbage(size);
-    return;
-  }
-  if (switch_local_idx(m, size)) {
-    return;
-  }
-  // gc pause suppression mode
-  if (rt->gc->GetGCPauseSuppressionMode() && rt->is_lepusng &&
-      m->footprint < 240 * MB) {
-    size_t expand_size = size * 1.5;
-    if (expand_size < 5 * MB) {
-      expand_size = 5 * MB;
-    }
-    add_footprint_limit(m, expand_size);
-    return;
-  }
-  rt->gc->CollectGarbage(size);
-  if (switch_local_idx(m, size)) {
-    return;
-  }
-}
-
 #define JS_OBJECT_IS_ARRAY_BUFFER(obj)       \
   (obj->class_id == JS_CLASS_ARRAY_BUFFER || \
    obj->class_id == JS_CLASS_SHARED_ARRAY_BUFFER)
-
-static void *base_allocate(JSMallocState *s, size_t size, int alloc_tag,
-                           void *(*allocate_debug)(struct malloc_state *state,
-                                                   size_t size),
-                           size_t (*allocate_usable_size)(void *ptr)) {
-#ifdef ENABLE_FORCE_GC
-  LEPUS_RunGC(static_cast<LEPUSRuntime *>(s->allocate_state.runtime));
-#endif
-  JS_UpdateGCInfo(s, size);
-  void *ptr;
-
-  /* Do not allocate zero bytes: behavior is platform dependent */
-  assert(size != 0);
-
-  ptr = allocate_debug(&s->allocate_state, size);
-
-  if (!ptr) {
-    trig_gc(s, size);
-    ptr = allocate_debug(&s->allocate_state, size);
-  }
-
-  if (!ptr) {
-#ifdef __ANDROID__
-    __android_log_print(ANDROID_LOG_ERROR, "PRIMJS_GC",
-                        "trace_gc_error, OOM, alloc_size: %zu, "
-                        "footprint_limit: %zu, cur_malloc_size: %zu",
-                        size, s->allocate_state.footprint_limit,
-                        s->allocate_state.cur_malloc_size);
-#else
-    printf("trace_gc_error, OOM, alloc_size: %zu\n", size);
-#endif
-    LEPUSRuntime *rt = static_cast<LEPUSRuntime *>(s->allocate_state.runtime);
-    if (rt->mem_for_oom != nullptr) {
-      gcfree(&s->allocate_state, rt->mem_for_oom);
-      rt->mem_for_oom = nullptr;
-    }
-    return nullptr;
-  }
-  *(reinterpret_cast<int *>(ptr) - 2) = alloc_tag;
-#ifdef ENABLE_GC_DEBUG_TOOLS
-  // DCHECK(alloc_tag != 0);
-#endif
-  return ptr;
-}
-
-static void *js_def_allocate(JSMallocState *s, size_t size, int alloc_tag) {
-  return base_allocate(s, size, alloc_tag, allocate, allocate_usable_size);
-}
-
-static void *js_def_allocate_gc(JSMallocState *s, size_t size, int alloc_tag) {
-  void *ptr = base_allocate(s, size, alloc_tag, allocate, allocate_usable_size);
-  LEPUSRuntime *rt = static_cast<LEPUSRuntime *>(s->allocate_state.runtime);
-  rt->gc->GetVisitor()->AddObjectDuringGC(ptr);
-  return ptr;
-}
 
 static void js_def_free(JSMallocState *s, void *ptr) {
   if (!ptr) return;
@@ -884,135 +628,17 @@ static void js_def_free(JSMallocState *s, void *ptr) {
   free(ptr);
 }
 
-static void base_gcfree(JSMallocState *s, void *ptr,
-                        size_t (*allocate_usable_size)(void *ptr),
-                        void (*cur_free)(struct malloc_state *state,
-                                         void *ptr)) {
-  if (!ptr) return;
-  s->malloc_count--;
-  s->malloc_size -=
-      (uint64_t)allocate_usable_size(ptr) + (uint64_t)MALLOC_OVERHEAD;
-}
+static void lepus_def_gcfree(JSMallocState *s, void *ptr) { abort(); }
 
-static void js_def_gcfree(JSMallocState *s, void *ptr) {
-  base_gcfree(s, ptr, allocate_usable_size, gcfree);
-}
-
-static void *js_def_realloc(JSMallocState *s, void *ptr, size_t size,
-                            int alloc_tag) {
-  size_t old_size;
-
-  if (!ptr) {
-    if (size == 0) return NULL;
-    return js_def_malloc(s, size, alloc_tag);
-  }
-  old_size = js_def_malloc_usable_size(ptr);
-  if (size == 0) {
-    s->malloc_count--;
-    s->malloc_size -= old_size + MALLOC_OVERHEAD;
-    free(ptr);
-    return NULL;
-  }
-  if (s->malloc_size + size - old_size > s->malloc_limit) return NULL;
-
-  ptr = realloc(ptr, size);
-  if (!ptr) return NULL;
-
-  s->malloc_size += js_def_malloc_usable_size(ptr) - old_size;
-  return ptr;
-}
-
-static void *base_reallocate(
-    JSMallocState *s, void *ptr, size_t size, int alloc_tag,
-    void *(*allocate_debug)(JSMallocState *s, size_t size, int alloc_tag),
-    size_t (*allocate_usable_size)(void *ptr),
-    void *(*cur_realloc)(struct malloc_state *s, void *ptr, size_t size),
-    void (*cur_free)(struct malloc_state *state, void *ptr)) {
-#ifdef ENABLE_FORCE_GC
-  LEPUS_RunGC(static_cast<LEPUSRuntime *>(s->allocate_state.runtime));
-#endif
-  mstate m = &s->allocate_state;
-  JS_UpdateGCInfo(s, size);
-  void *new_ptr;
-
-  if (!ptr) {
-    if (size == 0) return NULL;
-    new_ptr = allocate_debug(s, size, alloc_tag);
-    if (!new_ptr) {
-      trig_gc(s, size);
-      new_ptr = allocate_debug(s, size, alloc_tag);
-    }
-    if (!new_ptr) {
-#ifdef __ANDROID__
-      __android_log_print(ANDROID_LOG_ERROR, "PRIMJS_GC",
-                          "trace_gc_error, OOM, alloc_size: %zu, "
-                          "footprint_limit: %zu, cur_malloc_size: %zu",
-                          size, s->allocate_state.footprint_limit,
-                          s->allocate_state.cur_malloc_size);
-#else
-      printf("trace_gc_error, OOM, alloc_size: %zu\n", size);
-#endif
-      LEPUSRuntime *rt = static_cast<LEPUSRuntime *>(s->allocate_state.runtime);
-      if (rt->mem_for_oom != nullptr) {
-        gcfree(&s->allocate_state, rt->mem_for_oom);
-        rt->mem_for_oom = nullptr;
-      }
-      return nullptr;
-    }
-    return new_ptr;
-  }
-  if (size == 0) {
-    return NULL;
-  }
-  new_ptr = cur_realloc(&s->allocate_state, ptr, size);
-  if (!new_ptr) {
-    trig_gc(s, size);
-    new_ptr = cur_realloc(&s->allocate_state, ptr, size);
-  }
-  if (!new_ptr) {
-#ifdef __ANDROID__
-    __android_log_print(ANDROID_LOG_ERROR, "PRIMJS_GC",
-                        "trace_gc_error, OOM, alloc_size: %zu, "
-                        "footprint_limit: %zu, cur_malloc_size: %zu",
-                        size, s->allocate_state.footprint_limit,
-                        s->allocate_state.cur_malloc_size);
-#else
-    printf("trace_gc_error, OOM, alloc_size: %zu\n", size);
-#endif
-    LEPUSRuntime *rt = static_cast<LEPUSRuntime *>(s->allocate_state.runtime);
-    if (rt->mem_for_oom != nullptr) {
-      gcfree(&s->allocate_state, rt->mem_for_oom);
-      rt->mem_for_oom = nullptr;
-    }
-    return nullptr;
-  }
-  *(reinterpret_cast<int *>(new_ptr) - 2) = alloc_tag;
-#ifdef ENABLE_GC_DEBUG_TOOLS
-  // DCHECK(alloc_tag != 0);
-#endif
-  return new_ptr;
-}
-
-static void *js_def_reallocate(JSMallocState *s, void *ptr, size_t size,
-                               int alloc_tag) {
-  return base_reallocate(s, ptr, size, alloc_tag, js_def_allocate,
-                         allocate_usable_size, reallocate, gcfree);
-}
-
-static void *js_def_reallocate_gc(JSMallocState *s, void *ptr, size_t size,
-                                  int alloc_tag) {
-  void *ret = base_reallocate(s, ptr, size, alloc_tag, js_def_allocate,
-                              allocate_usable_size, reallocate, gcfree);
-  LEPUSRuntime *rt = static_cast<LEPUSRuntime *>(s->allocate_state.runtime);
-  rt->gc->GetVisitor()->AddObjectDuringGC(ret);
-  return ret;
+size_t allocate_usable_size(void *mem) {
+  return *(reinterpret_cast<uint32_t *>(mem) - 1) & 0x7FFFFFFF;
 }
 
 static const LEPUSMallocFunctions def_allocate_funcs = {
-    js_def_allocate,
-    js_def_gcfree,
-    js_def_reallocate,
-    (size_t(*)(const void *))allocate_usable_size,
+    nullptr,  // lepus_def_allocate,
+    lepus_def_gcfree,
+    nullptr,  // js_def_reallocate,
+    (size_t (*)(const void *))allocate_usable_size,
 };
 
 LEPUSRuntime *JS_NewRuntime_GC(uint32_t mode) {
@@ -1020,10 +646,7 @@ LEPUSRuntime *JS_NewRuntime_GC(uint32_t mode) {
 }
 
 void JS_SetMemoryLimit_GC(LEPUSRuntime *rt, size_t limit) {
-  if (limit < rt->malloc_state.allocate_state.footprint_limit) {
-    rt->malloc_state.allocate_state.footprint_limit = limit;
-  }
-  rt->gc->SetMaxLimit(limit);
+  rt->ros_->SetHeapGrowthLimit(limit);
 }
 
 /* return 0 if OK, < 0 if exception */
@@ -1033,14 +656,14 @@ int JS_EnqueueJob_GC(LEPUSContext *ctx, LEPUSJobFunc *job_func, int argc,
   JSJobEntry *e;
   int i;
 
-  e = static_cast<JSJobEntry *>(lepus_malloc(
+  e = static_cast<JSJobEntry *>(lepus_malloc_gc(
       ctx, sizeof(*e) + argc * sizeof(LEPUSValue), ALLOC_TAG_WITHOUT_PTR));
   if (!e) return -1;
   e->ctx = ctx;
   e->job_func = job_func;
   e->argc = argc;
   for (i = 0; i < argc; i++) {
-    e->argv[i] = argv[i];
+    HeapObjStore(ctx, &e->argv[i], argv[i]);
   }
   list_add_tail(&e->link, &rt->job_list);
   return 0;
@@ -1091,14 +714,8 @@ void JS_FreeRuntime_GC(LEPUSRuntime *rt) {
   std::unordered_set<LEPUSRuntime *> *g_rt_set = js_get_rt_set();
   if (g_rt_set->find(rt) != g_rt_set->end()) g_rt_set->erase(rt);
   pthread_mutex_unlock(&runtime_mutex);
-  rt->gc->DoOnlyFinalizer();
-#if defined(ENABLE_GC_DEBUG_TOOLS) && (defined(ANDROID) || defined(__ANDROID__))
-  __android_log_print(
-      ANDROID_LOG_ERROR, "PRIMJS_GC",
-      "free_runtime, leak_handle_num: %zu, leak_qjsvalue_num: %zu, rt: %p\n",
-      rt->gc->GetHandleSize(), rt->gc->GetQjsValueSize(), rt);
-#endif
-
+  auto pool = rt->collector_->GetThreadPool();
+  if (pool) pool->WaitFinish(true);
   struct list_head *el, *el1;
   int i;
 
@@ -1131,36 +748,12 @@ void JS_FreeRuntime_GC(LEPUSRuntime *rt) {
   rt->atom_array = NULL;
   rt->atom_hash = NULL;
   rt->shape_hash = NULL;
-  rt->mem_for_oom = NULL;
-
-#ifdef ENABLE_TRACING_GC_LOG
-  // rt->gc->CollectGarbage();
-#endif
-
-#ifdef ENABLE_GC_DEBUG_TOOLS
-#if 0
-  rt->gc->CollectGarbage();
-  if (!rt->gc->cur_mems.empty()) {
-    std::cout << "trace_gc, leak_cnt: " << rt->gc->cur_mems.size() << std::endl;
-    for (std::unordered_map<void *, size_t>::iterator it =
-             rt->gc->cur_mems.begin();
-         it != rt->gc->cur_mems.end(); it++) {
-      std::cout << "trace_gc_leak, ptr: " << it->first
-                << " mem_cnt: " << it->second
-                << " size: " << allocate_usable_size(it->first) << std::endl;
-    }
-  }
-#endif
-#endif
+  rt->collector_->RunFinalCollection();
 
   // free trace_gc data
   if (rt->ptr_handles) {
     delete rt->ptr_handles;
     rt->ptr_handles = nullptr;
-  }
-  if (rt->workerThreadPool) {
-    delete rt->workerThreadPool;
-    rt->workerThreadPool = nullptr;
   }
   if (rt->global_handles_) {
     delete rt->global_handles_;
@@ -1172,11 +765,21 @@ void JS_FreeRuntime_GC(LEPUSRuntime *rt) {
   }
 
   {
-    JSMallocState ms = rt->malloc_state;
-    destroy_allocate_instance(&ms.allocate_state);
-    if (rt->gc) {
-      delete rt->gc;
-      rt->gc = nullptr;
+    if (rt->ros_) {
+      delete rt->ros_;
+      rt->ros_ = nullptr;
+    }
+    if (rt->collector_) {
+      delete rt->collector_;
+      rt->collector_ = nullptr;
+    }
+    if (rt->finalizerSet) {
+      delete rt->finalizerSet;
+      rt->finalizerSet = nullptr;
+    }
+    if (rt->async_obj_recoder) {
+      delete rt->async_obj_recoder;
+      rt->async_obj_recoder = nullptr;
     }
     system_free(rt);
   }
@@ -1187,6 +790,8 @@ void JS_FreeRuntimeForEffect(LEPUSRuntime *rt) {
   std::unordered_set<LEPUSRuntime *> *g_rt_set = js_get_rt_set();
   if (g_rt_set->find(rt) != g_rt_set->end()) g_rt_set->erase(rt);
   pthread_mutex_unlock(&runtime_mutex);
+  auto pool = rt->collector_->GetThreadPool();
+  if (pool) pool->WaitFinish(true);
   /* free the classes */
   rt->class_count = 0;
   rt->class_array = NULL;
@@ -1198,21 +803,27 @@ void JS_FreeRuntimeForEffect(LEPUSRuntime *rt) {
   rt->shape_hash = NULL;
 
   // free trace_gc data
-  if (unlikely(rt->workerThreadPool)) {
-    delete rt->workerThreadPool;
-    rt->workerThreadPool = nullptr;
-  }
   if (rt->global_handles_) {
     delete rt->global_handles_;
     rt->global_handles_ = nullptr;
   }
 
   {
-    JSMallocState ms = rt->malloc_state;
-    destroy_allocate_instance(&ms.allocate_state);
-    if (rt->gc) {
-      delete rt->gc;
-      rt->gc = nullptr;
+    if (rt->ros_) {
+      delete rt->ros_;
+      rt->ros_ = nullptr;
+    }
+    if (rt->collector_) {
+      delete rt->collector_;
+      rt->collector_ = nullptr;
+    }
+    if (rt->finalizerSet) {
+      delete rt->finalizerSet;
+      rt->finalizerSet = nullptr;
+    }
+    if (rt->async_obj_recoder) {
+      delete rt->async_obj_recoder;
+      rt->async_obj_recoder = nullptr;
     }
   }
 }
@@ -1270,6 +881,7 @@ LEPUSContext *JS_NewContextRaw_GC(LEPUSRuntime *rt) {
 
   ctx = static_cast<LEPUSContext *>(system_mallocz(sizeof(LEPUSContext)));
   if (!ctx) return NULL;
+  ctx->obj_finalizer_recoder = new std::unordered_set<LEPUSObject *>();
   ctx->gc_enable = rt->gc_enable;
   ctx->ptr_handles = rt->ptr_handles;
   ctx->class_proto = static_cast<LEPUSValue *>(
@@ -1279,6 +891,7 @@ LEPUSContext *JS_NewContextRaw_GC(LEPUSRuntime *rt) {
     return NULL;
   }
   ctx->rt = rt;
+  ctx->con_mark_state = rt->con_mark_state;
 
   list_add_tail(&ctx->link, &rt->context_list);
 
@@ -1300,7 +913,7 @@ LEPUSContext *JS_NewContextRaw_GC(LEPUSRuntime *rt) {
     ctx->debugger_need_polling = true;
   }
 #endif
-  ctx->fg_ctx = static_cast<FinalizationRegistryContext *>(lepus_malloc(
+  ctx->fg_ctx = static_cast<FinalizationRegistryContext *>(lepus_malloc_gc(
       ctx, sizeof(FinalizationRegistryContext), ALLOC_TAG_WITHOUT_PTR));
   ctx->fg_ctx->ctx = ctx;
 
@@ -1317,6 +930,7 @@ static void JS_AddIntrinsicFinalizationRegistry(LEPUSContext *ctx);
 static void JS_AddIntrinsicBigInt(LEPUSContext *ctx);
 
 LEPUSContext *JS_NewContext_GC(LEPUSRuntime *rt) {
+  rt->collector_->SetForbidGC();
   LEPUSContext *ctx;
 
   ctx = JS_NewContextRaw_GC(rt);
@@ -1335,13 +949,14 @@ LEPUSContext *JS_NewContext_GC(LEPUSRuntime *rt) {
   JS_AddIntrinsicWeakRef(ctx);
   JS_AddIntrinsicFinalizationRegistry(ctx);
   JS_AddIntrinsicBigInt(ctx);
+  rt->collector_->ResetForbidGC();
   return ctx;
 }
 
 /* set the new value and free the old value after (freeing the value
    can reallocate the object data) */
 void set_value_gc(LEPUSContext *ctx, LEPUSValue *pval, LEPUSValue new_val) {
-  *pval = new_val;
+  HeapObjStore(ctx, pval, new_val);
 }
 
 void JS_SetClassProto_GC(LEPUSContext *ctx, LEPUSClassID class_id,
@@ -1358,13 +973,15 @@ LEPUSValue JS_GetClassProto_GC(LEPUSContext *ctx, LEPUSClassID class_id) {
 }
 
 void JS_FreeContext_GC(LEPUSContext *ctx) {
-  js_free_shape_null(ctx->rt, ctx->array_shape);
+  js_free_shape_null(ctx->array_shape);
   list_del(&ctx->link);
   ctx->fg_ctx->ctx = nullptr;
   if (ctx->napi_scope) {
     delete ctx->napi_scope;
     ctx->napi_scope = nullptr;
   }
+  delete ctx->obj_finalizer_recoder;
+  if (ctx->fr_data_finalizer_recoder) delete ctx->fr_data_finalizer_recoder;
   if (ctx->object_ctx_check && ctx->check_tools) {
     delete ctx->check_tools;
   }
@@ -1919,6 +1536,7 @@ static LEPUSValue string_buffer_end(StringBuffer *s) {
         ALLOC_TAG_JSString));
     if (str == NULL) str = s->str;
     s->str = str;
+    WriteBarrierNoStore(s->ctx, str);
   }
   if (!s->is_wide_char) str->u.str8[s->len] = 0;
 #ifdef DUMP_LEAKS
@@ -2215,7 +1833,7 @@ static LEPUSValue JS_ConcatSeparableString(LEPUSContext *ctx, LEPUSValue op1,
     func_scope.PushHandle(&op2, HANDLE_TYPE_LEPUS_VALUE);
   }
 
-  auto *separable_string = static_cast<JSSeparableString *>(lepus_malloc(
+  auto *separable_string = static_cast<JSSeparableString *>(lepus_malloc_gc(
       ctx, sizeof(JSSeparableString), ALLOC_TAG_JSSeparableString));
   if (!separable_string) return LEPUS_EXCEPTION;
   uint8_t is_wide_char = 0;
@@ -2246,8 +1864,8 @@ static LEPUSValue JS_ConcatSeparableString(LEPUSContext *ctx, LEPUSValue op1,
   separable_string->len = len;
   separable_string->is_wide_char = is_wide_char;
   separable_string->depth = depth;
-  separable_string->left_op = op1;
-  separable_string->right_op = op2;
+  HeapObjStore(ctx, &separable_string->left_op, op1);
+  HeapObjStore(ctx, &separable_string->right_op, op2);
   separable_string->flat_content = LEPUS_UNDEFINED;
   return LEPUS_MKPTR(LEPUS_TAG_SEPARABLE_STRING, separable_string);
 }
@@ -2301,7 +1919,7 @@ LEPUSValue JS_GetSeparableStringContentNotDup_GC(LEPUSContext *ctx,
       }
     }
   }
-  separable_string->flat_content = string_buffer_end(b);
+  HeapObjStore(ctx, &separable_string->flat_content, string_buffer_end(b));
   separable_string->left_op = LEPUS_NULL;
   separable_string->right_op = LEPUS_NULL;
   return separable_string->flat_content;
@@ -2347,14 +1965,12 @@ static JSShape *js_new_shape_nohash(LEPUSContext *ctx, LEPUSObject *proto,
   void *sh_alloc;
   JSShape *sh;
 
-  sh_alloc = lepus_mallocz(ctx, get_shape_size(hash_size, prop_size),
-                           ALLOC_TAG_JSShape);
+  sh_alloc = lepus_malloc_gc(ctx, get_shape_size(hash_size, prop_size),
+                             ALLOC_TAG_JSShape);
   if (!sh_alloc) return NULL;
   sh = get_shape_from_alloc(sh_alloc, hash_size);
   sh->header.ref_count = 1;
-  sh->proto = proto;
-  memset(sh->prop_hash_end - hash_size, 0,
-         sizeof(sh->prop_hash_end[0]) * hash_size);
+  HeapObjStore(ctx, &sh->proto, proto);
   sh->prop_hash_mask = hash_size - 1;
   sh->prop_size = prop_size;
 #ifndef _WIN32
@@ -2398,23 +2014,22 @@ static JSShape *js_clone_shape(LEPUSContext *ctx, JSShape *sh1) {
 
   hash_size = sh1->prop_hash_mask + 1;
   size = get_shape_size(hash_size, sh1->prop_size);
-  sh_alloc = lepus_malloc(ctx, size, ALLOC_TAG_JSShape);
+  sh_alloc = lepus_malloc_gc(ctx, size, ALLOC_TAG_JSShape);
   if (!sh_alloc) return NULL;
-  set_hash_size(sh_alloc, hash_size);
   sh_alloc1 = get_alloc_from_shape(sh1);
   memcpy(sh_alloc, sh_alloc1, size);
+  WriteBarrierNoStore(ctx, sh1->proto);
   sh = get_shape_from_alloc(sh_alloc, hash_size);
   sh->header.ref_count = 1;
   sh->is_hashed = FALSE;
+  set_hash_size(sh_alloc, hash_size);
   return sh;
 }
 
-static void js_free_shape(LEPUSRuntime *rt, JSShape *sh) {
-  sh->header.ref_count--;
-}
+static void js_free_shape(JSShape *sh) { sh->header.ref_count--; }
 
-static void js_free_shape_null(LEPUSRuntime *rt, JSShape *sh) {
-  if (sh) js_free_shape(rt, sh);
+static void js_free_shape_null(JSShape *sh) {
+  if (sh) js_free_shape(sh);
 }
 
 static int add_shape_property(LEPUSContext *ctx, JSShape **psh, LEPUSObject *p,
@@ -2506,6 +2121,14 @@ static JSShape *find_hashed_shape_prop(LEPUSRuntime *rt, JSShape *sh,
   return NULL;
 }
 
+static inline void HeapObjStoreShape(LEPUSContext *ctx, void *fieldAddr,
+                                     void *value) {
+  Release_Store(fieldAddr, value);
+  if (UNLIKELY(ctx->con_mark_state)) {
+    CombinedWriteBarrier((address_t)get_alloc_from_shape((JSShape *)value));
+  }
+}
+
 QJS_HIDE LEPUSValue JS_NewObjectFromShape_GC(LEPUSContext *ctx, JSShape *sh,
                                              LEPUSClassID class_id) {
   HandleScope func_scope(ctx, get_alloc_from_shape(sh),
@@ -2514,22 +2137,12 @@ QJS_HIDE LEPUSValue JS_NewObjectFromShape_GC(LEPUSContext *ctx, JSShape *sh,
 
   // js_trigger_gc(ctx->rt, sizeof(LEPUSObject));
   p = static_cast<LEPUSObject *>(
-      lepus_malloc(ctx, sizeof(LEPUSObject), ALLOC_TAG_LEPUSObject));
+      lepus_malloc_gc(ctx, LEPUS_OBJECT_SIZE, ALLOC_TAG_LEPUSObject));
   if (unlikely(!p)) goto fail;
   func_scope.PushHandle(p, HANDLE_TYPE_DIR_HEAP_OBJ);
+  HeapObjStoreShape(ctx, &p->shape, sh);
   p->class_id = class_id;
   p->extensible = TRUE;
-  p->free_mark = 0;
-  p->is_exotic = 0;
-  p->fast_array = 0;
-  p->is_constructor = 0;
-  p->is_uncatchable_error = 0;
-  p->is_class = 0;
-  p->tmp_mark = 0;
-  p->first_weak_ref = NULL;
-  p->u.opaque = NULL;
-  p->shape = sh;
-  p->prop = NULL;
   if (unlikely(ctx->object_ctx_check)) {
     p->ctx = ctx;
     p->tid = get_tid();
@@ -2544,9 +2157,6 @@ QJS_HIDE LEPUSValue JS_NewObjectFromShape_GC(LEPUSContext *ctx, JSShape *sh,
     case JS_CLASS_ARRAY: {
       p->is_exotic = 1;
       p->fast_array = 1;
-      p->u.array.u.values = NULL;
-      p->u.array.count = 0;
-      p->u.array.u1.size = 0;
     } break;
     case JS_CLASS_C_FUNCTION:
       break;
@@ -2554,12 +2164,8 @@ QJS_HIDE LEPUSValue JS_NewObjectFromShape_GC(LEPUSContext *ctx, JSShape *sh,
     case JS_CLASS_UINT8C_ARRAY ... JS_CLASS_BIG_UINT64_ARRAY:
       p->is_exotic = 1;
       p->fast_array = 1;
-      p->u.array.u.ptr = NULL;
-      p->u.array.count = 0;
       break;
     case JS_CLASS_DATAVIEW:
-      p->u.array.u.ptr = NULL;
-      p->u.array.count = 0;
       break;
     case JS_CLASS_NUMBER:
     case JS_CLASS_STRING:
@@ -2569,8 +2175,6 @@ QJS_HIDE LEPUSValue JS_NewObjectFromShape_GC(LEPUSContext *ctx, JSShape *sh,
       p->u.object_data = LEPUS_UNDEFINED;
       goto set_exotic;
     case JS_CLASS_REGEXP:
-      p->u.regexp.pattern = NULL;
-      p->u.regexp.bytecode = NULL;
       goto set_exotic;
     case JS_CLASS_BYTECODE_FUNCTION:
     case JS_CLASS_GENERATOR_FUNCTION:
@@ -2579,6 +2183,8 @@ QJS_HIDE LEPUSValue JS_NewObjectFromShape_GC(LEPUSContext *ctx, JSShape *sh,
       p->u.func.home_object = NULL;
       goto set_exotic;
     default:
+      if (unlikely(class_id > JS_CLASS_INIT_COUNT))
+        ctx->obj_finalizer_recoder->insert(p);
     set_exotic:
       if (ctx->rt->class_array[class_id].exotic) {
         p->is_exotic = 1;
@@ -2586,11 +2192,17 @@ QJS_HIDE LEPUSValue JS_NewObjectFromShape_GC(LEPUSContext *ctx, JSShape *sh,
       break;
   }
 
-  p->prop = static_cast<JSProperty *>(lepus_malloc(
-      ctx, sizeof(JSProperty) * sh->prop_size, ALLOC_TAG_WITHOUT_PTR));
+  if (sh->prop_size > LEPUS_IN_OBJECT_PROPERTY_SIZE) {
+    HeapObjStore(ctx, &p->prop,
+                 static_cast<JSProperty *>(
+                     lepus_malloc_gc(ctx, sizeof(JSProperty) * sh->prop_size,
+                                     ALLOC_TAG_JSPropertyArray)));
+  } else {
+    p->prop = (JSProperty *)&(p->link);
+  }
   if (unlikely(!p->prop)) {
   fail:
-    js_free_shape(ctx->rt, sh);
+    js_free_shape(sh);
     return LEPUS_EXCEPTION;
   }
 
@@ -2683,7 +2295,7 @@ static int JS_SetObjectData(LEPUSContext *ctx, LEPUSValueConst obj,
       case JS_CLASS_SYMBOL:
       case JS_CLASS_DATE:
       case JS_CLASS_BIG_INT:
-        p->u.object_data = val;
+        HeapObjStore(ctx, &p->u.object_data, val);
         return 0;
     }
   }
@@ -2731,7 +2343,9 @@ static void js_function_set_properties(LEPUSContext *ctx, LEPUSObject *p,
   pr = add_property_gc(ctx, p, JS_ATOM_length, prop_flag);
   if (pr) pr->u.value = LEPUS_NewInt32(ctx, len);
   pr = add_property_gc(ctx, p, JS_ATOM_name, prop_flag);
-  if (pr) pr->u.value = JS_AtomToString_GC(ctx, name);
+  if (pr) {
+    HeapObjStore(ctx, &pr->u.value, JS_AtomToString_GC(ctx, name));
+  }
   return;
 }
 
@@ -2750,7 +2364,7 @@ void js_method_set_home_object_gc(LEPUSContext *ctx, LEPUSValueConst func_obj,
       p1 = LEPUS_VALUE_GET_OBJ(home_obj);
     else
       p1 = NULL;
-    p->u.func.home_object = p1;
+    HeapObjStore(ctx, &p->u.func.home_object, p1);
   }
 }
 
@@ -2893,8 +2507,8 @@ LEPUSValue JS_NewCFunctionData_GC(LEPUSContext *ctx, LEPUSCFunctionData *func,
   if (LEPUS_IsException(func_obj)) return func_obj;
   HandleScope func_scope(ctx, &func_obj, HANDLE_TYPE_LEPUS_VALUE);
   s = static_cast<JSCFunctionDataRecord *>(
-      lepus_malloc(ctx, sizeof(*s) + data_len * sizeof(LEPUSValue),
-                   ALLOC_TAG_JSCFunctionDataRecord));
+      lepus_malloc_gc(ctx, sizeof(*s) + data_len * sizeof(LEPUSValue),
+                      ALLOC_TAG_JSCFunctionDataRecord));
   if (!s) {
     return LEPUS_EXCEPTION;
   }
@@ -2902,8 +2516,10 @@ LEPUSValue JS_NewCFunctionData_GC(LEPUSContext *ctx, LEPUSCFunctionData *func,
   s->length = length;
   s->data_len = data_len;
   s->magic = magic;
-  for (i = 0; i < data_len; i++) s->data[i] = data[i];
-  LEPUS_SetOpaque(func_obj, s);
+  for (i = 0; i < data_len; i++) {
+    HeapObjStore(ctx, &s->data[i], data[i]);
+  }
+  LEPUS_SetHeapOpaque(ctx, func_obj, s);
   js_function_set_properties(ctx, LEPUS_VALUE_GET_OBJ(func_obj),
                              JS_ATOM_empty_string, length);
   return func_obj;
@@ -2935,23 +2551,23 @@ QJS_STATIC force_inline JSShapeProperty *find_own_property(
   *ppr = NULL;
   return NULL;
 }
-/* indicate that the object may be part of a function prototype cycle */
-static void set_cycle_flag(LEPUSContext *ctx, LEPUSValueConst obj) {}
 
 void JS_MarkValue_GC(LEPUSRuntime *rt, LEPUSValueConst val,
-                     LEPUS_MarkFunc *mark_func, int local_idx) {
-  mark_func(rt, val, local_idx);
+                     LEPUS_MarkFunc *mark_func, uint64_t trace_tool) {
+  mark_func(rt, val, trace_tool);
 }
 
 /* garbage collection */
 
-void JS_RunGC_GC(LEPUSRuntime *rt) { rt->gc->CollectGarbage(); }
+void JS_RunGC_GC(LEPUSRuntime *rt) {
+  rt->collector_->RunFullCollection(0, ROS_GC::kEagerLevelMin, true);
+}
 
 void LEPUS_RunAllGC() {
   pthread_mutex_lock(&runtime_mutex);
   std::unordered_set<LEPUSRuntime *> *g_rt_set = js_get_rt_set();
   for (auto it : *g_rt_set) {
-    it->gc->CollectGarbage(0, true);
+    JS_RunGC_GC(it);
   }
   pthread_mutex_unlock(&runtime_mutex);
 }
@@ -2963,7 +2579,7 @@ static BOOL JS_IsLiveObject(LEPUSRuntime *rt, LEPUSValueConst obj) {
   LEPUSObject *p;
   if (!LEPUS_IsObject(obj)) return FALSE;
   p = LEPUS_VALUE_GET_OBJ(obj);
-  return is_marked(p);
+  return rt->ros_->IsObjectMarked((address_t)p - kHeaderSize);
 }
 
 /* Compute memory used by various object types */
@@ -3085,7 +2701,7 @@ int JS_SetPrototypeInternal_GC(LEPUSContext *ctx, LEPUSValueConst obj,
 
   if (js_shape_prepare_update(ctx, p, NULL)) return -1;
   sh = p->shape;
-  sh->proto = proto;
+  HeapObjStore(ctx, &sh->proto, proto);
   return TRUE;
 }
 
@@ -3246,14 +2862,18 @@ static int JS_AutoInitProperty(LEPUSContext *ctx, LEPUSObject *p, JSAtom prop,
   JSAutoInitFunc *func;
 
   if (js_shape_prepare_update(ctx, p, &prs)) return -1;
+  uintptr_t *opaque_ptr = (uintptr_t *)&(pr->u.init.opaque);
+  *(opaque_ptr) = (*opaque_ptr) & (~static_cast<uintptr_t>(LEPUS_CPOINTER_TAG));
   func = pr->u.init.init_func;
+  void *opaque = pr->u.init.opaque;
   /* 'func' shall not modify the object properties 'pr' */
-  val = func(ctx, p, prop, pr->u.init.opaque);
+  val = func(ctx, p, prop, opaque);
   HandleScope func_scope(ctx, &val, HANDLE_TYPE_LEPUS_VALUE);
+  pr->u.init.opaque = NULL;
   prs->flags &= ~LEPUS_PROP_TMASK;
   pr->u.value = LEPUS_UNDEFINED;
   if (LEPUS_IsException(val)) return -1;
-  pr->u.value = val;
+  HeapObjStore(ctx, &pr->u.value, val);
   return 0;
 }
 
@@ -3423,6 +3043,8 @@ LEPUSValue JS_GetPropertyInternalImpl_GC(LEPUSContext *ctx, LEPUSValueConst obj,
             if (ret < 0) return LEPUS_EXCEPTION;
             if (ret) {
               if (desc.flags & LEPUS_PROP_GETSET) {
+                HandleScope block_scope(ctx, &desc.getter,
+                                        HANDLE_TYPE_LEPUS_VALUE);
                 return JS_CallFree_GC(ctx, desc.getter, this_obj, 0, NULL);
               } else {
                 ctx->ptr_handles->PushLEPUSValuePtr(desc.value);
@@ -3475,7 +3097,7 @@ int JS_DefinePrivateField_GC(LEPUSContext *ctx, LEPUSValueConst obj,
   fail:
     return -1;
   }
-  pr->u.value = val;
+  HeapObjStore(ctx, &pr->u.value, val);
   return 0;
 }
 
@@ -3554,7 +3176,7 @@ int JS_AddBrand_GC(LEPUSContext *ctx, LEPUSValueConst obj,
     if (!pr) {
       return -1;
     }
-    pr->u.value = brand;
+    HeapObjStore(ctx, &pr->u.value, brand);
   } else {
     brand = pr->u.value;
   }
@@ -3751,11 +3373,10 @@ static int __exception JS_GetOwnPropertyNamesInternal(LEPUSContext *ctx,
   /* avoid allocating 0 bytes */
   tab_atom = static_cast<LEPUSPropertyEnum *>(
       lepus_mallocz(ctx, sizeof(tab_atom[0]) * max_int(atom_count, 1),
-                    ALLOC_TAG_LEPUSPropertyEnum));
+                    ALLOC_TAG_LEPUSPropertyEnumArray));
   if (!tab_atom) {
     return -1;
   }
-  set_heap_obj_len(tab_atom, max_int(atom_count, 1));
 
   num_index = 0;
   str_index = num_keys_count;
@@ -3824,7 +3445,7 @@ static int __exception JS_GetOwnPropertyNamesInternal(LEPUSContext *ctx,
   if (num_keys_count != 0 && !num_sorted) {
     rqsort(tab_atom, num_keys_count, sizeof(tab_atom[0]), num_keys_cmp, ctx);
   }
-  *ptab = tab_atom;
+  HeapObjStore(ctx, ptab, tab_atom);
   *plen = atom_count;
   return 0;
 }
@@ -4181,30 +3802,42 @@ JSProperty *add_property_gc(LEPUSContext *ctx, LEPUSObject *p, JSAtom prop,
       /*  the property array may need to be resized */
       if (new_sh->prop_size != sh->prop_size) {
         JSProperty *new_prop;
-        new_prop = static_cast<JSProperty *>(
-            lepus_realloc(ctx, p->prop, sizeof(p->prop[0]) * new_sh->prop_size,
-                          ALLOC_TAG_WITHOUT_PTR));
+        if (IS_IN_OBJECT_PROP(p, p->prop)) {
+          if (new_sh->prop_size <= LEPUS_IN_OBJECT_PROPERTY_SIZE) {
+            new_prop = p->prop;
+          } else {
+            new_prop = static_cast<JSProperty *>(
+                lepus_malloc_gc(ctx, sizeof(p->prop[0]) * new_sh->prop_size,
+                                ALLOC_TAG_JSPropertyArray));
+            if (!new_prop) return NULL;
+            for (size_t i = 0; i < LEPUS_IN_OBJECT_PROPERTY_SIZE; i++) {
+              new_prop[i] = p->prop[i];
+            }
+            if (UNLIKELY(ctx->con_mark_state))
+              JSPropertyStore(ctx, p, new_prop);
+          }
+        } else {
+          new_prop = static_cast<JSProperty *>(lepus_realloc(
+              ctx, p->prop, sizeof(p->prop[0]) * new_sh->prop_size,
+              ALLOC_TAG_JSPropertyArray));
+        }
         if (!new_prop) return NULL;
-        p->prop = new_prop;
+        if (new_prop != p->prop) {
+          HeapObjStore(ctx, &p->prop, new_prop);
+        }
       }
-      p->shape = js_dup_shape(new_sh);
-      js_free_shape(ctx->rt, sh);
+      HeapObjStoreShape(ctx, &p->shape, js_dup_shape(new_sh));
+      js_free_shape(sh);
       return &p->prop[new_sh->prop_count - 1];
     } else if (sh->header.ref_count != 1) {
       /* if the shape is shared, clone it */
       new_sh = js_clone_shape(ctx, sh);
       if (!new_sh) return NULL;
-      js_free_shape(ctx->rt, p->shape);
-      p->shape = new_sh;
       /* hash the cloned shape */
-      {
-        auto *rt = ctx->rt;
-        if (2 * (rt->shape_hash_count + 1) > rt->shape_hash_size) {
-          resize_shape_hash(rt, rt->shape_hash_bits + 1);
-        }
-      }
       new_sh->is_hashed = TRUE;
       js_shape_hash_link(ctx->rt, new_sh);
+      js_free_shape(p->shape);
+      HeapObjStoreShape(ctx, &p->shape, new_sh);
     }
   }
   assert(p->shape->header.ref_count == 1);
@@ -4235,7 +3868,7 @@ static no_inline __exception int convert_fast_array_to_array(LEPUSContext *ctx,
     /* add_property_gc cannot fail here but
        __JS_AtomFromUInt32(i) fails for i > INT32_MAX */
     pr = add_property_gc(ctx, p, __JS_AtomFromUInt32(i), LEPUS_PROP_C_W_E);
-    pr->u.value = *tab++;
+    HeapObjStore(ctx, &pr->u.value, *tab++);
   }
   p->u.array.count = 0;
   p->u.array.u.values = NULL; /* fail safe */
@@ -4281,6 +3914,7 @@ redo:
       pr->flags = 0;
       pr->atom = JS_ATOM_NULL;
       pr1->u.value = LEPUS_UNDEFINED;
+      pr1->u.init.opaque = 0;
       return TRUE;
     }
     lpr = pr;
@@ -4439,21 +4073,19 @@ static int add_fast_array_element(LEPUSContext *ctx, LEPUSObject *p,
   }
   if (unlikely(new_len > p->u.array.u1.size)) {
     uint32_t new_size;
-    size_t slack;
     LEPUSValue *new_array_prop;
     /* XXX: potential arithmetic overflow */
-    new_size = max_int(new_len, p->u.array.u1.size * 3 / 2);
+    new_size = max_int(new_len, p->u.array.u1.size * 3 / 2 + 2);
     new_array_prop = static_cast<LEPUSValue *>(
-        lepus_realloc2(ctx, p->u.array.u.values, sizeof(LEPUSValue) * new_size,
-                       &slack, ALLOC_TAG_WITHOUT_PTR));
+        lepus_realloc(ctx, p->u.array.u.values, sizeof(LEPUSValue) * new_size,
+                      ALLOC_TAG_JSValueArray));
     if (!new_array_prop) {
       return -1;
     }
-    new_size += slack / sizeof(*new_array_prop);
-    p->u.array.u.values = new_array_prop;
+    HeapObjStore(ctx, &p->u.array.u.values, new_array_prop);
     p->u.array.u1.size = new_size;
   }
-  p->u.array.u.values[new_len - 1] = val;
+  HeapObjStore(ctx, &p->u.array.u.values[new_len - 1], val);
   p->u.array.count = new_len;
   return TRUE;
 }
@@ -4557,7 +4189,6 @@ int JS_SetPropertyInternalImpl_GC(LEPUSContext *ctx, LEPUSValueConst this_obj,
   int ret;
   char buf[ATOM_GET_STR_BUF_SIZE];
   intptr_t offset = 0;
-
   tag = LEPUS_VALUE_GET_TAG(this_obj);
 #ifdef ENABLE_LEPUSNG
   // <Primjs begin>
@@ -4720,6 +4351,8 @@ retry:
                   setter = NULL;
                 else
                   setter = LEPUS_VALUE_GET_OBJ(desc.setter);
+                HandleScope block_scope(ctx, &desc.setter,
+                                        HANDLE_TYPE_LEPUS_VALUE);
                 ret = call_setter(ctx, setter, this_obj, val, flags);
                 return ret;
               } else {
@@ -4795,7 +4428,7 @@ retry:
   if (unlikely(!pr)) {
     return -1;
   }
-  pr->u.value = val;
+  HeapObjStore(ctx, &pr->u.value, val);
   return TRUE;
 }
 
@@ -5047,15 +4680,15 @@ static int JS_CreateProperty(LEPUSContext *ctx, LEPUSObject *p, JSAtom prop,
   if (flags & (LEPUS_PROP_HAS_GET | LEPUS_PROP_HAS_SET)) {
     pr->u.getset.getter = NULL;
     if ((flags & LEPUS_PROP_HAS_GET) && LEPUS_IsFunction(ctx, getter)) {
-      pr->u.getset.getter = LEPUS_VALUE_GET_OBJ(getter);
+      HeapObjStore(ctx, &pr->u.getset.getter, LEPUS_VALUE_GET_OBJ(getter));
     }
     pr->u.getset.setter = NULL;
     if ((flags & LEPUS_PROP_HAS_SET) && LEPUS_IsFunction(ctx, setter)) {
-      pr->u.getset.setter = LEPUS_VALUE_GET_OBJ(setter);
+      HeapObjStore(ctx, &pr->u.getset.setter, LEPUS_VALUE_GET_OBJ(setter));
     }
   } else {
     if (flags & LEPUS_PROP_HAS_VALUE) {
-      pr->u.value = val;
+      HeapObjStore(ctx, &pr->u.value, val);
     } else {
       pr->u.value = LEPUS_UNDEFINED;
     }
@@ -5106,8 +4739,8 @@ QJS_STATIC int js_shape_prepare_update(LEPUSContext *ctx, LEPUSObject *p,
       /* clone the shape (the resulting one is no longer hashed) */
       sh = js_clone_shape(ctx, sh);
       if (!sh) return -1;
-      js_free_shape(ctx->rt, p->shape);
-      p->shape = sh;
+      js_free_shape(p->shape);
+      HeapObjStoreShape(ctx, &p->shape, sh);
       if (pprs) *pprs = get_shape_prop(sh) + idx;
     } else {
       js_shape_hash_unlink(ctx->rt, sh);
@@ -5216,10 +4849,10 @@ redo_prop_update:
           }
         }
         if (flags & LEPUS_PROP_HAS_GET) {
-          pr->u.getset.getter = new_getter;
+          HeapObjStore(ctx, &pr->u.getset.getter, new_getter);
         }
         if (flags & LEPUS_PROP_HAS_SET) {
-          pr->u.getset.setter = new_setter;
+          HeapObjStore(ctx, &pr->u.getset.setter, new_setter);
         }
       } else {
         if ((prs->flags & LEPUS_PROP_TMASK) == LEPUS_PROP_GETSET) {
@@ -5277,7 +4910,7 @@ redo_prop_update:
             LEPUSValue val1;
             if (js_shape_prepare_update(ctx, p, &prs)) return -1;
             val1 = *pr->u.var_ref->pvalue;
-            pr->u.value = val1;
+            HeapObjStore(ctx, &pr->u.value, val1);
             prs->flags &= ~(LEPUS_PROP_TMASK | LEPUS_PROP_WRITABLE);
           }
         } else if ((prs->flags & LEPUS_PROP_TMASK) == LEPUS_PROP_AUTOINIT) {
@@ -5285,7 +4918,7 @@ redo_prop_update:
           abort();
         } else {
           if (flags & LEPUS_PROP_HAS_VALUE) {
-            pr->u.value = val;
+            HeapObjStore(ctx, &pr->u.value, val);
           }
           if (flags & LEPUS_PROP_HAS_WRITABLE) {
             if (js_update_property_flags(ctx, p, &prs,
@@ -5403,6 +5036,9 @@ int JS_DefineAutoInitProperty_GC(
   if (unlikely(!pr)) return -1;
   pr->u.init.init_func = init_func;
   pr->u.init.opaque = opaque;
+  uintptr_t *opaque_ptr = (uintptr_t *)(&(pr->u.init.opaque));
+  *opaque_ptr = (*opaque_ptr) | LEPUS_CPOINTER_TAG;
+
   return TRUE;
 }
 
@@ -5501,10 +5137,11 @@ int JS_DefineObjectName_GC(LEPUSContext *ctx, LEPUSValueConst obj, JSAtom name,
   obj = JSRef2Value(ctx, obj);
   // <Primjs end>
   if (name != JS_ATOM_NULL && LEPUS_IsObject(obj) &&
-      !js_object_has_name(ctx, obj) &&
-      JS_DefinePropertyValue_GC(ctx, obj, JS_ATOM_name,
-                                JS_AtomToString_GC(ctx, name), flags) < 0) {
-    return -1;
+      !js_object_has_name(ctx, obj)) {
+    LEPUSValue val = JS_AtomToString_GC(ctx, name);
+    HandleScope func_scope(ctx, &val, HANDLE_TYPE_LEPUS_VALUE);
+    int ret = JS_DefinePropertyValue_GC(ctx, obj, JS_ATOM_name, val, flags);
+    if (ret < 0) return -1;
   }
   return 0;
 }
@@ -5603,7 +5240,7 @@ int JS_DefineGlobalVar_GC(LEPUSContext *ctx, JSAtom prop, int def_flags) {
   if (!p->extensible) return 0;
   pr = add_property_gc(ctx, p, prop, flags);
   if (unlikely(!pr)) return -1;
-  pr->u.value = val;
+  HeapObjStore(ctx, &pr->u.value, val);
   return 0;
 }
 
@@ -5822,6 +5459,7 @@ LEPUSValue JS_ToPrimitiveFree_GC(LEPUSContext *ctx, LEPUSValue val, int hint) {
     method =
         JS_GetPropertyInternal_GC(ctx, val, JS_ATOM_Symbol_toPrimitive, val, 0);
     if (LEPUS_IsException(method)) goto exception;
+    HandleScope func_scope(ctx, &method, HANDLE_TYPE_LEPUS_VALUE);
     /* ECMA says *If exoticToPrim is not undefined* but tests in
        test262 use null as a non callable converter */
     if (!LEPUS_IsUndefined(method) && !LEPUS_IsNull(method)) {
@@ -6679,6 +6317,7 @@ void JS_SetStringCache_GC(LEPUSContext *ctx, LEPUSValue val, void *p) {
   void *old_ptr = str->cache_;
   str->cache_ = p;
   ctx->rt->js_callbacks_.free_str_cache(old_ptr, p);
+  SetRunSlotHasFinalizer(ctx->rt, str);
   return;
 }
 
@@ -6929,6 +6568,7 @@ static __exception int js_has_unscopable(LEPUSContext *ctx, LEPUSValueConst obj,
 
   arr = JS_GetPropertyInternal_GC(ctx, obj, JS_ATOM_Symbol_unscopables, obj, 0);
   if (LEPUS_IsException(arr)) return -1;
+  HandleScope func_scope(ctx, &arr, HANDLE_TYPE_LEPUS_VALUE);
   ret = 0;
   if (LEPUS_IsObject(arr)) {
     val = JS_GetPropertyInternal_GC(ctx, arr, atom, arr, 0);
@@ -7082,15 +6722,15 @@ LEPUSValue js_build_arguments_gc(LEPUSContext *ctx, int argc,
   tab = NULL;
   if (argc > 0) {
     tab = static_cast<LEPUSValue *>(
-        lepus_malloc(ctx, sizeof(tab[0]) * argc, ALLOC_TAG_WITHOUT_PTR));
+        lepus_malloc_gc(ctx, sizeof(tab[0]) * argc, ALLOC_TAG_JSValueArray));
     if (!tab) {
       return LEPUS_EXCEPTION;
     }
     for (i = 0; i < argc; i++) {
-      tab[i] = argv[i];
+      HeapObjStore(ctx, &tab[i], argv[i]);
     }
   }
-  p->u.array.u.values = tab;
+  HeapObjStore(ctx, &p->u.array.u.values, tab);
   p->u.array.count = argc;
 
   JS_DefinePropertyValue_GC(ctx, val, JS_ATOM_Symbol_iterator,
@@ -7106,79 +6746,81 @@ LEPUSValue js_build_arguments_gc(LEPUSContext *ctx, int argc,
 #define GLOBAL_VAR_OFFSET 0x40000000
 #define ARGUMENT_VAR_OFFSET 0x20000000
 
-#ifdef ENABLE_TRACING_GC
 LEPUSObject *ShallowCloneObj(LEPUSContext *ctx, LEPUSObject *src) {
   LEPUSObject *p = src;
-  JSProperty *new_prop = static_cast<JSProperty *>(lepus_malloc(
-      ctx, sizeof(JSProperty) * p->shape->prop_size, ALLOC_TAG_WITHOUT_PTR));
+  JSProperty *new_prop = static_cast<JSProperty *>(
+      lepus_malloc_gc(ctx, sizeof(JSProperty) * p->shape->prop_size,
+                      ALLOC_TAG_JSPropertyArray));
   memcpy(new_prop, p->prop, p->shape->prop_size * sizeof(JSProperty));
 
   HandleScope func_scope(ctx, new_prop, HANDLE_TYPE_DIR_HEAP_OBJ);
   LEPUSObject *new_p = static_cast<LEPUSObject *>(
-      lepus_malloc(ctx, sizeof(LEPUSObject), ALLOC_TAG_LEPUSObject));
-  memcpy(new_p, p, sizeof(LEPUSObject));
+      lepus_malloc_gc(ctx, LEPUS_OBJECT_SIZE, ALLOC_TAG_LEPUSObject));
+  if (UNLIKELY(ctx->con_mark_state)) JSPropertyStore(ctx, p, new_prop);
+  memcpy(new_p, p, LEPUS_OBJECT_SIZE);
+  HeapObjStoreShape(ctx, &new_p->shape, p->shape);
   js_dup_shape(p->shape);
-  new_p->prop = new_prop;
+  HeapObjStore(ctx, &new_p->prop, new_prop);
   return new_p;
 }
 void CopyProps(LEPUSContext *ctx, int argc, int arg_count, LEPUSStackFrame *sf,
                LEPUSObject *new_p, LEPUSValueConst *argv) {
   int i;
-  new_p->prop[2].u.value = ctx->rt->current_stack_frame->cur_func;
+  HeapObjStore(ctx, &new_p->prop[2].u.value,
+               ctx->rt->current_stack_frame->cur_func);
   size_t start_idx = 3;
   JSVarRef *var_ref = nullptr;
   for (i = 0; i < arg_count; i++) {
     var_ref = get_var_ref(ctx, sf, i, TRUE);
-    new_p->prop[start_idx++].u.var_ref = var_ref;
+    // if (!var_ref) return LEPUS_EXCEPTION;
+    // new_p->prop[start_idx++].u.var_ref = var_ref;
+    HeapObjStore(ctx, &new_p->prop[start_idx++].u.var_ref, var_ref);
   }
 
   /* the arguments not mapped to the arguments of the function can
      be normal properties */
   for (i = arg_count; i < argc; i++) {
-    new_p->prop[start_idx++].u.value = argv[i];
+    // new_p->prop[start_idx++].u.value = argv[i];
+    HeapObjStore(ctx, &new_p->prop[start_idx++].u.value, argv[i]);
   }
 }
-#endif
+
 /* legacy arguments object: add references to the function arguments */
 LEPUSValue js_build_mapped_arguments_gc(LEPUSContext *ctx, int argc,
                                         LEPUSValueConst *argv,
                                         LEPUSStackFrame *sf, int arg_count) {
-#ifdef ENABLE_TRACING_GC
+  // #ifdef ENABLE_TRACING_GC
   switch (argc) {
-    case 0: {
+    case 0:
       if (ctx->rt->boilerplateArg0 != nullptr) {
         LEPUSObject *new_p = ShallowCloneObj(ctx, ctx->rt->boilerplateArg0);
         CopyProps(ctx, argc, arg_count, sf, new_p, argv);
         return LEPUS_MKPTR(LEPUS_TAG_OBJECT, new_p);
       }
       break;
-    }
-    case 1: {
+    case 1:
       if (ctx->rt->boilerplateArg1 != nullptr && arg_count == 0) {
         LEPUSObject *new_p = ShallowCloneObj(ctx, ctx->rt->boilerplateArg1);
         CopyProps(ctx, argc, arg_count, sf, new_p, argv);
         return LEPUS_MKPTR(LEPUS_TAG_OBJECT, new_p);
       }
       break;
-    }
-    case 2: {
+    case 2:
       if (ctx->rt->boilerplateArg2 != nullptr && arg_count == 0) {
         LEPUSObject *new_p = ShallowCloneObj(ctx, ctx->rt->boilerplateArg2);
         CopyProps(ctx, argc, arg_count, sf, new_p, argv);
         return LEPUS_MKPTR(LEPUS_TAG_OBJECT, new_p);
       }
       break;
-    }
-    case 3: {
+    case 3:
       if (ctx->rt->boilerplateArg3 != nullptr && arg_count == 0) {
         LEPUSObject *new_p = ShallowCloneObj(ctx, ctx->rt->boilerplateArg3);
         CopyProps(ctx, argc, arg_count, sf, new_p, argv);
         return LEPUS_MKPTR(LEPUS_TAG_OBJECT, new_p);
       }
       break;
-    }
   }
-#endif
+  // #endif
   LEPUSValue val;
   JSProperty *pr;
   LEPUSObject *p;
@@ -7213,7 +6855,7 @@ LEPUSValue js_build_mapped_arguments_gc(LEPUSContext *ctx, int argc,
     if (!pr) {
       goto fail;
     }
-    pr->u.var_ref = var_ref;
+    HeapObjStore(ctx, &pr->u.var_ref, var_ref);
   }
 
   /* the arguments not mapped to the arguments of the function can
@@ -7223,18 +6865,24 @@ LEPUSValue js_build_mapped_arguments_gc(LEPUSContext *ctx, int argc,
                                         LEPUS_PROP_C_W_E) < 0)
       goto fail;
   }
-
-#ifdef ENABLE_TRACING_GC
-  if (argc == 0) {
-    ctx->rt->boilerplateArg0 = ShallowCloneObj(ctx, p);
-  } else if (arg_count == 0 && argc == 1) {
-    ctx->rt->boilerplateArg1 = ShallowCloneObj(ctx, p);
-  } else if (arg_count == 0 && argc == 2) {
-    ctx->rt->boilerplateArg2 = ShallowCloneObj(ctx, p);
-  } else if (arg_count == 0 && argc == 3) {
-    ctx->rt->boilerplateArg3 = ShallowCloneObj(ctx, p);
+  // #ifdef ENABLE_TRACING_GC
+  if (arg_count == 0) {
+    switch (argc) {
+      case 0:
+        ctx->rt->boilerplateArg0 = ShallowCloneObj(ctx, p);
+        break;
+      case 1:
+        ctx->rt->boilerplateArg1 = ShallowCloneObj(ctx, p);
+        break;
+      case 2:
+        ctx->rt->boilerplateArg2 = ShallowCloneObj(ctx, p);
+        break;
+      case 3:
+        ctx->rt->boilerplateArg3 = ShallowCloneObj(ctx, p);
+        break;
+    }
   }
-#endif
+  // #endif
   return val;
 fail:
   return LEPUS_EXCEPTION;
@@ -7276,7 +6924,7 @@ static LEPUSValue build_for_in_iterator(LEPUSContext *ctx, LEPUSValue obj) {
   }
 
   it = static_cast<JSForInIterator *>(
-      lepus_malloc(ctx, sizeof(*it), ALLOC_TAG_JSForInIterator));
+      lepus_malloc_gc(ctx, sizeof(*it), ALLOC_TAG_JSForInIterator));
   if (!it) {
     return LEPUS_EXCEPTION;
   }
@@ -7289,10 +6937,10 @@ static LEPUSValue build_for_in_iterator(LEPUSContext *ctx, LEPUSValue obj) {
   }
   func_scope.PushHandle(&enum_obj, HANDLE_TYPE_LEPUS_VALUE);
   it->is_array = FALSE;
-  it->obj = obj;
+  HeapObjStore(ctx, &it->obj, obj);
   it->idx = 0;
   p = LEPUS_VALUE_GET_OBJ(enum_obj);
-  p->u.for_in_iterator = it;
+  HeapObjStore(ctx, &p->u.for_in_iterator, it);
 
   if (tag == LEPUS_TAG_NULL || tag == LEPUS_TAG_UNDEFINED) return enum_obj;
 
@@ -7636,6 +7284,7 @@ static __exception int JS_CopyDataProperties(LEPUSContext *ctx,
   LEPUSPropertyEnum *tab_atom = nullptr;
   HandleScope func_scope(ctx, &tab_atom, HANDLE_TYPE_HEAP_OBJ);
   LEPUSValue val = LEPUS_UNDEFINED;
+  func_scope.PushHandle(&val, HANDLE_TYPE_LEPUS_VALUE);
   uint32_t i, tab_atom_count;
   LEPUSObject *p;
   LEPUSObject *pexcl = NULL;
@@ -7698,12 +7347,9 @@ static LEPUSValue js_instantiate_prototype(LEPUSContext *ctx, LEPUSObject *p,
   int ret;
 
   this_val = LEPUS_MKPTR(LEPUS_TAG_OBJECT, p);
-  HandleScope func_scope(ctx, &this_val, HANDLE_TYPE_LEPUS_VALUE);
   obj = JS_NewObject_GC(ctx);
+  HandleScope func_scope(ctx, &obj, HANDLE_TYPE_LEPUS_VALUE);
   if (LEPUS_IsException(obj)) return LEPUS_EXCEPTION;
-  func_scope.PushHandle(&obj, HANDLE_TYPE_LEPUS_VALUE);
-  set_cycle_flag(ctx, obj);
-  set_cycle_flag(ctx, this_val);
   ret =
       JS_DefinePropertyValue_GC(ctx, obj, JS_ATOM_constructor, this_val,
                                 LEPUS_PROP_WRITABLE | LEPUS_PROP_CONFIGURABLE);
@@ -7757,17 +7403,18 @@ LEPUSValue js_closure_gc(LEPUSContext *ctx, LEPUSValue bfunc,
     if (LEPUS_IsException(proto)) goto fail;
     func_scope.PushHandle(&proto, HANDLE_TYPE_LEPUS_VALUE);
     pr = add_property_gc(ctx, p, JS_ATOM_prototype, LEPUS_PROP_WRITABLE);
-    if (pr) pr->u.value = proto;
+    if (pr) HeapObjStore(ctx, &pr->u.value, proto);
   } else if (b->has_prototype) {
     /* add the 'prototype' property: delay instantiation to avoid
        creating cycles for every javascript function. The prototype
        object is created on the fly when first accessed */
     LEPUS_SetConstructorBit(ctx, func_obj, TRUE);
-    pr = add_property_gc(ctx, p, JS_ATOM_prototype,
-                         LEPUS_PROP_AUTOINIT | LEPUS_PROP_WRITABLE);
+    LEPUSValue obj =
+        js_instantiate_prototype(ctx, p, JS_ATOM_prototype, nullptr);
+    func_scope.PushHandle(&obj, HANDLE_TYPE_LEPUS_VALUE);
+    pr = add_property_gc(ctx, p, JS_ATOM_prototype, LEPUS_PROP_WRITABLE);
     if (pr) {
-      pr->u.init.init_func = js_instantiate_prototype;
-      pr->u.init.opaque = nullptr;
+      HeapObjStore(ctx, &pr->u.value, obj);
     }
   }
   return func_obj;
@@ -7777,16 +7424,35 @@ fail:
 
 #define JS_DEFINE_CLASS_HAS_HERITAGE (1 << 0)
 
+static void add_var_ref_pvalue(LEPUSRuntime *rt, LEPUSStackFrame *sf) {
+  LEPUSObject *obj = LEPUS_VALUE_GET_OBJ(sf->cur_func);
+  if (!obj) return;
+  JSVarRef **var_refs = obj->u.func.var_refs;
+  if (var_refs != nullptr) {
+    int array_size = get_obj_size(var_refs) / sizeof(JSVarRef *);
+    for (int i = 0; i < array_size; i++) {
+      auto var_ref = var_refs[i];
+      if (Acquire_Load8(&var_ref->is_detached)) {
+        WriteBarrierNoStoreNoCheck(var_ref->value);
+      } else {
+        WriteBarrierNoStoreNoCheck(*var_ref->pvalue);
+      }
+    }
+  }
+}
+
 static void close_var_refs(LEPUSRuntime *rt, LEPUSStackFrame *sf) {
   list_head *el;
   JSVarRef *var_ref;
 
   list_for_each(el, &sf->var_ref_list) {
     var_ref = list_entry(el, JSVarRef, link);
-    var_ref->is_detached = 1;
-    var_ref->value = *var_ref->pvalue;
+    var_ref->from = 0xd;
+    HeapObjStoreNoCtx(&var_ref->value, *var_ref->pvalue);
     var_ref->pvalue = &var_ref->value;
+    Release_Store8(&var_ref->is_detached, 1);
   }
+  if (rt->con_mark_state) add_var_ref_pvalue(rt, sf);
   return;
 }
 
@@ -8043,7 +7709,15 @@ LEPUSValue js_create_from_ctor_GC(LEPUSContext *ctx, LEPUSValueConst ctor,
   if (LEPUS_IsUndefined(ctor)) {
     proto = ctx->class_proto[class_id];
   } else {
-    proto = JS_GetPropertyInternal_GC(ctx, ctor, JS_ATOM_prototype, ctor, 0);
+    LEPUSObject *p = (LEPUSObject *)LEPUS_VALUE_GET_OBJ(ctor);
+    JSShape *shape = p->shape;
+    if (likely(shape->prop_count >= 3 &&
+               shape->prop[2].atom == JS_ATOM_prototype &&
+               !(shape->prop[2].flags & LEPUS_PROP_TMASK))) {
+      proto = p->prop[2].u.value;
+    } else {
+      proto = JS_GetPropertyInternal_GC(ctx, ctor, JS_ATOM_prototype, ctor, 0);
+    }
     if (LEPUS_IsException(proto)) return proto;
     if (!LEPUS_IsObject(proto)) {
       /* check if revoked proxy */
@@ -8056,6 +7730,7 @@ LEPUSValue js_create_from_ctor_GC(LEPUSContext *ctx, LEPUSValueConst ctor,
       proto = ctx->class_proto[class_id];
     }
   }
+  HandleScope func_scope(ctx, &proto, HANDLE_TYPE_LEPUS_VALUE);
   obj = JS_NewObjectProtoClass_GC(ctx, proto, class_id);
   return obj;
 }
@@ -8128,6 +7803,7 @@ LEPUSValue JS_Invoke_GC(LEPUSContext *ctx, LEPUSValueConst this_val,
   LEPUSValue func_obj;
   func_obj = JS_GetPropertyInternal_GC(ctx, this_val, atom, this_val, 0);
   if (LEPUS_IsException(func_obj)) return func_obj;
+  HandleScope func_scope(ctx, &func_obj, HANDLE_TYPE_LEPUS_VALUE);
   return JS_CallFree_GC(ctx, func_obj, this_val, argc, argv);
 }
 
@@ -8152,23 +7828,26 @@ static __exception int async_func_init(LEPUSContext *ctx,
   init_list_head(&sf->var_ref_list);
   p = LEPUS_VALUE_GET_OBJ(func_obj);
   b = p->u.func.function_bytecode;
-  sf->js_mode = b->js_mode;
+  sf->js_mode = b->js_mode | JS_MODE_ASYNC;
   sf->cur_pc = b->byte_code_buf;
   arg_buf_len = max_int(b->arg_count, argc);
   local_count =
       arg_buf_len + b->var_count + b->stack_size + 10 * sizeof(char *);
-  sf->arg_buf = static_cast<LEPUSValue *>(
-      lepus_malloc(ctx, sizeof(LEPUSValue) * max_int(local_count, 1),
-                   ALLOC_TAG_WITHOUT_PTR));
-  if (!sf->arg_buf) return -1;
-  sf->cur_func = func_obj;
-  s->this_val = this_obj;
+  auto arg_buf = (LEPUSValue *)lepus_malloc_gc(
+      ctx, sizeof(LEPUSValue) * max_int(local_count, 1), ALLOC_TAG_WITHOUT_PTR);
+  if (!arg_buf) return -1;
+  HeapObjStore(ctx, &sf->cur_func, func_obj);
+  HeapObjStore(ctx, &s->this_val, this_obj);
   s->argc = argc;
   sf->arg_count = arg_buf_len;
-  sf->var_buf = sf->arg_buf + arg_buf_len;
+  sf->var_buf = arg_buf + arg_buf_len;
   sf->cur_sp = sf->var_buf + b->var_count;
   sf->sp = nullptr;
-  for (i = 0; i < argc; i++) sf->arg_buf[i] = argv[i];
+  WriteBarrierNoStore(ctx, arg_buf);
+  sf->arg_buf = arg_buf;
+  for (i = 0; i < argc; i++) {
+    HeapObjStore(ctx, &sf->arg_buf[i], argv[i]);
+  }
   n = arg_buf_len + b->var_count;
   for (i = argc; i < n; i++) sf->arg_buf[i] = LEPUS_UNDEFINED;
   sf->var_refs = nullptr;
@@ -8186,16 +7865,22 @@ static void async_func_free(LEPUSRuntime *rt, JSAsyncFunctionState *s) {
   close_var_refs(rt, sf);
 }
 
-static LEPUSValue async_func_resume(LEPUSContext *ctx,
-                                    JSAsyncFunctionState *s) {
+static LEPUSValue async_func_resume(LEPUSContext *ctx, JSAsyncFunctionState *s,
+                                    void *ptr) {
   LEPUSValue func_obj;
   if (unlikely(js_check_stack_overflow(ctx, 0)))
     return JS_ThrowStackOverflow_GC(ctx);
   /* the tag does not matter provided it is not an object */
   func_obj = LEPUS_MKPTR(LEPUS_TAG_STRING, s);
-  return JS_CallInternalTI_GC(ctx, func_obj, s->this_val, LEPUS_UNDEFINED,
-                              s->argc, s->frame.arg_buf,
-                              JS_CALL_FLAG_GENERATOR);
+  Release_Store8(&s->on_stack, 1);
+  auto res =
+      JS_CallInternalTI_GC(ctx, func_obj, s->this_val, LEPUS_UNDEFINED, s->argc,
+                           s->frame.arg_buf, JS_CALL_FLAG_GENERATOR);
+  Release_Store8(&s->on_stack, 0);
+  if (UNLIKELY(ctx->con_mark_state)) {
+    ctx->rt->async_obj_recoder->insert(ptr);
+  }
+  return res;
 }
 
 /* Generators */
@@ -8242,7 +7927,8 @@ redo:
       break;
     case JS_GENERATOR_STATE_SUSPENDED_YIELD_STAR: {
       int done;
-      LEPUSValue method, iter_obj;
+      LEPUSValue method = LEPUS_UNDEFINED, iter_obj;
+      HandleScope block_scope(ctx, &method, HANDLE_TYPE_LEPUS_VALUE);
       iter_obj = sf->cur_sp[-2];
       if (magic == GEN_MAGIC_NEXT) {
         method = sf->cur_sp[-1];
@@ -8309,13 +7995,14 @@ redo:
       } else {
       exec_arg:
         sf->cur_sp[-1] = ret;
+        WriteBarrierNoStore(ctx, ret);
         sf->cur_sp[0] = LEPUS_NewBool(ctx, (magic == GEN_MAGIC_RETURN));
         sf->cur_sp++;
       exec_no_arg:
         s->func_state.throw_flag = FALSE;
       }
       s->state = JS_GENERATOR_STATE_EXECUTING;
-      func_ret = async_func_resume(ctx, &s->func_state);
+      func_ret = async_func_resume(ctx, &s->func_state, s);
       s->state = JS_GENERATOR_STATE_SUSPENDED_YIELD;
       if (LEPUS_IsException(func_ret)) {
         /* finalize the execution in case of exception */
@@ -8376,6 +8063,7 @@ static LEPUSValue js_generator_function_call(LEPUSContext *ctx,
   s = static_cast<JSGeneratorData *>(
       lepus_mallocz(ctx, sizeof(*s), ALLOC_TAG_JSGeneratorData));
   if (!s) return LEPUS_EXCEPTION;
+  SetRunSlotHasFinalizer(ctx->rt, s);
   HandleScope func_scope(ctx, s, HANDLE_TYPE_DIR_HEAP_OBJ);
   s->state = JS_GENERATOR_STATE_SUSPENDED_START;
   if (async_func_init(ctx, &s->func_state, func_obj, this_obj, argc, argv)) {
@@ -8384,12 +8072,12 @@ static LEPUSValue js_generator_function_call(LEPUSContext *ctx,
   }
 
   /* execute the function up to 'OP_initial_yield' */
-  func_ret = async_func_resume(ctx, &s->func_state);
+  func_ret = async_func_resume(ctx, &s->func_state, s);
   if (LEPUS_IsException(func_ret)) goto fail;
 
   obj = js_create_from_ctor_GC(ctx, func_obj, JS_CLASS_GENERATOR);
   if (LEPUS_IsException(obj)) goto fail;
-  LEPUS_SetOpaque(obj, s);
+  LEPUS_SetHeapOpaque(ctx, obj, s);
   return obj;
 fail:
   free_generator_stack_rt(ctx->rt, s);
@@ -8419,7 +8107,7 @@ static int js_async_function_resolve_create(LEPUSContext *ctx,
       return -1;
     }
     p = LEPUS_VALUE_GET_OBJ(resolving_funcs[i]);
-    p->u.async_function_data = s;
+    HeapObjStore(ctx, &p->u.async_function_data, s);
   }
   return 0;
 }
@@ -8427,7 +8115,7 @@ static int js_async_function_resolve_create(LEPUSContext *ctx,
 static void js_async_function_resume(LEPUSContext *ctx,
                                      JSAsyncFunctionData *s) {
   LEPUSValue func_ret, ret2;
-  func_ret = async_func_resume(ctx, &s->func_state);
+  func_ret = async_func_resume(ctx, &s->func_state, s);
   if (LEPUS_IsException(func_ret)) {
     LEPUSValue error;
   fail:
@@ -8492,6 +8180,7 @@ static LEPUSValue js_async_function_resolve_call(
   } else {
     /* return value of await */
     s->func_state.frame.cur_sp[-1] = arg;
+    WriteBarrierNoStore(ctx, arg);
   }
   js_async_function_resume(ctx, s);
   return LEPUS_UNDEFINED;
@@ -8507,6 +8196,7 @@ static LEPUSValue js_async_function_call(LEPUSContext *ctx,
   s = static_cast<JSAsyncFunctionData *>(
       lepus_mallocz(ctx, sizeof(*s), ALLOC_TAG_JSAsyncFunctionData));
   if (!s) return LEPUS_EXCEPTION;
+  SetRunSlotHasFinalizer(ctx->rt, s);
   HandleScope func_scope(ctx, s, HANDLE_TYPE_DIR_HEAP_OBJ);
   s->is_active = FALSE;
   s->resolving_funcs[0] = LEPUS_UNDEFINED;
@@ -8552,6 +8242,7 @@ typedef struct JSAsyncGeneratorData {
   JSAsyncGeneratorStateEnum state;
   JSAsyncFunctionState func_state;
   struct list_head queue; /* list of JSAsyncGeneratorRequest.link */
+  bool is_completed;
 } JSAsyncGeneratorData;
 
 static LEPUSValue js_async_generator_resolve_function(
@@ -8612,7 +8303,8 @@ static void js_async_generator_resolve_or_reject(LEPUSContext *ctx,
   LEPUSValue ret;
 
   next = list_entry(s->queue.next, JSAsyncGeneratorRequest, link);
-  list_del(&next->link);
+  gc_list_del(ctx->rt, &next->link, &s->queue,
+              offsetof(JSAsyncGeneratorRequest, link));
   ret = JS_Call_GC(ctx, next->resolving_funcs[is_reject], LEPUS_UNDEFINED, 1,
                    &result);
 }
@@ -8638,6 +8330,7 @@ static void js_async_generator_complete(LEPUSContext *ctx,
   if (s->state != JS_ASYNC_GENERATOR_STATE_COMPLETED) {
     s->state = JS_ASYNC_GENERATOR_STATE_COMPLETED;
     async_func_free(ctx->rt, &s->func_state);
+    s->is_completed = true;
   }
 }
 
@@ -8711,6 +8404,7 @@ static void js_async_generator_resume_next(LEPUSContext *ctx,
           /* 'yield' returns a value. 'yield *' also returns a value
              in case the 'throw' method is called */
           s->func_state.frame.cur_sp[-1] = value;
+          WriteBarrierNoStore(ctx, value);
           s->func_state.frame.cur_sp[0] =
               LEPUS_NewInt32(ctx, next->completion_type);
           s->func_state.frame.cur_sp++;
@@ -8719,7 +8413,7 @@ static void js_async_generator_resume_next(LEPUSContext *ctx,
         }
         s->state = JS_ASYNC_GENERATOR_STATE_EXECUTING;
       resume_exec:
-        func_ret = async_func_resume(ctx, &s->func_state);
+        func_ret = async_func_resume(ctx, &s->func_state, s);
         if (LEPUS_IsException(func_ret)) {
           value = LEPUS_GetException(ctx);
           js_async_generator_complete(ctx, s);
@@ -8790,6 +8484,7 @@ static LEPUSValue js_async_generator_resolve_function(
     } else {
       /* return value of await */
       s->func_state.frame.cur_sp[-1] = arg;
+      WriteBarrierNoStore(ctx, arg);
     }
     js_async_generator_resume_next(ctx, s);
   }
@@ -8821,14 +8516,16 @@ static LEPUSValue js_async_generator_next(LEPUSContext *ctx,
     return promise;
   }
   req = static_cast<JSAsyncGeneratorRequest *>(
-      lepus_mallocz(ctx, sizeof(*req), ALLOC_TAG_WITHOUT_PTR));
+      lepus_mallocz(ctx, sizeof(*req), ALLOC_TAG_JSAsyncGeneratorRequest));
   if (!req) goto fail;
   req->completion_type = magic;
-  req->result = argv[0];
-  req->promise = promise;
-  req->resolving_funcs[0] = resolving_funcs[0];
-  req->resolving_funcs[1] = resolving_funcs[1];
-  list_add_tail(&req->link, &s->queue);
+  HeapObjStore(ctx, &req->result, argv[0]);
+  HeapObjStore(ctx, &req->promise, promise);
+  HeapObjStore(ctx, &req->resolving_funcs[0], resolving_funcs[0]);
+  HeapObjStore(ctx, &req->resolving_funcs[1], resolving_funcs[1]);
+  gc_list_add_tail(ctx, &req->link, &s->queue,
+                   offsetof(JSAsyncGeneratorRequest, link));
+  WriteBarrierNoStore(ctx, req);
   if (s->state != JS_ASYNC_GENERATOR_STATE_EXECUTING) {
     js_async_generator_resume_next(ctx, s);
   }
@@ -8847,22 +8544,25 @@ static LEPUSValue js_async_generator_function_call(
       lepus_mallocz(ctx, sizeof(*s), ALLOC_TAG_JSAsyncGeneratorData));
   HandleScope func_scope(ctx, s, HANDLE_TYPE_DIR_HEAP_OBJ);
   if (!s) return LEPUS_EXCEPTION;
+  s->is_completed = false;
+  SetRunSlotHasFinalizer(ctx->rt, s);
   s->state = JS_ASYNC_GENERATOR_STATE_SUSPENDED_START;
   init_list_head(&s->queue);
   if (async_func_init(ctx, &s->func_state, func_obj, this_obj, argc, argv)) {
     s->state = JS_ASYNC_GENERATOR_STATE_COMPLETED;
+    s->is_completed = true;
     goto fail;
   }
 
   /* execute the function up to 'OP_initial_yield' (no yield nor
      await are possible) */
-  func_ret = async_func_resume(ctx, &s->func_state);
+  func_ret = async_func_resume(ctx, &s->func_state, s);
   if (LEPUS_IsException(func_ret)) goto fail;
 
   obj = js_create_from_ctor_GC(ctx, func_obj, JS_CLASS_ASYNC_GENERATOR);
   if (LEPUS_IsException(obj)) goto fail;
-  s->generator = LEPUS_VALUE_GET_OBJ(obj);
-  LEPUS_SetOpaque(obj, s);
+  HeapObjStore(ctx, &s->generator, LEPUS_VALUE_GET_OBJ(obj));
+  LEPUS_SetHeapOpaque(ctx, obj, s);
   return obj;
 fail:
   return LEPUS_EXCEPTION;
@@ -10664,6 +10364,7 @@ static __exception int js_parse_for_in_of(JSParseState *s, int label_name,
       if (next_token(s)) {
         return -1;
       }
+      func_scope.PushLEPUSAtom(var_name);
       if (js_define_var(s, var_name, tok)) {
         return -1;
       }
@@ -10877,7 +10578,9 @@ static __exception int js_parse_statement_or_decl(JSParseState *s,
       goto done;
     }
   }
-
+#ifdef ENABLE_QUICKJS_DEBUGGER
+  LEPUSValue debugger;
+#endif
   switch (tok = s->token.val) {
     case '{':
       if (js_parse_block(s)) goto fail;
@@ -11458,7 +11161,6 @@ static __exception int js_parse_statement_or_decl(JSParseState *s,
 #ifdef ENABLE_QUICKJS_DEBUGGER
       if (next_token(s)) goto fail;
       // generate opcode: op_push_const
-      LEPUSValue debugger;
       debugger = JS_NewString_GC(ctx, "debugger");
       func_scope.PushHandle(&debugger, HANDLE_TYPE_LEPUS_VALUE);
       if (LEPUS_IsException(debugger)) goto fail;
@@ -11545,10 +11247,12 @@ JSFunctionDef *js_new_function_def_GC(LEPUSContext *ctx, JSFunctionDef *parent,
   init_list_head(&fd->child_list);
 
   /* insert in parent list */
-  fd->parent = parent;
+  HeapObjStore(ctx, &fd->parent, parent);
   fd->parent_cpool_idx = -1;
   if (parent) {
-    list_add_tail(&fd->link, &parent->child_list);
+    gc_list_add_tail(ctx, &fd->link, &parent->child_list,
+                     offsetof(JSFunctionDef, link));
+    WriteBarrierNoStore(ctx, fd);
     fd->js_mode = parent->js_mode;
     fd->parent_scope_level = parent->scope_level;
   }
@@ -11639,6 +11343,7 @@ __exception int js_parse_function_decl2_GC(
           (s->token.val == TOK_AWAIT && !s->is_module)) &&
          func_type == JS_PARSE_FUNC_EXPR)) {
       func_name = s->token.u.ident.atom;
+      func_scope.PushLEPUSAtom(func_name);
       if (next_token(s)) {
         return -1;
       }
@@ -11704,11 +11409,12 @@ __exception int js_parse_function_decl2_GC(
   if (!fd) {
     return -1;
   }
+  func_scope.PushHandle(&fd->byte_code.buf, HANDLE_TYPE_HEAP_OBJ);
 #ifdef ENABLE_QUICKJS_DEBUGGER
   fd->column_num = compute_column(s, 0);
 #endif
   if (pfd) *pfd = fd;
-  s->cur_func = fd;
+  HeapObjStore(ctx, &s->cur_func, fd);
   fd->func_name = func_name;
   /* XXX: test !fd->is_generator is always false */
   fd->has_prototype =
@@ -11975,8 +11681,9 @@ __exception int js_parse_function_decl2_GC(
         /* the end of the function source code is after the last
            token of the function source stored into s->last_ptr */
         fd->source_len = s->last_ptr - ptr;
-        fd->source = js_strmalloc((const char *)ptr, fd->source_len);
+        fd->source = js_strmalloc_gc(ctx, (const char *)ptr, fd->source_len);
         if (!fd->source) goto fail;
+        WriteBarrierNoStore(ctx, (void *)fd->source);
       }
       goto done;
     }
@@ -11995,8 +11702,9 @@ __exception int js_parse_function_decl2_GC(
   if (!(fd->js_mode & JS_MODE_STRIP)) {
     /* save the function source code */
     fd->source_len = s->buf_ptr - ptr;
-    fd->source = js_strmalloc((const char *)ptr, fd->source_len);
+    fd->source = js_strmalloc_gc(ctx, (const char *)ptr, fd->source_len);
     if (!fd->source) goto fail;
+    WriteBarrierNoStore(ctx, (void *)fd->source);
   }
 
   if (next_token(s)) {
@@ -12009,7 +11717,7 @@ __exception int js_parse_function_decl2_GC(
     emit_return(s, FALSE);
   }
 done:
-  s->cur_func = fd->parent;
+  HeapObjStore(ctx, &s->cur_func, fd->parent);
 
   /* create the function object */
   {
@@ -12110,7 +11818,7 @@ done:
   }
   return 0;
 fail:
-  s->cur_func = fd->parent;
+  HeapObjStore(ctx, &s->cur_func, fd->parent);
   if (pfd) *pfd = NULL;
   return -1;
 }
@@ -12245,23 +11953,24 @@ static LEPUSValue __JS_EvalInternal_GC(LEPUSContext *ctx,
     if (eval_type == LEPUS_EVAL_TYPE_MODULE) {
       JSAtom module_name = LEPUS_NewAtom(ctx, filename);
       if (module_name == JS_ATOM_NULL) return LEPUS_EXCEPTION;
-      HandleScope func_scope(ctx->rt);
-      func_scope.PushLEPUSAtom(module_name);
+      HandleScope block_scope(ctx->rt);
+      block_scope.PushLEPUSAtom(module_name);
       m = js_new_module_def(ctx, module_name);
       if (!m) return LEPUS_EXCEPTION;
-      func_scope.PushHandle(m, HANDLE_TYPE_DIR_HEAP_OBJ);
+      block_scope.PushHandle(m, HANDLE_TYPE_DIR_HEAP_OBJ);
       js_mode |= JS_MODE_STRICT;
     }
   }
   fd = js_new_function_def_GC(ctx, NULL, TRUE, FALSE, filename, 1);
   func_scope.PushHandle(fd, HANDLE_TYPE_DIR_HEAP_OBJ);
+  func_scope.PushHandle(&fd->byte_code.buf, HANDLE_TYPE_HEAP_OBJ);
 
 #ifdef ENABLE_QUICKJS_DEBUGGER
   fd->column_num = 0;
 #endif
 
   if (!fd) goto fail1;
-  s->cur_func = fd;
+  HeapObjStore(ctx, &s->cur_func, fd);
   fd->eval_type = eval_type;
   fd->has_this_binding = (eval_type != LEPUS_EVAL_TYPE_DIRECT);
   if (eval_type == LEPUS_EVAL_TYPE_DIRECT) {
@@ -12287,7 +11996,7 @@ static LEPUSValue __JS_EvalInternal_GC(LEPUSContext *ctx,
       if (add_closure_variables(ctx, fd, b, scope_idx)) goto fail;
     }
   }
-  fd->module = m;
+  HeapObjStore(ctx, &fd->module, m);
   s->is_module = (m != NULL);
   s->allow_html_comments = !s->is_module;
 
@@ -12312,18 +12021,18 @@ static LEPUSValue __JS_EvalInternal_GC(LEPUSContext *ctx,
   /* create the function object and all the enclosed functions */
   fun_obj = js_create_function(ctx, fd);
 
+  if (LEPUS_IsException(fun_obj)) goto fail1;
+  func_scope.PushHandle(&fun_obj, HANDLE_TYPE_LEPUS_VALUE);
+
 #ifdef ENABLE_QUICKJS_DEBUGGER
   if (script && ctx->debugger_mode) {
     // adjust breakpoint which pc is null(script_id = -1)
     AdjustBreakpoints(ctx, script);
   }
 #endif
-
-  if (LEPUS_IsException(fun_obj)) goto fail1;
-  func_scope.PushHandle(&fun_obj, HANDLE_TYPE_LEPUS_VALUE);
   /* Could add a flag to avoid resolution if necessary */
   if (m) {
-    m->func_obj = fun_obj;
+    HeapObjStore(ctx, &m->func_obj, fun_obj);
     if (js_resolve_module(ctx, m) < 0) goto fail1;
     fun_obj = LEPUS_MKPTR(LEPUS_TAG_MODULE, m);
   }
@@ -12784,8 +12493,6 @@ static void JS_SetConstructor2(LEPUSContext *ctx, LEPUSValueConst func_obj,
                             proto_flags);
   JS_DefinePropertyValue_GC(ctx, proto, JS_ATOM_constructor, func_obj,
                             ctor_flags);
-  set_cycle_flag(ctx, func_obj);
-  set_cycle_flag(ctx, proto);
 }
 
 static void JS_SetFunctionListForConstructor(LEPUSContext *ctx,
@@ -12939,9 +12646,11 @@ LEPUSValue JS_ToObject_GC(LEPUSContext *ctx, LEPUSValueConst val) {
 #ifdef ENABLE_LEPUSNG
     case LEPUS_TAG_LEPUS_REF: {
       auto *js_ref = static_cast<LEPUSLepusRef *>(LEPUS_VALUE_GET_PTR(val));
-      auto &obj = js_ref->lepus_val;
+      auto obj = js_ref->lepus_val;
       if (LEPUS_VALUE_IS_OBJECT(obj)) return obj;
-      return obj = ctx->rt->js_callbacks_.convert_to_object(ctx, val);
+      HeapObjStore(ctx, &js_ref->lepus_val,
+                   ctx->rt->js_callbacks_.convert_to_object(ctx, val));
+      return js_ref->lepus_val;
     }
 #endif
       // Primjs end
@@ -14065,6 +13774,8 @@ static LEPUSValue JS_SpeciesConstructor(LEPUSContext *ctx, LEPUSValueConst obj,
 
   if (!LEPUS_IsObject(obj)) return JS_ThrowTypeErrorNotAnObject(ctx);
   ctor = JS_GetPropertyInternal_GC(ctx, obj, JS_ATOM_constructor, obj, 0);
+  HandleScope func_scope(ctx, &ctor, HANDLE_TYPE_LEPUS_VALUE);
+
   if (LEPUS_IsException(ctor)) return ctor;
   if (LEPUS_IsUndefined(ctor)) return defaultConstructor;
   if (!LEPUS_IsObject(ctor)) {
@@ -14364,10 +14075,26 @@ LEPUSValue js_get_length(LEPUSContext *ctx, LEPUSValueConst obj) {
   return len_val;
 }
 
+bool js_set_length(LEPUSContext *ctx, LEPUSValueConst obj, int64_t newLen) {
+  LEPUSValue len_val;
+
+  LEPUSObject *p = (LEPUSObject *)LEPUS_VALUE_GET_OBJ(obj);
+  // Array's length must exist and the idx is 0
+  if (likely(LEPUS_VALUE_IS_OBJECT(obj) && p->class_id == JS_CLASS_ARRAY)) {
+    p->prop[0].u.value = JS_NewInt64_GC(ctx, newLen);
+    return true;
+  } else {
+    if (JS_SetPropertyInternal_GC(ctx, obj, JS_ATOM_length,
+                                  JS_NewInt64_GC(ctx, newLen),
+                                  LEPUS_PROP_THROW) < 0)
+      return false;
+    return true;
+  }
+}
+
 static __exception int js_get_length64(LEPUSContext *ctx, int64_t *pres,
                                        LEPUSValueConst obj) {
-  LEPUSValue len_val;
-  len_val = JS_GetPropertyInternal_GC(ctx, obj, JS_ATOM_length, obj, 0);
+  LEPUSValue len_val = js_get_length(ctx, obj);
   if (LEPUS_IsException(len_val)) {
     *pres = 0;
     return -1;
@@ -14391,24 +14118,21 @@ static LEPUSValue *build_arg_list(LEPUSContext *ctx, uint32_t *plen,
   tab = static_cast<LEPUSValue *>(lepus_mallocz(
       ctx, sizeof(tab[0]) * max_uint32(1, len), ALLOC_TAG_JSValueArray));
   if (!tab) return NULL;
-  set_heap_obj_len(tab, 0);
   HandleScope func_scope(ctx, tab, HANDLE_TYPE_DIR_HEAP_OBJ);
   p = LEPUS_VALUE_GET_OBJ(array_arg);
 
   if ((p->class_id == JS_CLASS_ARRAY || p->class_id == JS_CLASS_ARGUMENTS) &&
       p->fast_array && len == p->u.array.count) {
     for (i = 0; i < len; i++) {
-      tab[i] = p->u.array.u.values[i];
+      HeapObjStore(ctx, &tab[i], p->u.array.u.values[i]);
     }
-    set_heap_obj_len(tab, len);
   } else {
     for (i = 0; i < len; i++) {
       ret = JS_GetPropertyUint32_GC(ctx, array_arg, i);
       if (LEPUS_IsException(ret)) {
         return NULL;
       }
-      tab[i] = ret;
-      set_heap_obj_len(tab, i + 1);
+      HeapObjStore(ctx, &tab[i], ret);
     }
   }
   *plen = len;
@@ -14462,25 +14186,26 @@ static LEPUSValue js_function_bind(LEPUSContext *ctx, LEPUSValueConst this_val,
 
   if (check_function(ctx, this_val)) return LEPUS_EXCEPTION;
 
+  auto proto = JS_GetPrototype_GC(ctx, this_val);
+  func_scope.PushHandle(&proto, HANDLE_TYPE_LEPUS_VALUE);
   // https://262.ecma-international.org/6.0/#sec-boundfunctioncreate
-  func_obj = JS_NewObjectProtoClass_GC(ctx, JS_GetPrototype_GC(ctx, this_val),
-                                       JS_CLASS_BOUND_FUNCTION);
+  func_obj = JS_NewObjectProtoClass_GC(ctx, proto, JS_CLASS_BOUND_FUNCTION);
   if (LEPUS_IsException(func_obj)) return LEPUS_EXCEPTION;
   func_scope.PushHandle(&func_obj, HANDLE_TYPE_LEPUS_VALUE);
   p = LEPUS_VALUE_GET_OBJ(func_obj);
   p->is_constructor = LEPUS_IsConstructor(ctx, this_val);
   arg_count = max_int(0, argc - 1);
   bf = static_cast<JSBoundFunction *>(
-      lepus_malloc(ctx, sizeof(*bf) + arg_count * sizeof(LEPUSValue),
-                   ALLOC_TAG_JSBoundFunction));
+      lepus_malloc_gc(ctx, sizeof(*bf) + arg_count * sizeof(LEPUSValue),
+                      ALLOC_TAG_JSBoundFunction));
   if (!bf) goto exception;
-  bf->func_obj = this_val;
-  bf->this_val = argv[0];
+  HeapObjStore(ctx, &bf->func_obj, this_val);
+  HeapObjStore(ctx, &bf->this_val, argv[0]);
   bf->argc = arg_count;
   for (i = 0; i < arg_count; i++) {
-    bf->argv[i] = argv[i + 1];
+    HeapObjStore(ctx, &bf->argv[i], argv[i + 1]);
   }
-  p->u.bound_function = bf;
+  HeapObjStore(ctx, &p->u.bound_function, bf);
 
   ret = JS_GetOwnProperty_GC(ctx, NULL, this_val, JS_ATOM_length);
   if (ret < 0) goto exception;
@@ -14575,6 +14300,7 @@ LEPUSValue js_function_toString_GC(LEPUSContext *ctx, LEPUSValueConst this_val,
     name = JS_GetPropertyInternal_GC(ctx, this_val, JS_ATOM_name, this_val, 0);
     if (LEPUS_IsUndefined(name))
       name = JS_AtomToString_GC(ctx, JS_ATOM_empty_string);
+    HandleScope func_scope(ctx, &name, HANDLE_TYPE_LEPUS_VALUE);
     return JS_ConcatString3(ctx, pref, name, suff);
   }
 }
@@ -14711,7 +14437,7 @@ static LEPUSValue js_array_constructor(LEPUSContext *ctx,
   int i;
 
   obj = js_create_from_ctor_GC(ctx, new_target, JS_CLASS_ARRAY);
-  if (LEPUS_IsException(obj)) return obj;
+  if (LEPUS_IsException(obj) || argc == 0) return obj;
   HandleScope func_scope(ctx, &obj, HANDLE_TYPE_LEPUS_VALUE);
   if (argc == 1 && LEPUS_IsNumber(argv[0])) {
     uint32_t len;
@@ -15429,6 +15155,7 @@ static LEPUSValue js_array_toString(LEPUSContext *ctx, LEPUSValueConst this_val,
     /* Use intrinsic Object.prototype.toString */
     ret = js_object_toString(ctx, obj, 0, NULL);
   } else {
+    HandleScope func_scope(ctx, &method, HANDLE_TYPE_LEPUS_VALUE);
     ret = JS_CallFree_GC(ctx, method, obj, 0, NULL);
   }
   return ret;
@@ -15492,8 +15219,7 @@ static LEPUSValue js_array_pop(LEPUSContext *ctx, LEPUSValueConst this_val,
   LEPUSValue obj, res = LEPUS_UNDEFINED;
   HandleScope func_scope(ctx, &res, HANDLE_TYPE_LEPUS_VALUE);
   int64_t len, newLen;
-  LEPUSValue *arrp = nullptr;
-  func_scope.PushHandle(&arrp, HANDLE_TYPE_HEAP_OBJ);
+  LEPUSValue *arrp;
   uint32_t count32;
 
   obj = JS_ToObject_GC(ctx, this_val);
@@ -15507,7 +15233,9 @@ static LEPUSValue js_array_pop(LEPUSContext *ctx, LEPUSValueConst this_val,
       LEPUSObject *p = LEPUS_VALUE_GET_OBJ(obj);
       if (shift) {
         res = arrp[0];
-        memmove(arrp, arrp + 1, (count32 - 1) * sizeof(*arrp));
+        for (uint32_t i = 0; i < count32 - 1; i++) {
+          HeapObjStore(ctx, &arrp[i], arrp[i + 1]);
+        }
         p->u.array.count--;
       } else {
         res = arrp[count32 - 1];
@@ -15527,7 +15255,7 @@ static LEPUSValue js_array_pop(LEPUSContext *ctx, LEPUSValueConst this_val,
     }
   }
   if (JS_SetPropertyInternal_GC(ctx, obj, JS_ATOM_length,
-                                JS_NewInt64_GC(ctx, newLen),
+                                LEPUS_NewInt64(ctx, newLen),
                                 LEPUS_PROP_THROW) < 0)
     goto exception;
 
@@ -15560,7 +15288,7 @@ static LEPUSValue js_array_push(LEPUSContext *ctx, LEPUSValueConst this_val,
     if (JS_SetPropertyInt64_GC(ctx, obj, from + i, argv[i]) < 0) goto exception;
   }
   if (JS_SetPropertyInternal_GC(ctx, obj, JS_ATOM_length,
-                                JS_NewInt64_GC(ctx, newLen),
+                                LEPUS_NewInt64(ctx, newLen),
                                 LEPUS_PROP_THROW) < 0)
     goto exception;
 
@@ -15592,8 +15320,8 @@ static LEPUSValue js_array_reverse(LEPUSContext *ctx, LEPUSValueConst this_val,
     if (count32 > 1) {
       for (ll = 0, hh = count32 - 1; ll < hh; ll++, hh--) {
         lval = arrp[ll];
-        arrp[ll] = arrp[hh];
-        arrp[hh] = lval;
+        HeapObjStore(ctx, &arrp[ll], arrp[hh]);
+        HeapObjStore(ctx, &arrp[hh], lval);
       }
     }
     return obj;
@@ -15888,6 +15616,12 @@ static int js_array_cmp_generic(const void *a, const void *b, void *opaque) {
 
   if (psc->exception) return 0;
 
+  // add wb for rqsort
+  WriteBarrierNoStore(ctx, ap->val);
+  WriteBarrierNoStore(ctx, bp->val);
+  if (ap->str) WriteBarrierNoStore(ctx, ap->str);
+  if (bp->str) WriteBarrierNoStore(ctx, bp->str);
+
   if (psc->has_method) {
     /* custom sort function is specified as returning 0 for identical
      * objects: avoid method call overhead.
@@ -15912,12 +15646,12 @@ static int js_array_cmp_generic(const void *a, const void *b, void *opaque) {
     if (!ap->str) {
       LEPUSValue str = JS_ToString_GC(ctx, ap->val);
       if (LEPUS_IsException(str)) goto exception;
-      ap->str = LEPUS_VALUE_GET_STRING(str);
+      HeapObjStore(ctx, &ap->str, LEPUS_VALUE_GET_STRING(str));
     }
     if (!bp->str) {
       LEPUSValue str = JS_ToString_GC(ctx, bp->val);
       if (LEPUS_IsException(str)) goto exception;
-      bp->str = LEPUS_VALUE_GET_STRING(str);
+      HeapObjStore(ctx, &bp->str, LEPUS_VALUE_GET_STRING(str));
     }
     cmp = js_string_compare(ctx, ap->str, bp->str);
   }
@@ -15938,6 +15672,8 @@ static LEPUSValue js_array_sort(LEPUSContext *ctx, LEPUSValueConst this_val,
   HandleScope func_scope(ctx, &obj, HANDLE_TYPE_LEPUS_VALUE);
   ValueSlot *array = NULL;
   func_scope.PushHandle(&array, HANDLE_TYPE_HEAP_OBJ);
+  LEPUSValue val = LEPUS_UNDEFINED;
+  func_scope.PushHandle(&val, HANDLE_TYPE_LEPUS_VALUE);
   size_t array_size = 0, pos = 0, n = 0;
   int64_t i, len, undefined_count = 0;
   int present;
@@ -15955,24 +15691,25 @@ static LEPUSValue js_array_sort(LEPUSContext *ctx, LEPUSValueConst this_val,
       size_t new_size, slack;
       ValueSlot *new_array;
       new_size = (array_size + (array_size >> 1) + 31) & ~15;
-      new_array = static_cast<ValueSlot *>(lepus_realloc2(
-          ctx, array, new_size * sizeof(*array), &slack, ALLOC_TAG_ValueSlot));
+      new_array = static_cast<ValueSlot *>(
+          lepus_realloc2(ctx, array, new_size * sizeof(*array), &slack,
+                         ALLOC_TAG_ValueSlotArray));
       if (new_array == NULL) goto exception;
       new_size += slack / sizeof(*new_array);
-      array = new_array;
+      HeapObjStore(ctx, &array, new_array);
       array_size = new_size;
     }
-    present = JS_TryGetPropertyInt64(ctx, obj, i, &array[pos].val);
+    present = JS_TryGetPropertyInt64(ctx, obj, i, &val);
     if (present < 0) goto exception;
+    HeapObjStore(ctx, &array[pos].val, val);
     if (present == 0) continue;
-    if (LEPUS_IsUndefined(array[pos].val)) {
+    if (LEPUS_IsUndefined(val)) {
       undefined_count++;
       continue;
     }
     array[pos].str = NULL;
     array[pos].pos = i;
     pos++;
-    set_heap_obj_len(array, pos);
   }
   rqsort(array, pos, sizeof(*array), js_array_cmp_generic, &asc);
   if (asc.exception) goto exception;
@@ -16046,12 +15783,12 @@ static LEPUSValue js_create_array_iterator(LEPUSContext *ctx,
   if (LEPUS_IsException(enum_obj)) goto fail;
   func_scope.PushHandle(&enum_obj, HANDLE_TYPE_LEPUS_VALUE);
   it = static_cast<JSArrayIteratorData *>(
-      lepus_malloc(ctx, sizeof(*it), ALLOC_TAG_JSArrayIteratorData));
+      lepus_malloc_gc(ctx, sizeof(*it), ALLOC_TAG_JSArrayIteratorData));
   if (!it) goto fail1;
-  it->obj = arr;
+  HeapObjStore(ctx, &it->obj, arr);
   it->kind = kind;
   it->idx = 0;
-  LEPUS_SetOpaque(enum_obj, it);
+  LEPUS_SetHeapOpaque(ctx, enum_obj, it);
   return enum_obj;
 fail1:
 fail:
@@ -16592,15 +16329,15 @@ static int js_string_get_own_property_names(LEPUSContext *ctx,
   tab = NULL;
   if (len > 0) {
     /* do not allocate 0 bytes */
-    tab = static_cast<LEPUSPropertyEnum *>(lepus_mallocz(
-        ctx, sizeof(LEPUSPropertyEnum) * len, ALLOC_TAG_LEPUSPropertyEnum));
+    tab = static_cast<LEPUSPropertyEnum *>(
+        lepus_mallocz(ctx, sizeof(LEPUSPropertyEnum) * len,
+                      ALLOC_TAG_LEPUSPropertyEnumArray));
     if (!tab) return -1;
-    set_heap_obj_len(tab, len);
     for (i = 0; i < len; i++) {
       tab[i].atom = __JS_AtomFromUInt32(i);
     }
   }
-  *ptab = tab;
+  HeapObjStore(ctx, ptab, tab);
   *plen = len;
   return 0;
 }
@@ -16671,15 +16408,16 @@ static LEPUSValue js_string_constructor(LEPUSContext *ctx,
   LEPUSValue val = LEPUS_UNDEFINED, obj = LEPUS_UNDEFINED;
   HandleScope func_scope(ctx, &val, HANDLE_TYPE_LEPUS_VALUE);
   func_scope.PushHandle(&obj, HANDLE_TYPE_LEPUS_VALUE);
+  LEPUSValue symName;
   if (argc == 0) {
     val = JS_AtomToString_GC(ctx, JS_ATOM_empty_string);
   } else {
     if (LEPUS_IsUndefined(new_target) && LEPUS_IsSymbol(argv[0])) {
       JSAtomStruct *p =
           static_cast<JSAtomStruct *>(LEPUS_VALUE_GET_PTR(argv[0]));
-      val = JS_ConcatString3(
-          ctx, "Symbol(",
-          JS_AtomToString_GC(ctx, js_get_atom_index(ctx->rt, p)), ")");
+      symName = JS_AtomToString_GC(ctx, js_get_atom_index(ctx->rt, p));
+      func_scope.PushHandle(&symName, HANDLE_TYPE_LEPUS_VALUE);
+      val = JS_ConcatString3(ctx, "Symbol(", symName, ")");
     } else {
       val = JS_ToString_GC(ctx, argv[0]);
     }
@@ -16843,18 +16581,16 @@ static LEPUSValue js_string___isSpace(LEPUSContext *ctx, LEPUSValueConst this_va
 static LEPUSValue js_string_charCodeAt(LEPUSContext *ctx,
                                        LEPUSValueConst this_val, int argc,
                                        LEPUSValueConst *argv) {
-  LEPUSValue val, ret = LEPUS_UNDEFINED;
-  HandleScope func_scope(ctx, &ret, HANDLE_TYPE_LEPUS_VALUE);
+  LEPUSValue val, ret;
   JSString *p;
   int idx, c;
 
-  val = JS_ToStringCheckObject(ctx, this_val);
-  if (LEPUS_IsException(val)) return val;
-  func_scope.PushHandle(&val, HANDLE_TYPE_LEPUS_VALUE);
-  p = LEPUS_VALUE_GET_STRING(val);
   if (JS_ToInt32Sat(ctx, &idx, argv[0])) {
     return LEPUS_EXCEPTION;
   }
+  val = JS_ToStringCheckObject(ctx, this_val);
+  if (LEPUS_IsException(val)) return val;
+  p = LEPUS_VALUE_GET_STRING(val);
   if (idx < 0 || idx >= p->len) {
     ret = LEPUS_NAN;
   } else {
@@ -17354,6 +17090,7 @@ static LEPUSValue js_string_split(LEPUSContext *ctx, LEPUSValueConst this_val,
     splitter = JS_GetPropertyInternal_GC(ctx, separator, JS_ATOM_Symbol_split,
                                          separator, 0);
     if (LEPUS_IsException(splitter)) return LEPUS_EXCEPTION;
+    HandleScope func_scope(ctx, &splitter, HANDLE_TYPE_LEPUS_VALUE);
     if (!LEPUS_IsUndefined(splitter) && !LEPUS_IsNull(splitter)) {
       args[0] = O;
       args[1] = limit;
@@ -17682,9 +17419,8 @@ static int JS_ToUTF32String(LEPUSContext *ctx, uint32_t **pbuf,
   HandleScope func_scope(ctx, &val, HANDLE_TYPE_LEPUS_VALUE);
   p = LEPUS_VALUE_GET_STRING(val);
   len = p->len;
-  /* UTF32 buffer length is len minus the number of correct surrogates pairs
-   */
-  buf = static_cast<uint32_t *>(lepus_malloc(
+  /* UTF32 buffer length is len minus the number of correct surrogates pairs */
+  buf = static_cast<uint32_t *>(lepus_malloc_gc(
       ctx, sizeof(buf[0]) * max_int(len, 1), ALLOC_TAG_WITHOUT_PTR));
   if (!buf) {
     goto fail;
@@ -18451,8 +18187,8 @@ LEPUSValue js_regexp_constructor_internal_gc(LEPUSContext *ctx,
   func_scope.PushHandle(&obj, HANDLE_TYPE_LEPUS_VALUE);
   p = LEPUS_VALUE_GET_OBJ(obj);
   re = &p->u.regexp;
-  re->pattern = LEPUS_VALUE_GET_STRING(pattern);
-  re->bytecode = LEPUS_VALUE_GET_STRING(bc);
+  HeapObjStore(ctx, &re->pattern, LEPUS_VALUE_GET_STRING(pattern));
+  HeapObjStore(ctx, &re->bytecode, LEPUS_VALUE_GET_STRING(bc));
   JS_DefinePropertyValue_GC(ctx, obj, JS_ATOM_lastIndex, LEPUS_NewInt32(ctx, 0),
                             LEPUS_PROP_WRITABLE);
   return obj;
@@ -18565,8 +18301,8 @@ static LEPUSValue js_regexp_compile(LEPUSContext *ctx, LEPUSValueConst this_val,
     bc = js_compile_regexp(ctx, pattern, flags1);
     if (LEPUS_IsException(bc)) goto fail;
   }
-  re->pattern = LEPUS_VALUE_GET_STRING(pattern);
-  re->bytecode = LEPUS_VALUE_GET_STRING(bc);
+  HeapObjStore(ctx, &re->pattern, LEPUS_VALUE_GET_STRING(pattern));
+  HeapObjStore(ctx, &re->bytecode, LEPUS_VALUE_GET_STRING(bc));
   if (JS_SetPropertyInternal_GC(ctx, this_val, JS_ATOM_lastIndex,
                                 LEPUS_NewInt32(ctx, 0), LEPUS_PROP_THROW) < 0)
     return LEPUS_EXCEPTION;
@@ -18781,6 +18517,7 @@ static LEPUSValue js_regexp_exec(LEPUSContext *ctx, LEPUSValueConst this_val,
   int64_t last_index;
   const char *group_name_ptr;
   LEPUSValue regexp_obj = LEPUS_UNDEFINED;
+  func_scope.PushHandle(&regexp_obj, HANDLE_TYPE_LEPUS_VALUE);
 
   if (!re) return LEPUS_EXCEPTION;
   str_val = JS_ToString_GC(ctx, argv[0]);
@@ -18801,7 +18538,7 @@ static LEPUSValue js_regexp_exec(LEPUSContext *ctx, LEPUSValueConst this_val,
   capture_count = lre_get_capture_count(re_bytecode);
   capture = NULL;
   if (capture_count > 0) {
-    capture = static_cast<uint8_t **>(lepus_malloc(
+    capture = static_cast<uint8_t **>(lepus_malloc_gc(
         ctx, sizeof(capture[0]) * capture_count * 2, ALLOC_TAG_WITHOUT_PTR));
     if (!capture) {
       return LEPUS_EXCEPTION;
@@ -18953,7 +18690,7 @@ static LEPUSValue JS_RegExpDelete(LEPUSContext *ctx, LEPUSValueConst this_val,
   }
   capture_count = lre_get_capture_count(re_bytecode);
   if (capture_count > 0) {
-    capture = static_cast<uint8_t **>(lepus_malloc(
+    capture = static_cast<uint8_t **>(lepus_malloc_gc(
         ctx, sizeof(capture[0]) * capture_count * 2, ALLOC_TAG_WITHOUT_PTR));
     if (!capture) goto fail;
     func_scope.PushHandle(capture, HANDLE_TYPE_DIR_HEAP_OBJ);
@@ -19017,6 +18754,7 @@ static LEPUSValue JS_RegExpExec(LEPUSContext *ctx, LEPUSValueConst r,
 
   method = JS_GetPropertyInternal_GC(ctx, r, JS_ATOM_exec, r, 0);
   if (LEPUS_IsException(method)) return method;
+  HandleScope func_scope(ctx, &method, HANDLE_TYPE_LEPUS_VALUE);
   if (LEPUS_IsFunction(ctx, method)) {
     ret = JS_CallFree_GC(ctx, method, r, 1, &s);
     if (LEPUS_IsException(ret)) return ret;
@@ -19236,15 +18974,15 @@ static LEPUSValue js_regexp_Symbol_matchAll(LEPUSContext *ctx,
   if (LEPUS_IsException(iter)) goto exception;
   func_scope.PushHandle(&iter, HANDLE_TYPE_LEPUS_VALUE);
   it = static_cast<JSRegExpStringIteratorData *>(
-      lepus_malloc(ctx, sizeof(*it), ALLOC_TAG_JSRegExpStringIteratorData));
+      lepus_malloc_gc(ctx, sizeof(*it), ALLOC_TAG_JSRegExpStringIteratorData));
   if (!it) goto exception;
-  it->iterating_regexp = matcher;
-  it->iterated_string = S;
+  HeapObjStore(ctx, &it->iterating_regexp, matcher);
+  HeapObjStore(ctx, &it->iterated_string, S);
   strp = LEPUS_VALUE_GET_STRING(flags);
   it->global = string_indexof_char(strp, 'g', 0) >= 0;
   it->unicode = string_indexof_char(strp, 'u', 0) >= 0;
   it->done = FALSE;
-  LEPUS_SetOpaque(iter, it);
+  LEPUS_SetHeapOpaque(ctx, iter, it);
 
   return iter;
 exception:
@@ -19271,29 +19009,25 @@ static int value_buffer_append(ValueBuffer *b, LEPUSValue val) {
 
   if (b->len >= b->size) {
     int new_size = (b->len + (b->len >> 1) + 31) & ~16;
-    size_t slack;
     LEPUSValue *new_arr;
 
     if (b->arr == b->def) {
-      new_arr = static_cast<LEPUSValue *>(
-          lepus_realloc2(b->ctx, NULL, sizeof(*b->arr) * new_size, &slack,
-                         ALLOC_TAG_WITHOUT_PTR));
+      new_arr = static_cast<LEPUSValue *>(lepus_realloc(
+          b->ctx, NULL, sizeof(*b->arr) * new_size, ALLOC_TAG_WITHOUT_PTR));
       if (new_arr) memcpy(new_arr, b->def, sizeof b->def);
     } else {
-      new_arr = static_cast<LEPUSValue *>(
-          lepus_realloc2(b->ctx, b->arr, sizeof(*b->arr) * new_size, &slack,
-                         ALLOC_TAG_WITHOUT_PTR));
+      new_arr = static_cast<LEPUSValue *>(lepus_realloc(
+          b->ctx, b->arr, sizeof(*b->arr) * new_size, ALLOC_TAG_WITHOUT_PTR));
     }
     if (!new_arr) {
       value_buffer_free(b);
       b->error_status = -1;
       return -1;
     }
-    new_size += slack / sizeof(*new_arr);
-    b->arr = new_arr;
+    HeapObjStore(b->ctx, &b->arr, new_arr);
     b->size = new_size;
   }
-  b->arr[b->len++] = val;
+  HeapObjStore(b->ctx, &b->arr[b->len++], val);
   return 0;
 }
 
@@ -19875,6 +19609,7 @@ static LEPUSValue internalize_json_property(LEPUSContext *ctx,
 
   val = JS_GetPropertyInternal_GC(ctx, holder, name, holder, 0);
   if (LEPUS_IsException(val)) return val;
+  func_scope.PushHandle(&val, HANDLE_TYPE_LEPUS_VALUE);
   if (LEPUS_IsObject(val)) {
     is_array = JS_IsArray_GC(ctx, val);
     if (is_array < 0) goto fail;
@@ -19972,6 +19707,7 @@ static LEPUSValue js_json_check(LEPUSContext *ctx, JSONStringifyContext *jsc,
     LEPUSValue f = JS_GetPropertyInternal_GC(ctx, val, JS_ATOM_toJSON, val, 0);
     if (LEPUS_IsException(f)) goto exception;
     if (LEPUS_IsFunction(ctx, f)) {
+      HandleScope func_scope(ctx, &f, HANDLE_TYPE_LEPUS_VALUE);
       v = JS_CallFree_GC(ctx, f, val, 1, &key);
       val = v;
       if (LEPUS_IsException(val)) goto exception;
@@ -20292,7 +20028,6 @@ QJS_HIDE LEPUSValue js_json_stringify_opt_GC(LEPUSContext *ctx,
   func_scope.PushHandle(&str_arr, HANDLE_TYPE_HEAP_OBJ);
   size_t ts = JSON_ALLOC_INIT_SIZE;
   size_t cs = 0;
-  set_heap_obj_len(str_arr, 0);
 
   jsc->replacer_func = LEPUS_UNDEFINED;
   jsc->stack = LEPUS_UNDEFINED;
@@ -20310,7 +20045,7 @@ QJS_HIDE LEPUSValue js_json_stringify_opt_GC(LEPUSContext *ctx,
   func_scope.PushHandle(&ret, HANDLE_TYPE_LEPUS_VALUE);
   func_scope.PushHandle(&wrapper, HANDLE_TYPE_LEPUS_VALUE);
 
-  jsc->stack = JS_NewArray_GC(ctx);
+  HeapObjStore(ctx, &jsc->stack, JS_NewArray_GC(ctx));
   if (LEPUS_IsException(jsc->stack)) goto exception;
   if (LEPUS_IsFunction(ctx, replacer)) {
     jsc->replacer_func = replacer;
@@ -20322,7 +20057,7 @@ QJS_HIDE LEPUSValue js_json_stringify_opt_GC(LEPUSContext *ctx,
     }
     if (res) {
       /* XXX: enumeration is not fully correct */
-      jsc->property_list = JS_NewArray_GC(ctx);
+      HeapObjStore(ctx, &jsc->property_list, JS_NewArray_GC(ctx));
       if (LEPUS_IsException(jsc->property_list)) goto exception;
       if (js_get_length64(ctx, &n, replacer)) goto exception;
       for (i = j = 0; i < n; i++) {
@@ -20517,21 +20252,6 @@ static const LEPUSCFunctionListEntry js_reflect_obj[] = {
                      LEPUS_PROP_WRITABLE | LEPUS_PROP_CONFIGURABLE),
 };
 
-/* Proxy */
-
-static void js_proxy_finalizer(LEPUSRuntime *rt, LEPUSValue val) {}
-
-static void js_proxy_mark(LEPUSRuntime *rt, LEPUSValueConst val,
-                          LEPUS_MarkFunc *mark_func, uint64_t trace_tool) {
-  JSProxyData *s =
-      static_cast<JSProxyData *>(LEPUS_GetOpaque(val, JS_CLASS_PROXY));
-  if (s) {
-    JS_MarkValue_GC(rt, s->target, mark_func, trace_tool);
-    JS_MarkValue_GC(rt, s->handler, mark_func, trace_tool);
-    JS_MarkValue_GC(rt, s->proto, mark_func, trace_tool);
-  }
-}
-
 static LEPUSValue JS_ThrowTypeErrorRevokedProxy(LEPUSContext *ctx) {
   return LEPUS_ThrowTypeError(ctx, "revoked proxy");
 }
@@ -20567,6 +20287,7 @@ static LEPUSValueConst js_proxy_getPrototypeOf(LEPUSContext *ctx,
   HandleScope func_scope(ctx, &method, HANDLE_TYPE_LEPUS_VALUE);
   LEPUSValueConst proto1 = LEPUS_UNDEFINED;
   func_scope.PushHandle(&proto1, HANDLE_TYPE_LEPUS_VALUE);
+  func_scope.PushHandle(&obj, HANDLE_TYPE_LEPUS_VALUE);
   int res;
 
   /* must check for timeout to avoid infinite loop in instanceof */
@@ -21119,10 +20840,10 @@ static int js_proxy_get_own_property_names(LEPUSContext *ctx,
   len2 = 0;
   if (js_get_length32_gc(ctx, &len, prop_array)) goto fail;
   if (len > 0) {
-    tab = static_cast<LEPUSPropertyEnum *>(
-        lepus_mallocz(ctx, sizeof(tab[0]) * len, ALLOC_TAG_LEPUSPropertyEnum));
+    tab = static_cast<LEPUSPropertyEnum *>(lepus_mallocz(
+        ctx, sizeof(tab[0]) * len, ALLOC_TAG_LEPUSPropertyEnumArray));
     if (!tab) goto fail;
-    set_heap_obj_len(tab, len);
+    WriteBarrierNoStore(ctx, tab);
   }
   for (i = 0; i < len; i++) {
     val = JS_GetPropertyUint32_GC(ctx, prop_array, i);
@@ -21192,7 +20913,7 @@ static int js_proxy_get_own_property_names(LEPUSContext *ctx,
     }
   }
 
-  *ptab = tab;
+  HeapObjStore(ctx, ptab, tab);
   *plen = len;
   return 0;
 fail:
@@ -21300,16 +21021,16 @@ static LEPUSValue js_proxy_constructor(LEPUSContext *ctx,
   if (LEPUS_IsException(obj)) return obj;
   HandleScope func_scope(ctx, &obj, HANDLE_TYPE_LEPUS_VALUE);
   s = static_cast<JSProxyData *>(
-      lepus_malloc(ctx, sizeof(JSProxyData), ALLOC_TAG_JSProxyData));
+      lepus_malloc_gc(ctx, sizeof(JSProxyData), ALLOC_TAG_JSProxyData));
   if (!s) {
     return LEPUS_EXCEPTION;
   }
-  s->target = target;
-  s->handler = handler;
+  HeapObjStore(ctx, &s->target, target);
+  HeapObjStore(ctx, &s->handler, handler);
   s->proto = LEPUS_NULL;
   s->is_func = LEPUS_IsFunction(ctx, target);
   s->is_revoked = FALSE;
-  LEPUS_SetOpaque(obj, s);
+  LEPUS_SetHeapOpaque(ctx, obj, s);
   LEPUS_SetConstructorBit(ctx, obj, LEPUS_IsConstructor(ctx, target));
   return obj;
 }
@@ -21362,7 +21083,7 @@ static const LEPUSCFunctionListEntry js_proxy_funcs[] = {
 };
 
 static const JSClassShortDef js_proxy_class_def[] = {
-    {JS_ATOM_Object, js_proxy_finalizer, js_proxy_mark}, /* JS_CLASS_PROXY */
+    {JS_ATOM_Object, nullptr, nullptr}, /* JS_CLASS_PROXY */
 };
 
 void JS_AddIntrinsicProxy_GC(LEPUSContext *ctx) {
@@ -21511,28 +21232,13 @@ static const LEPUSCFunctionListEntry js_symbol_funcs[] = {
 
 static void free_weakref_prop(LEPUSRuntime *rt, LEPUSObject *p, JSShape *sh) {
   JSShapeProperty *pr = get_shape_prop(sh);
-  js_free_shape(rt, sh);  // p->shape
+  js_free_shape(sh);  // p->shape
   p->shape = NULL;
   p->prop = NULL;
 }
 
 static void js_weakref_finalizer(LEPUSRuntime *rt, LEPUSValue val) {
   // trace_gc, remove
-}
-
-static void js_finalizationRegistry_finalizer(LEPUSRuntime *rt,
-                                              LEPUSValue val) {
-  // trace_gc, remove
-}
-
-static void js_finalizationRegistry_mark(LEPUSRuntime *rt, LEPUSValueConst val,
-                                         LEPUS_MarkFunc *mark_func,
-                                         uint64_t trace_tool) {
-  // trace_gc, remove
-  LEPUSObject *p = LEPUS_VALUE_GET_OBJ(val);
-  LEPUSValue ccb = p->prop[0].u.value;
-  if (!LEPUS_IsNull(ccb)) return;
-  JS_MarkValue_GC(rt, ccb, mark_func, trace_tool);
 }
 
 static LEPUSValue js_map_constructor(LEPUSContext *ctx,
@@ -21555,14 +21261,19 @@ static LEPUSValue js_map_constructor(LEPUSContext *ctx,
   s = static_cast<JSMapState *>(
       lepus_mallocz(ctx, sizeof(*s), ALLOC_TAG_JSMapState));
   if (!s) goto fail;
+  if (is_weak) {
+    SetRunSlotHasFinalizer(ctx->rt, s);
+  }
   func_scope.PushHandle(s, HANDLE_TYPE_DIR_HEAP_OBJ);
   init_list_head(&s->records);
   s->is_weak = is_weak;
-  LEPUS_SetOpaque(obj, s);
+  LEPUS_SetHeapOpaque(ctx, obj, s);
   s->hash_bits = 1;
   s->hash_size = 1U << s->hash_bits;
-  s->hash_table = static_cast<struct list_head *>(lepus_malloc(
-      ctx, sizeof(s->hash_table[0]) * s->hash_size, ALLOC_TAG_WITHOUT_PTR));
+  HeapObjStore(ctx, &s->hash_table,
+               static_cast<struct list_head *>(
+                   lepus_malloc_gc(ctx, sizeof(s->hash_table[0]) * s->hash_size,
+                                   ALLOC_TAG_WITHOUT_PTR)));
   if (!s->hash_table) goto fail;
   init_list_head(&s->hash_table[0]);
   init_list_head(&s->hash_table[1]);
@@ -21687,7 +21398,7 @@ static void map_hash_resize(LEPUSContext *ctx, JSMapState *s) {
       list_add_tail(&mr->hash_link, &new_hash_table[h]);
     }
   }
-  s->hash_table = new_hash_table;
+  HeapObjStore(ctx, &s->hash_table, new_hash_table);
   s->hash_size = new_hash_size;
   s->hash_bits = new_hash_bits;
   s->record_count_threshold = new_hash_size * 2;
@@ -21700,7 +21411,7 @@ static JSMapRecord *map_add_record(LEPUSContext *ctx, JSMapState *s,
   WeakRefRecord *wr;
 
   mr = static_cast<JSMapRecord *>(
-      lepus_malloc(ctx, sizeof(*mr), ALLOC_TAG_WITHOUT_PTR));
+      lepus_malloc_gc(ctx, sizeof(*mr), ALLOC_TAG_JSMapRecord));
   if (!mr) return NULL;
   HandleScope func_scope(ctx, mr, HANDLE_TYPE_DIR_HEAP_OBJ);
   mr->ref_count = 1;
@@ -21710,19 +21421,20 @@ static JSMapRecord *map_add_record(LEPUSContext *ctx, JSMapState *s,
   mr->key = LEPUS_UNDEFINED;
   if (s->is_weak) {
     wr = static_cast<WeakRefRecord *>(
-        lepus_malloc(ctx, sizeof(WeakRefRecord), ALLOC_TAG_WITHOUT_PTR));
+        lepus_malloc_gc(ctx, sizeof(WeakRefRecord), ALLOC_TAG_WeakRefRecord));
     if (!wr) {
       return nullptr;
     }
     LEPUSObject *p = LEPUS_VALUE_GET_OBJ(key);
     wr->kind = WEAK_REF_KIND_WEAK_MAP;
     wr->u.map_record = mr;
-    insert_weakref_record(LEPUS_VALUE_GET_OBJ(key), wr);
+    insert_weakref_record(ctx, LEPUS_VALUE_GET_OBJ(key), wr);
   }
-  mr->key = (LEPUSValue)key;
+  HeapObjStore(ctx, &mr->key, (LEPUSValue)key);
   h = map_hash_key(ctx, key, s->hash_bits);
   list_add_tail(&mr->hash_link, &s->hash_table[h]);
-  list_add_tail(&mr->link, &s->records);
+  gc_list_add_tail(ctx, &mr->link, &s->records, offsetof(JSMapRecord, link));
+  WriteBarrierNoStore(ctx, mr);
   s->record_count++;
   if (s->record_count >= s->record_count_threshold) {
     map_hash_resize(ctx, s);
@@ -21748,7 +21460,7 @@ static void delete_weak_ref(LEPUSRuntime *rt, LEPUSObject *p, void *ptr) {
   }
   assert(wr != nullptr);
   *pwr = wr->next_weak_ref;
-  return;
+  WriteBarrierNoStore(rt, wr->next_weak_ref);
 }
 
 static void map_delete_record(LEPUSRuntime *rt, JSMapState *s,
@@ -21759,7 +21471,7 @@ static void map_delete_record(LEPUSRuntime *rt, JSMapState *s,
     delete_weak_ref(rt, LEPUS_VALUE_GET_OBJ(mr->key), mr);
   }
   if (--mr->ref_count == 0) {
-    list_del(&mr->link);
+    gc_list_del(rt, &mr->link, &s->records, offsetof(JSMapRecord, link));
   } else {
     /* keep a zombie record for iterators */
     mr->empty = TRUE;
@@ -21773,7 +21485,7 @@ static void map_decref_record(LEPUSRuntime *rt, JSMapRecord *mr) {
   if (--mr->ref_count == 0) {
     /* the record can be safely removed */
     assert(mr->empty);
-    list_del(&mr->link);
+    gc_list_del(rt, &mr->link, &mr->map->records, offsetof(JSMapRecord, link));
   }
 }
 
@@ -21804,7 +21516,7 @@ static LEPUSValue js_map_set(LEPUSContext *ctx, LEPUSValueConst this_val,
     mr = map_add_record(ctx, s, key);
     if (!mr) return LEPUS_EXCEPTION;
   }
-  mr->value = value;
+  HeapObjStore(ctx, &mr->value, value);
   return this_val;
 }
 
@@ -21973,14 +21685,15 @@ static LEPUSValue js_create_map_iterator(LEPUSContext *ctx,
   if (LEPUS_IsException(enum_obj)) goto fail;
   func_scope.PushHandle(&enum_obj, HANDLE_TYPE_LEPUS_VALUE);
   it = static_cast<JSMapIteratorData *>(
-      lepus_malloc(ctx, sizeof(*it), ALLOC_TAG_JSMapIteratorData));
+      lepus_malloc_gc(ctx, sizeof(*it), ALLOC_TAG_JSMapIteratorData));
   if (!it) {
     goto fail;
   }
-  it->obj = this_val;
+  SetRunSlotHasFinalizer(ctx->rt, it);
+  HeapObjStore(ctx, &it->obj, this_val);
   it->kind = kind;
   it->cur_record = NULL;
-  LEPUS_SetOpaque(enum_obj, it);
+  LEPUS_SetHeapOpaque(ctx, enum_obj, it);
   return enum_obj;
 fail:
   return LEPUS_EXCEPTION;
@@ -22029,7 +21742,7 @@ static LEPUSValue js_map_iterator_next(LEPUSContext *ctx,
 
   /* lock the record so that it won't be freed */
   mr->ref_count++;
-  it->cur_record = mr;
+  HeapObjStore(ctx, &it->cur_record, mr);
   *pdone = FALSE;
 
   if (it->kind == JS_ITERATOR_KIND_KEY) {
@@ -22207,20 +21920,21 @@ static LEPUSValue js_weakref_constructor_gc(LEPUSContext *ctx,
   if (LEPUS_IsException(val)) return val;
   HandleScope func_scope(ctx, &val, HANDLE_TYPE_LEPUS_VALUE);
   wrd = static_cast<WeakRefData *>(
-      lepus_malloc(ctx, sizeof(WeakRefData), ALLOC_TAG_WeakRefData));
+      lepus_malloc_gc(ctx, sizeof(WeakRefData), ALLOC_TAG_WeakRefData));
   if (!wrd) goto fail1;
+  SetRunSlotHasFinalizer(ctx->rt, wrd);
   func_scope.PushHandle(wrd, HANDLE_TYPE_DIR_HEAP_OBJ);
   target = argv[0];
-  wrd->target = target;
+  HeapObjStore(ctx, &wrd->target, target);
 
   wr = static_cast<WeakRefRecord *>(
-      lepus_malloc(ctx, sizeof(WeakRefRecord), ALLOC_TAG_WITHOUT_PTR));
+      lepus_malloc_gc(ctx, sizeof(WeakRefRecord), ALLOC_TAG_WeakRefRecord));
   if (!wr) goto fail1;
 
   wr->kind = WEAK_REF_KIND_WEAK_REF;
-  wr->u.weak_ref = wrd;
-  insert_weakref_record(LEPUS_VALUE_GET_OBJ(target), wr);
-  LEPUS_SetOpaque(val, wrd);
+  HeapObjStore(ctx, &wr->u.weak_ref, wrd);
+  insert_weakref_record(ctx, LEPUS_VALUE_GET_OBJ(target), wr);
+  LEPUS_SetHeapOpaque(ctx, val, wrd);
   return val;
 
 fail1:
@@ -22294,22 +22008,25 @@ LEPUSValue js_finalizationRegistry_register_gc(LEPUSContext *ctx,
     token = LEPUS_UNDEFINED;
   }
   wr = static_cast<WeakRefRecord *>(
-      lepus_malloc(ctx, sizeof(WeakRefRecord), ALLOC_TAG_WITHOUT_PTR));
+      lepus_malloc_gc(ctx, sizeof(WeakRefRecord), ALLOC_TAG_WeakRefRecord));
   if (!wr) return LEPUS_EXCEPTION;
   HandleScope func_scope(ctx, wr, HANDLE_TYPE_DIR_HEAP_OBJ);
-  fin_node = static_cast<FinalizationRegistryEntry *>(lepus_malloc(
-      ctx, sizeof(FinalizationRegistryEntry), ALLOC_TAG_WITHOUT_PTR));
+  fin_node = static_cast<FinalizationRegistryEntry *>(
+      lepus_malloc_gc(ctx, sizeof(FinalizationRegistryEntry),
+                      ALLOC_TAG_FinalizationRegistryEntry));
   if (!fin_node) {
     return LEPUS_EXCEPTION;
   }
-  fin_node->data = frd;
-  fin_node->target = target;
-  fin_node->held_value = held_value;
-  fin_node->token = token;
-  list_add_tail(&fin_node->link, &frd->entries);
+  HeapObjStore(ctx, &fin_node->data, frd);
+  HeapObjStore(ctx, &fin_node->target, target);
+  HeapObjStore(ctx, &fin_node->held_value, held_value);
+  HeapObjStore(ctx, &fin_node->token, token);
+  gc_list_add_tail(ctx, &fin_node->link, &frd->entries,
+                   offsetof(FinalizationRegistryEntry, link));
+  WriteBarrierNoStore(ctx, fin_node);
   wr->kind = WEAK_REF_KIND_FINALIZATION_REGISTRY;
-  wr->u.fin_node = fin_node;
-  insert_weakref_record(target_p, wr);
+  HeapObjStore(ctx, &wr->u.fin_node, fin_node);
+  insert_weakref_record(ctx, target_p, wr);
   return LEPUS_UNDEFINED;
 }
 
@@ -22339,7 +22056,8 @@ LEPUSValue js_finalizationRegistry_unregister_gc(LEPUSContext *ctx,
     fin_node = list_entry(el, FinalizationRegistryEntry, link);
     if (LEPUS_VALUE_IS_OBJECT(fin_node->token) &&
         LEPUS_VALUE_GET_OBJ(fin_node->token) == token_p) {
-      list_del(&fin_node->link);
+      gc_list_del(ctx->rt, &fin_node->link, &frd->entries,
+                  offsetof(FinalizationRegistryEntry, link));
       delete_weak_ref(ctx->rt, LEPUS_VALUE_GET_OBJ(fin_node->target), fin_node);
       removed = true;
     }
@@ -22365,15 +22083,19 @@ static LEPUSValue js_finalizationRegistry_constructor_gc(
   HandleScope func_scope(ctx, &val, HANDLE_TYPE_LEPUS_VALUE);
 
   FinalizationRegistryData *frd = static_cast<FinalizationRegistryData *>(
-      lepus_malloc(ctx, sizeof(FinalizationRegistryData),
-                   ALLOC_TAG_FinalizationRegistryData));
+      lepus_malloc_gc(ctx, sizeof(FinalizationRegistryData),
+                      ALLOC_TAG_FinalizationRegistryData));
   if (!frd) {
     return LEPUS_EXCEPTION;
   }
+  if (unlikely(!ctx->fr_data_finalizer_recoder))
+    ctx->fr_data_finalizer_recoder =
+        new std::unordered_set<FinalizationRegistryData *>();
+  ctx->fr_data_finalizer_recoder->insert(frd);
   frd->fg_ctx = ctx->fg_ctx;
   init_list_head(&frd->entries);
-  frd->cbs = executor;
-  LEPUS_SetOpaque(val, frd);
+  HeapObjStore(ctx, &frd->cbs, executor);
+  LEPUS_SetHeapOpaque(ctx, val, frd);
 
   return val;
 }
@@ -22392,8 +22114,7 @@ void JS_AddIntrinsicFinalizationRegistry(LEPUSContext *ctx) {
   HandleScope func_scope(ctx);
   func_scope.PushLEPUSAtom(JS_ATOM_FinalizationRegistry);
   JSClassShortDef const js_finalization_ref_def[] = {
-      {JS_ATOM_FinalizationRegistry, js_finalizationRegistry_finalizer,
-       js_finalizationRegistry_mark},
+      {JS_ATOM_FinalizationRegistry, nullptr, nullptr},
   };
 
   LEPUSRuntime *rt = ctx->rt;
@@ -22504,28 +22225,31 @@ static void fulfill_or_reject_promise(LEPUSContext *ctx,
     args[3] = LEPUS_NewBool(ctx, is_reject);
     args[4] = value;
     JS_EnqueueJob_GC(ctx, promise_reaction_job, 5, args);
-    list_del(&rd->link);
+    gc_list_del(ctx->rt, &rd->link, &s->promise_reactions[is_reject],
+                offsetof(JSPromiseReactionData, link));
   }
 
   list_for_each_safe(el, el1, &s->promise_reactions[1 - is_reject]) {
     rd = list_entry(el, JSPromiseReactionData, link);
-    list_del(&rd->link);
+    gc_list_del(ctx->rt, &rd->link, &s->promise_reactions[1 - is_reject],
+                offsetof(JSPromiseReactionData, link));
   }
 
+  JSUnhandledRejectionEntry *e;
   if (is_reject && !rejection_handled) {
     /* Unhandled rejection detected */
-    JSUnhandledRejectionEntry *e;
     e = static_cast<JSUnhandledRejectionEntry *>(
-        lepus_malloc(ctx, sizeof(*e), ALLOC_TAG_WITHOUT_PTR));
+        lepus_malloc_gc(ctx, sizeof(*e), ALLOC_TAG_WITHOUT_PTR));
     func_scope.PushHandle(e, HANDLE_TYPE_DIR_HEAP_OBJ);
     // only promises handled later will use this value, thus its refcount
     // always > 0 when using
-    e->promise = promise;
+    HeapObjStore(ctx, &e->promise, promise);
 
     if (LEPUS_IsError(ctx, value)) {
-      e->error = value;
+      HeapObjStore(ctx, &e->error, value);
     } else {
-      e->error = js_error_constructor(ctx, promise, 1, &value, -1);
+      HeapObjStore(ctx, &e->error,
+                   js_error_constructor(ctx, promise, 1, &value, -1));
     }
     auto stack_val = LEPUS_GetProperty(ctx, e->error, JS_ATOM_stack);
     int32_t has_stack =
@@ -22584,7 +22308,7 @@ static int js_create_resolving_functions(LEPUSContext *ctx,
   int i, ret;
 
   sr = static_cast<JSPromiseFunctionDataResolved *>(
-      lepus_malloc(ctx, sizeof(*sr), ALLOC_TAG_WITHOUT_PTR));
+      lepus_malloc_gc(ctx, sizeof(*sr), ALLOC_TAG_WITHOUT_PTR));
   if (!sr) return -1;
   func_scope.PushHandle(sr, HANDLE_TYPE_DIR_HEAP_OBJ);
   sr->ref_count = 1;
@@ -22595,7 +22319,7 @@ static int js_create_resolving_functions(LEPUSContext *ctx,
                                     JS_CLASS_PROMISE_RESOLVE_FUNCTION + i);
     if (LEPUS_IsException(obj)) goto fail;
     s = static_cast<JSPromiseFunctionData *>(
-        lepus_malloc(ctx, sizeof(*s), ALLOC_TAG_JSPromiseFunctionData));
+        lepus_malloc_gc(ctx, sizeof(*s), ALLOC_TAG_JSPromiseFunctionData));
     if (!s) {
     fail:
 
@@ -22603,9 +22327,9 @@ static int js_create_resolving_functions(LEPUSContext *ctx,
       break;
     }
     sr->ref_count++;
-    s->presolved = sr;
-    s->promise = promise;
-    LEPUS_SetOpaque(obj, s);
+    HeapObjStore(ctx, &s->presolved, sr);
+    HeapObjStore(ctx, &s->promise, promise);
+    LEPUS_SetHeapOpaque(ctx, obj, s);
     js_function_set_properties(ctx, LEPUS_VALUE_GET_OBJ(obj),
                                JS_ATOM_empty_string, 1);
     resolving_funcs[i] = obj;
@@ -22649,8 +22373,8 @@ static LEPUSValue js_promise_resolve_function_call(
   then =
       JS_GetPropertyInternal_GC(ctx, resolution, JS_ATOM_then, resolution, 0);
   func_scope.PushHandle(&then, HANDLE_TYPE_LEPUS_VALUE);
+  LEPUSValue error;
   if (LEPUS_IsException(then)) {
-    LEPUSValue error;
   fail_reject:
     error = LEPUS_GetException(ctx);
     func_scope.PushHandle(&error, HANDLE_TYPE_LEPUS_VALUE);
@@ -22692,7 +22416,7 @@ static LEPUSValue js_promise_constructor(LEPUSContext *ctx,
   s->is_handled = FALSE;
   for (i = 0; i < 2; i++) init_list_head(&s->promise_reactions[i]);
   s->promise_result = LEPUS_UNDEFINED;
-  LEPUS_SetOpaque(obj, s);
+  LEPUS_SetHeapOpaque(ctx, obj, s);
   if (js_create_resolving_functions(ctx, args, obj)) goto fail;
   ret = JS_Call_GC(ctx, executor, LEPUS_UNDEFINED, 2,
                    reinterpret_cast<LEPUSValueConst *>(args));
@@ -22721,7 +22445,7 @@ static LEPUSValue js_promise_executor(LEPUSContext *ctx,
   for (i = 0; i < 2; i++) {
     if (!LEPUS_IsUndefined(func_data[i]))
       return LEPUS_ThrowTypeError(ctx, "resolving function already set");
-    func_data[i] = argv[i];
+    HeapObjStore(ctx, &func_data[i], argv[i]);
   }
   return LEPUS_UNDEFINED;
 }
@@ -22964,8 +22688,8 @@ static LEPUSValue js_promise_all(LEPUSContext *ctx, LEPUSValueConst this_val,
       check_function(ctx, promise_resolve))
     goto fail_reject;
   iter = JS_GetIterator(ctx, argv[0], FALSE);
+  LEPUSValue error;
   if (LEPUS_IsException(iter)) {
-    LEPUSValue error;
   fail_reject:
     error = LEPUS_GetException(ctx);
     func_scope.PushHandle(&error, HANDLE_TYPE_LEPUS_VALUE);
@@ -23088,8 +22812,8 @@ static LEPUSValue js_promise_race(LEPUSContext *ctx, LEPUSValueConst this_val,
       check_function(ctx, promise_resolve))
     goto fail_reject;
   iter = JS_GetIterator(ctx, argv[0], FALSE);
+  LEPUSValue error;
   if (LEPUS_IsException(iter)) {
-    LEPUSValue error;
   fail_reject:
     error = LEPUS_GetException(ctx);
     func_scope.PushHandle(&error, HANDLE_TYPE_LEPUS_VALUE);
@@ -23146,17 +22870,24 @@ static __exception int perform_promise_then(
     if (!rd) {
       return -1;
     }
-    for (j = 0; j < 2; j++) rd->resolving_funcs[j] = cap_resolving_funcs[j];
+    for (j = 0; j < 2; j++) {
+      // rd->resolving_funcs[j] = cap_resolving_funcs[j];
+      HeapObjStore(ctx, &rd->resolving_funcs[j], cap_resolving_funcs[j]);
+    }
     handler = resolve_reject[i];
     if (!LEPUS_IsFunction(ctx, handler)) handler = LEPUS_UNDEFINED;
-    rd->handler = handler;
+    // rd->handler = handler;
+    HeapObjStore(ctx, &rd->handler, handler);
     rd_array[i] = rd;
     func_scope.PushHandle(rd_array[i], HANDLE_TYPE_DIR_HEAP_OBJ);
   }
 
   if (s->promise_state == JS_PROMISE_PENDING) {
-    for (i = 0; i < 2; i++)
-      list_add_tail(&rd_array[i]->link, &s->promise_reactions[i]);
+    for (i = 0; i < 2; i++) {
+      gc_list_add_tail(ctx, &rd_array[i]->link, &s->promise_reactions[i],
+                       offsetof(JSPromiseReactionData, link));
+      WriteBarrierNoStore(ctx, rd_array[i]);
+    }
   } else {
     HandleScope block_scope(ctx->rt);
     LEPUSValueConst args[5];
@@ -23205,6 +22936,7 @@ static LEPUSValue js_promise_then_for_deepcopy(LEPUSContext *ctx,
 
   ctor = JS_SpeciesConstructor(ctx, this_val, LEPUS_UNDEFINED);
   if (LEPUS_IsException(ctor)) return ctor;
+  func_scope.PushHandle(&ctor, HANDLE_TYPE_LEPUS_VALUE);
   result_promise = js_new_promise_capability(ctx, resolving_funcs, ctor);
   if (LEPUS_IsException(result_promise)) return result_promise;
   func_scope.PushHandle(&result_promise, HANDLE_TYPE_LEPUS_VALUE);
@@ -25094,7 +24826,7 @@ static LEPUSValue js_array_buffer_constructor3(
     goto fail;
   }
   abuf = static_cast<JSArrayBuffer *>(
-      lepus_malloc(ctx, sizeof(*abuf), ALLOC_TAG_JSArrayBuffer));
+      lepus_malloc_gc(ctx, sizeof(*abuf), ALLOC_TAG_JSArrayBuffer));
   if (!abuf) goto fail;
   func_scope.PushHandle(abuf, HANDLE_TYPE_DIR_HEAP_OBJ);
   abuf->byte_length = len;
@@ -25103,10 +24835,12 @@ static LEPUSValue js_array_buffer_constructor3(
   if (alloc_flag) {
     /* the allocation must be done after the object creation */
     abuf->from_js_heap = true;
-    abuf->data = static_cast<uint8_t *>(
-        lepus_mallocz(ctx, max_int(len, 1), ALLOC_TAG_WITHOUT_PTR));
+    HeapObjStore(ctx, &abuf->data,
+                 static_cast<uint8_t *>(lepus_mallocz(ctx, max_int(len, 1),
+                                                      ALLOC_TAG_WITHOUT_PTR)));
     if (!abuf->data) goto fail;
   } else {
+    SetRunSlotHasFinalizer(ctx->rt, abuf);
     abuf->data = buf;
   }
   init_list_head(&abuf->array_list);
@@ -25115,7 +24849,7 @@ static LEPUSValue js_array_buffer_constructor3(
   abuf->opaque = opaque;
   abuf->free_func = free_func;
   if (alloc_flag && buf) memcpy(abuf->data, buf, len);
-  LEPUS_SetOpaque(obj, abuf);
+  LEPUS_SetHeapOpaque(ctx, obj, abuf);
   return obj;
 fail:
   return LEPUS_EXCEPTION;
@@ -26469,26 +26203,27 @@ static LEPUSValue js_typed_array_sort(LEPUSContext *ctx,
     elt_size = 1 << typed_array_size_log2(p->class_id);
     cmpfun = tsc.cmpfun;
     if (!LEPUS_IsUndefined(tsc.cmp)) {
+      HandleScope block_scope(ctx);
       uint32_t *array_idx;
       void *array_tmp;
       size_t i, j;
 
       /* XXX: a stable sort would use less memory */
-      array_idx = static_cast<uint32_t *>(
-          lepus_malloc(ctx, len * sizeof(array_idx[0]), ALLOC_TAG_WITHOUT_PTR));
+      array_idx = static_cast<uint32_t *>(lepus_malloc_gc(
+          ctx, len * sizeof(array_idx[0]), ALLOC_TAG_WITHOUT_PTR));
       if (!array_idx) return LEPUS_EXCEPTION;
-      func_scope.PushHandle(array_idx, HANDLE_TYPE_DIR_HEAP_OBJ);
+      block_scope.PushHandle(array_idx, HANDLE_TYPE_DIR_HEAP_OBJ);
       for (i = 0; i < len; i++) array_idx[i] = i;
       tsc.array_ptr = static_cast<uint8_t *>(array_ptr);
       tsc.elt_size = elt_size;
       rqsort(array_idx, len, sizeof(array_idx[0]), js_TA_cmp_generic, &tsc);
       if (tsc.exception) goto fail;
-      array_tmp = lepus_malloc(ctx, len * elt_size, ALLOC_TAG_WITHOUT_PTR);
+      array_tmp = lepus_malloc_gc(ctx, len * elt_size, ALLOC_TAG_WITHOUT_PTR);
       if (!array_tmp) {
       fail:
         return LEPUS_EXCEPTION;
       }
-      func_scope.PushHandle(array_tmp, HANDLE_TYPE_DIR_HEAP_OBJ);
+      block_scope.PushHandle(array_tmp, HANDLE_TYPE_DIR_HEAP_OBJ);
       memcpy(array_tmp, array_ptr, len * elt_size);
       switch (elt_size) {
         case 1:
@@ -26612,18 +26347,19 @@ static int typed_array_init(LEPUSContext *ctx, LEPUSValueConst obj,
   p = LEPUS_VALUE_GET_OBJ(obj);
   size_log2 = typed_array_size_log2(p->class_id);
   ta = static_cast<JSTypedArray *>(
-      lepus_malloc(ctx, sizeof(*ta), ALLOC_TAG_JSTypedArray));
+      lepus_malloc_gc(ctx, sizeof(*ta), ALLOC_TAG_JSTypedArray));
   if (!ta) {
     return -1;
   }
+  SetRunSlotHasFinalizer(ctx->rt, ta);
   pbuffer = LEPUS_VALUE_GET_OBJ(buffer);
   abuf = pbuffer->u.array_buffer;
-  ta->obj = p;
-  ta->buffer = pbuffer;
+  HeapObjStore(ctx, &ta->obj, p);
+  HeapObjStore(ctx, &ta->buffer, pbuffer);
   ta->offset = offset;
   ta->length = len << size_log2;
   list_add_tail(&ta->link, &abuf->array_list);
-  p->u.typed_array = ta;
+  HeapObjStore(ctx, &p->u.typed_array, ta);
   p->u.array.count = len;
   p->u.array.u.ptr = abuf->data + offset;
   return 0;
@@ -27041,6 +26777,7 @@ static LEPUSValue JS_StructuredClone(LEPUSContext *ctx, LEPUSValue src,
 
 #ifdef ENABLE_LEPUSNG
     case LEPUS_TAG_LEPUS_REF: {
+      HandleScope block_scope(ctx);
       LEPUSLepusRef *pref =
           reinterpret_cast<LEPUSLepusRef *>(LEPUS_VALUE_GET_PTR(src));
 
@@ -27048,9 +26785,9 @@ static LEPUSValue JS_StructuredClone(LEPUSContext *ctx, LEPUSValue src,
         return LEPUS_MKPTR(LEPUS_TAG_OBJECT, p);
       }
       LEPUSValue src_val = JSRef2Value(ctx, src);
-      func_scope.PushHandle(&src_val, HANDLE_TYPE_LEPUS_VALUE);
+      block_scope.PushHandle(&src_val, HANDLE_TYPE_LEPUS_VALUE);
       LEPUSValue ret = JS_StructuredClone(ctx, src_val, state);
-      func_scope.PushHandle(&ret, HANDLE_TYPE_LEPUS_VALUE);
+      block_scope.PushHandle(&ret, HANDLE_TYPE_LEPUS_VALUE);
       if (!LEPUS_IsException(ret)) {
         state.SetValue(reinterpret_cast<LEPUSObject *>(pref->p),
                        LEPUS_VALUE_GET_OBJ(ret));
@@ -27126,10 +26863,16 @@ static LEPUSValue JS_StructuredClone(LEPUSContext *ctx, LEPUSValue src,
           }
         } break;
         case JS_CLASS_REGEXP: {
-          ret_p->u.regexp.pattern = LEPUS_VALUE_GET_STRING(JS_StructuredClone(
-              ctx, LEPUS_MKPTR(LEPUS_TAG_STRING, p->u.regexp.pattern), state));
-          ret_p->u.regexp.bytecode = LEPUS_VALUE_GET_STRING(JS_StructuredClone(
-              ctx, LEPUS_MKPTR(LEPUS_TAG_STRING, p->u.regexp.bytecode), state));
+          HeapObjStore(
+              ctx, &ret_p->u.regexp.pattern,
+              LEPUS_VALUE_GET_STRING(JS_StructuredClone(
+                  ctx, LEPUS_MKPTR(LEPUS_TAG_STRING, p->u.regexp.pattern),
+                  state)));
+          HeapObjStore(
+              ctx, &ret_p->u.regexp.bytecode,
+              LEPUS_VALUE_GET_STRING(JS_StructuredClone(
+                  ctx, LEPUS_MKPTR(LEPUS_TAG_STRING, p->u.regexp.bytecode),
+                  state)));
         } break;
         case JS_CLASS_NUMBER:
         case JS_CLASS_STRING:
@@ -27147,7 +26890,7 @@ static LEPUSValue JS_StructuredClone(LEPUSContext *ctx, LEPUSValue src,
           s->is_handled = FALSE;
           for (int i = 0; i < 2; i++) init_list_head(&s->promise_reactions[i]);
           s->promise_result = LEPUS_UNDEFINED;
-          LEPUS_SetOpaque(ret, s);
+          LEPUS_SetHeapOpaque(ctx, ret, s);
           HandleScope block_scope(ctx);
           LEPUSValue args[2];
           block_scope.PushLEPUSValueArrayHandle(args, 2);
@@ -27171,13 +26914,16 @@ static LEPUSValue JS_StructuredClone(LEPUSContext *ctx, LEPUSValue src,
         case JS_CLASS_ARRAY_BUFFER: {
           auto *array_buffer = p->u.array_buffer;
           if (array_buffer && !array_buffer->detached) {
+            HandleScope block_scope(ctx);
             auto *abuf = reinterpret_cast<JSArrayBuffer *>(lepus_mallocz(
                 ctx, sizeof(JSArrayBuffer), ALLOC_TAG_JSArrayBuffer));
             if (!abuf) goto fail;
-            func_scope.PushHandle(abuf, HANDLE_TYPE_DIR_HEAP_OBJ);
+            SetRunSlotHasFinalizer(ctx->rt, abuf);
+            block_scope.PushHandle(abuf, HANDLE_TYPE_DIR_HEAP_OBJ);
             abuf->byte_length = array_buffer->byte_length;
-            abuf->data = reinterpret_cast<uint8_t *>(
-                lepus_malloc(ctx, abuf->byte_length, ALLOC_TAG_WITHOUT_PTR));
+            HeapObjStore(ctx, &abuf->data,
+                         reinterpret_cast<uint8_t *>(lepus_malloc_gc(
+                             ctx, abuf->byte_length, ALLOC_TAG_WITHOUT_PTR)));
             if (!abuf->data) {
               goto fail;
             }
@@ -27186,7 +26932,7 @@ static LEPUSValue JS_StructuredClone(LEPUSContext *ctx, LEPUSValue src,
             abuf->opaque = array_buffer->opaque;
             init_list_head(&abuf->array_list);
             memcpy(abuf->data, array_buffer->data, abuf->byte_length);
-            LEPUS_SetOpaque(ret, abuf);
+            LEPUS_SetHeapOpaque(ctx, ret, abuf);
           }
         } break;
         case JS_CLASS_UINT8C_ARRAY ... JS_CLASS_DATAVIEW: {
@@ -27197,8 +26943,9 @@ static LEPUSValue JS_StructuredClone(LEPUSContext *ctx, LEPUSValue src,
             auto *ta = reinterpret_cast<JSTypedArray *>(lepus_mallocz(
                 ctx, sizeof(JSTypedArray), ALLOC_TAG_JSTypedArray));
             if (!ta) goto fail;
+            SetRunSlotHasFinalizer(ctx->rt, ta);
             func_scope.PushHandle(ta, HANDLE_TYPE_DIR_HEAP_OBJ);
-            ta->obj = ret_p;
+            HeapObjStore(ctx, &ta->obj, ret_p);
             ta->offset = typearray->offset;
             ta->length = typearray->length;
             LEPUSValue new_buffer = JS_StructuredClone(
@@ -27208,11 +26955,11 @@ static LEPUSValue JS_StructuredClone(LEPUSContext *ctx, LEPUSValue src,
               goto fail;
             }
             auto *pbuffer = LEPUS_VALUE_GET_OBJ(new_buffer);
-            ta->buffer = pbuffer;
+            HeapObjStore(ctx, &ta->buffer, pbuffer);
             auto *abuf = pbuffer->u.array_buffer;
             list_add_tail(&ta->link, &(abuf->array_list));
 
-            ret_p->u.typed_array = ta;
+            HeapObjStore(ctx, &ret_p->u.typed_array, ta);
             if (class_id != JS_CLASS_DATAVIEW) {
               ret_p->u.array.count = p->u.array.count;
               ret_p->u.array.u.ptr = abuf->data + ta->offset;
@@ -27226,14 +26973,18 @@ static LEPUSValue JS_StructuredClone(LEPUSContext *ctx, LEPUSValue src,
           auto *ms = reinterpret_cast<JSMapState *>(
               lepus_mallocz(ctx, sizeof(JSMapState), ALLOC_TAG_JSMapState));
           if (!ms) goto fail;
+          if (map_state->is_weak) {
+            SetRunSlotHasFinalizer(ctx->rt, ms);
+          }
           init_list_head(&ms->records);
-          LEPUS_SetOpaque(ret, ms);
+          LEPUS_SetHeapOpaque(ctx, ret, ms);
           ms->is_weak = map_state->is_weak;
           ms->record_count = 0;
           ms->hash_size = 1;
-          ms->hash_table = static_cast<struct list_head *>(
-              lepus_malloc(ctx, sizeof(ms->hash_table[0]) * ms->hash_size,
-                           ALLOC_TAG_WITHOUT_PTR));
+          HeapObjStore(ctx, &ms->hash_table,
+                       static_cast<struct list_head *>(lepus_malloc_gc(
+                           ctx, sizeof(ms->hash_table[0]) * ms->hash_size,
+                           ALLOC_TAG_WITHOUT_PTR)));
           if (!ms->hash_table) goto fail;
           init_list_head(&ms->hash_table[0]);
           ms->record_count_threshold = 4;
@@ -27328,7 +27079,7 @@ LEPUSValue JS_NewObjectWithArgs_GC(LEPUSContext *ctx, int32_t size,
     func_scope.PushLEPUSAtom(atom);
     auto *prop = add_property_gc(ctx, p, atom, LEPUS_PROP_C_W_E);
     if (prop) {
-      prop->u.value = values[i];
+      HeapObjStore(ctx, &prop->u.value, values[i]);
     } else {
       return LEPUS_EXCEPTION;
     }
@@ -27345,12 +27096,13 @@ LEPUSValue JS_NewArrayWithArgs_GC(LEPUSContext *ctx, int32_t size,
   if (!JS_IsArray_GC(ctx, array)) goto failed;
   p = LEPUS_VALUE_GET_OBJ(array);
 
-  p->u.array.u.values = reinterpret_cast<LEPUSValue *>(
-      lepus_malloc(ctx, sizeof(LEPUSValue) * size, ALLOC_TAG_WITHOUT_PTR));
+  HeapObjStore(ctx, &p->u.array.u.values,
+               reinterpret_cast<LEPUSValue *>(lepus_malloc_gc(
+                   ctx, sizeof(LEPUSValue) * size, ALLOC_TAG_JSValueArray)));
   if (p->u.array.u.values == nullptr) goto failed;
 
   for (int32_t i = 0; i < size; ++i) {
-    p->u.array.u.values[i] = values[i];
+    HeapObjStore(ctx, &p->u.array.u.values[i], values[i]);
   }
   p->u.array.count = size;
   p->u.array.u1.size = size;
@@ -27402,17 +27154,13 @@ LEPUSValue prim_js_op_eval_gc(LEPUSContext *ctx, int scope_idx,
   return ret_val;
 }
 
-void prim_WriteBarrierNoStore(LEPUSValue value, LEPUSContext *ctx) {
-  // GC_TODO
-}
-
 void prim_HeapObjStoreLEPUSValue(void *fieldAddr, LEPUSValue value) {
-  *reinterpret_cast<LEPUSValue *>(fieldAddr) = value;
+  HeapObjStoreNoCtx(fieldAddr, value);
 }
 
 void prim_HeapObjStorePtr(void *dstObj, address_t offset, void *value) {
   void *fieldAddr = (void *)((address_t)dstObj + offset);
-  *reinterpret_cast<address_t *>(fieldAddr) = (address_t)value;
+  HeapObjStoreNoCtx(fieldAddr, value);
 }
 
 void prim_close_var_refs_gc(LEPUSContext *ctx, LEPUSStackFrame *sf) {
@@ -27420,10 +27168,12 @@ void prim_close_var_refs_gc(LEPUSContext *ctx, LEPUSStackFrame *sf) {
   JSVarRef *var_ref;
   list_for_each(el, &sf->var_ref_list) {
     var_ref = list_entry(el, JSVarRef, link);
-    var_ref->is_detached = 1;
-    var_ref->value = *var_ref->pvalue;
+    var_ref->from = 0xc;
+    HeapObjStore(ctx, &var_ref->value, *var_ref->pvalue);
     var_ref->pvalue = &var_ref->value;
+    Release_Store8(&var_ref->is_detached, 1);
   }
+  if (ctx->con_mark_state) add_var_ref_pvalue(ctx->rt, sf);
   return;
 }
 
@@ -28462,48 +28212,13 @@ void FreeNapiScope_GC(LEPUSContext *ctx) {
   }
 }
 
-void JS_VisitLEPUSValue_GC(LEPUSRuntime *rt, LEPUSValue *val, int local_idx) {
-  rt->gc->GetVisitor()->VisitRootLEPUSValue(val, local_idx);
+void *JS_VisitLEPUSValue_GC(LEPUSRuntime *rt, LEPUSValue *val) {
+  return rt->collector_->GetVisitor()->VisitRootLEPUSValue(*val);
 }
 
-void LEPUS_TrigGC(LEPUSRuntime *rt) {
-  // rt->malloc_state.allocate_state.open_madvise = true;
-  rt->gc->CollectGarbage();
-  // rt->malloc_state.allocate_state.open_madvise = false;
-}
-
-void AddCurNode(LEPUSRuntime *rt, void *node, int type) {
-#ifdef ENABLE_GC_DEBUG_TOOLS
-  add_cur_node(rt, node, type);
-#endif
-}
-
-void DeleteCurNode(LEPUSRuntime *rt, void *node, int type) {
-#ifdef ENABLE_GC_DEBUG_TOOLS
-  delete_cur_node(rt, node, type);
-#endif
-}
-
-bool CheckValidNode(LEPUSRuntime *rt, void *node, int type) {
-#ifdef ENABLE_GC_DEBUG_TOOLS
-  return (get_cur_node_cnt(rt, node, type) != 0);
-#endif
-  return true;
-}
-
-__attribute__((unused)) bool CheckValidPtr_GC(void *runtime, void *ptr) {
-#ifdef ENABLE_GC_DEBUG_TOOLS
-  return (get_cur_cnt(runtime, ptr) != 0);
-#else
-  return true;
-#endif
-}
+void LEPUS_TrigGC(LEPUSRuntime *rt) { JS_RunGC_GC(rt); }
 
 void DisposeGlobal_GC(LEPUSRuntime *runtime, LEPUSValue *global_handle) {
-#ifdef ENABLE_GC_DEBUG_TOOLS
-  DCHECK(CheckValidNode(runtime, reinterpret_cast<void *>(global_handle), 1));
-  DeleteCurNode(runtime, reinterpret_cast<void *>(global_handle), 1);
-#endif
   runtime->global_handles_->Destroy(global_handle);
 }
 
@@ -28525,518 +28240,208 @@ void SetWeakState_GC(LEPUSRuntime *runtime, LEPUSValue *global_handle) {
   runtime->global_handles_->SetWeakState(global_handle);
 }
 
-bool gc_info_enabled() {
-#ifdef ENABLE_COMPATIBLE_MM
-  return GC_INFO_ENABLE & settingsFlag;
-#else
-  return false;
-#endif
+void prim_WriteBarrierNoStore(LEPUSValue value, LEPUSContext *ctx) {
+  if (UNLIKELY(ctx->con_mark_state)) {
+    CombinedWriteBarrier((address_t)Visitor::StaticVisitRootLEPUSValue(value));
+  }
 }
-
-bool lepusng_stragety_enabled() {
-#ifdef ENABLE_COMPATIBLE_MM
-  return ENABLE_LEPUSNG_STRAGETY & settingsFlag;
-#else
-  return false;
-#endif
-}
-
 /* trace gc end */
 
-void GarbageCollector::CollectGarbage(size_t size, bool gc_state) noexcept {
-  TRACE_EVENT("RunGC");
-  rt_->gc_cnt++;
-#ifdef ENABLE_FORCE_GC
-  if (rt_->gc_cnt % 1000 == 0) {
-#if defined(ANDROID) || defined(__ANDROID__)
-    __android_log_print(ANDROID_LOG_ERROR, "PRIMJS_GC",
-                        "----------------> trace_gc_cnt: %zu, rt: %p\n",
-                        rt_->gc_cnt, rt_);
-#else
-    std::cout << "----------------> trace_gc_cnt: " << rt_->gc_cnt
-              << " rt: " << rt_ << std::endl;
-#endif
-  }
-#endif
-  if (forbid_gc_ > 0) {
-    size_t expand_size = size * 1.5;
-    if (expand_size < 5 * MB) {
-      expand_size = 5 * MB;
-    }
-    rt_->malloc_state.allocate_state.footprint_limit += expand_size;
-    return;
-  }
-  if (rt_->workerThreadPool == nullptr) {
-    rt_->gc->Init(rt_);
-    rt_->workerThreadPool = new ByteThreadPool("gc", CREATE_THREAD_NUM, -1);
-    rt_->malloc_state.allocate_state.pool =
-        static_cast<void *>(rt_->workerThreadPool);
-  }
-  forbid_gc_++;
-  rt_->mf.lepus_malloc = js_def_allocate_gc;
-  rt_->mf.lepus_realloc = js_def_reallocate_gc;
-
-  size_t heapsize_before = rt_->malloc_state.allocate_state.footprint;
-
-  int64_t gc_begin = get_daytime();
-  // 1. mark phase
-  MarkLiveObjects();
-#ifdef ENABLE_TRACING_GC_LOG
-  int64_t mark_end = get_daytime();
-#endif
-  // 2. sweep phase
-  SweepDeadObjects();
-#ifdef ENABLE_TRACING_GC_LOG
-  PrintGCLog(gc_begin, mark_end);
-#endif  // ENABLE_TRACING_GC_LOG
-  UpdateFootprintLimit(size);
-
-  rt_->mf.lepus_malloc = js_def_allocate;
-  rt_->mf.lepus_realloc = js_def_reallocate;
-#ifndef ENABLE_FORCE_GC
-  if (rt_->mem_for_oom == nullptr) {
-    rt_->malloc_state.allocate_state.footprint_limit += 64 * KB;
-    rt_->mem_for_oom = lepus_malloc_rt(rt_, 16 * KB, ALLOC_TAG_WITHOUT_PTR);
-  }
-#endif
-  forbid_gc_--;
-  int64_t gc_end = get_daytime();
-  AddGCDuration(gc_end - gc_begin);
-  if (gc_info_enabled() && !gc_state) {
-    UpdateGCInfo(heapsize_before, gc_end - gc_begin);
-  }
-}
-
-void GarbageCollector::UpdateGCInfo(size_t heapsize_before, int64_t duration) {
-  if (rt_->gc_cnt % UPDATE_GC_INFO_TIMES == 0) {
-    gc_info << "{\n"
-            << "  \"gc_info\": [\n";
-  }
-  pthread_mutex_lock(&runtime_mutex);
-  std::unordered_set<LEPUSRuntime *> *g_rt_set = js_get_rt_set();
-  size_t rt_num = g_rt_set->size();
-  size_t total_mem = 0;
-  for (auto it : *g_rt_set) {
-    total_mem += it->malloc_state.allocate_state.footprint;
-  }
-  pthread_mutex_unlock(&runtime_mutex);
-  gc_info << "    {\n"
-          << "      \"cur_cnt\": " << rt_->gc_cnt << ",\n"
-          << "      \"cur_duration\": " << duration / MS << ",\n"
-          << "      \"heapsize_before\": " << heapsize_before / KB << ",\n"
-          << "      \"heapsize_after\": "
-          << rt_->malloc_state.allocate_state.footprint / KB << ",\n"
-          << "      \"num_of_rt\": " << rt_num << ",\n"
-          << "      \"survival_time\": "
-          << (get_daytime() - rt_->init_time) / MS << ",\n"
-          << "      \"timestamp\": " << get_daytime() << ",\n"
-          << "      \"rt_ptr\": \"" << rt_ << "\",\n"
-          << "      \"total_mem\": " << total_mem / KB << ",\n";
-  if (rt_->rt_info) {
-    gc_info << "      \"rt_info\": \"" << rt_->rt_info << "\"\n";
-  }
-  if ((rt_->gc_cnt + 1) % UPDATE_GC_INFO_TIMES == 0) {
-    gc_info << "    }\n"
-            << "  ]\n"
-            << "}\n";
-    info_size++;
-    LEPUSContext *ctx = nullptr;
-    struct list_head *el, *el1;
-    list_for_each_safe(el, el1, &rt_->context_list) {
-      ctx = list_entry(el, LEPUSContext, link);
-    }
-    std::string gc_info_str = gc_info.str();
-    GCObserver *observer = static_cast<GCObserver *>(rt_->gc_observer);
-    if (observer) {
-      observer->OnGC(std::move(gc_info_str));
-    }
-    gc_info.str("");
-    info_size = 0;
-  } else {
-    gc_info << "    },\n";
-    info_size++;
-  }
-}
-
-void GarbageCollector::MarkLiveObjects() noexcept { visitor->ScanRoots(); }
-
-void GarbageCollector::SweepDeadObjects() noexcept {
-  sweeper->sweep_finalizer();
-  visitor->VisitObjectDuringGC();
-  sweeper->sweep_free();
-}
-
-void GarbageCollector::DoOnlyFinalizer() noexcept {
-  sweeper->traverse_chunk_for_finalizer(true);
-}
-
-#ifdef ENABLE_TRACING_GC_LOG
-void GarbageCollector::PrintGCLog(int64_t mark_begin,
-                                  int64_t mark_end) noexcept {
-  int64_t sweep_end = get_daytime();
-  int64_t internal_time = (mark_begin - last_gc_time) / 1000;
-  mstate s = &rt_->malloc_state.allocate_state;
-  double speed = (s->malloc_size_before_gc - s->malloc_size_after_gc) / 1024 /
-                 internal_time;
-  std::stringstream buf1;
-  const char *info = "";
-  if (rt_->rt_info != nullptr) {
-    info = rt_->rt_info;
-  }
-  buf1 << "<--------- gc_info, gc_cnt: " << rt_->gc_cnt << " rt_info: " << info
-       << " time: " << (mark_begin - gc_begin_time) / 1000
-       << " ms --------->\nduration: " << (sweep_end - mark_begin) / 1000
-       << " ms, mark: " << (mark_end - mark_begin) / 1000
-       << " ms, sweep: " << (sweep_end - mark_end) / 1000 << " ms\n"
-       << "sweep-finalizer: " << s->finalizer_time
-       << " ms;\nsweep-free: " << s->free_time
-       << " ms; sweep-free-set_bit: " << s->free_set_bit_time
-       << " ms, sweep-free-gene_freelist: " << s->free_gene_freelist_time
-       << " ms, sweep-free-mmap_chunk: " << s->free_mmap_chunk_time
-       << " ms;\nsweep-release: " << s->release_time
-       << "ms, release_seg_num: " << s->release_seg_num
-       << ";\nmalloc_size_before: " << s->malloc_size_before_gc / 1024 << " KB "
-       << "malloc_size_after: " << s->malloc_size_after_gc / 1024 << " KB "
-       << "malloc_speed: " << speed << " KB/ms"
-       << "; footprint_before: " << s->footprint_before_gc / 1024 << " KB "
-       << "footprint_after: " << s->footprint / 1024 << " KB;\n"
-       << "footprint_limit before: " << s->footprint_limit / 1024 << " KB;"
-       << std::endl;
-  last_gc_time = sweep_end;
-#if defined(ANDROID) || defined(__ANDROID__)
-  __android_log_print(ANDROID_LOG_ERROR, "PRIMJS_GC", " %s",
-                      buf1.str().c_str());
-#else
-  std::cout << buf1.str().c_str() << "\n";
-#endif
-}
-#endif
-
-void GarbageCollector::SetMaxLimit(size_t limit) { max_limit = limit; }
-
-size_t GarbageCollector::GetMaxLimit() {
-  size_t cur_limit = (size_t)2048 * MB;
-  if (max_limit != 0 && max_limit < cur_limit) {
-    return max_limit;
-  } else {
-    return cur_limit;
-  }
-}
-
-void GarbageCollector::UpdateFootprintLimit(size_t size) noexcept {
-  if (rt_->is_lepusng && lepusng_stragety_enabled()) {
-    return UpdateNGFootprintLimit(size);
-  }
-  size_t limit = GetMaxLimit();
-  size_t new_limit;
-  mstate s = &rt_->malloc_state.allocate_state;
-#if defined(ANDROID) || defined(__ANDROID__) || defined(OS_IOS)
-  if (s->footprint > 100 * MB) {
-    size_t ss = s->footprint > s->cur_malloc_size * 3 ? s->footprint
-                                                      : s->cur_malloc_size * 3;
-    size_t expand_size = size * 1.5;
-    expand_size = (expand_size < 5 * MB) ? 5 * MB : expand_size;
-    ss = ss > s->footprint_limit + expand_size
-             ? ss
-             : s->footprint_limit + expand_size;
-    new_limit = ss >= limit ? limit : ss;
-  } else if (s->footprint > 50 * MB) {
-    new_limit = s->footprint_limit >= limit ? limit : s->footprint * 1.2;
-  } else if (s->footprint > 30 * MB) {
-    new_limit = s->footprint_limit >= limit ? limit : s->footprint * 1.5;
-  } else {
-    new_limit = s->footprint_limit >= limit ? limit : s->footprint * 2;
-  }
-#else
-  double times = (s->footprint_limit < 512 * MB) ? 4
-                 : (s->footprint_limit < limit)  ? 2
-                                                 : 1.5;
-  new_limit = s->footprint_limit * times;
-  new_limit = (new_limit > limit) ? limit : new_limit;
-#endif
-  s->footprint_limit = new_limit;
-  if (s->footprint > 100 * MB &&
-      (s->footprint_before_gc - s->footprint < (10 * MB)) && size > 100 * KB) {
-    size_t ss = s->footprint_limit + 32 * MB;
-    s->footprint_limit = ss >= limit ? limit : ss;
-  }
-}
-
-void GarbageCollector::UpdateNGFootprintLimit(size_t size) noexcept {
-  size_t limit = GetMaxLimit();
-  size_t new_limit;
-  mstate s = &rt_->malloc_state.allocate_state;
-#if defined(ANDROID) || defined(__ANDROID__) || defined(OS_IOS)
-  if (s->footprint > 100 * MB) {
-    size_t ss = s->footprint > s->cur_malloc_size * 2 ? s->footprint
-                                                      : s->cur_malloc_size * 2;
-    new_limit = ss >= limit ? limit : ss;
-  } else if (s->footprint > 50 * MB) {
-    size_t ss = s->footprint > s->cur_malloc_size * 3 ? s->footprint
-                                                      : s->cur_malloc_size * 3;
-    new_limit = ss >= limit ? limit : ss;
-  } else {
-    size_t ss = s->footprint > s->cur_malloc_size * 2 ? s->footprint
-                                                      : s->cur_malloc_size * 2;
-    new_limit = ss >= limit ? limit : ss;
-  }
-#else
-  double times = (s->footprint_limit < 512 * MB) ? 4
-                 : (s->footprint_limit < limit)  ? 2
-                                                 : 1.5;
-  new_limit = s->footprint_limit * times;
-  new_limit = (new_limit > limit) ? limit : new_limit;
-#endif
-  s->footprint_limit = new_limit;
-  if (s->footprint > 100 * MB &&
-      (s->footprint_before_gc - s->footprint < (10 * MB)) && size > 100 * KB) {
-    size_t ss = s->footprint_limit + 32 * MB;
-    s->footprint_limit = ss >= limit ? limit : ss;
-  }
-}
-
-void Visitor::ScanRoots() {
-  MlockScope scope(queue);
-
-  ByteThreadPool *workerThreadPool = rt_->workerThreadPool;
-  workerThreadPool->AddTask(
-      new ByteLambdaTask([this](size_t) { ScanStack(); }));
-  workerThreadPool->Start();
-  workerThreadPool->AddTask(
-      new ByteLambdaTask([this](size_t) { ScanHandles(); }));
-  // scan context
-  struct list_head *el, *el1;
-  list_for_each_safe(el, el1, &rt_->context_list) {
-    LEPUSContext *ctx = list_entry(el, LEPUSContext, link);
-    workerThreadPool->AddTask(
-        new ByteLambdaTask([this, ctx](size_t) { ScanContext(ctx); }));
-  }
-  workerThreadPool->AddTask(
-      new ByteLambdaTask([this](size_t) { ScanRuntime(); }));
-
-  bool addToExecute = (THREAD_NUM == CREATE_THREAD_NUM) ? false : true;
-  workerThreadPool->WaitFinish(addToExecute);
-}
-
-void Visitor::ScanStack() noexcept {
-  mstate m = &rt_->malloc_state.allocate_state;
-  int local_idx = atomic_acqurie_local_idx(m);
-  while (local_idx == -1) {
-#ifndef _WIN32
-    sched_yield();
-#endif
-    local_idx = atomic_acqurie_local_idx(m);
-  }
+void Visitor::ScanStack(GCWorkStack &workStack) noexcept {
   LEPUSStackFrame *sf = rt_->current_stack_frame;
-  struct list_head *el;
   while (sf) {
-    // arg_buf
-    if (sf->arg_buf) {
-      for (int i = 0; i < sf->arg_count; i++) {
-        VisitRootLEPUSValue(sf->arg_buf[i], local_idx);
-      }
-    }
-    // var_buf
-    if (sf->var_buf) {
-      LEPUSValue *cur_sp =
-          sf->cur_sp ? sf->cur_sp : (sf->sp ? sf->sp : nullptr);
-      if (cur_sp) {
-        for (LEPUSValue *sp = sf->var_buf; sp < cur_sp; sp++) {
-          VisitRootLEPUSValue(sp, local_idx);
-        }
-      }
-    }
-    VisitRootLEPUSValue(sf->cur_func, local_idx);
-    list_for_each(el, &sf->var_ref_list) {
-      JSVarRef *var_ref = list_entry(el, JSVarRef, link);
-      VisitRootHeapObj(var_ref, local_idx);
-    }
-
-    if (sf->var_refs) {
-      VisitRootHeapObj(sf->var_refs, local_idx);
-    }
+    PushObjLEPUSStackFrame(sf, workStack);
     sf = sf->prev_frame;
   }
-  atomic_release_local_idx(m, local_idx);
 }
 
-void Visitor::ScanRuntime() noexcept {
-  mstate m = &rt_->malloc_state.allocate_state;
-  int local_idx = atomic_acqurie_local_idx(m);
-  while (local_idx == -1) {
-#ifndef _WIN32
-    sched_yield();
-#endif
-    local_idx = atomic_acqurie_local_idx(m);
+void Visitor::ScanAsyncStack(GCWorkStack &workStack) noexcept {
+  for (auto it = rt_->async_obj_recoder->begin();
+       it != rt_->async_obj_recoder->end();) {
+    switch (get_alloc_tag(*it)) {
+      case ALLOC_TAG_JSGeneratorData: {
+        JSGeneratorData *s = static_cast<JSGeneratorData *>(*it);
+        if (s->state != JS_GENERATOR_STATE_COMPLETED) {
+          PushObjLEPUSStackFrame(&s->func_state.frame, workStack);
+        }
+        break;
+      }
+      case ALLOC_TAG_JSAsyncFunctionData: {
+        JSAsyncFunctionData *obj = static_cast<JSAsyncFunctionData *>(*it);
+        if (obj->is_active) {
+          PushObjLEPUSStackFrame(&obj->func_state.frame, workStack);
+        }
+        break;
+      }
+      case ALLOC_TAG_JSAsyncGeneratorData: {
+        JSAsyncGeneratorData *s = static_cast<JSAsyncGeneratorData *>(*it);
+        if (!s->is_completed) {
+          PushObjLEPUSStackFrame(&s->func_state.frame, workStack);
+        }
+        break;
+      }
+      default:
+        break;
+    }
+    it++;
   }
+}
 
-  if (rt_->mem_for_oom) {
-    VisitRootHeapObj(rt_->mem_for_oom, local_idx);
-  }
-
+void Visitor::ScanRuntime(GCWorkStack &workStack, bool isFinalRemark,
+                          bool markWeak) noexcept {
   struct list_head *el, *el1;
   int i;
   // job_list
   list_for_each_safe(el, el1, &rt_->job_list) {
     JSJobEntry *e = list_entry(el, JSJobEntry, link);
     for (i = 0; i < e->argc; i++) {
-      VisitRootLEPUSValue(e->argv[i], local_idx);
+      PushObjLEPUSValue(e->argv[i], workStack);
     }
-    VisitRootHeapObj(e, local_idx);
+    workStack.push_back((address_t)e);
   }
   // unhandled_rejections
   list_for_each_safe(el, el1, &rt_->unhandled_rejections) {
     JSUnhandledRejectionEntry *e =
         list_entry(el, JSUnhandledRejectionEntry, link);
-    VisitRootLEPUSValue(e->error, local_idx);
-    VisitRootHeapObj(e, local_idx);
+    PushObjLEPUSValue(e->error, workStack);
+    workStack.push_back((address_t)e);
   }
+  workStack.push_back((address_t)rt_->atom_array);
   // class_array
-  for (i = 0; i < rt_->class_count; i++) {
-    LEPUSClass *cl = &rt_->class_array[i];
-    if (cl->class_id != 0) {
-      PushObjAtom(cl->class_name, local_idx);
+  if (isFinalRemark) {
+    for (i = 0; i < rt_->class_count; i++) {
+      LEPUSClass *cl = &rt_->class_array[i];
+      if (cl->class_id != 0) {
+        void *ret = GetAtomObj(cl->class_name, workStack);
+        workStack.push_back((address_t)ret);
+      }
     }
-  }
-  if (rt_->class_array) VisitRootHeapObj(rt_->class_array, local_idx);
+    workStack.push_back((address_t)rt_->class_array);
 
-  // current_exception
-  VisitRootLEPUSValue(rt_->current_exception, local_idx);
+    // current_exception
+    PushObjLEPUSValue(rt_->current_exception, workStack);
 
-  // the atoms, will cause string leak
-  // mark non-const atom
-  for (i = 0; i < rt_->atom_size; i++) {
-    JSAtomStruct *p = rt_->atom_array[i];
-    if (!atom_is_free(p)) {
-      VisitRootHeapObj(p, local_idx);
-    }
+    workStack.push_back((address_t)rt_->atom_hash);
+    workStack.push_back((address_t)rt_->shape_hash);
+    // #ifdef ENABLE_TRACING_GC
+    workStack.push_back((address_t)rt_->boilerplateArg0);
+    workStack.push_back((address_t)rt_->boilerplateArg1);
+    workStack.push_back((address_t)rt_->boilerplateArg2);
+    workStack.push_back((address_t)rt_->boilerplateArg3);
+    // #endif
   }
-  if (rt_->atom_array) VisitRootHeapObj(rt_->atom_array, local_idx);
-  if (rt_->atom_hash) VisitRootHeapObj(rt_->atom_hash, local_idx);
-  if (rt_->shape_hash) VisitRootHeapObj(rt_->shape_hash, local_idx);
-#ifdef ENABLE_TRACING_GC
-  if (rt_->boilerplateArg0) VisitRootHeapObj(rt_->boilerplateArg0, local_idx);
-  if (rt_->boilerplateArg1) VisitRootHeapObj(rt_->boilerplateArg1, local_idx);
-  if (rt_->boilerplateArg2) VisitRootHeapObj(rt_->boilerplateArg2, local_idx);
-  if (rt_->boilerplateArg3) VisitRootHeapObj(rt_->boilerplateArg3, local_idx);
-#endif
   // global handles
-  if (rt_->global_handles_) rt_->global_handles_->IterateAllRoots(local_idx, 0);
+  if (rt_->global_handles_)
+    rt_->global_handles_->CollectAllRoots(workStack, 0, markWeak);
   if (rt_->qjsvaluevalue_allocator)
-    rt_->qjsvaluevalue_allocator->IterateAllRoots(local_idx);
-  atomic_release_local_idx(m, local_idx);
+    rt_->qjsvaluevalue_allocator->CollectAllRoots(workStack);
 }
 
-void Visitor::ScanHandles() noexcept {
-  mstate m = &rt_->malloc_state.allocate_state;
-  int local_idx = atomic_acqurie_local_idx(m);
-  while (local_idx == -1) {
-#ifndef _WIN32
-    sched_yield();
-#endif
-    local_idx = atomic_acqurie_local_idx(m);
+void Visitor::ScanShapeArray(GCWorkStack &workStack) noexcept {
+  if (rt_->shape_hash == nullptr) return;
+  for (int i = 0; i < rt_->shape_hash_size; i++) {
+    for (JSShape *sh = rt_->shape_hash[i]; sh != NULL;
+         sh = sh->shape_hash_next) {
+      address_t shape_addr = (address_t)get_alloc_from_shape(sh);
+      workStack.push_back(shape_addr);
+    }
   }
+}
+
+void Visitor::ScanHandles(GCWorkStack &workStack) noexcept {
   PtrHandles *handles = rt_->ptr_handles;
   int size, i;
   // handles
   size = handles->GetHeapObjIdx();
   HeapStruct *heap_struct_handles = handles->GetHandles();
   for (i = 0; i < size; i++) {
-    VisitRoot(heap_struct_handles[i].ptr, heap_struct_handles[i].type,
-              local_idx);
+    GetHandlePtr(heap_struct_handles[i].ptr, heap_struct_handles[i].type,
+                 workStack);
   }
-  atomic_release_local_idx(m, local_idx);
 }
 
-void Visitor::ScanContext(LEPUSContext *ctx) noexcept {
-  mstate m = &rt_->malloc_state.allocate_state;
-  int local_idx = atomic_acqurie_local_idx(m);
-  while (local_idx == -1) {
-#ifndef _WIN32
-    sched_yield();
-#endif
-    local_idx = atomic_acqurie_local_idx(m);
-  }
+void Visitor::ScanContext(GCWorkStack &workStack, bool isFinalRemark) noexcept {
   struct list_head *el, *el1;
-  // modules
-  list_for_each_safe(el, el1, &ctx->loaded_modules) {
-    LEPUSModuleDef *m = list_entry(el, LEPUSModuleDef, link);
-    VisitRootHeapObj(m, local_idx);
-  }
-
-  VisitRootLEPUSValue(ctx->global_obj, local_idx);
-  VisitRootLEPUSValue(ctx->global_var_obj, local_idx);
-
-  VisitRootLEPUSValue(ctx->throw_type_error, local_idx);
-  VisitRootLEPUSValue(ctx->eval_obj, local_idx);
-
-  PushObjLEPUSValue(ctx->array_proto_values, local_idx);
-  for (int i = 0; i < JS_NATIVE_ERROR_COUNT; i++) {
-    VisitRootLEPUSValue(ctx->native_error_proto[i], local_idx);
-  }
-  for (int i = 0; i < rt_->class_count; i++) {
-    VisitRootLEPUSValue(ctx->class_proto[i], local_idx);
-  }
-  VisitRootHeapObj(ctx->class_proto, local_idx);
-  VisitRootLEPUSValue(ctx->iterator_proto, local_idx);
-  VisitRootLEPUSValue(ctx->async_iterator_proto, local_idx);
-  VisitRootLEPUSValue(ctx->promise_ctor, local_idx);
-  VisitRootLEPUSValue(ctx->regexp_ctor, local_idx);
-  VisitRootLEPUSValue(ctx->function_ctor, local_idx);
-  VisitRootLEPUSValue(ctx->function_proto, local_idx);
-  if (ctx->array_shape) {
-    VisitRootHeapObj(get_alloc_from_shape(ctx->array_shape), local_idx);
-  }
-
-  for (size_t i = 0; i < kFunctionShapeSize; ++i) {
-    if (ctx->function_shape[i] == nullptr) continue;
-    VisitRootHeapObj(get_alloc_from_shape(ctx->function_shape[i]), local_idx);
-  }
-  // napi scope
-  NAPIHandleScope *cur_scope = ctx->napi_scope;
-  while (cur_scope) {
-    NAPIHandleScope::Handle *cur_handle = cur_scope->GetHandle();
-    while (cur_handle) {
-      VisitRootLEPUSValue(cur_handle->value, local_idx);
-      cur_handle = cur_handle->prev;
+  list_for_each_safe(el, el1, &rt_->context_list) {
+    LEPUSContext *ctx = list_entry(el, LEPUSContext, link);
+    struct list_head *el, *el1;
+    // modules
+    list_for_each_safe(el, el1, &ctx->loaded_modules) {
+      LEPUSModuleDef *m = list_entry(el, LEPUSModuleDef, link);
+      workStack.push_back((address_t)m);
     }
-    cur_scope = cur_scope->GetPrevScope();
-  }
+
+    // if (!isFinalRemark) {
+    PushObjLEPUSValue(ctx->global_obj, workStack);
+
+    PushObjLEPUSValue(ctx->global_var_obj, workStack);
+
+    PushObjLEPUSValue(ctx->throw_type_error, workStack);
+    PushObjLEPUSValue(ctx->eval_obj, workStack);
+
+    PushObjLEPUSValue(ctx->array_proto_values, workStack);
+    for (int i = 0; i < JS_NATIVE_ERROR_COUNT; i++) {
+      PushObjLEPUSValue(ctx->native_error_proto[i], workStack);
+    }
+    for (int i = 0; i < rt_->class_count; i++) {
+      PushObjLEPUSValue(ctx->class_proto[i], workStack);
+    }
+    workStack.push_back((address_t)ctx->class_proto);
+    PushObjLEPUSValue(ctx->iterator_proto, workStack);
+    PushObjLEPUSValue(ctx->async_iterator_proto, workStack);
+    PushObjLEPUSValue(ctx->promise_ctor, workStack);
+    PushObjLEPUSValue(ctx->regexp_ctor, workStack);
+    PushObjLEPUSValue(ctx->function_ctor, workStack);
+    PushObjLEPUSValue(ctx->function_proto, workStack);
+    if (ctx->array_shape)
+      workStack.push_back((address_t)get_alloc_from_shape(ctx->array_shape));
+    // }
+    // napi scope
+    NAPIHandleScope *cur_scope = ctx->napi_scope;
+    while (cur_scope) {
+      NAPIHandleScope::Handle *cur_handle = cur_scope->GetHandle();
+      while (cur_handle) {
+        PushObjLEPUSValue(cur_handle->value, workStack);
+        cur_handle = cur_handle->prev;
+      }
+      cur_scope = cur_scope->GetPrevScope();
+    }
 #ifdef ENABLE_QUICKJS_DEBUGGER
-  if (ctx->debugger_info) {
-    VisitRootHeapObj(ctx->debugger_info->source_code, local_idx);
-    VisitRootHeapObj(ctx->debugger_info, local_idx);
-  }
+    if (ctx->debugger_info) {
+      workStack.push_back((address_t)ctx->debugger_info->source_code);
+      workStack.push_back((address_t)ctx->debugger_info);
+      VisitLEPUSDebuggerInfo(ctx->debugger_info, workStack);
+    }
 #endif
-  if (ctx->lynx_target_sdk_version) {
-    VisitRootHeapObj(ctx->lynx_target_sdk_version, local_idx);
+    workStack.push_back((address_t)ctx->lynx_target_sdk_version);
+    workStack.push_back((address_t)ctx->fg_ctx);
   }
-  if (ctx->fg_ctx) VisitRootHeapObj(ctx->fg_ctx, local_idx);
-  atomic_release_local_idx(m, local_idx);
 }
 
-void Visitor::VisitRoot(void *ptr, HandleType type, int local_idx) noexcept {
+void Visitor::GetHandlePtr(void *ptr, HandleType type,
+                           GCWorkStack &workStack) noexcept {
   switch (type) {
     case HANDLE_TYPE_HEAP_OBJ:
-      VisitRootHeapObj(*(reinterpret_cast<void **>(ptr)), local_idx);
+      workStack.push_back((address_t)(*(reinterpret_cast<void **>(ptr))));
       break;
     case HANDLE_TYPE_DIR_HEAP_OBJ:
-      VisitRootHeapObj(ptr, local_idx);
+      workStack.push_back((address_t)ptr);
       break;
     case HANDLE_TYPE_LEPUS_VALUE:
-      VisitRootLEPUSValue(reinterpret_cast<LEPUSValue *>(ptr), local_idx);
+      PushObjLEPUSValue(*reinterpret_cast<LEPUSValue *>(ptr), workStack);
       break;
     case HANDLE_TYPE_LEPUS_TOKEN:
-      VisitRootJSToken(reinterpret_cast<JSToken *>(ptr), local_idx);
+      GetLEPUSTokenPtr(reinterpret_cast<JSToken *>(ptr), workStack);
       break;
     case HANDLE_TYPE_BC_READER_STATE:
-      VisitRootBCReaderState(reinterpret_cast<BCReaderState *>(ptr), local_idx);
+      GetBCReaderStatePtr(reinterpret_cast<BCReaderState *>(ptr), workStack);
       break;
     case HANDLE_TYPE_VALUE_BUFFER:
-      VisitRootValueBuffer(reinterpret_cast<ValueBuffer *>(ptr), local_idx);
+      GetValueBufferPtr(reinterpret_cast<ValueBuffer *>(ptr), workStack);
       break;
     case HANDLE_TYPE_CSTRING:
-      VisitRootCString(*(reinterpret_cast<char **>(ptr)), local_idx);
+      workStack.push_back(
+          (address_t)(GetCStringPtr(*(reinterpret_cast<char **>(ptr)))));
       break;
     case HANDLE_TYPE_UNDEFINED:
       break;
@@ -29045,120 +28450,87 @@ void Visitor::VisitRoot(void *ptr, HandleType type, int local_idx) noexcept {
   }
 }
 
-void Visitor::VisitRootHeapObj(void *ptr, int local_idx) noexcept {
-  if (!ptr) return;
-  DCHECK(check_valid_ptr(rt_, ptr));
-  if (!is_marked_multi(ptr)) {
-    set_mark_multi(ptr);
-    VisitEntry(ptr, local_idx);
-  }
-  void *current_ptr = nullptr;
-  while (!queue[local_idx]->IsEmpty()) {
-    current_ptr = queue[local_idx]->DeQueue();
-    if (current_ptr != nullptr && !is_marked_multi(current_ptr)) {
-      set_mark_multi(current_ptr);
-      VisitEntry(current_ptr, local_idx);
-    }
-
-    // if (queue[local_idx]->GetCount() >= 20000) {
-    //   Queue *q = queue[local_idx];
-    //   queue[local_idx] = new Queue(rt_);
-    //   rt_->workerThreadPool->AddTask(new ByteLambdaTask(
-    //       [this, q, ptr](size_t) { VisitRootHeapObjForTask(q, ptr); }));
-    // }
-  }
-}
-
-void Visitor::VisitRootHeapObjForTask(Queue *q, void *ptr) noexcept {
-  mstate m = &rt_->malloc_state.allocate_state;
-  int local_idx = atomic_acqurie_local_idx(m);
-  while (local_idx == -1) {
-#ifndef _WIN32
-    sched_yield();
-#endif
-    local_idx = atomic_acqurie_local_idx(m);
-  }
-  delete queue[local_idx];
-  queue[local_idx] = q;
-  void *current_ptr = nullptr;
-  while (!queue[local_idx]->IsEmpty()) {
-    current_ptr = queue[local_idx]->DeQueue();
-    if (current_ptr != nullptr && !is_marked_multi(current_ptr)) {
-      set_mark_multi(current_ptr);
-      VisitEntry(current_ptr, local_idx);
-    }
-
-    if (queue[local_idx]->GetCount() >= 40000) {
-      Queue *q = new Queue(rt_);
-      queue[local_idx]->Split(queue[local_idx]->GetCount() / 2, q);
-      rt_->workerThreadPool->AddTask(new ByteLambdaTask(
-          [this, q, ptr](size_t) { VisitRootHeapObjForTask(q, ptr); }));
-    }
-  }
-  atomic_release_local_idx(m, local_idx);
-}
-
 void set_mark_func(LEPUSRuntime *rt, LEPUSValueConst val, uint64_t trace_tool) {
-  rt->gc->GetVisitor()->VisitRootLEPUSValue(val, (int)trace_tool);
+  rt->collector_->GetVisitor()->PushObjLEPUSValue(
+      val, *reinterpret_cast<GCWorkStack *>(trace_tool));
 }
 
-void Visitor::VisitRootLEPUSValue(LEPUSValue &val, int local_idx) noexcept {
+void *Visitor::VisitRootLEPUSValue(LEPUSValue val) noexcept {
   int64_t tag = LEPUS_VALUE_GET_TAG(val);
   void *ptr = LEPUS_VALUE_GET_PTR(val);
   switch (tag) {
     case LEPUS_TAG_STRING:
-      if (IsConstString(ptr)) break;
-      VisitRootHeapObj(ptr, local_idx);
-      break;
+      // if (IsConstString(ptr)) return nullptr;
+      return ptr;
     case LEPUS_TAG_SEPARABLE_STRING:
     case LEPUS_TAG_FUNCTION_BYTECODE:
     case LEPUS_TAG_LEPUS_REF:
     case LEPUS_TAG_SYMBOL:
     case LEPUS_TAG_BIG_INT:
     case LEPUS_TAG_OBJECT: {
-      VisitRootHeapObj(ptr, local_idx);
-      break;
+      return ptr;
     }
     case LEPUS_TAG_Atom: {
-      JSAtom atom = LEPUS_VALUE_GET_INT(val);
-      if (__JS_AtomIsTaggedInt(atom) || __JS_AtomIsConst(atom)) break;
-      VisitRootHeapObj(rt_->atom_array[atom], local_idx);
-      break;
+      LEPUSAtom atom = LEPUS_VALUE_GET_INT(val);
+      if (__JS_AtomIsTaggedInt(atom) || __JS_AtomIsConst(atom)) return nullptr;
+      return rt_->atom_array[atom];
     }
     default:
       // printf("__JS_FreeValue: unknown tag=%d\n", tag);
-      break;
+      return nullptr;
   }
 }
 
-void Visitor::VisitRootBCReaderState(BCReaderState *s, int local_idx) noexcept {
+// used in CombinedWriteBarrier, LEPUS_TAG_Atom only used during napi and will
+// be skipped
+void *Visitor::StaticVisitRootLEPUSValue(LEPUSValue val) noexcept {
+  int64_t tag = LEPUS_VALUE_GET_TAG(val);
+  void *ptr = LEPUS_VALUE_GET_PTR(val);
+  switch (tag) {
+    case LEPUS_TAG_STRING:
+      // if (IsConstString(ptr)) return nullptr;
+      return ptr;
+    case LEPUS_TAG_SEPARABLE_STRING:
+    case LEPUS_TAG_FUNCTION_BYTECODE:
+    case LEPUS_TAG_LEPUS_REF:
+    case LEPUS_TAG_SYMBOL:
+    case LEPUS_TAG_BIG_INT:
+    case LEPUS_TAG_OBJECT: {
+      return ptr;
+    }
+    default:
+      // printf("__JS_FreeValue: unknown tag=%d\n", tag);
+      return nullptr;
+  }
+}
+
+void Visitor::GetBCReaderStatePtr(BCReaderState *s,
+                                  GCWorkStack &workStack) noexcept {
   DCHECK(s != nullptr);
   if (s->idx_to_atom) {
     uint32_t atom_count = s->idx_to_atom_count;
     for (uint32_t i = 0; i < atom_count; i++) {
-      VisitJSAtom(s->idx_to_atom[i], local_idx);
+      void *tmp = GetAtomObj(s->idx_to_atom[i], workStack);
+      workStack.push_back((address_t)tmp);
     }
-    VisitRootHeapObj(s->idx_to_atom, local_idx);
+    workStack.push_back((address_t)s->idx_to_atom);
   }
 }
 
-void Visitor::VisitRootValueBuffer(ValueBuffer *b, int local_idx) noexcept {
+void Visitor::GetValueBufferPtr(ValueBuffer *b,
+                                GCWorkStack &workStack) noexcept {
   DCHECK(b != nullptr);
   for (int i = 0; i < b->len; i++) {
-    VisitRootLEPUSValue(b->arr[i], local_idx);
+    PushObjLEPUSValue(b->arr[i], workStack);
   }
   if (b->arr != b->def) {
-    VisitRootHeapObj(b->arr, local_idx);
+    workStack.push_back((address_t)b->arr);
   }
 }
 
-void Visitor::VisitJSAtom(JSAtom atom, int local_idx) noexcept {
-  if (__JS_AtomIsTaggedInt(atom) || __JS_AtomIsConst(atom)) return;
-  VisitRootHeapObj(rt_->atom_array[atom], local_idx);
-}
-
-// private push
-void Visitor::PushObjLEPUSValue(LEPUSValue &val, int local_idx) noexcept {
+void Visitor::PushObjLEPUSValue(LEPUSValue val,
+                                GCWorkStack &workStack) noexcept {
+  // todo, confirm omit const string is necessary?
   int64_t tag = LEPUS_VALUE_GET_TAG(val);
   switch (tag) {
     case LEPUS_TAG_STRING:
@@ -29166,16 +28538,16 @@ void Visitor::PushObjLEPUSValue(LEPUSValue &val, int local_idx) noexcept {
     case LEPUS_TAG_OBJECT:
     case LEPUS_TAG_FUNCTION_BYTECODE:
     case LEPUS_TAG_SYMBOL:
-    // trace_gc, todo
     case LEPUS_TAG_BIG_INT:
 #ifdef ENABLE_LEPUSNG
     case LEPUS_TAG_LEPUS_REF:
 #endif
-      queue[local_idx]->EnQueue(LEPUS_VALUE_GET_PTR(val));
+      workStack.push_back((address_t)LEPUS_VALUE_GET_PTR(val));
       break;
     case LEPUS_TAG_Atom: {
       JSAtom atom = LEPUS_VALUE_GET_INT(val);
-      queue[local_idx]->EnQueue(rt_->atom_array[atom]);
+      auto rt = workStack.GetRuntime();
+      workStack.push_back((address_t)rt->atom_array[atom]);
       break;
     }
     default:
@@ -29183,248 +28555,168 @@ void Visitor::PushObjLEPUSValue(LEPUSValue &val, int local_idx) noexcept {
   }
 }
 
-void Visitor::PushObjAtom(JSAtom atom, int local_idx) noexcept {
-  if (__JS_AtomIsTaggedInt(atom) || __JS_AtomIsConst(atom)) return;
-  assert(atom < rt_->atom_size);
-  JSAtomStruct *p = rt_->atom_array[atom];
-  assert(!atom_is_free(p));
-  queue[local_idx]->EnQueue(static_cast<void *>(p));
+void *Visitor::GetAtomObj(LEPUSAtom atom, GCWorkStack &workStack) noexcept {
+  auto rt = workStack.GetRuntime();
+  if (__JS_AtomIsTaggedInt(atom) || __JS_AtomIsConst(atom)) return nullptr;
+  // this check can skip the relocating bytecode
+  if (atom >= rt->atom_size) {
+    return nullptr;
+  }
+  JSAtomStruct *p = rt->atom_array[atom];
+  if (atom_is_free(p)) {
+    return nullptr;
+  }
+  return p;
 }
 
-void Visitor::PushObjJSAsyncFunctionState(JSAsyncFunctionState *s,
-                                          int local_idx) noexcept {
+void Visitor::PushObjLEPUSAsyncFunctionState(JSAsyncFunctionState *s,
+                                             GCWorkStack &workStack) noexcept {
   // async_func_free
-  PushObjJStackFrame(&s->frame, local_idx);
-  PushObjLEPUSValue(s->this_val, local_idx);
+  auto on_stack = Acquire_Load8(&s->on_stack);
+  if (!on_stack) {
+    PushObjLEPUSStackFrame(&s->frame, workStack);
+  }
+  auto arg_buf = s->frame.arg_buf;
+  if (arg_buf) {
+    workStack.push_back((address_t)arg_buf);
+  }
+  PushObjLEPUSValue(s->this_val, workStack);
 }
 
-void Visitor::PushObjJStackFrame(LEPUSStackFrame *sf, int local_idx) noexcept {
+void Visitor::PushObjLEPUSStackFrame(LEPUSStackFrame *sf,
+                                     GCWorkStack &workStack) noexcept {
   // free: async_func_free()
-  JSVarRef *var_ref;
-  list_head *el;
-  if (sf->var_refs) {
-    VisitRootHeapObj(sf->var_refs, local_idx);
-  }
-
-  list_for_each(el, &sf->var_ref_list) {
-    var_ref = list_entry(el, JSVarRef, link);
-    VisitRootHeapObj(var_ref, local_idx);
-  }
-
   if (sf->arg_buf) {
-    for (LEPUSValue *sp = sf->arg_buf; sp < sf->cur_sp; sp++) {
-      PushObjLEPUSValue(sp, local_idx);
+    for (int i = 0; i < sf->arg_count; i++) {
+      PushObjLEPUSValue(sf->arg_buf[i], workStack);
     }
-    queue[local_idx]->EnQueue(sf->arg_buf);
   }
-  PushObjLEPUSValue(sf->cur_func, local_idx);
-}
-
-void Visitor::PushBytecodeAtoms(const uint8_t *bc_buf, int bc_len,
-                                int use_short_opcodes, int local_idx) noexcept {
-  int pos, len, op;
-  JSAtom atom;
-  const JSOpCode *oi;
-
-  pos = 0;
-  while ((pos + 1) < bc_len) {
-    op = bc_buf[pos];
-    if (use_short_opcodes)
-      oi = &short_opcode_info(op);
-    else
-      oi = &opcode_info[op];
-
-    len = oi->size;
-    switch (oi->fmt) {
-      case OP_FMT_atom:
-      case OP_FMT_atom_u8:
-      case OP_FMT_atom_u16:
-      case OP_FMT_atom_label_u8:
-      case OP_FMT_atom_label_u16:
-        atom = get_u32(bc_buf + pos + 1);
-        PushObjAtom(atom, local_idx);
-        break;
-      default:
-        break;
-    }
-    pos += len;
-  }
-}
-
-void Visitor::PushObjJSRegExp(JSRegExp *re, int local_idx) noexcept {
-  // js_regexp_finalizer
-  // class_id: JS_CLASS_REGEXP
-  // p->u.regexp
-  queue[local_idx]->EnQueue(re->pattern);
-  queue[local_idx]->EnQueue(re->bytecode);
-}
-
-void Visitor::PushObjFunc(LEPUSObject *obj, int local_idx) noexcept {
-  // js_bytecode_function_finalizer
-  LEPUSObject *p = obj->u.func.home_object;
-  if (p) queue[local_idx]->EnQueue(p);
-  LEPUSFunctionBytecode *b = obj->u.func.function_bytecode;
-  if (b) {
-    JSVarRef **var_refs = obj->u.func.var_refs;
-    if (var_refs) {
-      for (int i = 0; i < b->closure_var_count; i++) {
-        queue[local_idx]->EnQueue(var_refs[i]);
+  if (sf->var_buf) {
+    LEPUSValue *cur_sp = sf->cur_sp ? sf->cur_sp : (sf->sp ? sf->sp : nullptr);
+    if (cur_sp) {
+      for (LEPUSValue *sp = sf->var_buf; sp < cur_sp; sp++) {
+        PushObjLEPUSValue(*sp, workStack);
       }
-      queue[local_idx]->EnQueue(var_refs);
-    }
-    queue[local_idx]->EnQueue(b);
-  }
-}
-
-void Visitor::PushObjArray(LEPUSObject *obj, int local_idx) noexcept {
-  // js_array_finalizer
-  if (!obj->u.array.u.values) return;
-  for (int i = 0; i < obj->u.array.count; i++) {
-    PushObjLEPUSValue(obj->u.array.u.values[i], local_idx);
-  }
-  queue[local_idx]->EnQueue(obj->u.array.u.values);
-}
-
-void Visitor::PushObjRegExp(LEPUSObject *obj, int local_idx) noexcept {
-  // js_regexp_finalizer
-  JSRegExp *re = &obj->u.regexp;
-  queue[local_idx]->EnQueue(re->bytecode);
-  queue[local_idx]->EnQueue(re->pattern);
-}
-
-void Visitor::PushObjProperty(JSProperty *pr, int prop_flags,
-                              int local_idx) noexcept {
-  if (unlikely(prop_flags & LEPUS_PROP_TMASK)) {
-    if ((prop_flags & LEPUS_PROP_TMASK) == LEPUS_PROP_GETSET) {
-      if (pr->u.getset.getter) queue[local_idx]->EnQueue(pr->u.getset.getter);
-      if (pr->u.getset.setter) queue[local_idx]->EnQueue(pr->u.getset.setter);
-    } else if ((prop_flags & LEPUS_PROP_TMASK) == LEPUS_PROP_VARREF) {
-      queue[local_idx]->EnQueue(pr->u.var_ref);
-    } else if ((prop_flags & LEPUS_PROP_TMASK) == LEPUS_PROP_AUTOINIT) {
-      /* nothing to do */
-    }
-  } else {
-    PushObjLEPUSValue(pr->u.value, local_idx);
-  }
-}
-
-void Visitor::VisitJShape(void *ptr, int local_idx) noexcept {
-  int hash_size = get_hash_size(ptr);
-  JSShape *sh = get_shape_from_alloc(ptr, hash_size);
-  if (sh->proto != NULL) {
-    queue[local_idx]->EnQueue(sh->proto);
-  }
-  JSShapeProperty *pr = get_shape_prop(sh);
-  for (int i = 0; i < sh->prop_count; i++) {
-    PushObjAtom(pr->atom, local_idx);
-    pr++;
-  }
-}
-
-void Visitor::VisitJSFunctionBytecode(void *ptr, int local_idx) noexcept {
-  /*
-  free_function_bytecode
-  */
-  LEPUSFunctionBytecode *b = static_cast<LEPUSFunctionBytecode *>(ptr);
-  PushBytecodeAtoms(b->byte_code_buf, b->byte_code_len, TRUE, local_idx);
-  int i;
-  if (b->vardefs) {
-    for (i = 0; i < b->arg_count + b->var_count; i++) {
-      PushObjAtom(b->vardefs[i].var_name, local_idx);
     }
   }
-  if (b->cpool) {
-    for (i = 0; i < b->cpool_count; i++) {
-      PushObjLEPUSValue(b->cpool[i], local_idx);
-    }
-  }
-  for (i = 0; i < b->closure_var_count; i++) {
-    LEPUSClosureVar *cv = &b->closure_var[i];
-    PushObjAtom(cv->var_name, local_idx);
-  }
-  PushObjAtom(b->func_name, local_idx);
-  // debug
-  if (b->has_debug) {
-    PushObjAtom(b->debug.filename, local_idx);
-#ifdef ENABLE_QUICKJS_DEBUGGER
-    if (b->debug.func_name) {
-      queue[local_idx]->EnQueue(b->debug.func_name);
-    }
-#endif
-    queue[local_idx]->EnQueue(b->debug.pc2line_buf);
-    if (b->debug.caller_size) {
-      for (uint32_t i = 0, count = b->debug.caller_size; i < count; ++i) {
-        auto &slot = b->debug.caller_slots[i];
-        if (slot.is_str) {
-          queue[local_idx]->EnQueue(
-              reinterpret_cast<void *>(const_cast<char *>(slot.str)));
+  LEPUSObject *obj = LEPUS_VALUE_GET_OBJ(sf->cur_func);
+  if (obj && ((obj->class_id == JS_CLASS_BYTECODE_FUNCTION) ||
+              (obj->class_id == JS_CLASS_GENERATOR_FUNCTION) ||
+              (obj->class_id == JS_CLASS_ASYNC_FUNCTION) ||
+              (obj->class_id == JS_CLASS_ASYNC_GENERATOR_FUNCTION))) {
+    JSVarRef **var_refs = obj->u.func.var_refs;
+    if (var_refs != nullptr) {
+      int array_size = get_obj_size(var_refs) / sizeof(JSVarRef *);
+      for (int i = 0; i < array_size; i++) {
+        if (var_refs[i] != nullptr) {
+          if (Acquire_Load8(&var_refs[i]->is_detached)) {
+            PushObjLEPUSValue(var_refs[i]->value, workStack);
+          } else {
+            PushObjLEPUSValue(*var_refs[i]->pvalue, workStack);
+          }
         }
       }
-      queue[local_idx]->EnQueue(b->debug.caller_slots);
     }
   }
-  return;
+
+  PushObjLEPUSValue(sf->cur_func, workStack);
+  if (sf->var_refs) {
+    JSVarRef **var_refs = sf->var_refs;
+    workStack.push_back((address_t)var_refs);
+    int array_size = get_obj_size(var_refs) / sizeof(JSVarRef *);
+    for (int i = 0; i < array_size; i++) {
+      if (var_refs[i] != nullptr) {
+        if (Acquire_Load8(&var_refs[i]->is_detached)) {
+          PushObjLEPUSValue(var_refs[i]->value, workStack);
+        } else {
+          PushObjLEPUSValue(*var_refs[i]->pvalue, workStack);
+        }
+      }
+    }
+  }
+#ifdef ENABLE_QUICKJS_DEBUGGER
+  PushObjLEPUSValue(sf->pthis, workStack);
+#endif
 }
 
-void Visitor::VisitJSObject(void *ptr, int local_idx) noexcept {
+void Visitor::PushObjFunc(LEPUSObject *obj, GCWorkStack &workStack) noexcept {
+  // js_bytecode_function_finalizer
+  LEPUSObject *p = obj->u.func.home_object;
+  workStack.push_back((address_t)p);
+  LEPUSFunctionBytecode *b = obj->u.func.function_bytecode;
+  workStack.push_back((address_t)b);
+
+  workStack.push_back((address_t)obj->u.func.var_refs);
+}
+
+void Visitor::PushObjRegExp(LEPUSObject *obj, GCWorkStack &workStack) noexcept {
+  // js_regexp_finalizer
+  JSRegExp *re = &obj->u.regexp;
+  workStack.push_back((address_t)re->bytecode);
+  workStack.push_back((address_t)re->pattern);
+}
+
+void Visitor::PushObjProperty(JSProperty *pr, GCWorkStack &workStack) noexcept {
+  address_t sencodPtr = (address_t)pr->u.getset.setter;
+  address_t val = (address_t)pr->u.init.init_func;
+  if (val != (address_t)(JS_InstantiateFunctionListItem2) &&
+      val != (address_t)(js_module_ns_autoinit)) {
+    PushObjLEPUSValue((LEPUSValue){.as_int64 = (int64_t)val}, workStack);
+    PushObjLEPUSValue((LEPUSValue){.as_int64 = (int64_t)sencodPtr}, workStack);
+  }
+}
+
+void Visitor::VisitLEPUSObject(void *ptr, GCWorkStack &workStack) noexcept {
   // free_object
   LEPUSObject *obj = static_cast<LEPUSObject *>(ptr);
   JSShape *sh;
-  JSShapeProperty *pr;
-  // shape and prop
-  sh = obj->shape;
+  // shape maybe changed during con-mark, it is safe to visit this object if we
+  // use the mismatch shape and props.
+  // case1: shrink shape props, we validate the prop location to avoid
+  // out-of-bound. case2: expand shape props, the new props will be skipped, but
+  // captured by write-barrier.
+  sh = (JSShape *)Acquire_Load(&obj->shape);
   if (sh) {
-    queue[local_idx]->EnQueue(get_alloc_from_shape(sh));
-    if (obj->prop) {
-      pr = get_shape_prop(sh);
-      for (int i = 0; i < sh->prop_count; i++) {
-        PushObjProperty(&obj->prop[i], pr->flags, local_idx);
-        pr++;
+    if (LIKELY(sh->prop_hash_mask != 0)) {
+      workStack.push_back((address_t)get_alloc_from_shape(sh));
+    }
+    JSProperty *prop = obj->prop;
+    bool isInObject = IS_IN_OBJECT_PROP(obj, prop);
+    if (isInObject) {
+      auto prop_count = LEPUS_IN_OBJECT_PROPERTY_SIZE;
+      for (int i = 0; i < prop_count; i++) {
+        PushObjProperty(&prop[i], workStack);
       }
-      queue[local_idx]->EnQueue(obj->prop);
+    } else {
+      workStack.push_back((address_t)prop);
     }
   }
   // first_weak_ref
   if (unlikely(obj->first_weak_ref)) {
-    /* second pass to free the values to avoid modifying the weak
-     reference list while traversing it. */
-    WeakRefRecord *wr;
-    for (wr = obj->first_weak_ref; wr != nullptr; wr = wr->next_weak_ref) {
-      switch (wr->kind) {
-        case WEAK_REF_KIND_WEAK_MAP: {
-          queue[local_idx]->EnQueue(wr->u.map_record);
-          PushObjLEPUSValue(wr->u.map_record->value, local_idx);
-        } break;
-        case WEAK_REF_KIND_FINALIZATION_REGISTRY: {
-          FinalizationRegistryEntry *fin_node = wr->u.fin_node;
-          queue[local_idx]->EnQueue(fin_node);
-          PushObjLEPUSValue(fin_node->held_value, local_idx);
-          PushObjLEPUSValue(fin_node->token, local_idx);
-        } break;
-        default:
-          break;
-      }
-      queue[local_idx]->EnQueue(wr);
-    }
+    workStack.push_back((address_t)obj->first_weak_ref);
   }
   // finalizer
   switch (obj->class_id) {
     case JS_CLASS_ARRAY:
-    case JS_CLASS_ARGUMENTS:
-      PushObjArray(obj, local_idx);
+    case JS_CLASS_ARGUMENTS: {
+      auto values = obj->u.array.u.values;
+      if (values) {
+        workStack.push_back((address_t)values);
+      }
       break;
+    }
     case JS_CLASS_BOUND_FUNCTION:
-      queue[local_idx]->EnQueue(obj->u.bound_function);
+      workStack.push_back((address_t)obj->u.bound_function);
       break;
     case JS_CLASS_C_FUNCTION_DATA:
-      queue[local_idx]->EnQueue(obj->u.c_function_data_record);
+      workStack.push_back((address_t)obj->u.c_function_data_record);
       break;
     case JS_CLASS_FOR_IN_ITERATOR:
-      queue[local_idx]->EnQueue(obj->u.for_in_iterator);
+      workStack.push_back((address_t)obj->u.for_in_iterator);
       break;
     case JS_CLASS_ARRAY_BUFFER:
     case JS_CLASS_SHARED_ARRAY_BUFFER:
-      queue[local_idx]->EnQueue(obj->u.array_buffer);
+      workStack.push_back((address_t)obj->u.array_buffer);
       break;
     case JS_CLASS_UINT8C_ARRAY:
     case JS_CLASS_INT8_ARRAY:
@@ -29438,480 +28730,573 @@ void Visitor::VisitJSObject(void *ptr, int local_idx) noexcept {
     case JS_CLASS_FLOAT32_ARRAY:
     case JS_CLASS_FLOAT64_ARRAY:
     case JS_CLASS_DATAVIEW:
-      queue[local_idx]->EnQueue(obj->u.typed_array);
+      workStack.push_back((address_t)obj->u.typed_array);
       break;
     case JS_CLASS_MAP:
     case JS_CLASS_SET:
     case JS_CLASS_WEAKMAP:
     case JS_CLASS_WEAKSET:
       // js_map_finalizer
-      queue[local_idx]->EnQueue(obj->u.map_state);
+      workStack.push_back((address_t)obj->u.map_state);
       break;
     case JS_CLASS_MAP_ITERATOR:
     case JS_CLASS_SET_ITERATOR:
-      queue[local_idx]->EnQueue(obj->u.map_iterator_data);
+      workStack.push_back((address_t)obj->u.map_iterator_data);
       break;
     case JS_CLASS_ARRAY_ITERATOR:
     case JS_CLASS_STRING_ITERATOR:
-      queue[local_idx]->EnQueue(obj->u.array_iterator_data);
+      workStack.push_back((address_t)obj->u.array_iterator_data);
       break;
     case JS_CLASS_REGEXP_STRING_ITERATOR:
-      queue[local_idx]->EnQueue(obj->u.regexp_string_iterator_data);
+      workStack.push_back((address_t)obj->u.regexp_string_iterator_data);
       break;
     case JS_CLASS_GENERATOR:
-      queue[local_idx]->EnQueue(obj->u.generator_data);
+      workStack.push_back((address_t)obj->u.generator_data);
       break;
     case JS_CLASS_PROXY:
-      queue[local_idx]->EnQueue(obj->u.proxy_data);
+      workStack.push_back((address_t)obj->u.proxy_data);
       break;
     case JS_CLASS_PROMISE:
-      queue[local_idx]->EnQueue(obj->u.promise_data);
+      workStack.push_back((address_t)obj->u.promise_data);
       break;
     case JS_CLASS_PROMISE_RESOLVE_FUNCTION:
     case JS_CLASS_PROMISE_REJECT_FUNCTION:
-      queue[local_idx]->EnQueue(obj->u.promise_function_data);
+      workStack.push_back((address_t)obj->u.promise_function_data);
       break;
     case JS_CLASS_ASYNC_FUNCTION_RESOLVE:
     case JS_CLASS_ASYNC_FUNCTION_REJECT:
-      queue[local_idx]->EnQueue(obj->u.async_function_data);
+      workStack.push_back((address_t)obj->u.async_function_data);
       break;
     case JS_CLASS_ASYNC_FROM_SYNC_ITERATOR:
-      queue[local_idx]->EnQueue(obj->u.async_from_sync_iterator_data);
+      workStack.push_back((address_t)obj->u.async_from_sync_iterator_data);
       break;
     case JS_CLASS_ASYNC_GENERATOR:
-      queue[local_idx]->EnQueue(obj->u.async_generator_data);
+      workStack.push_back((address_t)obj->u.async_generator_data);
       break;
     case JS_CLASS_BYTECODE_FUNCTION:
     case JS_CLASS_GENERATOR_FUNCTION:
     case JS_CLASS_ASYNC_FUNCTION:
     case JS_CLASS_ASYNC_GENERATOR_FUNCTION:
-      PushObjFunc(obj, local_idx);
+      PushObjFunc(obj, workStack);
       break;
     case JS_CLASS_C_FUNCTION:
       break;
     case JS_CLASS_REGEXP:
-      PushObjRegExp(obj, local_idx);
+      PushObjRegExp(obj, workStack);
       break;
     case JS_CLASS_NUMBER:
     case JS_CLASS_STRING:
     case JS_CLASS_BOOLEAN:
     case JS_CLASS_SYMBOL:
     case JS_CLASS_DATE:
-      PushObjLEPUSValue(obj->u.object_data, local_idx);
+    case JS_CLASS_BIG_INT:
+      PushObjLEPUSValue(obj->u.object_data, workStack);
       break;
     case JS_CLASS_WeakRef:
       // js_weakref_finalizer
-      queue[local_idx]->EnQueue(obj->u.weak_ref_data);
+      workStack.push_back((address_t)obj->u.weak_ref_data);
       break;
     case JS_CLASS_FinalizationRegistry:
       // js_finalizationRegistry_finalizer
-      queue[local_idx]->EnQueue(obj->u.opaque);
-      break;
-    case JS_CLASS_BIG_INT:
-      PushObjLEPUSValue(obj->u.object_data, local_idx);
+      workStack.push_back((address_t)obj->u.opaque);
       break;
     default:
       break;
   }
   if (JS_OBJECT_IS_OUTER(obj)) {
-    LEPUSClassGCMark *gc_mark = rt_->class_array[obj->class_id].gc_mark;
+    auto rt = workStack.GetRuntime();
+    LEPUSClassGCMark *gc_mark = rt->class_array[obj->class_id].gc_mark;
     if (gc_mark) {
-      (*gc_mark)(rt_, LEPUS_MKPTR(LEPUS_TAG_OBJECT, obj), set_mark_func,
-                 local_idx);
+      (*gc_mark)(rt, LEPUS_MKPTR(LEPUS_TAG_OBJECT, obj), set_mark_func,
+                 reinterpret_cast<uint64_t>(&workStack));
     }
   }
 }
 
-void Visitor::VisitJSBoundFunction(void *ptr, int local_idx) noexcept {
+void Visitor::VisitJSBoundFunction(void *ptr, GCWorkStack &workStack) noexcept {
   // free: js_bound_function_finalizer
   // class_id: JS_CLASS_BOUND_FUNCTION
   // p->u.bound_function
   JSBoundFunction *bf = static_cast<JSBoundFunction *>(ptr);
-  PushObjLEPUSValue(bf->func_obj, local_idx);
-  PushObjLEPUSValue(bf->this_val, local_idx);
+  PushObjLEPUSValue(bf->func_obj, workStack);
+  PushObjLEPUSValue(bf->this_val, workStack);
+  auto size = get_obj_size(bf);
+  if (size != sizeof(JSBoundFunction) + bf->argc * sizeof(LEPUSValue)) {
+    *((void **)0xdead) = ptr;
+  }
   for (int i = 0; i < bf->argc; i++) {
-    PushObjLEPUSValue(bf->argv[i], local_idx);
+    PushObjLEPUSValue(bf->argv[i], workStack);
   }
 }
-void Visitor::VisitJSCFunctionDataRecord(void *ptr, int local_idx) noexcept {
+void Visitor::VisitJSCFunctionDataRecord(void *ptr,
+                                         GCWorkStack &workStack) noexcept {
   // JS_CLASS_C_FUNCTION_DATA
   // js_c_function_data_finalizer
   // u.c_function_data_record
   JSCFunctionDataRecord *s = static_cast<JSCFunctionDataRecord *>(ptr);
   for (int i = 0; i < s->data_len; i++) {
-    PushObjLEPUSValue(s->data[i], local_idx);
+    PushObjLEPUSValue(s->data[i], workStack);
   }
 }
 
-void Visitor::VisitJSForInIterator(void *ptr, int local_idx) noexcept {
+void Visitor::VisitJSForInIterator(void *ptr, GCWorkStack &workStack) noexcept {
   // free: js_for_in_iterator_finalizer
   // class_id: JS_CLASS_FOR_IN_ITERATOR
   // p->u.for_in_iterator
   JSForInIterator *it = static_cast<JSForInIterator *>(ptr);
-  PushObjLEPUSValue(it->obj, local_idx);
+  PushObjLEPUSValue(it->obj, workStack);
 }
 
-void Visitor::VisitJSArrayBuffer(void *ptr, int local_idx) noexcept {
+void Visitor::VisitJSArrayBuffer(void *ptr, GCWorkStack &workStack) noexcept {
   // JS_CLASS_ARRAY_BUFFER
   // js_array_buffer_finalizer
   // p->u.array_buffer
   JSArrayBuffer *abuf = static_cast<JSArrayBuffer *>(ptr);
-  if (abuf->from_js_heap) queue[local_idx]->EnQueue(abuf->data);
+  if (abuf->from_js_heap) workStack.push_back((address_t)abuf->data);
 }
 
-void Visitor::VisitJSTypedArray(void *ptr, int local_idx) noexcept {
+void Visitor::VisitJSTypedArray(void *ptr, GCWorkStack &workStack) noexcept {
   // JS_CLASS_DATAVIEW
   // js_typed_array_finalizer
   // u.array
   JSTypedArray *ta = static_cast<JSTypedArray *>(ptr);
-  queue[local_idx]->EnQueue(ta->buffer);
+  workStack.push_back((address_t)ta->buffer);
 }
 
-void Visitor::VisitJSMapState(void *ptr, int local_idx) noexcept {
+void Visitor::VisitJSMapRecord(void *ptr, GCWorkStack &workStack) noexcept {
+  JSMapRecord *mr = static_cast<JSMapRecord *>(ptr);
+  if (!mr->empty) {
+    auto s = mr->map;
+    if (!s->is_weak) PushObjLEPUSValue(mr->key, workStack);
+    PushObjLEPUSValue(mr->value, workStack);
+  }
+  auto el = mr->link.prev;
+  if (el != nullptr) {
+    mr = list_entry(el, JSMapRecord, link);
+    workStack.push_back((address_t)mr);
+  }
+}
+
+void Visitor::VisitJSMapState(void *ptr, GCWorkStack &workStack) noexcept {
   // JS_CLASS_MAP..JS_CLASS_WEAKSET
   // js_map_finalizer
   // u.map_state
   JSMapState *s = static_cast<JSMapState *>(ptr);
-  struct list_head *el, *el1;
-  JSMapRecord *mr;
-  list_for_each_safe(el, el1, &s->records) {
-    mr = list_entry(el, JSMapRecord, link);
-    if (!mr->empty) {
-      if (!s->is_weak) PushObjLEPUSValue(mr->key, local_idx);
-      PushObjLEPUSValue(mr->value, local_idx);
-    }
-    queue[local_idx]->EnQueue(mr);  // tag == 1
+  workStack.push_back((address_t)s->hash_table);
+  auto head = &s->records;
+  auto el = head->prev;
+  if (el && (el != head)) {
+    auto mr = list_entry(el, JSMapRecord, link);
+    workStack.push_back((address_t)mr);
   }
-  queue[local_idx]->EnQueue(s->hash_table);
 }
 
-void Visitor::VisitJSMapIteratorData(void *ptr, int local_idx) noexcept {
+void Visitor::VisitJSMapIteratorData(void *ptr,
+                                     GCWorkStack &workStack) noexcept {
   // JS_CLASS_MAP_ITERATOR JS_CLASS_SET_ITERATOR
   // js_map_iterator_finalizer
   // u.map_iterator_data
   JSMapIteratorData *it = static_cast<JSMapIteratorData *>(ptr);
-  if (it->cur_record) {
-    queue[local_idx]->EnQueue(it->cur_record);
-  }
-  PushObjLEPUSValue(it->obj, local_idx);
+  workStack.push_back((address_t)it->cur_record);
+  PushObjLEPUSValue(it->obj, workStack);
 }
 
-void Visitor::VisitJSArrayIteratorData(void *ptr, int local_idx) noexcept {
+void Visitor::VisitJSArrayIteratorData(void *ptr,
+                                       GCWorkStack &workStack) noexcept {
   // JS_CLASS_ARRAY_ITERATOR JS_CLASS_STRING_ITERATOR
   // js_array_iterator_finalizer
   // u.array_iterator_data
   JSArrayIteratorData *it = static_cast<JSArrayIteratorData *>(ptr);
-  PushObjLEPUSValue(it->obj, local_idx);
+  PushObjLEPUSValue(it->obj, workStack);
 }
 
 void Visitor::VisitJSRegExpStringIteratorData(void *ptr,
-                                              int local_idx) noexcept {
+                                              GCWorkStack &workStack) noexcept {
   // JS_CLASS_REGEXP_STRING_ITERATOR
   // js_regexp_string_iterator_finalizer
   // u.regexp_string_iterator_data
   JSRegExpStringIteratorData *it =
       static_cast<JSRegExpStringIteratorData *>(ptr);
-  PushObjLEPUSValue(it->iterating_regexp, local_idx);
-  PushObjLEPUSValue(it->iterated_string, local_idx);
+  PushObjLEPUSValue(it->iterating_regexp, workStack);
+  PushObjLEPUSValue(it->iterated_string, workStack);
 }
 
-void Visitor::VisitJSGeneratorData(void *ptr, int local_idx) noexcept {
+void Visitor::VisitJSGeneratorData(void *ptr, GCWorkStack &workStack) noexcept {
   // JS_CLASS_GENERATOR
   // js_generator_finalizer
   // u.generator_data
   JSGeneratorData *s = static_cast<JSGeneratorData *>(ptr);
   if (s->state == JS_GENERATOR_STATE_COMPLETED) return;
-  PushObjJSAsyncFunctionState(&s->func_state, local_idx);
+  PushObjLEPUSAsyncFunctionState(&s->func_state, workStack);
 }
 
-void Visitor::VisitJSProxyData(void *ptr, int local_idx) noexcept {
+void Visitor::VisitJSProxyData(void *ptr, GCWorkStack &workStack) noexcept {
   // JS_CLASS_PROXY
   // js_proxy_finalizer
   // p->u.proxy_data
   JSProxyData *s = static_cast<JSProxyData *>(ptr);
-  PushObjLEPUSValue(s->target, local_idx);
-  PushObjLEPUSValue(s->handler, local_idx);
-  PushObjLEPUSValue(s->proto, local_idx);
+  PushObjLEPUSValue(s->target, workStack);
+  PushObjLEPUSValue(s->handler, workStack);
+  PushObjLEPUSValue(s->proto, workStack);
 }
 
-void Visitor::VisitJSPromiseData(void *ptr, int local_idx) noexcept {
+void Visitor::VisitJSPromiseData(void *ptr, GCWorkStack &workStack) noexcept {
   // JS_CLASS_PROMISE
   // js_promise_finalizer
   // u.promise_data
   JSPromiseData *s = static_cast<JSPromiseData *>(ptr);
-  struct list_head *el, *el1;
   for (int i = 0; i < 2; i++) {
-    list_for_each_safe(el, el1, &s->promise_reactions[i]) {
-      JSPromiseReactionData *rd = list_entry(el, JSPromiseReactionData, link);
-      queue[local_idx]->EnQueue(rd);
-      // promise_reaction_data_free(rt, rd);
+    auto head = &s->promise_reactions[i];
+    auto el = head->prev;
+    if (el && (el != head)) {
+      auto rd = list_entry(el, JSPromiseReactionData, link);
+      workStack.push_back((address_t)rd);
     }
   }
-  PushObjLEPUSValue(s->promise_result, local_idx);
+  PushObjLEPUSValue(s->promise_result, workStack);
 }
 
-void Visitor::VisitJSPromiseReactionData(void *ptr, int local_idx) noexcept {
+void Visitor::VisitJSPromiseReactionData(void *ptr,
+                                         GCWorkStack &workStack) noexcept {
   // promise_reaction_data_free
   JSPromiseReactionData *rd = static_cast<JSPromiseReactionData *>(ptr);
-  PushObjLEPUSValue(rd->resolving_funcs[0], local_idx);
-  PushObjLEPUSValue(rd->resolving_funcs[1], local_idx);
-  PushObjLEPUSValue(rd->handler, local_idx);
+  PushObjLEPUSValue(rd->resolving_funcs[0], workStack);
+  PushObjLEPUSValue(rd->resolving_funcs[1], workStack);
+  PushObjLEPUSValue(rd->handler, workStack);
+  auto el = rd->link.prev;
+  if (el != nullptr) {
+    rd = list_entry(el, JSPromiseReactionData, link);
+    workStack.push_back((address_t)rd);
+  }
 }
 
-void Visitor::VisitJSPromiseFunctionData(void *ptr, int local_idx) noexcept {
+void Visitor::VisitJSAsyncGeneratorRequest(void *ptr,
+                                           GCWorkStack &workStack) noexcept {
+  JSAsyncGeneratorRequest *req = static_cast<JSAsyncGeneratorRequest *>(ptr);
+  PushObjLEPUSValue(req->result, workStack);
+  PushObjLEPUSValue(req->promise, workStack);
+  PushObjLEPUSValue(req->resolving_funcs[0], workStack);
+  PushObjLEPUSValue(req->resolving_funcs[1], workStack);
+  auto el = req->link.prev;
+  if (el != nullptr) {
+    req = list_entry(el, JSAsyncGeneratorRequest, link);
+    workStack.push_back((address_t)req);
+  }
+}
+
+void Visitor::VisitWeakRefRecord(void *ptr, GCWorkStack &workStack) noexcept {
+  WeakRefRecord *wr = static_cast<WeakRefRecord *>(ptr);
+  if (wr->kind != WEAK_REF_KIND_WEAK_REF) {
+    workStack.push_back((address_t)wr->u.ptr);
+  }
+  auto next_wr = wr->next_weak_ref;
+  if (next_wr != nullptr) {
+    workStack.push_back((address_t)next_wr);
+  }
+}
+
+void Visitor::VisitFinalizationRegistryEntry(void *ptr,
+                                             GCWorkStack &workStack) noexcept {
+  FinalizationRegistryEntry *fin_node =
+      static_cast<FinalizationRegistryEntry *>(ptr);
+  PushObjLEPUSValue(fin_node->held_value, workStack);
+  PushObjLEPUSValue(fin_node->token, workStack);
+  auto el = fin_node->link.prev;
+  if (el != nullptr) {
+    fin_node = list_entry(el, FinalizationRegistryEntry, link);
+    workStack.push_back((address_t)fin_node);
+  }
+}
+
+void Visitor::VisitJSPromiseFunctionData(void *ptr,
+                                         GCWorkStack &workStack) noexcept {
   // JS_CLASS_PROMISE_RESOLVE_FUNCTION
   // js_promise_resolve_function_finalizer
   // u.promise_function_data
   JSPromiseFunctionData *s = static_cast<JSPromiseFunctionData *>(ptr);
-  queue[local_idx]->EnQueue(s->presolved);
-  PushObjLEPUSValue(s->promise, local_idx);
+  workStack.push_back((address_t)s->presolved);
+  PushObjLEPUSValue(s->promise, workStack);
 }
 
-void Visitor::VisitJSAsyncFunctionData(void *ptr, int local_idx) noexcept {
+void Visitor::VisitJSAsyncFunctionData(void *ptr,
+                                       GCWorkStack &workStack) noexcept {
   // JS_CLASS_ASYNC_FUNCTION_REJECT
   // js_async_function_resolve_finalizer, asyn_function_free
   // u.async_function_data
   JSAsyncFunctionData *obj = static_cast<JSAsyncFunctionData *>(ptr);
   if (obj->is_active) {
-    PushObjJSAsyncFunctionState(&obj->func_state, local_idx);
+    PushObjLEPUSAsyncFunctionState(&obj->func_state, workStack);
   }
-  PushObjLEPUSValue(obj->resolving_funcs[0], local_idx);
-  PushObjLEPUSValue(obj->resolving_funcs[1], local_idx);
+  PushObjLEPUSValue(obj->resolving_funcs[0], workStack);
+  PushObjLEPUSValue(obj->resolving_funcs[1], workStack);
 }
 
-void Visitor::VisitJSAsyncFromSyncIteratorData(void *ptr,
-                                               int local_idx) noexcept {
+void Visitor::VisitJSAsyncFromSyncIteratorData(
+    void *ptr, GCWorkStack &workStack) noexcept {
   // JS_CLASS_ASYNC_FROM_SYNC_ITERATOR
   // js_async_from_sync_iterator_finalizer
   // async_from_sync_iterator_data
   JSAsyncFromSyncIteratorData *s =
       static_cast<JSAsyncFromSyncIteratorData *>(ptr);
-  PushObjLEPUSValue(s->sync_iter, local_idx);
-  PushObjLEPUSValue(s->next_method, local_idx);
+  PushObjLEPUSValue(s->sync_iter, workStack);
+  PushObjLEPUSValue(s->next_method, workStack);
 }
 
-void Visitor::VisitJSAsyncGeneratorData(void *ptr, int local_idx) noexcept {
+void Visitor::VisitJSAsyncGeneratorData(void *ptr,
+                                        GCWorkStack &workStack) noexcept {
   // JS_CLASS_ASYNC_GENERATOR
   // js_async_generator_finalizer, js_async_generator_free
   // u.async_generator_data
   JSAsyncGeneratorData *s = static_cast<JSAsyncGeneratorData *>(ptr);
-  struct list_head *el, *el1;
-  JSAsyncGeneratorRequest *req;
 
-  list_for_each_safe(el, el1, &s->queue) {
-    req = list_entry(el, JSAsyncGeneratorRequest, link);
-    PushObjLEPUSValue(req->result, local_idx);
-    PushObjLEPUSValue(req->promise, local_idx);
-    PushObjLEPUSValue(req->resolving_funcs[0], local_idx);
-    PushObjLEPUSValue(req->resolving_funcs[1], local_idx);
-    queue[local_idx]->EnQueue(req);
+  // init_list_head have no-atomic logic, here may encounter uninitialized list
+  auto head = &s->queue;
+  auto el = head->prev;
+  if (el && (el != head)) {
+    auto req = list_entry(el, JSAsyncGeneratorRequest, link);
+    workStack.push_back((address_t)req);
   }
-  if (s->state != JS_ASYNC_GENERATOR_STATE_COMPLETED &&
-      s->state != JS_ASYNC_GENERATOR_STATE_AWAITING_RETURN) {
-    PushObjJSAsyncFunctionState(&s->func_state, local_idx);
+
+  if (!s->is_completed) {
+    PushObjLEPUSAsyncFunctionState(&s->func_state, workStack);
   }
 }
 
+void Visitor::VisitLEPUSScriptSource(void *ptr,
+                                     GCWorkStack &workStack) noexcept {
 #ifdef ENABLE_QUICKJS_DEBUGGER
-void Visitor::VisitJSScriptSource(void *ptr, int local_idx) noexcept {
   // DebuggerFreeScript
   LEPUSScriptSource *script = static_cast<LEPUSScriptSource *>(ptr);
-  queue[local_idx]->EnQueue(script->url);
-  queue[local_idx]->EnQueue(script->source);
-  queue[local_idx]->EnQueue(script->hash);
-  if (script->source_map_url) {
-    queue[local_idx]->EnQueue(script->source_map_url);
-  }
-}
+  workStack.push_back((address_t)script->url);
+  workStack.push_back((address_t)script->source);
+  workStack.push_back((address_t)script->hash);
+  workStack.push_back((address_t)script->source_map_url);
 #endif
-
-void Visitor::VisitJSPropertyEnum(void *ptr, int local_idx) noexcept {
-  // js_free_prop_enum();
-  int len = get_heap_obj_len(ptr);
-  LEPUSPropertyEnum *tab = static_cast<LEPUSPropertyEnum *>(ptr);
-  for (int i = 0; i < len; i++) {
-    PushObjAtom(tab[i].atom, local_idx);
-  }
 }
 
-void Visitor::VisitJSModuleDef(void *ptr, int local_idx) noexcept {
+void Visitor::VisitLEPUSModuleDef(void *ptr, GCWorkStack &workStack) noexcept {
   // LEPUS_TAG_MODULE
   LEPUSModuleDef *m = static_cast<LEPUSModuleDef *>(ptr);
-  PushObjAtom(m->module_name, local_idx);
+  PushObjAtom(m->module_name, workStack);
 
-  int i;
-  for (i = 0; i < m->req_module_entries_count; i++) {
-    JSReqModuleEntry *rme = &m->req_module_entries[i];
-    PushObjAtom(rme->module_name, local_idx);
-  }
-  queue[local_idx]->EnQueue(m->req_module_entries);  // visit_nothing
-
-  for (i = 0; i < m->export_entries_count; i++) {
-    JSExportEntry *me = &m->export_entries[i];
-    if (me->export_type == JS_EXPORT_TYPE_LOCAL) {
-      JSVarRef *var_ref = me->u.local.var_ref;
-      if (var_ref) {
-        queue[local_idx]->EnQueue(var_ref);  // alloc_tag_LEPUSVarRef
-      }
-    }
-    PushObjAtom(me->export_name, local_idx);
-    PushObjAtom(me->local_name, local_idx);
-  }
-  queue[local_idx]->EnQueue(m->export_entries);
-
-  queue[local_idx]->EnQueue(m->star_export_entries);
-
-  for (i = 0; i < m->import_entries_count; i++) {
-    JSImportEntry *mi = &m->import_entries[i];
-    PushObjAtom(mi->import_name, local_idx);
-  }
-  queue[local_idx]->EnQueue(m->import_entries);
-  PushObjLEPUSValue(m->module_ns, local_idx);
-  PushObjLEPUSValue(m->func_obj, local_idx);
-  PushObjLEPUSValue(m->eval_exception, local_idx);
+  workStack.push_back((address_t)(m->req_module_entries));
+  workStack.push_back((address_t)(m->export_entries));
+  workStack.push_back((address_t)m->star_export_entries);
+  workStack.push_back((address_t)m->import_entries);
+  PushObjLEPUSValue(m->module_ns, workStack);
+  PushObjLEPUSValue(m->func_obj, workStack);
+  PushObjLEPUSValue(m->eval_exception, workStack);
 }
 
-void Visitor::VisitJSFunctionDef(void *ptr, int local_idx) noexcept {
-  // js_free_function_def
-  JSFunctionDef *fd = static_cast<JSFunctionDef *>(ptr);
-  int i;
-  struct list_head *el, *el1;
-  list_for_each_safe(el, el1, &fd->child_list) {
-    JSFunctionDef *fd1 = list_entry(el, JSFunctionDef, link);
-    queue[local_idx]->EnQueue(fd1);
-  }
-
-  DynBuf *dbuf;
-  if (fd->byte_code.buf) {
-    PushBytecodeAtoms(fd->byte_code.buf, fd->byte_code.size,
-                      fd->use_short_opcodes, local_idx);
-    dbuf = &fd->byte_code;
-    queue[local_idx]->EnQueue(dbuf->buf);
-  }
-
-  queue[local_idx]->EnQueue(fd->jump_slots);
-  if (fd->label_slots) {
-    queue[local_idx]->EnQueue(fd->label_slots);
-    for (int i = 0; i < fd->label_count; i++) {
-      LabelSlot *ls = &fd->label_slots[i];
-      for (RelocEntry *re = ls->first_reloc; re != NULL; re = re->next) {
-        queue[local_idx]->EnQueue(re);
-      }
-    }
-  }
-
-  queue[local_idx]->EnQueue(fd->line_number_slots);
-
-  if (fd->cpool) {
-    for (i = 0; i < fd->cpool_count; i++) {
-      PushObjLEPUSValue(fd->cpool[i], local_idx);
-    }
-    queue[local_idx]->EnQueue(fd->cpool);
-  }
-
-  PushObjAtom(fd->func_name, local_idx);
-
-  for (i = 0; i < fd->var_count; i++) {
-    PushObjAtom(fd->vars[i].var_name, local_idx);
-  }
-  queue[local_idx]->EnQueue(fd->vars);
-  for (i = 0; i < fd->arg_count; i++) {
-    PushObjAtom(fd->args[i].var_name, local_idx);
-  }
-  queue[local_idx]->EnQueue(fd->args);
-
-  for (i = 0; i < fd->hoisted_def_count; i++) {
-    PushObjAtom(fd->hoisted_def[i].var_name, local_idx);
-  }
-  queue[local_idx]->EnQueue(fd->hoisted_def);
-
-  if (fd->closure_var) {
-    for (i = 0; i < fd->closure_var_count; i++) {
-      LEPUSClosureVar *cv = &fd->closure_var[i];
-      PushObjAtom(cv->var_name, local_idx);
-    }
-    queue[local_idx]->EnQueue(fd->closure_var);
-  }
-
-  if (fd->scopes != fd->def_scope_array) {
-    queue[local_idx]->EnQueue(fd->scopes);
-  }
-
-  PushObjAtom(fd->filename, local_idx);
-  dbuf = &fd->pc2line;
-  queue[local_idx]->EnQueue(dbuf->buf);
-
-  if (fd->caller_slots) {
-    for (uint32_t i = 0, count = fd->caller_count; i < count; ++i) {
-      auto &slot = fd->caller_slots[i];
-      if (slot.is_str) {
-        queue[local_idx]->EnQueue(
-            reinterpret_cast<void *>(const_cast<char *>(slot.str)));
-      }
-    }
-    queue[local_idx]->EnQueue(fd->caller_slots);
+void Visitor::VisitRelocEntry(void *ptr, GCWorkStack &workStack) noexcept {
+  RelocEntry *re = static_cast<RelocEntry *>(ptr);
+  if (re->next) {
+    workStack.push_back((address_t)re->next);
   }
 }
 
-void Visitor::VisitJSValueArray(void *ptr, int local_idx) noexcept {
-  LEPUSValue *arr = static_cast<LEPUSValue *>(ptr);
-  int len = get_heap_obj_len(ptr);
-  for (int i = 0; i < len; i++) {
-    PushObjLEPUSValue(arr[i], local_idx);
-  }
-}
-
-void Visitor::VisitValueSlot(void *ptr, int local_idx) noexcept {
-  ValueSlot *array = static_cast<ValueSlot *>(ptr);
-  int len = get_heap_obj_len(ptr);
-  for (int i = 0; i < len; i++) {
-    PushObjLEPUSValue(array[i].val, local_idx);
-    queue[local_idx]->EnQueue(array[i].str);
-  }
-}
-
-void Visitor::VisitJsonStrArray(void *ptr, int local_idx) noexcept {
-  int len = get_heap_obj_len(ptr);
-  char **str_arr = static_cast<char **>(ptr);
-  for (int i = 0; i < len; ++i) {
-    VisitRootCString(str_arr[i], local_idx);
-  }
-}
-
-void Visitor::VisitFinalizationRegistryData(void *ptr, int local_idx) noexcept {
+void Visitor::VisitFinalizationRegistryData(void *ptr,
+                                            GCWorkStack &workStack) noexcept {
   // js_finalizationRegistry_mark
   auto *frd = reinterpret_cast<FinalizationRegistryData *>(ptr);
-  if (!frd) return;
-  PushObjLEPUSValue(frd->cbs, local_idx);
-  list_head *el;
-  list_for_each(el, &frd->entries) {
-    FinalizationRegistryEntry *fin_node =
-        list_entry(el, FinalizationRegistryEntry, link);
-    queue[local_idx]->EnQueue(fin_node);
-    PushObjLEPUSValue(fin_node->held_value, local_idx);
-    PushObjLEPUSValue(fin_node->token, local_idx);
+  PushObjLEPUSValue(frd->cbs, workStack);
+
+  auto head = &frd->entries;
+  list_head *el = head->prev;
+  if (el && (el != head)) {
+    auto fin_node = list_entry(el, FinalizationRegistryEntry, link);
+    workStack.push_back((address_t)fin_node);
   }
 }
 
-void Finalizer::close_var_refs(LEPUSStackFrame *sf) noexcept {
-  struct list_head *el;
-  JSVarRef *var_ref;
-  list_for_each(el, &sf->var_ref_list) {
-    var_ref = list_entry(el, JSVarRef, link);
-    var_ref->is_detached = 1;
-    var_ref->value = *var_ref->pvalue;
-    var_ref->pvalue = &var_ref->value;
+void Visitor::VisitJSValueArray(void *ptr, GCWorkStack &workStack) noexcept {
+  LEPUSValue *arr = static_cast<LEPUSValue *>(ptr);
+  auto array_size = get_obj_size(arr) / sizeof(LEPUSValue);
+  for (auto i = 0; i < array_size; i++) {
+    PushObjLEPUSValue(arr[i], workStack);
   }
-  return;
+}
+
+void Visitor::VisitJSPropertyArray(void *ptr, GCWorkStack &workStack) noexcept {
+  JSProperty *arr = static_cast<JSProperty *>(ptr);
+  auto array_size = get_obj_size(arr) / sizeof(JSProperty);
+  for (auto i = 0; i < array_size; i++) {
+    PushObjProperty(&arr[i], workStack);
+  }
+}
+
+void Visitor::VisitLabelSlotArray(void *ptr, GCWorkStack &workStack) noexcept {
+  LabelSlot *label_slots = static_cast<LabelSlot *>(ptr);
+  auto array_size = get_obj_size(label_slots) / sizeof(LabelSlot);
+  for (auto i = 0; i < array_size; i++) {
+    LabelSlot *ls = &label_slots[i];
+    if (ls->first_reloc) {
+      workStack.push_back((address_t)ls->first_reloc);
+    }
+  }
+}
+
+void Visitor::VisitCallerStrSlotArray(void *ptr,
+                                      GCWorkStack &workStack) noexcept {
+  CallerStrSlot *caller_slots = static_cast<CallerStrSlot *>(ptr);
+  auto array_size = get_obj_size(caller_slots) / sizeof(CallerStrSlot);
+  for (auto i = 0; i < array_size; ++i) {
+    auto &slot = caller_slots[i];
+    if (slot.is_str) {
+      workStack.push_back((address_t)slot.str);
+    }
+  }
+}
+
+void Visitor::VisitLEPUSPropertyEnumArray(void *ptr,
+                                          GCWorkStack &workStack) noexcept {
+  LEPUSPropertyEnum *tab = static_cast<LEPUSPropertyEnum *>(ptr);
+  auto array_size = get_obj_size(tab) / sizeof(LEPUSPropertyEnum);
+  for (auto i = 0; i < array_size; i++) {
+    PushObjAtom(tab[i].atom, workStack);
+  }
+}
+
+void Visitor::VisitJSVarRefPtrArray(void *ptr,
+                                    GCWorkStack &workStack) noexcept {
+  JSVarRef **var_refs = static_cast<JSVarRef **>(ptr);
+  auto array_size = get_obj_size(var_refs) / sizeof(JSVarRef *);
+  for (auto i = 0; i < array_size; i++) {
+    workStack.push_back((address_t)var_refs[i]);
+  }
+}
+
+void Visitor::VisitJSReqModuleEntryArray(void *ptr,
+                                         GCWorkStack &workStack) noexcept {
+  JSReqModuleEntry *req_entries = static_cast<JSReqModuleEntry *>(ptr);
+  auto array_size = get_obj_size(req_entries) / sizeof(JSReqModuleEntry);
+  for (auto i = 0; i < array_size; i++) {
+    JSReqModuleEntry *rme = &req_entries[i];
+    PushObjAtom(rme->module_name, workStack);
+  }
+}
+
+void Visitor::VisitJSExportEntryArray(void *ptr,
+                                      GCWorkStack &workStack) noexcept {
+  JSExportEntry *export_entries = static_cast<JSExportEntry *>(ptr);
+  auto array_size = get_obj_size(export_entries) / sizeof(JSExportEntry);
+  for (auto i = 0; i < array_size; i++) {
+    JSExportEntry *me = &export_entries[i];
+    if (me->export_type == JS_EXPORT_TYPE_LOCAL) {
+      JSVarRef *var_ref = me->u.local.var_ref;
+      workStack.push_back((address_t)(var_ref));
+    }
+    PushObjAtom(me->export_name, workStack);
+    PushObjAtom(me->local_name, workStack);
+  }
+}
+
+void Visitor::VisitJSImportEntryArray(void *ptr,
+                                      GCWorkStack &workStack) noexcept {
+  JSImportEntry *import_entries = static_cast<JSImportEntry *>(ptr);
+  auto array_size = get_obj_size(import_entries) / sizeof(JSImportEntry);
+  for (auto i = 0; i < array_size; i++) {
+    JSImportEntry *mi = &import_entries[i];
+    PushObjAtom(mi->import_name, workStack);
+  }
+}
+
+void Visitor::VisitJSResolveEntryArray(void *ptr,
+                                       GCWorkStack &workStack) noexcept {
+  JSResolveEntry *resolve_entries = static_cast<JSResolveEntry *>(ptr);
+  auto array_size = get_obj_size(resolve_entries) / sizeof(JSResolveEntry);
+  for (auto i = 0; i < array_size; i++) {
+    JSResolveEntry *re = &resolve_entries[i];
+    PushObjAtom(re->name, workStack);
+  }
+}
+
+void Visitor::VisitValueSlotArray(void *ptr, GCWorkStack &workStack) noexcept {
+  ValueSlot *array = static_cast<ValueSlot *>(ptr);
+  auto array_size = get_obj_size(array) / sizeof(ValueSlot);
+  for (auto i = 0; i < array_size; i++) {
+    PushObjLEPUSValue(array[i].val, workStack);
+    workStack.push_back((address_t)array[i].str);
+  }
+}
+
+void Visitor::VisitJsonStrArray(void *ptr, GCWorkStack &workStack) noexcept {
+  char **str_arr = static_cast<char **>(ptr);
+  auto array_size = get_obj_size(str_arr) / sizeof(char *);
+  for (auto i = 0; i < array_size; ++i) {
+    workStack.push_back((address_t)GetCStringPtr(str_arr[i]));
+  }
+}
+
+void Visitor::VisitAtomArray(void *ptr, GCWorkStack &workStack) noexcept {
+  JSAtomStruct **atom_array = static_cast<JSAtomStruct **>(ptr);
+  auto array_size = get_obj_size(atom_array) / sizeof(JSAtomStruct *);
+  for (auto i = 0; i < array_size; i++) {
+    JSAtomStruct *p = atom_array[i];
+    if (!atom_is_free(p)) {
+      workStack.push_back((address_t)p);
+    }
+  }
+}
+
+void Visitor::VisitLEPUSBreakpointArray(void *ptr,
+                                        GCWorkStack &workStack) noexcept {
+#ifdef ENABLE_QUICKJS_DEBUGGER
+  LEPUSBreakpoint *bps = static_cast<LEPUSBreakpoint *>(ptr);
+  auto array_size = get_obj_size(bps) / sizeof(LEPUSBreakpoint);
+  for (auto i = 0; i < array_size; ++i) {
+    auto *bp = bps + i;
+    workStack.push_back((address_t)bp->script_url);
+    PushObjLEPUSValue(bp->breakpoint_id, workStack);
+    PushObjLEPUSValue(bp->condition, workStack);
+  }
+#endif
+}
+
+void Visitor::DoFinalizer(void *ptr) {
+  int tag = get_alloc_tag(ptr);
+  switch (tag) {
+    case ALLOC_TAG_JSString:
+      finalizer->JSStringFinalizer(ptr);
+      break;
+#ifdef ENABLE_LEPUSNG
+    case ALLOC_TAG_LEPUSLepusRef:
+      finalizer->JSLepusRefFinalizer(ptr);
+      break;
+#endif
+    case ALLOC_TAG_JSTypedArray:
+      finalizer->JSTypedArrayFinalizer(ptr);
+      break;
+    case ALLOC_TAG_JSMapIteratorData:
+      finalizer->JSMapIteratorDataFinalizer(ptr);
+      break;
+    case ALLOC_TAG_LEPUSModuleDef:
+      finalizer->JSModuleDefFinalizer(ptr);
+      break;
+    case ALLOC_TAG_JSMapState:
+      finalizer->JSMapStateFinalizer(ptr);
+      break;
+    case ALLOC_TAG_JSArrayBuffer:
+      finalizer->JSArrayBufferFinalizer(ptr);
+      break;
+    case ALLOC_TAG_WeakRefData:
+      finalizer->WeakRefDataFinalizer(ptr);
+      break;
+    case ALLOC_TAG_JSGeneratorData:
+      finalizer->JSGeneratorDataFinalizer(ptr);
+      break;
+    case ALLOC_TAG_JSAsyncFunctionData:
+      finalizer->JSAsyncFunctionDataFinalizer(ptr);
+      break;
+    case ALLOC_TAG_JSAsyncGeneratorData:
+      finalizer->JSAsyncGeneratorDataFinalizer(ptr);
+      break;
+    default:
+      break;
+  }
 }
 
 void Finalizer::free_atom(LEPUSRuntime *rt, JSAtomStruct *p) noexcept {
-  /* free the string structure */
-  // Primjs begin
-#ifdef ENABLE_LEPUSNG
-  JS_FreeStringCache(rt, p);
-#endif
-  // Primjs end
   if (rt->atom_size == 0) return;
   uint32_t i = p->hash_next; /* atom_index */
   if (p->atom_type != JS_ATOM_TYPE_SYMBOL) {
@@ -29954,15 +29339,11 @@ void Finalizer::JSLepusRefFinalizer(void *ptr) noexcept {
 
 void Finalizer::JSStringFinalizer(void *ptr) noexcept {
   JSString *str = static_cast<JSString *>(ptr);
-  if (str->atom_type) {
-    free_atom(rt_, str);
-  } else {
 #ifdef ENABLE_LEPUSNG
-    // <Primjs begin>
-    JS_FreeStringCache(rt_, str);
-    // <Primjs end>
+  // <Primjs begin>
+  JS_FreeStringCache(rt_, str);
+  // <Primjs end>
 #endif
-  }
 }
 #ifdef ENABLE_LEPUSNG
 void Finalizer::JSStringOnlyFinalizer(void *ptr) noexcept {
@@ -29971,12 +29352,44 @@ void Finalizer::JSStringOnlyFinalizer(void *ptr) noexcept {
 }
 #endif
 
-void Finalizer::JSShapeFinalizer(void *ptr) noexcept {
-  int hash_size = get_hash_size(ptr);  // get hash size
-  JSShape *sh = get_shape_from_alloc(ptr, hash_size);
-  if (sh->is_hashed) {
-    js_shape_hash_unlink(rt_, sh);
+void Finalizer::JSShapeArrayFinalizer() noexcept {
+  if (rt_->shape_hash == nullptr) return;
+  for (int i = 0; i < rt_->shape_hash_size; i++) {
+    if (!rt_->shape_hash[i]) continue;
+    JSShape **psh = &rt_->shape_hash[i];
+    while (*psh != nullptr) {
+      address_t shape_addr = (address_t)get_alloc_from_shape(*psh);
+      if (!rt_->ros_->IsObjectMarked(shape_addr - kHeaderSize)) {
+        *psh = (*psh)->shape_hash_next;
+        rt_->shape_hash_count--;
+      } else {
+        psh = &(*psh)->shape_hash_next;
+      }
+      if (*psh == nullptr) break;
+    }
   }
+}
+
+void Finalizer::BytecodeListFinalizer() noexcept {
+#ifdef ENABLE_QUICKJS_DEBUGGER
+  struct list_head *el, *el1;
+  list_for_each_safe(el, el1, &rt_->context_list) {
+    LEPUSContext *ctx = list_entry(el, LEPUSContext, link);
+    if (ctx->debugger_info) {
+      if (ctx->debugger_info->bytecode_list.next == nullptr) continue;
+      struct list_head *el2, *el3;
+      struct LEPUSFunctionBytecode *b;
+      list_for_each_safe(el2, el3, &ctx->debugger_info->bytecode_list) {
+        b = list_entry(el2, LEPUSFunctionBytecode, link);
+        if (rt_->ros_->IsObjectMarked((address_t)b - kHeaderSize)) continue;
+        if (b->func_level_state != NO_DEBUGGER && b->link.next &&
+            b->link.prev) {
+          list_del(&b->link);
+        }
+      }
+    }
+  }
+#endif
 }
 
 QJS_STATIC void reset_weak_ref_gc(LEPUSRuntime *rt, LEPUSObject *p) {
@@ -29991,7 +29404,8 @@ QJS_STATIC void reset_weak_ref_gc(LEPUSRuntime *rt, LEPUSObject *p) {
         mr = wr->u.map_record;
         assert(mr->map->is_weak);
         assert(!mr->empty);
-        list_del(&mr->link);
+        gc_list_del(rt, &mr->link, &mr->map->records,
+                    offsetof(JSMapRecord, link));
         list_del(&mr->hash_link);
       } break;
       case WEAK_REF_KIND_WEAK_REF: {
@@ -30000,7 +29414,8 @@ QJS_STATIC void reset_weak_ref_gc(LEPUSRuntime *rt, LEPUSObject *p) {
       } break;
       case WEAK_REF_KIND_FINALIZATION_REGISTRY: {
         FinalizationRegistryEntry *fin_node = wr->u.fin_node;
-        list_del(&fin_node->link);
+        gc_list_del(rt, &fin_node->link, &fin_node->data->entries,
+                    offsetof(FinalizationRegistryEntry, link));
       } break;
     }
   }
@@ -30013,6 +29428,9 @@ QJS_STATIC void reset_weak_ref_gc(LEPUSRuntime *rt, LEPUSObject *p) {
       FinalizationRegistryData *frd = fin_node->data;
       LEPUSContext *ctx = frd->fg_ctx->ctx;
       if (ctx) {
+        rt->collector_->GetVisitor()->AddObjectDuringFinalizer(
+            fin_node->held_value);
+        rt->collector_->GetVisitor()->AddObjectDuringFinalizer(frd->cbs);
         LEPUS_Call(ctx, frd->cbs, LEPUS_UNDEFINED, 1, &fin_node->held_value);
       }
     }
@@ -30022,7 +29440,6 @@ QJS_STATIC void reset_weak_ref_gc(LEPUSRuntime *rt, LEPUSObject *p) {
 
 void Finalizer::JSObjectFinalizer(void *ptr) noexcept {
   LEPUSObject *obj = static_cast<LEPUSObject *>(ptr);
-  js_free_shape(rt_, obj->shape);
   if (unlikely(obj->first_weak_ref)) {
     reset_weak_ref_gc(rt_, obj);
     obj->first_weak_ref = NULL;
@@ -30031,6 +29448,7 @@ void Finalizer::JSObjectFinalizer(void *ptr) noexcept {
   if (JS_OBJECT_IS_OUTER(obj)) {
     LEPUSClassFinalizer *finalizer = rt_->class_array[obj->class_id].finalizer;
     if (finalizer) {
+      rt_->collector_->GetVisitor()->AddObjectDuringFinalizer(ptr);
       (*finalizer)(rt_, LEPUS_MKPTR(LEPUS_TAG_OBJECT, obj));
     }
   }
@@ -30040,6 +29458,7 @@ void Finalizer::JSObjectOnlyFinalizer(void *ptr) noexcept {
   LEPUSObject *obj = static_cast<LEPUSObject *>(ptr);
   LEPUSClassFinalizer *finalizer = rt_->class_array[obj->class_id].finalizer;
   if (finalizer) {
+    rt_->collector_->GetVisitor()->AddObjectDuringFinalizer(ptr);
     (*finalizer)(rt_, LEPUS_MKPTR(LEPUS_TAG_OBJECT, obj));
   }
 }
@@ -30061,9 +29480,9 @@ void Finalizer::JSTypedArrayFinalizer(void *ptr) noexcept {
 }
 void Finalizer::JSMapStateFinalizer(void *ptr) noexcept {
   JSMapState *s = static_cast<JSMapState *>(ptr);
-  struct list_head *el, *el1;
+  struct list_head *el;
   JSMapRecord *mr;
-  list_for_each_safe(el, el1, &s->records) {
+  list_for_each(el, &s->records) {
     mr = list_entry(el, JSMapRecord, link);
     if (!mr->empty) {
       if (s->is_weak) delete_weak_ref(rt_, LEPUS_VALUE_GET_OBJ(mr->key), mr);
@@ -30076,42 +29495,10 @@ void Finalizer::JSMapIteratorDataFinalizer(void *ptr) noexcept {
     map_decref_record(rt_, it->cur_record);
   }
 }
-void Finalizer::JSGeneratorDataFinalizer(void *ptr) noexcept {
-  // JS_CLASS_GENERATOR
-  // js_generator_finalizer
-  // u.generator_data
-  JSGeneratorData *s = static_cast<JSGeneratorData *>(ptr);
-  if (s->state == JS_GENERATOR_STATE_COMPLETED) return;
-  close_var_refs(&s->func_state.frame);
-  s->state = JS_GENERATOR_STATE_COMPLETED;
-}
-void Finalizer::JSAsyncFunctionDataFinalizer(void *ptr) noexcept {
-  JSAsyncFunctionData *s = static_cast<JSAsyncFunctionData *>(ptr);
-  if (s->is_active) {
-    close_var_refs(&s->func_state.frame);
-  }
-}
-void Finalizer::JSAsyncGeneratorDataFinalizer(void *ptr) noexcept {
-  JSAsyncGeneratorData *s = static_cast<JSAsyncGeneratorData *>(ptr);
-  if (s->state != JS_ASYNC_GENERATOR_STATE_COMPLETED &&
-      s->state != JS_ASYNC_GENERATOR_STATE_AWAITING_RETURN) {
-    close_var_refs(&s->func_state.frame);
-  }
-}
 
 void Finalizer::JSModuleDefFinalizer(void *ptr) noexcept {
   LEPUSModuleDef *m = static_cast<LEPUSModuleDef *>(ptr);
   list_del(&m->link);
-}
-void Finalizer::JSFunctionDefFinalizer(void *ptr) noexcept {
-  JSFunctionDef *fd = static_cast<JSFunctionDef *>(ptr);
-  if (fd->parent && fd->link.prev) {
-    /* remove in parent list */
-    list_del(&fd->link);
-  }
-  if (fd->source) {
-    system_free(fd->source);
-  }
 }
 
 void Finalizer::FinalizationRegistryDataFinalizer(void *ptr) noexcept {
@@ -30134,13 +29521,34 @@ void Finalizer::WeakRefDataFinalizer(void *ptr) noexcept {
   return;
 }
 
-// finalizer
-void do_finalizer(void *rt, void *ptr, bool is_only) {
-  LEPUSRuntime *rt_ = static_cast<LEPUSRuntime *>(rt);
-  if (is_only) {
-    rt_->gc->GetFinalizer()->DoFinalizer2(ptr);
-  } else {
-    rt_->gc->GetFinalizer()->DoFinalizer(ptr);
+void Finalizer::close_var_refs_in_finalizer(LEPUSStackFrame *sf) noexcept {
+  struct list_head *el;
+  JSVarRef *var_ref;
+  list_for_each(el, &sf->var_ref_list) {
+    var_ref = list_entry(el, JSVarRef, link);
+    var_ref->is_detached = 1;
+    var_ref->value = *var_ref->pvalue;
+    var_ref->pvalue = &var_ref->value;
+  }
+  return;
+}
+
+void Finalizer::JSGeneratorDataFinalizer(void *ptr) noexcept {
+  JSGeneratorData *s = static_cast<JSGeneratorData *>(ptr);
+  if (s->state == JS_GENERATOR_STATE_COMPLETED) return;
+  close_var_refs_in_finalizer(&s->func_state.frame);
+  s->state = JS_GENERATOR_STATE_COMPLETED;
+}
+void Finalizer::JSAsyncFunctionDataFinalizer(void *ptr) noexcept {
+  JSAsyncFunctionData *s = static_cast<JSAsyncFunctionData *>(ptr);
+  if (s->is_active) {
+    close_var_refs_in_finalizer(&s->func_state.frame);
+  }
+}
+void Finalizer::JSAsyncGeneratorDataFinalizer(void *ptr) noexcept {
+  JSAsyncGeneratorData *s = static_cast<JSAsyncGeneratorData *>(ptr);
+  if (!s->is_completed) {
+    close_var_refs_in_finalizer(&s->func_state.frame);
   }
 }
 
@@ -30149,6 +29557,15 @@ void do_global_finalizer(void *rt) {
   rt_->global_handles_->GlobalRootsFinalizer();
 }
 
+bool LEPUS_IsMarkedLEPUSValue(LEPUSRuntime *rt, LEPUSValue *val) {
+  if (LEPUS_VALUE_HAS_REF_COUNT((*val))) {
+    void *ptr = LEPUS_VALUE_GET_PTR((*val));
+    return rt->ros_->IsObjectMarked((address_t)ptr - kHeaderSize);
+  }
+  return true;
+}
+// <Primjs end>
+
 char *LEPUS_GetGCTimingInfo(LEPUSContext *ctx, bool is_start) {
   if (ctx->gc_enable) {
     LEPUSRuntime *rt = ctx->rt;
@@ -30156,19 +29573,21 @@ char *LEPUS_GetGCTimingInfo(LEPUSContext *ctx, bool is_start) {
     memset(gc_info, 0, BUF_LEN);
     snprintf(gc_info, BUF_LEN,
              "{\n  \"gc_count\" : %zu,\n  \"gc_duration\" : %" PRIu64
-             ",\n  \"gc_heapsize\" : %zu,\n  \"rt_info\" : \"%s\"\n}\n",
-             rt->gc_cnt, rt->gc->GetGCDuration() / MS,
-             rt->malloc_state.allocate_state.footprint / KB, ctx->rt->rt_info);
+             ",\n  \"gc_heapsize\" : %zu,\n  \"rt_info\" : %s\n}\n",
+             rt->ros_->GetGCTracer()->GetGCCount(),
+             rt->ros_->GetGCTracer()->GetGCDuration(),
+             rt->ros_->GetAllocatedSize() / KB, ctx->rt->rt_info);
     return gc_info;
   } else {
-    return nullptr;
+    strcpy(ctx->rt->gc_info_start_, "");
+    return ctx->rt->gc_info_start_;
   }
 }
 void AddLepusRefCount(LEPUSContext *ctx) {
   LEPUSRuntime *rt = ctx->rt;
-  rt->gc->js_ref_count++;
-  if (rt->gc->js_ref_count % NUM_OF_LEPUSREF == 0) {
-    rt->gc->js_ref_count = 0;
+  rt->ros_->js_ref_count++;
+  if (rt->ros_->js_ref_count % NUM_OF_LEPUSREF == 0) {
+    rt->ros_->js_ref_count = 0;
     LEPUS_RunGC(rt);  // Collect JSValue
   }
 }
@@ -30193,13 +29612,12 @@ void HandleScope::PushLEPUSPropertyDescriptor(LEPUSPropertyDescriptor *desc) {}
 void LEPUS_PushHandle(LEPUSContext *ctx, void *ptr, int type) {}
 void LEPUS_ResetHandle(LEPUSContext *ctx, void *ptr, int type) {}
 
-void AddCurNode(LEPUSRuntime *rt, void *node, int type) {}
-void DeleteCurNode(LEPUSRuntime *rt, void *node, int type) {}
-bool CheckValidNode(LEPUSRuntime *rt, void *node, int type) { return true; }
-
 void LEPUS_TrigGC(LEPUSRuntime *rt) {}
 void JS_FreeRuntimeForEffect(LEPUSRuntime *rt) {}
-
+bool LEPUS_IsMarkedLEPUSValue(LEPUSRuntime *rt, LEPUSValue *val) {
+  return true;
+}
+size_t allocate_usable_size(void *mem) { return 0; }
 char *LEPUS_GetGCTimingInfo(LEPUSContext *ctx, bool is_start) {
   return nullptr;
 }
@@ -30349,32 +29767,25 @@ bool CheckTools::IsValidTid(int tid) {
   return false;
 }
 
-void JS_UpdateGCInfo(JSMallocState *s, size_t size) {
-  mstate m = &s->allocate_state;
-  LEPUSRuntime *rt = static_cast<LEPUSRuntime *>(m->runtime);
-  if (m->gc_info_threshold == 0) return;
-  m->gc_info_interval_size += size;
-  if (m->gc_info_interval_size > m->gc_info_threshold &&
-      LEPUS_GetHeapSize(rt) > m->gc_info_threshold) {
-    if (rt->gc_enable) {
-#ifdef ENABLE_COMPATIBLE_MM
-      rt->gc->UpdateGCInfo(0, 0);
-#endif
-    } else {
-      GCObserver *observer = static_cast<GCObserver *>(rt->gc_observer);
-      if (observer) {
-        std::stringstream gc_info;
-        gc_info << "{\n"
-                << "  \"gc_info\": [\n"
-                << "    {\n"
-                << "      \"heapsize_after\": "
-                << rt->malloc_state.malloc_size / KB << "    }\n"
-                << "  ]\n"
-                << "}\n";
-        std::string gc_info_str = gc_info.str();
-        observer->OnGC(std::move(gc_info_str));
-      }
+void JS_UpdateGCInfo(LEPUSRuntime *rt, size_t size, bool from_gc) {
+  if (rt == nullptr || rt->gc_info_threshold == 0) return;
+  rt->gc_info_interval_size += size;
+  if ((rt->gc_info_interval_size > rt->gc_info_threshold &&
+       LEPUS_GetHeapSize(rt) > rt->gc_info_threshold) ||
+      from_gc) {
+    GCObserver *observer = static_cast<GCObserver *>(rt->gc_observer);
+    if (observer) {
+      std::stringstream gc_info;
+      gc_info << "{\n"
+              << "  \"gc_info\": [\n"
+              << "    {\n"
+              << "      \"heapsize_after\": " << LEPUS_GetHeapSize(rt) / KB
+              << "    }\n"
+              << "  ]\n"
+              << "}\n";
+      std::string gc_info_str = gc_info.str();
+      observer->OnGC(std::move(gc_info_str));
     }
-    m->gc_info_interval_size = 0;
+    rt->gc_info_interval_size = 0;
   }
 }
