@@ -7153,7 +7153,7 @@ QJS_STATIC int JS_OrdinaryIsInstanceOf(LEPUSContext *ctx, LEPUSValueConst val,
           goto done;
         }
         proto1 = LEPUS_VALUE_GET_OBJ(proto_val);
-        if (!proto1) break;
+        if (LEPUS_VALUE_IS_NOT_OBJECT(proto_val) || !proto1) break;
       } else {
         break;
       }
