@@ -37,7 +37,7 @@ jobs:
           fi
 
   harmony-release:
-    runs-on: lynx-container
+    runs-on: lynx-custom-container
     needs: get-version
     container: 
       image: ghcr.io/lynx-family/ubuntu24.04-harmony@sha256:8eb0ee8da7e8592669f0fcd41d0e1bc818b33a75e27943521f57af87d04db2fb
