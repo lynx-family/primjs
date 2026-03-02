@@ -2614,7 +2614,7 @@ napi_status napi_gen_code_cache(napi_env env, const char* script,
       LEPUS_Eval(env->ctx->ctx, script, script_len, "",
                  LEPUS_EVAL_FLAG_COMPILE_ONLY | LEPUS_EVAL_TYPE_GLOBAL);
   CHECK_QJS(env, !LEPUS_IsException(top_func) && !LEPUS_IsUndefined(top_func));
-  env->ctx->CreateHandle(top_func, true);
+  env->ctx->CreateHandle(top_func);
 
   size_t obj_len;
   uint8_t* cache = LEPUS_WriteObject(env->ctx->ctx, &obj_len, top_func,
