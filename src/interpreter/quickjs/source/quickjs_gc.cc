@@ -28060,6 +28060,9 @@ LEPUSValue prim_js_operator_delete_gc(LEPUSContext *ctx, LEPUSValue op1,
   }
   return LEPUS_NewBool(ctx, ret);
 }
+__exception int prim_js_poll_interrupts_gc(LEPUSContext *ctx) {
+  return __js_poll_interrupts(ctx);
+}
 // <primjs begin>
 
 extern "C" void _call_stub_entry();

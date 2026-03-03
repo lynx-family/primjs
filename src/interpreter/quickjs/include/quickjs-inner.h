@@ -1905,6 +1905,7 @@ QJS_HIDE __exception int js_operator_typeof_gc(LEPUSContext *ctx,
                                                LEPUSValue op1);
 QJS_HIDE LEPUSValue prim_js_operator_delete_gc(LEPUSContext *ctx,
                                                LEPUSValue op1, LEPUSValue op2);
+QJS_HIDE __exception int prim_js_poll_interrupts_gc(LEPUSContext *ctx);
 QJS_HIDE int JS_SetPropertyInternalImpl(LEPUSContext *ctx,
                                         LEPUSValueConst this_obj, JSAtom prop,
                                         LEPUSValue val, int flags);
