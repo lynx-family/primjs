@@ -680,13 +680,13 @@ typedef struct LEPUSLepusRefCallbacks {
   // void (*free_string_cache)();
 } LEPUSLepusRefCallbacks;
 
-struct LEPUSLepusRef {
+typedef struct LEPUSLepusRef {
   LEPUSRefCountHeader header;
   int tag;               // lepus value tag
   void *p;               // lepus value reference
   LEPUSValue lepus_val;  // convert to lepusvalue cache, default is undefined
   struct list_head link;
-};
+} LEPUSLepusRef;
 void RegisterLepusType(LEPUSRuntime *rt, int32_t array_typeid,
                        int32_t table_typeid);
 
