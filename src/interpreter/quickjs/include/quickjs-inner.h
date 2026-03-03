@@ -370,7 +370,6 @@ struct LEPUSRuntime {
   /* list of allocated objects (used by the garbage collector) */
   struct list_head obj_list; /* list of LEPUSObject.link */
   // <Primjs begin>
-  struct list_head lynx_obj_list;
   struct list_head gc_bytecode_list;
   struct list_head gc_obj_list;
   // <Primjs end>

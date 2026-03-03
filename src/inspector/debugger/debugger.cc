@@ -37,6 +37,7 @@
 #include "inspector/debugger/debugger_breakpoint.h"
 #include "inspector/debugger/debugger_callframe.h"
 #include "inspector/debugger/debugger_properties.h"
+#include "inspector/debugger/debugger_queue.h"
 #include "inspector/debugger_inner.h"
 #include "inspector/interface.h"
 #include "inspector/protocols.h"
@@ -57,6 +58,10 @@ void SetDebuggerInfoOpaque(LEPUSDebuggerInfo *info, void *opaque) {
   if (info) {
     info->opaque = opaque;
   }
+}
+
+struct qjs_queue *GetDebuggerMessageQueue(LEPUSDebuggerInfo *info) {
+  return info ? info->message_queue : nullptr;
 }
 
 void SetDebuggerSourceCode(LEPUSContext *ctx, char *source_code) {
@@ -2075,7 +2080,7 @@ void ProcessPausedMessages(LEPUSContext *ctx, const char *message) {
   LEPUSDebuggerInfo *info = ctx->debugger_info;
   if (!info) return;
   if (message && message[0] != '\0') {
-    ctx->debugger_info->message_queue.push(message);
+    PushBackQueue(GetDebuggerMessageQueue(info), message);
   }
   ProcessProtocolMessages(info);
 }
@@ -2304,6 +2309,7 @@ LEPUSDebuggerInfo::LEPUSDebuggerInfo(LEPUSContext *ctx_) : ctx{ctx_} {
   init_list_head(&bytecode_list);
   LEPUS_HeapObjStore(ctx, &running_state.get_properties_array,
                      LEPUS_NewArray(ctx));
+  message_queue = InitQueue();
   InitializeStringPool(this);
   InitializeFixedShapeObj(this);
   debugger_current_pc = nullptr;
@@ -2355,6 +2361,9 @@ static void FreeDebuggerScriptAndBytecodeList(LEPUSContext *ctx) {
 
 LEPUSDebuggerInfo::~LEPUSDebuggerInfo() {
   FreeDebuggerScriptAndBytecodeList(ctx);
+  if (auto *qjs_queue = message_queue) {
+    DeleteQueue(qjs_queue);
+  }
 
   int32_t bp_num = breakpoints_num;
   for (int32_t i = 0; i < bp_num; i++) {

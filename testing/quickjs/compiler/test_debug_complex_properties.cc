@@ -30,6 +30,12 @@ class QjsDebugPropertiesMethods : public ::testing::Test {
 
   void TearDown() override {
     auto info = GetDebuggerInfo(ctx_);
+    auto* mq = GetDebuggerMessageQueue(info);
+    while (!QueueIsEmpty(mq)) {
+      char* message_str = GetFrontQueue(mq);
+      free(message_str);
+      message_str = NULL;
+    }
     QJSDebuggerFree(ctx_);
     LEPUS_FreeContext(ctx_);
     LEPUS_FreeRuntime(rt_);

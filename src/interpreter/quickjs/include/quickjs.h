@@ -664,7 +664,7 @@ typedef void LEPUS_MarkFunc(LEPUSRuntime *rt, LEPUSValueConst val,
                             uint64_t trace_tool);
 
 typedef struct LEPUSLepusRefCallbacks {
-  void (*free_value)(void *p);
+  LEPUSValue (*free_value)(LEPUSRuntime *rt, LEPUSValue val);
   LEPUSValue (*get_property)(LEPUSContext *ctx, LEPUSValue thisObj, JSAtom prop,
                              int idx);
   size_t (*get_length)(LEPUSContext *ctx, LEPUSValue val);
@@ -680,13 +680,13 @@ typedef struct LEPUSLepusRefCallbacks {
   // void (*free_string_cache)();
 } LEPUSLepusRefCallbacks;
 
-struct LEPUSLepusRef {
+typedef struct LEPUSLepusRef {
   LEPUSRefCountHeader header;
   int tag;               // lepus value tag
   void *p;               // lepus value reference
   LEPUSValue lepus_val;  // convert to lepusvalue cache, default is undefined
-  struct list_head link;
-};
+} LEPUSLepusRef;
+
 void RegisterLepusType(LEPUSRuntime *rt, int32_t array_typeid,
                        int32_t table_typeid);
 

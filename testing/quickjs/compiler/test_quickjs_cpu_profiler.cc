@@ -12,6 +12,7 @@ extern "C" {
 #endif
 #include <string.h>
 
+#include "inspector/debugger/debugger_queue.h"
 #include "inspector/interface.h"
 #include "quickjs/include/quickjs-libc.h"
 #ifdef __cplusplus
@@ -127,6 +128,12 @@ class QjsCpuProfilerMethods : public ::testing::Test {
 
   void TearDown() override {
     auto info = GetDebuggerInfo(ctx_);
+    auto* mq = GetDebuggerMessageQueue(info);
+    while (!QueueIsEmpty(mq)) {
+      char* message_str = GetFrontQueue(mq);
+      free(message_str);
+      message_str = NULL;
+    }
     QJSDebuggerFree(ctx_);
     LEPUS_FreeContext(ctx_);
     LEPUS_FreeRuntime(rt_);

@@ -37,6 +37,7 @@
 #include "inspector/debugger/debugger_breakpoint.h"
 #include "inspector/debugger/debugger_callframe.h"
 #include "inspector/debugger/debugger_properties.h"
+#include "inspector/debugger/debugger_queue.h"
 #include "inspector/debugger_inner.h"
 #include "inspector/heapprofiler/heapprofiler.h"
 #include "inspector/interface.h"
@@ -205,7 +206,7 @@ void DoInspectorCheck(LEPUSContext *ctx) {
     keep_running = DebuggerNeedProcess(info, ctx);
   }
 
-  if (keep_running && GetProtocolMessages(ctx)) {
+  if (keep_running && info->message_queue && GetProtocolMessages(ctx)) {
     ProcessProtocolMessages(ctx->debugger_info);
   }
 }
@@ -285,8 +286,11 @@ void HandleProtocols(LEPUSContext *ctx, LEPUSValue message,
 
 // push msg to message queue, and process it
 void PushAndProcessProtocolMessages(LEPUSDebuggerInfo *info, const char *msg) {
-  info->message_queue.push(msg);
-  ProcessProtocolMessages(info);
+  struct qjs_queue *debugger_queue = GetDebuggerMessageQueue(info);
+  if (debugger_queue) {
+    PushBackQueue(debugger_queue, msg);
+    ProcessProtocolMessages(info);
+  }
 }
 
 static bool PauseOnNextStatement(LEPUSContext *ctx, const char *method,
@@ -305,49 +309,75 @@ static bool PauseOnNextStatement(LEPUSContext *ctx, const char *method,
       LEPUS_FreeValue(ctx, reason);
     }
   }
+  if (!ctx->rt->gc_enable && res) {
+    LEPUS_FreeCString(ctx, method);
+    LEPUS_FreeValue(ctx, message_method);
+  }
   return res;
 }
 
-static void ProcessMessage(LEPUSDebuggerInfo *info, int32_t view_id) {
-  auto &mq = info->message_queue;
-  LEPUSContext *ctx = info->ctx;
-  LEPUSValue message = LEPUS_UNDEFINED, message_method = LEPUS_UNDEFINED;
-  HandleScope func_scope(ctx, &message, HANDLE_TYPE_LEPUS_VALUE);
-  bool gc_mode = ctx->gc_enable;
-  while (!mq.empty()) {
-    std::string message_str{std::move(mq.front())};
-    mq.pop();
-    message = LEPUS_ParseJSON(ctx, message_str.c_str(), message_str.size(), "");
-    HandleScope block_scope(ctx, &message, HANDLE_TYPE_LEPUS_VALUE);
-    if (view_id != -1) {
-      LEPUS_SetPropertyStr(ctx, message, "view_id",
-                           LEPUS_NewInt32(ctx, view_id));
-    }
-    message_method = LEPUS_GetPropertyStr(ctx, message, "method");
-    block_scope.PushHandle(&message_method, HANDLE_TYPE_LEPUS_VALUE);
-    const char *method = LEPUS_ToCString(ctx, message_method);
-    block_scope.PushHandle(&method, HANDLE_TYPE_CSTRING);
+enum ProcessMessageResult { MESSAGE_NULL, SUCCESS };
 
-    // handle protocol messages
-    if (!PauseOnNextStatement(ctx, method, message, message_method)) {
-      HandleProtocols(ctx, message, method);
-    }
-
-    if (!gc_mode) {
-      LEPUS_FreeCString(ctx, method);
-      LEPUS_FreeValue(ctx, message_method);
-      LEPUS_FreeValue(ctx, message);
-    }
+static ProcessMessageResult ProcessMessage(LEPUSContext *ctx,
+                                           LEPUSStackFrame *sf, qjs_queue *mq,
+                                           LEPUSValue message) {
+  LEPUSValue message_method = LEPUS_GetPropertyStr(ctx, message, "method");
+  const char *method = LEPUS_ToCString(ctx, message_method);
+  // handle protocol messages
+  if (!method) {
+    if (!ctx->rt->gc_enable) LEPUS_FreeValue(ctx, message_method);
+    PopFrontQueue(mq);
+    return MESSAGE_NULL;
   }
-  return;
+  HandleScope func_scope(ctx, reinterpret_cast<void *>(&method),
+                         HANDLE_TYPE_CSTRING);
+  bool pause_on_next_statement =
+      PauseOnNextStatement(ctx, method, message, message_method);
+  PopFrontQueue(mq);
+  if (pause_on_next_statement) {
+    return SUCCESS;
+  }
+
+  // handle protocol messages
+  HandleProtocols(ctx, message, method);
+
+  if (!ctx->rt->gc_enable) {
+    LEPUS_FreeCString(ctx, method);
+    LEPUS_FreeValue(ctx, message_method);
+  }
+  return SUCCESS;
 }
+
+#define process_messages(view_id)                                           \
+  auto *mq = GetDebuggerMessageQueue(info);                                 \
+  LEPUSContext *ctx = info->ctx;                                            \
+  auto *sf = ctx->rt->current_stack_frame;                                  \
+  LEPUSValue message = LEPUS_UNDEFINED;                                     \
+  HandleScope func_scope(ctx, &message, HANDLE_TYPE_LEPUS_VALUE);           \
+  while (!QueueIsEmpty(mq)) {                                               \
+    char *message_str = GetFrontQueue(mq);                                  \
+    if (message_str) {                                                      \
+      message = LEPUS_ParseJSON(ctx, message_str, strlen(message_str), ""); \
+      if (view_id != -1) {                                                  \
+        LEPUS_SetPropertyStr(ctx, message, "view_id",                       \
+                             LEPUS_NewInt32(ctx, view_id));                 \
+      }                                                                     \
+      auto process_result = ProcessMessage(ctx, sf, mq, message);           \
+      if (process_result == MESSAGE_NULL) {                                 \
+        continue;                                                           \
+      }                                                                     \
+      if (!ctx->rt->gc_enable) LEPUS_FreeValue(ctx, message);               \
+    }                                                                       \
+    free(message_str);                                                      \
+    message_str = NULL;                                                     \
+  }
 
 // for shared context qjs debugger: need to send this view_id to front end
 // through sendResponse
 void ProcessProtocolMessagesWithViewID(LEPUSDebuggerInfo *info,
                                        int32_t view_id) {
   // get protocol message from message queue
-  ProcessMessage(info, view_id);
+  process_messages(view_id);
 }
 
 /**
@@ -356,7 +386,7 @@ void ProcessProtocolMessagesWithViewID(LEPUSDebuggerInfo *info,
  */
 void ProcessProtocolMessages(LEPUSDebuggerInfo *info) {
   // get protocol message from message queue
-  ProcessMessage(info, -1);
+  process_messages(-1);
 }
 
 /**
@@ -473,11 +503,4 @@ bool CheckEnable(LEPUSContext *ctx, LEPUSValue message, ProtocolType protocol) {
       break;
   }
   return ret;
-}
-
-void PushBackQueue(LEPUSContext *ctx, const char *message) {
-  if (ctx && ctx->debugger_info && message) {
-    ctx->debugger_info->message_queue.push(message);
-  }
-  return;
 }
