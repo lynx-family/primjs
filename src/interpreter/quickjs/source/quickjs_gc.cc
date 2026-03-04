@@ -2861,8 +2861,10 @@ static int JS_AutoInitProperty(LEPUSContext *ctx, LEPUSObject *p, JSAtom prop,
   JSAutoInitFunc *func;
 
   if (js_shape_prepare_update(ctx, p, &prs)) return -1;
+#if defined(__aarch64__) && !defined(OS_WIN) && !DISABLE_NANBOX
   uintptr_t *opaque_ptr = (uintptr_t *)&(pr->u.init.opaque);
   *(opaque_ptr) = (*opaque_ptr) & (~static_cast<uintptr_t>(LEPUS_CPOINTER_TAG));
+#endif
   func = pr->u.init.init_func;
   void *opaque = pr->u.init.opaque;
   /* 'func' shall not modify the object properties 'pr' */
@@ -5037,8 +5039,10 @@ int JS_DefineAutoInitProperty_GC(
   if (unlikely(!pr)) return -1;
   pr->u.init.init_func = init_func;
   pr->u.init.opaque = opaque;
+#if defined(__aarch64__) && !defined(OS_WIN) && !DISABLE_NANBOX
   uintptr_t *opaque_ptr = (uintptr_t *)(&(pr->u.init.opaque));
   *opaque_ptr = (*opaque_ptr) | LEPUS_CPOINTER_TAG;
+#endif
 
   return TRUE;
 }
@@ -28662,8 +28666,10 @@ void Visitor::PushObjProperty(JSProperty *pr, GCWorkStack &workStack) noexcept {
   address_t val = (address_t)pr->u.init.init_func;
   if (val != (address_t)(JS_InstantiateFunctionListItem2) &&
       val != (address_t)(js_module_ns_autoinit)) {
+#if defined(__aarch64__) && !defined(OS_WIN) && !DISABLE_NANBOX
     PushObjLEPUSValue((LEPUSValue){.as_int64 = (int64_t)val}, workStack);
     PushObjLEPUSValue((LEPUSValue){.as_int64 = (int64_t)sencodPtr}, workStack);
+#endif
   }
 }
 
