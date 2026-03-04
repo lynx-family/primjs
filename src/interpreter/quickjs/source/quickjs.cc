@@ -41762,9 +41762,9 @@ static int make_json_val(LEPUSContext *ctx, LEPUSValue obj,
       return 0;
     }
     case LEPUS_TAG_BIG_INT: {
-// Special handling for INT64-bit data in lynx
-#if JS_LIMB_BITS == 64
+      // Special handling for INT64-bit data in lynx
       auto *p = LEPUS_VALUE_GET_BIGINT(obj);
+#if JS_LIMB_BITS == 64
       if (p->len == 1) {
         val_incr();
         int64_t num = p->tab[0];
@@ -41775,6 +41775,29 @@ static int make_json_val(LEPUSContext *ctx, LEPUSValue obj,
       } else if (p->len == 2 && p->tab[1] == 0) {
         val_incr();
         uint64_t num = p->tab[0];
+        val->tag = JSON_TYPE_NUM | JSON_SUBTYPE_REAL;
+        val->uni.f64 = static_cast<double>(num);
+        LEPUS_FreeValue(ctx, obj);
+        return 0;
+      }
+#else
+      if (p->len == 1) {
+        val_incr();
+        int64_t num = (int32_t)p->tab[0];
+        val->tag = JSON_TYPE_NUM | JSON_SUBTYPE_REAL;
+        val->uni.f64 = (double)num;
+        LEPUS_FreeValue(ctx, obj);
+        return 0;
+      } else if (p->len == 2) {
+        val_incr();
+        int64_t num = (int64_t)(((uint64_t)p->tab[1] << 32) | p->tab[0]);
+        val->tag = JSON_TYPE_NUM | JSON_SUBTYPE_REAL;
+        val->uni.f64 = (double)num;
+        LEPUS_FreeValue(ctx, obj);
+        return 0;
+      } else if (p->len == 3 && p->tab[2] == 0) {
+        val_incr();
+        uint64_t num = ((uint64_t)p->tab[1] << 32) | p->tab[0];
         val->tag = JSON_TYPE_NUM | JSON_SUBTYPE_REAL;
         val->uni.f64 = static_cast<double>(num);
         LEPUS_FreeValue(ctx, obj);
