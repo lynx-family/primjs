@@ -3,6 +3,7 @@
 
 #include <cstdint>
 #include <cstring>
+#include <iterator>
 #include <mutex>
 #ifndef _WIN32
 #include <sys/mman.h>
