@@ -465,9 +465,6 @@ struct LEPUSRuntime {
   std::unordered_set<void *> *async_obj_recoder;
   size_t gc_info_threshold;
   size_t gc_info_interval_size;
-  struct list_head
-      weak_ref_target_list; /* list of objects pointed by WeakRef
-                                or FinalizationRegistry in RC mode */
 };
 
 static const char *const native_error_name[JS_NATIVE_ERROR_COUNT] = {
