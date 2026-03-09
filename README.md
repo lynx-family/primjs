@@ -17,6 +17,7 @@ PrimJS is a lightweight, high-performance JavaScript engine designed specificall
 - **Seamless Object Model Integration:** The engine's object model integrates efficiently with the Lynx object model, reducing data communication overhead and improving rendering performance.
 - **[Advanced Memory Management](./docs/gc.md):** Utilizing a Garbage Collector (GC) instead of QuickJS's Reference Counting, PrimJS offers better performance, improved memory analyzability, and reduced risk of memory leaks.
 - **[Comprehensive Debugging Support](./docs/debugger.md):** Full implementation of the [Chrome DevTools Protocol (CDP)](https://chromedevtools.github.io/devtools-protocol/) enables seamless integration with Chrome Debugger for enhanced debugging capabilities.
+- **[WebAssembly Support](./docs/wasm.md):** Built-in WebAssembly runtime with support for multiple WASM engines (wasm3 and Prism), providing seamless interoperability between JavaScript and WebAssembly code.
 
 ## Performance
 For detailed performance benchmarks, please refer to [performance comparison document](./docs/benchmark.md). The benchmark results show that PrimJS outperforms QuickJS by approximately 28% in overall score (3735 vs 2904) on the Octane Benchmark suite.

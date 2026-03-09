@@ -10,6 +10,7 @@
 #include <condition_variable>
 #include <cstring>
 #include <fstream>
+#include <iostream>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -157,7 +158,7 @@ void inject_js_function_gc(LEPUSContext *ctx) {
         if (!msg)
           WLOGI("JsException");
         else
-          WLOGI("%s", msg);
+          std::cout << msg << std::endl;
 
         return LEPUS_UNDEFINED;
       },
@@ -260,7 +261,7 @@ void inject_js_function(LEPUSContext *ctx) {
         if (!msg)
           WLOGI("JsException");
         else
-          WLOGI("%s", msg);
+          std::cout << msg << std::endl;
 
         LEPUS_FreeCString(ctx, msg);
         return LEPUS_UNDEFINED;
@@ -453,7 +454,7 @@ int main(int argc, char **argv) {
   bool test_cache = false;
   primjs::WasmRuntimeType runtime_type = primjs::WasmRuntimeType::WASM3;
   if (argc < 2) {
-    WLOGI(" Please enter js file path as an argument.");
+    std::cout << " Please enter js file path as an argument." << std::endl;
     return 0;
   } else {
     // default the last parameter is test file
@@ -472,7 +473,7 @@ int main(int argc, char **argv) {
   const char *file_name = argv[argc - 1];
   read_js(file_name, &script, false);
   if (script == nullptr) {
-    WLOGI("Invalid js file path: %s", file_name);
+    std::cout << "Invalid js file path: " << file_name << std::endl;
     return 0;
   }
 
