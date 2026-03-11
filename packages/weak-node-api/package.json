@@ -1,6 +1,6 @@
 {
   "name": "@lynx-js/weak-node-api",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "license": "Apache-2.0",
   "private": false,
   "publishConfig": {
@@ -19,11 +19,7 @@
   },
   "packageManager": "pnpm@9.12.0",
   "bugs": "https://github.com/lynx-family/primjs/issues",
-
-  "author": "Lynx Team <46469310+RobinWuu@users.noreply.github.com>",
-  "contributors": [
-    "RobinWuu <46469310+RobinWuu@users.noreply.github.com>"
-  ],
+  "author": "Lynx Authors",
   "scripts": {
     "prepare:headers": "node scripts/prepare-headers.mjs",
     "bootstrap": "npm run prepare:headers",

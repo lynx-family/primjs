@@ -50,18 +50,24 @@ target_include_directories(${PROJECT_NAME}
 
 # Apple (macOS) shared library configuration (non-Framework)
 if(APPLE)
-  # Produce a universal dylib with an explicit output name and per-config output dirs
+  # Produce a dylib with an explicit output name and per-config output dirs
   # The actual file on disk will be "libweak-node-api.dylib" under the configured
-  # output directories below.
+  # output directories below. For single-arch builds, we let Xcode handle
+  # output to its default location to avoid conflicts.
   set_target_properties(${PROJECT_NAME} PROPERTIES
     OUTPUT_NAME "libweak-node-api"
     PREFIX ""
-    RUNTIME_OUTPUT_DIRECTORY_DEBUG   "${CMAKE_CURRENT_SOURCE_DIR}/build/macos/debug"
-    RUNTIME_OUTPUT_DIRECTORY_RELEASE "${CMAKE_CURRENT_SOURCE_DIR}/build/macos/release"
-    LIBRARY_OUTPUT_DIRECTORY_DEBUG   "${CMAKE_CURRENT_SOURCE_DIR}/build/macos/debug"
-    LIBRARY_OUTPUT_DIRECTORY_RELEASE "${CMAKE_CURRENT_SOURCE_DIR}/build/macos/release"
-    ARCHIVE_OUTPUT_DIRECTORY_DEBUG   "${CMAKE_CURRENT_SOURCE_DIR}/build/macos/debug"
-    ARCHIVE_OUTPUT_DIRECTORY_RELEASE "${CMAKE_CURRENT_SOURCE_DIR}/build/macos/release"
+    # macOS-specific dylib properties
+    INSTALL_NAME_DIR "@rpath"
+    MACOSX_RPATH TRUE
+    BUILD_WITH_INSTALL_RPATH TRUE
+  )
+  
+  # Add linker flags to ensure proper dylib exports and compatibility
+  target_link_options(${PROJECT_NAME} PRIVATE
+    "-Wl,-export_dynamic"
+    "-Wl,-dead_strip_dylibs"
+    "-Wl,-no_deduplicate"
   )
 endif()
 

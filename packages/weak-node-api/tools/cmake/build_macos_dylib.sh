@@ -17,7 +17,7 @@ npm install
 npm run prepare:headers
 
 GENERATOR="Xcode"
-BASE_CMAKE_ARGS="-DCMAKE_OSX_DEPLOYMENT_TARGET=10.0"
+BASE_CMAKE_ARGS="-DCMAKE_OSX_DEPLOYMENT_TARGET=10.13"
 
 # Build both Debug and Release configurations for each variant. The default
 # layout is written under prebuilt/macos/{debug,release} and the weak_suffix
@@ -44,32 +44,65 @@ for VARIANT in default weak_suffix; do
     BUILD_DIR="build/macos_${CONFIG}"
     mkdir -p "$BUILD_DIR"
 
-    echo "[cmake] Configuring Xcode project (universal arm64;x86_64) for $CONFIG (variant=$VARIANT)..."
-    cmake -S . -B "$BUILD_DIR" -G "$GENERATOR" \
-      -DCMAKE_BUILD_TYPE="$CONFIG" \
-      -DCMAKE_SYSTEM_NAME=Darwin \
-      -DCMAKE_OSX_ARCHITECTURES="arm64;x86_64" \
-      $CMAKE_EXTRA_ARGS
-
-    echo "[cmake] Building $CONFIG (variant=$VARIANT)..."
-    cmake --build "$BUILD_DIR" --config "$CONFIG"
-
     LIB_NAME="libweak-node-api.dylib"
     CONFIG_LOWER=$(printf '%s' "$CONFIG" | tr '[:upper:]' '[:lower:]')
+    
+    # Build for each architecture separately
+    for ARCH in arm64 x86_64; do
+      ARCH_BUILD_DIR="${BUILD_DIR}_${ARCH}"
+      mkdir -p "$ARCH_BUILD_DIR"
+      
+      echo "[cmake] Configuring Xcode project for $ARCH architecture, $CONFIG configuration (variant=$VARIANT)..."
+      cmake -S . -B "$ARCH_BUILD_DIR" -G "$GENERATOR" \
+        -DCMAKE_BUILD_TYPE="$CONFIG" \
+        -DCMAKE_SYSTEM_NAME=Darwin \
+        -DCMAKE_OSX_ARCHITECTURES="$ARCH" \
+        $CMAKE_EXTRA_ARGS
 
-    # Prefer the explicit output directories configured in CMakeLists.txt, but
-    # fall back to typical Xcode layout under the build directory if needed.
-    PREFERRED_PATH="build/macos/${CONFIG_LOWER}/${LIB_NAME}"
-    ALT_PATH="$BUILD_DIR/$CONFIG/$LIB_NAME"
-
-    LIB_PATH=""
-    if [[ -f "$PREFERRED_PATH" ]]; then
-      LIB_PATH="$PREFERRED_PATH"
-    elif [[ -f "$ALT_PATH" ]]; then
-      LIB_PATH="$ALT_PATH"
-    else
-      LIB_PATH=$(find "$BUILD_DIR" -maxdepth 4 -name "$LIB_NAME" -print -quit || true)
-    fi
+      echo "[cmake] Building $ARCH architecture, $CONFIG configuration (variant=$VARIANT)..."
+      cmake --build "$ARCH_BUILD_DIR" --config "$CONFIG"
+    done
+    
+    # Locate the dylibs for each architecture
+    ARM64_LIB=""
+    X86_64_LIB=""
+    for ARCH in arm64 x86_64; do
+      ARCH_BUILD_DIR="${BUILD_DIR}_${ARCH}"
+      PREFERRED_ARCH_PATH="build/macos/${CONFIG_LOWER}/${LIB_NAME}"
+      ALT_ARCH_PATH="$ARCH_BUILD_DIR/$CONFIG/$LIB_NAME"
+      
+      if [[ -f "$PREFERRED_ARCH_PATH" ]]; then
+        ARCH_LIB_PATH="$PREFERRED_ARCH_PATH"
+      elif [[ -f "$ALT_ARCH_PATH" ]]; then
+        ARCH_LIB_PATH="$ALT_ARCH_PATH"
+      else
+        ARCH_LIB_PATH=$(find "$ARCH_BUILD_DIR" -maxdepth 4 -name "$LIB_NAME" -print -quit || true)
+      fi
+      
+      if [[ -z "$ARCH_LIB_PATH" || ! -f "$ARCH_LIB_PATH" ]]; then
+        echo "Failed to locate $LIB_NAME for $ARCH architecture, $CONFIG configuration under $ARCH_BUILD_DIR" >&2
+        exit 1
+      fi
+      
+      # Copy to a temporary location with architecture-specific name
+      TEMP_ARCH_LIB="${BUILD_DIR}_${LIB_NAME}_${ARCH}"
+      cp "$ARCH_LIB_PATH" "$TEMP_ARCH_LIB"
+      
+      if [[ "$ARCH" == "arm64" ]]; then
+        ARM64_LIB="$TEMP_ARCH_LIB"
+      else
+        X86_64_LIB="$TEMP_ARCH_LIB"
+      fi
+    done
+    
+    # Merge the architectures with lipo
+    echo "[cmake] Merging arm64 and x86_64 architectures into universal dylib..."
+    lipo -create "$ARM64_LIB" "$X86_64_LIB" -output "${BUILD_DIR}/${LIB_NAME}"
+    
+    # Clean up temporary files
+    rm "$ARM64_LIB" "$X86_64_LIB"
+    
+    LIB_PATH="${BUILD_DIR}/${LIB_NAME}"
 
     if [[ -z "${LIB_PATH}" || ! -f "$LIB_PATH" ]]; then
       echo "Failed to locate $LIB_NAME for configuration $CONFIG under $BUILD_DIR" >&2
