@@ -46,9 +46,9 @@ extern "C" {
 #endif
 
 #include "gc/allocator.h"
-#include "gc/collector_ms.h"
 #include "quickjs/include/dtoa.h"
 #include "quickjs/include/primjs_monitor.h"
+#include "quickjs/include/quickjs_queue.h"
 
 #ifndef _WIN32
 #include <sys/mman.h>
@@ -57,82 +57,25 @@ extern "C" {
 #else
 #define pid_t int
 #endif
-
 #include <cstring>
 
+#ifdef ENABLE_GC_DEBUG_TOOLS
+#include <unordered_map>
 #ifndef DCHECK
-#ifdef ROS_DEBUG
 #define DCHECK(condition) \
-  if (!(condition)) *(int *)(0xdead) = 0;
+  if (!(condition)) abort();
+#endif
 #else
+#ifndef DCHECK
 #define DCHECK(condition) ((void)0)
-#endif  // ROS_DEBUG
-#endif  // DCHECK
+#endif
+#endif
 
 typedef int BOOL;
 #define SYSCALL_CHECK(condition) \
   if ((condition) == -1) {       \
     /*abort()*/                  \
   }
-
-volatile inline std::atomic<uint64_t> *to_std_atomic64(volatile address_t ptr) {
-  return reinterpret_cast<volatile std::atomic<uint64_t> *>(ptr);
-}
-
-volatile inline std::atomic<uint32_t> *to_std_atomic32(volatile uint32_t *ptr) {
-  return reinterpret_cast<volatile std::atomic<uint32_t> *>(ptr);
-}
-
-inline void init_obj_header(void *ptr, int obj_size, int alloc_tag) {
-  auto addr =
-      to_std_atomic64(reinterpret_cast<address_t>(ptr) - ROS_GC::kHeaderSize);
-  uint64_t val = (static_cast<uint64_t>(obj_size) << 32) |
-                 ROS_GC::kAllocatedBit64 |
-                 (static_cast<uint64_t>(alloc_tag) & 0x3F);
-  std::atomic_store_explicit(addr, val, std::memory_order_release);
-}
-
-// alloc tag
-inline void set_alloc_tag(void *ptr, int alloc_tag) {
-  auto atomic_ptr = to_std_atomic32(reinterpret_cast<uint32_t *>(ptr) - 2);
-  int size = std::atomic_load_explicit(atomic_ptr, std::memory_order_acquire) &
-             ~(0x3F);
-  std::atomic_store_explicit(atomic_ptr,
-                             size | (static_cast<uint32_t>(alloc_tag) & 0x3F),
-                             std::memory_order_release);
-}
-
-inline int get_alloc_tag(void *ptr) {
-  auto addr = reinterpret_cast<address_t>(ptr) - ROS_GC::kHeaderSize;
-  auto header = std::atomic_load_explicit(to_std_atomic64(addr),
-                                          std::memory_order_acquire);
-  if ((header & ROS_GC::kAllocatedBit64) == 0) return 0;
-  return header & 0x3F;
-}
-
-inline uint32_t get_obj_size(void *ptr) {
-  auto atomic_ptr = to_std_atomic32(reinterpret_cast<uint32_t *>(ptr) - 1);
-  return std::atomic_load_explicit(atomic_ptr, std::memory_order_acquire) &
-         0x7FFFFFFF;
-}
-
-// hash size
-inline void set_hash_size(void *ptr, int hash_size) {  // with tag
-  if (hash_size > (1 << 25) - 1) {
-    *(int *)(0xdead) = 0;
-  }
-  auto atomic_ptr = to_std_atomic32(reinterpret_cast<uint32_t *>(ptr) - 2);
-  int tag =
-      std::atomic_load_explicit(atomic_ptr, std::memory_order_acquire) & 0x3F;
-  std::atomic_store_explicit(atomic_ptr,
-                             (static_cast<uint32_t>(hash_size) << 6) | tag,
-                             std::memory_order_release);
-}
-
-inline int get_hash_size(void *ptr) {
-  auto atomic_ptr = to_std_atomic32(reinterpret_cast<uint32_t *>(ptr) - 2);
-  return std::atomic_load_explicit(atomic_ptr, std::memory_order_acquire) >> 6;
-}
 
 #ifdef ENABLE_QUICKJS_DEBUGGER
 #include "inspector/debugger_inner.h"
@@ -166,8 +109,14 @@ inline int get_hash_size(void *ptr) {
 
 #define KB (1024)
 #define MB (1024 * KB)
+#define MS (1000)
 
 #define BUF_LEN (100)
+
+#ifdef ENABLE_GC_DEBUG_TOOLS
+size_t get_cur_cnt(void *runtime, void *ptr);
+size_t get_del_cnt(void *runtime, void *ptr);
+#endif
 
 #define __exception __attribute__((warn_unused_result))
 using address_t = uintptr_t;
@@ -281,7 +230,7 @@ typedef struct JSMallocState {
   // <Primjs begin>
   uint64_t malloc_size;
   uint64_t malloc_limit;
-  LEPUSRuntime *runtime;
+  struct malloc_state allocate_state;
   // <Primjs end>
   void *opaque; /* user opaque */
 } JSMallocState;
@@ -337,16 +286,12 @@ typedef struct QJSDebuggerCallbacks2 {
 #endif
 
 class GlobalHandles;
+class GarbageCollector;
 class PtrHandles;
 class CheckTools;
 class ByteThreadPool;
 class NAPIHandleScope;
 
-void *lepus_def_allocate(ROS_GC::RosAllocImpl *, size_t size, int alloc_tag);
-void *lepus_def_reallocate(ROS_GC::RosAllocImpl *ros, void *ptr, size_t size,
-                           int alloc_tag);
-
-struct JSVarRef;
 struct LEPUSRuntime {
   LEPUSMallocFunctions mf;
   const char *rt_info;
@@ -437,34 +382,29 @@ struct LEPUSRuntime {
   void (*update_gc_info)(LEPUSContext *, const char *, int);
   char gc_info_start_[BUF_LEN];
   char gc_info_end_[BUF_LEN];
+  int64_t init_time;
 
+  ByteThreadPool *workerThreadPool;
   GlobalHandles *global_handles_ = nullptr;
 
   QJSValueValueSpace *qjsvaluevalue_allocator = nullptr;
   PtrHandles *ptr_handles;
+  GarbageCollector *gc;
+  size_t gc_cnt;
+  void *mem_for_oom;
   bool gc_enable;
   bool is_lepusng;
   void *user_opaque;
   JSMallocState malloc_state;
-  ROS_GC::RosAllocImpl *ros_;
-  ROS_GC::MarkSweepCollector *collector_;
   void *gc_observer;
   int gc_depth;
   bool object_ctx_check;
-  // #ifdef ENABLE_TRACING_GC
+#ifdef ENABLE_TRACING_GC
   LEPUSObject *boilerplateArg0;
   LEPUSObject *boilerplateArg1;
   LEPUSObject *boilerplateArg2;
   LEPUSObject *boilerplateArg3;
-  // #endif
-  bool con_mark_state = false;
-  void *(*js_malloc_rt)(LEPUSRuntime *rt, size_t size, int alloc_tag);
-  void *(*js_realloc_rt)(LEPUSRuntime *rt, void *ptr, size_t size,
-                         int alloc_tag);
-  std::unordered_set<void *> *finalizerSet;
-  std::unordered_set<void *> *async_obj_recoder;
-  size_t gc_info_threshold;
-  size_t gc_info_interval_size;
+#endif
 };
 
 static const char *const native_error_name[JS_NATIVE_ERROR_COUNT] = {
@@ -502,9 +442,7 @@ struct LEPUSClass {
 
 #define JS_MODE_STRICT (1 << 0)
 #define JS_MODE_STRIP (1 << 1)
-#define JS_MODE_BIGINT (1 << 2)
-#define JS_MODE_MATH (1 << 3)
-#define JS_MODE_ASYNC (1 << 4)
+#define JS_MODE_MATH (1 << 2)
 
 typedef struct LEPUSStackFrame {
   struct LEPUSStackFrame *prev_frame; /* NULL if first stack frame */
@@ -659,13 +597,12 @@ typedef struct JSGCHeader {
 typedef struct JSVarRef {
   LEPUSRefCountHeader header; /* must come first, 32-bit */
   JSGCHeader gc_header;       /* must come after LEPUSRefCountHeader, 8-bit */
-  uint8_t is_arg;
+  uint8_t is_arg : 1;
   /*
    * 0: the VarRef is on the stack.
    * 1: the VarRef is detached, pvalue == &value;
    */
-  uint8_t is_detached;
-  uint8_t from;
+  uint8_t is_detached : 1;
   int var_idx; /* index of the corresponding function variable on
                   the stack */
   struct list_head link;
@@ -726,15 +663,16 @@ typedef enum OPCodeEnum {
 
 struct FinalizationRegistryContext;
 constexpr size_t kFunctionShapeSize = 2;
-struct WeakRefData;
-struct FinalizationRegistryData;
 
 struct LEPUSContext {
   // <primjs begin>
 #ifdef ENABLE_PRIMJS_SNAPSHOT
   address *dispatch_table;
 #endif
-  // <primjs end>
+// <primjs end>
+#ifndef ALLOCATE_WINDOWS
+  mstate allocate_state;
+#endif
   LEPUSRuntime *rt;
   struct list_head link;
 
@@ -795,14 +733,11 @@ struct LEPUSContext {
 
   PtrHandles *ptr_handles;
   NAPIHandleScope *napi_scope;
+  struct FinalizationRegistryContext *fg_ctx = nullptr;
+  uint64_t binary_version;
   bool gc_enable;
   bool is_lepusng;
   bool object_ctx_check;
-  uint64_t binary_version;
-  struct FinalizationRegistryContext *fg_ctx = nullptr;
-  bool con_mark_state = false;
-  std::unordered_set<LEPUSObject *> *obj_finalizer_recoder;
-  std::unordered_set<FinalizationRegistryData *> *fr_data_finalizer_recoder;
   CheckTools *check_tools;
 };
 
@@ -930,7 +865,6 @@ enum {
   ENABLE_LEPUSNG_STRAGETY = 0b100000000000,
   LEPUSNG_HEAP_12 = 0b1000000000000,
   LEPUSNG_GC_DISABLE = 0b10000000000000,
-  CONCURRENT_DISABLE = 0b100000000000000,
 };
 
 inline int settingsFlag = 0;
@@ -940,8 +874,10 @@ typedef struct CallerStrSlot {
   uint32_t pc;
   uint32_t size : 31;
   uint32_t is_str : 1;
-  const char *str;
-  uint32_t off;
+  union {
+    const char *str;
+    uint32_t off;
+  };
 } CallerStrSlot;
 
 typedef struct LEPUSFunctionBytecode {
@@ -1073,7 +1009,6 @@ typedef struct JSAsyncFunctionState {
 #ifdef ENABLE_PRIMJS_SNAPSHOT
   LEPUSValue *_arg_buf;
 #endif
-  uint8_t on_stack;
 } JSAsyncFunctionState;
 
 /* XXX: could use an object instead to avoid the
@@ -1274,6 +1209,7 @@ struct LEPUSObject {
   uint8_t tmp_mark : 1;             /* used in JS_WriteObjectRec() */
   uint16_t class_id;                /* see JS_CLASS_x */
   /* byte offsets: 8/8 */
+  struct list_head link; /* object list */
   /* byte offsets: 16/24 */
   JSShape *shape;   /* prototype and property names + flag */
   JSProperty *prop; /* array of properties */
@@ -1360,19 +1296,8 @@ struct LEPUSObject {
   } u;
   LEPUSContext *ctx;
   pid_t tid;
-  struct list_head link; /* object list */
   /* byte sizes: 40/48/72 */
 };
-
-// should config together with kObjRunIdx
-#define LEPUS_IN_OBJECT_PROPERTY_SIZE 4
-static_assert((sizeof(struct list_head) + sizeof(JSProperty) * 3) /
-                  sizeof(JSProperty) ==
-              LEPUS_IN_OBJECT_PROPERTY_SIZE);
-static size_t LEPUS_OBJECT_SIZE = sizeof(LEPUSObject) + sizeof(JSProperty) * 3;
-static size_t OBJECT_PROP_OFFSET = (uintptr_t)(&(((LEPUSObject *)(0x0))->link));
-#define IS_IN_OBJECT_PROP(p, prop) \
-  ((uintptr_t)(prop) - (uintptr_t)p == OBJECT_PROP_OFFSET)
 
 constexpr const char *lepusjs_filename = "file://lepus.js";
 constexpr const char *lepusng_functionid_str = "__lepusNG_function_id__";
@@ -1544,11 +1469,6 @@ inline void system_free(void *ptr) {
   if (!ptr) return;
   free(ptr);
 }
-
-typedef struct JSResolveEntry {
-  LEPUSModuleDef *module;
-  JSAtom name;
-} JSResolveEntry;
 
 typedef struct JSSeparableString {
   LEPUSRefCountHeader header; /* ref count for gc*/
@@ -1830,8 +1750,8 @@ QJS_HIDE JSProperty *add_property(LEPUSContext *ctx, LEPUSObject *p,
                                   JSAtom prop, int prop_flags);
 QJS_HIDE JSProperty *add_property_gc(LEPUSContext *ctx, LEPUSObject *p,
                                      JSAtom prop, int prop_flags);
-QJS_HIDE void prim_HeapObjStoreLEPUSValue(void *fieldAddr, LEPUSValue value);
 QJS_HIDE void prim_WriteBarrierNoStore(LEPUSValue value, LEPUSContext *ctx);
+QJS_HIDE void prim_HeapObjStoreLEPUSValue(void *fieldAddr, LEPUSValue value);
 QJS_HIDE void prim_HeapObjStorePtr(void *dstObj, address_t offset, void *value);
 QJS_HIDE LEPUSValue js_get_length(LEPUSContext *ctx, LEPUSValueConst obj);
 
@@ -2052,7 +1972,7 @@ QJS_HIDE int init_class_range(LEPUSRuntime *rt, JSClassShortDef const *tab,
 const char *JS_AtomToCString_GC(LEPUSContext *ctx, JSAtom atom);
 
 void JS_MarkValue_GC(LEPUSRuntime *rt, LEPUSValueConst val,
-                     LEPUS_MarkFunc *mark_func, uint64_t trace_tool = 0);
+                     LEPUS_MarkFunc *mark_func, int local_idx = -1);
 
 LEPUSValue JS_NewInt64_GC(LEPUSContext *ctx, int64_t v);
 LEPUSValue JS_NewError_GC(LEPUSContext *ctx);
@@ -2235,7 +2155,8 @@ QJS_HIDE int JS_ToBoolFree_GC(LEPUSContext *ctx, LEPUSValue val);
 QJS_HIDE LEPUSValue JS_ToPrimitiveFree_GC(LEPUSContext *ctx, LEPUSValue val,
                                           int hint);
 
-QJS_HIDE void *JS_VisitLEPUSValue_GC(LEPUSRuntime *rt, LEPUSValue *val);
+QJS_HIDE void JS_VisitLEPUSValue_GC(LEPUSRuntime *rt, LEPUSValue *val,
+                                    int local_idx);
 QJS_HIDE void DisposeGlobal_GC(LEPUSRuntime *runtime,
                                LEPUSValue *global_handle);
 QJS_HIDE LEPUSValue *GlobalizeReference_GC(LEPUSRuntime *runtime,
@@ -2252,6 +2173,8 @@ QJS_HIDE void SetWeakState_GC(LEPUSRuntime *runtime, LEPUSValue *global_handle);
 
 QJS_HIDE void JS_SetGCPauseSuppressionMode_GC(LEPUSRuntime *rt, bool mode);
 QJS_HIDE bool JS_GetGCPauseSuppressionMode_GC(LEPUSRuntime *rt);
+QJS_HIDE __attribute__((unused)) bool CheckValidPtr_GC(void *runtime,
+                                                       void *ptr);
 QJS_HIDE JSString *js_alloc_string(LEPUSContext *ctx, int max_len,
                                    int is_wide_char);
 QJS_HIDE int JS_InitAtoms(LEPUSRuntime *rt);
@@ -2335,8 +2258,7 @@ QJS_HIDE int js_parse_skip_parens_token(JSParseState *s, int *pbits,
                                         BOOL no_line_terminator,
                                         BOOL *has_ellipsis = nullptr);
 QJS_HIDE int js_resize_array(LEPUSContext *ctx, void **parray, int elem_size,
-                             int *psize, int *pcount, int new_count,
-                             int alloc_tag);
+                             int *psize, int *pcount, int new_count);
 QJS_HIDE JSExportEntry *find_export_entry(LEPUSContext *ctx, LEPUSModuleDef *m,
                                           JSAtom export_name);
 
@@ -2906,8 +2828,6 @@ QJS_HIDE JSAtom js_symbol_to_atom(LEPUSContext *, LEPUSValue);
 QJS_HIDE LEPUSValueConst JS_GetActiveFunction(LEPUSContext *ctx);
 QJS_HIDE LEPUSValue js_array_buffer_get_byteLength(LEPUSContext *,
                                                    LEPUSValueConst, int32_t);
-QJS_HIDE LEPUSValue js_module_ns_autoinit(LEPUSContext *ctx, LEPUSObject *p,
-                                          JSAtom atom, void *opaque);
 #ifndef NO_QUICKJS_COMPILER
 // the last two parameters are needed for qjs debugger, default value: false,
 // NULL
@@ -3059,6 +2979,9 @@ typedef struct FinalizerOpaque {
 bool JS_IsNewVersion(LEPUSContext *ctx);
 bool JS_CheckBytecodeVersion(uint64_t v64);
 
+QJS_HIDE void DeleteCurNode(LEPUSRuntime *rt, void *node, int type);
+QJS_HIDE bool CheckValidNode(LEPUSRuntime *rt, void *node, int type);
+
 // #sec-tointgerorinfinity
 inline double DoubleToInteger(double x) {
   if (isnan(x) || x == 0.0) return 0;
@@ -3066,15 +2989,15 @@ inline double DoubleToInteger(double x) {
   return ((x > 0) ? floor(x) : ceil(x)) + 0.0;
 }
 
-void insert_weakref_record(LEPUSContext *ctx, LEPUSObject *p,
-                           struct WeakRefRecord *record);
+inline void insert_weakref_record(LEPUSObject *p,
+                                  struct WeakRefRecord *record) {
+  record->next_weak_ref = p->first_weak_ref;
+  p->first_weak_ref = record;
+  return;
+}
 
 char *js_strmalloc(const char *s, size_t n);
-char *js_strmalloc_gc(LEPUSContext *ctx, const char *s, size_t n);
-void *lepus_dbuf_realloc_rt(LEPUSRuntime *rt, void *ptr, size_t size,
-                            int alloc_tag);
 void AddLepusRefCount(LEPUSContext *ctx);
-void LEPUS_SetHeapOpaque(LEPUSContext *ctx, LEPUSValue obj, void *opaque);
 
 class LynxTraceInstance {
  public:
@@ -3145,8 +3068,8 @@ void SetObjectCtxCheckStatus(LEPUSContext *ctx, bool enable);
 int64_t NapiAdjustExternalMemory(LEPUSRuntime *rt, int64_t size);
 
 void trig_gc(JSMallocState *s, size_t size, bool is_outer = false);
-void set_gc_info_threshold(LEPUSRuntime *rt, uint32_t mode);
-void JS_UpdateGCInfo(LEPUSRuntime *rt, size_t size, bool from_gc = false);
+void set_gc_info_threshold(mstate s, uint32_t mode);
+void JS_UpdateGCInfo(JSMallocState *s, size_t size);
 
 QJS_HIDE pid_t get_tid();
 

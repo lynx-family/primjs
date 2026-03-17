@@ -12,13 +12,20 @@
  * NON-INFRINGEMENT, MERCHANTABILITY OR FIT FOR A PARTICULAR PURPOSE. See the
  * Mulan PSL v2 for more details.
  */
-#ifdef ENABLE_COMPATIBLE_MM
+
+// Copyright 2024 The Lynx Authors. All rights reserved.
+// Licensed under the Apache License Version 2.0 that can be found in the
+// LICENSE file in the root directory of this source tree.
+
+#ifndef _WIN32
 #include "gc/thread_pool.h"
 
+#include <sched.h>
+#include <string.h>
 #include <sys/resource.h>
 #include <sys/time.h>
 
-#include "gc/logger.h"
+#include <iostream>
 
 #define CHECK_PTHREAD_CALL(call, args, what)                       \
   do {                                                             \
@@ -30,57 +37,45 @@
     }                                                              \
   } while (false)
 
-struct CreateParam {
-  void *poolThread;
-  void *vmSource;
-};
-
-// thread pool implementation
-namespace ROS_GC {
-MplPoolThread::MplPoolThread(MplThreadPool *threadPool, const char *threadName,
-                             size_t threadId, size_t stackSize)
+BytePoolThread::BytePoolThread(ByteThreadPool *threadPool,
+                               const char *threadName, size_t threadId,
+                               size_t stackSize)
     : schedCores(nullptr),
       id(threadId),
       tid(-1),
       name(threadName),
       pool(threadPool) {
-  SCOPED_LOGGER(__func__);
   pthread_attr_t attr;
   CHECK_PTHREAD_CALL(pthread_attr_init, (&attr), "");
   CHECK_PTHREAD_CALL(pthread_attr_setstacksize, (&attr, stackSize), stackSize);
-  CreateParam *param = (CreateParam *)malloc(sizeof(CreateParam));
-  param->poolThread = (void *)this;
-  CHECK_PTHREAD_CALL(pthread_create,
-                     (&pthread, nullptr, &WorkerFunc, (void *)param),
-                     "MplPoolThread init");
+  CHECK_PTHREAD_CALL(pthread_create, (&pthread, nullptr, &WorkerFunc, this),
+                     "BytePoolThread init");
 #if defined(ANDROID) || defined(__ANDROID__)
   CHECK_PTHREAD_CALL(pthread_setname_np, (pthread, threadName),
-                     "MplThreadPool SetName");
+                     "BytePoolThread SetName");
 #endif
-  CHECK_PTHREAD_CALL(pthread_attr_destroy, (&attr), "MplPoolThread init");
+  CHECK_PTHREAD_CALL(pthread_attr_destroy, (&attr), "BytePoolThread init");
 }
 
-MplPoolThread::~MplPoolThread() {
+BytePoolThread::~BytePoolThread() {
   CHECK_PTHREAD_CALL(pthread_join, (pthread, nullptr), "thread deinit");
   schedCores = nullptr;
   pool = nullptr;
 }
 
-void MplPoolThread::SetPriority(int32_t priority) {
+void BytePoolThread::SetPriority(int32_t priority) {
   int32_t result = setpriority(static_cast<int>(PRIO_PROCESS), tid, priority);
   if (result != 0) {
-    // LOG(ERROR) << "Failed to setpriority to :" << priority;
+    std::cout << "Failed to setpriority to :" << priority;
   }
 }
 
-void *MplPoolThread::WorkerFunc(void *param) {
-  CreateParam *createParam = reinterpret_cast<CreateParam *>(param);
-  MplPoolThread *thread =
-      reinterpret_cast<MplPoolThread *>(createParam->poolThread);
-  MplThreadPool *pool = thread->pool;
+void *BytePoolThread::WorkerFunc(void *param) {
+  BytePoolThread *thread = reinterpret_cast<BytePoolThread *>(param);
+  ByteThreadPool *pool = thread->pool;
 
   while (!pool->IsExited()) {
-    MplTask *task = nullptr;
+    ByteTask *task = nullptr;
     {
       std::unique_lock<std::mutex> taskLock(pool->taskMutex);
       // hang up in threadSleepingCondVar when pool stopped or to many active
@@ -90,33 +85,25 @@ void *MplPoolThread::WorkerFunc(void *param) {
              !pool->IsExited()) {
         // currActiveThreadNum start at maxThreadNum, dec before thread hangup
         // in sleeping state
-        --(pool->currActiveThreadNum);
+        pool->currActiveThreadNum.fetch_sub(1);
         if (pool->currActiveThreadNum.load() == 0) {
           // all thread sleeping, pool in stop state, notify wait stop thread
           pool->allThreadStopped.notify_all();
         }
         pool->threadSleepingCondVar.wait(taskLock);
-        ++(pool->currActiveThreadNum);
+        pool->currActiveThreadNum.fetch_add(1);
       }
       // if no task available thread hung up in taskEmptyCondVar
       while (pool->taskQueue.empty() && pool->IsRunning() &&
              !pool->IsExited()) {
         // currExecuteThreadNum start at 0, inc before thread wait for task
-        ++(pool->currWaittingThreadNum);
-        bool hasNewTask = false;
+        pool->currWaittingThreadNum.fetch_add(1);
         if (pool->currWaittingThreadNum.load() == pool->maxActiveThreadNum) {
           // all task is done, notify wait finish thread
-          auto func = pool->GetNofifyFunc();
-          hasNewTask = !pool->taskQueue.empty();
-          if (func && !hasNewTask) {
-            func(0);
-          }
-          if (!hasNewTask) pool->allWorkDoneCondVar.notify_all();
+          pool->allWorkDoneCondVar.notify_all();
         }
-        if (!hasNewTask) {
-          pool->taskEmptyCondVar.wait(taskLock);
-        }
-        --(pool->currWaittingThreadNum);
+        pool->taskEmptyCondVar.wait(taskLock);
+        pool->currWaittingThreadNum.fetch_sub(1);
       }
       if (!pool->taskQueue.empty() && pool->IsRunning() && !pool->IsExited()) {
         task = pool->taskQueue.front();
@@ -124,16 +111,17 @@ void *MplPoolThread::WorkerFunc(void *param) {
       }
     }
     if (task != nullptr) {
-      if (thread->schedCores != nullptr) {
-        // thread->schedCores->push_back(sched_getcpu());
-      }
+      // todo enable on android
+      /*if (thread->schedCores != nullptr) {
+        thread->schedCores->push_back(sched_getcpu());
+      }*/
       task->Execute(thread->id);
       delete task;
     }
   }
   {
     std::unique_lock<std::mutex> taskLock(pool->taskMutex);
-    --(pool->currActiveThreadNum);
+    pool->currActiveThreadNum.fetch_sub(1);
     if (pool->currActiveThreadNum.load() == 0) {
       // all thread sleeping, pool in stop state, notify wait stop thread
       pool->allThreadStopped.notify_all();
@@ -144,13 +132,13 @@ void *MplPoolThread::WorkerFunc(void *param) {
 
 const int kMaxNameLen = 256;
 
-MplThreadPool::MplThreadPool(const char *poolName, int32_t threadNum,
-                             int32_t prior)
-    //    : priority(prior),
-    : name(poolName),
+ByteThreadPool::ByteThreadPool(const char *poolName, int32_t threadNum,
+                               int32_t prior)
+    :  // priority(prior),
+      name(poolName),
       running(false),
       exit(false),
-      maxThreadNum(threadNum),
+      maxThreadNum(0),
       maxActiveThreadNum(0) {
   // init and start thread
   currActiveThreadNum.store(0);
@@ -158,32 +146,31 @@ MplThreadPool::MplThreadPool(const char *poolName, int32_t threadNum,
   char threadName[kMaxNameLen];
   for (int32_t i = 0; i < maxThreadNum; ++i) {
     // threadID 0 is main thread, sub threadID start at 1
-    int ret = snprintf(threadName, (kMaxNameLen - 1), "RosPool%s_%d", poolName,
-                       (i + 1));
+    int ret =
+        snprintf(threadName, (kMaxNameLen - 1), "Pool%s_%d", poolName, (i + 1));
     if (ret < 0) {
       std::cout << "snprintf "
                 << "name = " << name << "threadId" << (i + 1)
-                << " in MplThreadPool::MplThreadPool return " << ret
+                << " in ByteThreadPool::ByteThreadPool return " << ret
                 << " rather than 0." << std::endl;
     }
     // default Sleeping
-    MplPoolThread *threadItem = new (std::nothrow)
-        MplPoolThread(this, threadName, (i + 1), kDefaultStackSize);
+    BytePoolThread *threadItem = new (std::nothrow)
+        BytePoolThread(this, threadName, (i + 1), kDefaultStackSize);
     if (threadItem == nullptr) {
-      // LOG(FATAL) << "new MplPoolThread failed" << std::endl;
-      std::cout << "new MplThreadPool failed" << std::endl;
+      std::cout << "new BytePoolThread failed" << std::endl;
     } else {
       threads.push_back(threadItem);
+      maxThreadNum++;
       maxActiveThreadNum++;
-      currActiveThreadNum++;
+      currActiveThreadNum.fetch_add(1);
     }
   }
   // pool init in stop state
   Stop();
-  // LOG(DEBUGY) << "MplThreadPool init" << std::endl;
 }
 
-void MplThreadPool::Exit() {
+void ByteThreadPool::Exit() {
   std::unique_lock<std::mutex> taskLock(taskMutex);
   // set pool exit flag
   exit.store(true, std::memory_order_relaxed);
@@ -197,10 +184,10 @@ void MplThreadPool::Exit() {
   allWorkDoneCondVar.notify_all();
   // notify all WaitStop thread return
   allThreadStopped.notify_all();
-  // LOG(DEBUGY) << "MplThreadPool Exit" << std::endl;
+  // std::cout << "ByteThreadPool Exit" << std::endl;
 }
 
-MplThreadPool::~MplThreadPool() {
+ByteThreadPool::~ByteThreadPool() {
   Exit();
   // wait until threads exit
   for (auto thread : threads) {
@@ -210,13 +197,13 @@ MplThreadPool::~MplThreadPool() {
   ClearAllTask();
 }
 
-void MplThreadPool::SetPriority(int32_t prior) {
+void ByteThreadPool::SetPriority(int32_t prior) {
   for (auto thread : threads) {
     thread->SetPriority(prior);
   }
 }
 
-void MplThreadPool::SetMaxActiveThreadNum(int32_t num) {
+void ByteThreadPool::SetMaxActiveThreadNum(int32_t num) {
   std::unique_lock<std::mutex> taskLock(taskMutex);
   int32_t oldNum = maxActiveThreadNum;
   if (num >= maxThreadNum) {
@@ -224,7 +211,7 @@ void MplThreadPool::SetMaxActiveThreadNum(int32_t num) {
   } else if (num > 0) {
     maxActiveThreadNum = num;
   } else {
-    // LOG(ERROR) << "SetMaxActiveThreadNum invalid input val" << std::endl;;
+    std::cout << "SetMaxActiveThreadNum invalid input val" << std::endl;
     return;
   }
   // active more thread get to work when pool is running
@@ -234,9 +221,9 @@ void MplThreadPool::SetMaxActiveThreadNum(int32_t num) {
   }
 }
 
-void MplThreadPool::AddTask(MplTask *task) {
-  if (UNLIKELY(task == nullptr)) {
-    // LOG(FATAL) << "failed to add a null task" << std::endl;
+void ByteThreadPool::AddTask(ByteTask *task) {
+  if (task == nullptr) {
+    std::cout << "failed to add a null task" << std::endl;
   }
   std::unique_lock<std::mutex> taskLock(taskMutex);
   taskQueue.push(task);
@@ -247,29 +234,20 @@ void MplThreadPool::AddTask(MplTask *task) {
   }
 }
 
-// only used in remark phase. gc worker thread already acquired taskMutex
-// when it posts a remark task.
-void MplThreadPool::AddTaskNoLock(MplTask *task) {
-  taskQueue.push(task);
-  if (IsRunning() && (currWaittingThreadNum.load() > 0)) {
-    taskEmptyCondVar.notify_one();
-  }
+void ByteThreadPool::AddTask(std::function<void(size_t)> func) {
+  AddTask(new (std::nothrow) ByteLambdaTask(func));
 }
 
-void MplThreadPool::AddTask(std::function<void(size_t)> func) {
-  AddTask(new (std::nothrow) MplLambdaTask(func));
-}
-
-void MplThreadPool::Start() {
+void ByteThreadPool::Start() {
   // notify all sleeping threads get to work
   std::unique_lock<std::mutex> taskLock(taskMutex);
   running.store(true, std::memory_order_relaxed);
   threadSleepingCondVar.notify_all();
 }
 
-void MplThreadPool::DrainTaskQueue() {
-  //__MRT_ASSERT(!IsRunning(), "thread pool is running");
-  MplTask *task = nullptr;
+void ByteThreadPool::DrainTaskQueue() {
+  if (IsRunning()) abort();
+  ByteTask *task = nullptr;
   do {
     task = nullptr;
     taskMutex.lock();
@@ -284,16 +262,11 @@ void MplThreadPool::DrainTaskQueue() {
     }
   } while (task != nullptr);
 }
-void MplThreadPool::WaitFinishAndKeepNotifyFunc(bool addToExecute) {
-  auto notifyFunc = GetNofifyFunc();
-  SetNotifyFunc(nullptr);
-  WaitFinish(true);
-  SetNotifyFunc(notifyFunc);
-}
-void MplThreadPool::WaitFinish(bool addToExecute,
-                               std::vector<int32_t> *schedCores) {
+
+void ByteThreadPool::WaitFinish(bool addToExecute,
+                                std::vector<int32_t> *schedCores) {
   if (addToExecute) {
-    MplTask *task = nullptr;
+    ByteTask *task = nullptr;
     do {
       task = nullptr;
       taskMutex.lock();
@@ -303,9 +276,10 @@ void MplThreadPool::WaitFinish(bool addToExecute,
       }
       taskMutex.unlock();
       if (task != nullptr) {
-        if (schedCores != nullptr) {
-          // schedCores->push_back(sched_getcpu());
-        }
+        // todo, enable on android
+        /*if (schedCores != nullptr) {
+          schedCores->push_back(sched_getcpu());
+        }*/
         task->Execute(0);
         delete task;
       }
@@ -329,23 +303,22 @@ void MplThreadPool::WaitFinish(bool addToExecute,
   DrainTaskQueue();
 }
 
-void MplThreadPool::Stop() {
+void ByteThreadPool::Stop() {
   // notify & wait all thread enter stopped state
   std::unique_lock<std::mutex> taskLock(taskMutex);
   running.store(false, std::memory_order_relaxed);
   taskEmptyCondVar.notify_all();
-  while (currActiveThreadNum.load() != 0) {
+  while (currActiveThreadNum != 0) {
     allThreadStopped.wait(taskLock);
   }
 }
 
-void MplThreadPool::ClearAllTask() {
+void ByteThreadPool::ClearAllTask() {
   std::unique_lock<std::mutex> taskLock(taskMutex);
   while (!taskQueue.empty()) {
-    MplTask *task = taskQueue.front();
+    ByteTask *task = taskQueue.front();
     taskQueue.pop();
     delete task;
   }
 }
-}  // namespace ROS_GC
-#endif  // ENABLE_COMPATIBLE_MM
+#endif

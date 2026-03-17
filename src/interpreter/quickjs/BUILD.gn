@@ -13,6 +13,7 @@ primjs_source_set("quickjs") {
     "source/quickjs-libc.cc",
     "source/quickjs.cc",
     "source/quickjs_gc.cc",
+    "source/quickjs_queue.cc",
     "source/quickjs_version.cc",
   ]
 }

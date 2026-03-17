@@ -54,24 +54,20 @@ config("quickjs_public_config") {
     defines += [ "ENABLE_COMPATIBLE_MM" ]
   }
 
-  if (enable_ros_force_gc) {
-    defines += [ "ROS_FORCE_GC" ]
+  if (enable_force_gc) {
+    defines += [ "ENABLE_FORCE_GC" ]
   }
 
-  if (enable_conmark_checker) {
-    defines += [ "CONMARK_CHECKER_ENABLE" ]
-  }
-
-  if (enable_ros_debug) {
-    defines += [ "ROS_DEBUG" ]
-  }
-
-  if (enable_gc_log) {
-    defines += [ "ENABLE_GC_LOG" ]
+  if (enable_tracing_gc_log) {
+    defines += [ "ENABLE_TRACING_GC_LOG" ]
   }
 
   if (gen_android_embedded) {
     defines += [ "GEN_ANDROID_EMBEDDED" ]
+  }
+
+  if (enable_gc_debug_tools) {
+    defines += [ "ENABLE_GC_DEBUG_TOOLS" ]
   }
 
   if (enable_primjs_trace) {

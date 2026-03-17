@@ -993,7 +993,6 @@ void LEPUS_FreeValueRT(LEPUSRuntime *rt, LEPUSValue v);
 
 bool LEPUS_IsGCMode(LEPUSContext *ctx);
 bool LEPUS_IsGCModeRT(LEPUSRuntime *rt);
-bool LEPUS_IsMarkedLEPUSValue(LEPUSRuntime *rt, LEPUSValue *val);
 
 char *LEPUS_GetGCTimingInfo(LEPUSContext *ctx, bool is_start);
 
@@ -1167,7 +1166,11 @@ void SetNapiScope(LEPUSContext *ctx, void *scope);
 void InitNapiScope(LEPUSContext *ctx);
 void FreeNapiScope(LEPUSContext *ctx);
 
-void *LEPUS_VisitLEPUSValue(LEPUSRuntime *rt, LEPUSValue *val);
+void LEPUS_VisitLEPUSValue(LEPUSRuntime *rt, LEPUSValue *val, int local_idx);
+
+void AddCurNode(LEPUSRuntime *rt, void *node, int type);
+
+bool CheckValidPtr(void *runtime, void *ptr);
 
 void LEPUS_TrigGC(LEPUSRuntime *rt);
 /* trace gc end*/

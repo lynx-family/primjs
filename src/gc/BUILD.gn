@@ -5,19 +5,11 @@
 import("//Primjs.gni")
 primjs_source_set("gc") {
   sources = [
+    "allocator.cc",
     "collector.cc",
-    "collector_ms.cc",
     "global-handles.cc",
-    "logger.cc",
-    "mem_map.cc",
-    "mrt_bitmap.cc",
-    "page_group.cc",
-    "page_map.cc",
     "qjsvaluevalue-space.cc",
-    "ros_allocator.cc",
-    "space.cc",
-    "gc_marking.cc",
-    "gc_tracer.cc",
-    "thread_pool.cc"
+    "sweeper.cc",
+    "thread_pool.cc",
   ]
 }

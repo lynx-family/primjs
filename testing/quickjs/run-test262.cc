@@ -52,7 +52,10 @@ extern "C" {
 }
 #endif
 
-#include "gc/logger.h"
+#ifdef ENABLE_GC_DEBUG_TOOLS
+#include <iostream>
+#endif
+
 #include "gc/trace-gc.h"
 #include "quickjs/include/quickjs-inner.h"
 
@@ -2218,8 +2221,10 @@ void run_test_dir_list(namelist_t *lp, int start_index, int stop_index) {
     } else if (stop_index >= 0 && test_index > stop_index) {
       test_skipped++;
     } else {
-      LOG(ROS_GC::LEVEL_0) << "trace_gc, index: " << i
-                           << " total: " << lp->count << " file: " << p;
+#ifdef ENABLE_GC_DEBUG_TOOLS
+      std::cout << "trace_gc, index: " << i << " total: " << lp->count
+                << " file: " << p << std::endl;
+#endif
       run_test(p, test_index);
       show_progress(FALSE);
     }

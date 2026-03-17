@@ -445,11 +445,10 @@ static LEPUSValue GeneratePropertyPreview(LEPUSContext* ctx,
   }
   HandleScope func_scope(ctx, &property, HANDLE_TYPE_LEPUS_VALUE);
   int64_t tag = LEPUS_VALUE_GET_NORM_TAG(property_value);
-  LEPUSValue description;
   switch (tag) {
     case LEPUS_TAG_INT:
     case LEPUS_TAG_FLOAT64: {
-      description = LEPUS_ToString(ctx, property_value);
+      LEPUSValue description = LEPUS_ToString(ctx, property_value);
       func_scope.PushHandle(&description, HANDLE_TYPE_LEPUS_VALUE);
       DebuggerSetPropertyStr(ctx, property, "description", description);
       break;
@@ -461,7 +460,7 @@ static LEPUSValue GeneratePropertyPreview(LEPUSContext* ctx,
       break;
     }
     case LEPUS_TAG_SYMBOL: {
-      description = GetSymbolDescription(ctx, property_value);
+      LEPUSValue description = GetSymbolDescription(ctx, property_value);
       func_scope.PushHandle(&description, HANDLE_TYPE_LEPUS_VALUE);
       DebuggerSetPropertyStr(ctx, property, "description", description);
       break;
@@ -609,12 +608,12 @@ LEPUSValue GetExceptionDescription(LEPUSContext* ctx, LEPUSValue exception) {
     func_scope.PushHandle(reinterpret_cast<void*>(&exception_stack_str),
                           HANDLE_TYPE_CSTRING);
     uint8_t is_error = LEPUS_IsError(ctx, exception);
-    char* new_exp_desc_str = nullptr;
     if (is_error) {
       LEPUSValue stack = LEPUS_GetPropertyStr(ctx, exception, "stack");
       if (!LEPUS_IsUndefined(stack)) {
         exception_stack_str = LEPUS_ToCString(ctx, stack);
         use_size += strlen(exception_stack_str);
+        char* new_exp_desc_str = nullptr;
         func_scope.PushHandle(reinterpret_cast<void*>(&new_exp_desc_str),
                               HANDLE_TYPE_HEAP_OBJ);
         while (use_size >= allocate_size) {
@@ -1086,14 +1085,14 @@ static LEPUSValue GetObjectProperties(LEPUSContext* ctx, LEPUSValue& obj,
   if (!ctx->rt->gc_enable) lepus_free(ctx, tab);
 
   auto* info = ctx->debugger_info;
-  LEPUSValue entries;
   // [[entries]]
   if (tag == LEPUS_TAG_OBJECT) {
     LEPUSValue subtype = GetObjectSubtype(ctx, obj);
     int32_t magic = GetMapSetMagicNumber(ctx, subtype);
     if (magic != -1) {
       // MAP, SET, WEAKMAP, WEAKSET
-      entries = GetMapSetProperties(ctx, obj, EntryPreviewCallback, magic);
+      LEPUSValue entries =
+          GetMapSetProperties(ctx, obj, EntryPreviewCallback, magic);
       func_scope.PushHandle(&entries, HANDLE_TYPE_LEPUS_VALUE);
       int32_t entries_size = LEPUS_GetLength(ctx, entries);
       LEPUSValue entries_size_val = LEPUS_NewInt32(ctx, entries_size);
@@ -1441,11 +1440,10 @@ static LEPUSValue PropertyDescriptorCallback(
   HandleScope func_scope(ctx, &property_descriptor, HANDLE_TYPE_LEPUS_VALUE);
 
   int64_t tag = LEPUS_VALUE_GET_NORM_TAG(property_name);
-  LEPUSValue str;
   switch (tag) {
     case LEPUS_TAG_SYMBOL: {
       JSAtom symbol_atom = js_symbol_to_atom(ctx, property_name);
-      str = LEPUS_AtomToString(ctx, symbol_atom);
+      LEPUSValue str = LEPUS_AtomToString(ctx, symbol_atom);
       func_scope.PushHandle(&str, HANDLE_TYPE_LEPUS_VALUE);
       DebuggerSetPropertyStr(ctx, property_descriptor, "name", str);
       break;
@@ -1775,8 +1773,8 @@ const char* GetConsoleObject(LEPUSContext* ctx, const char* object_id) {
                                     LEPUSValue& property_value, int32_t,
                                     int32_t, int32_t) {
       LEPUSValue property_descriptor = LEPUS_NewObject(ctx);
-      HandleScope block_scope{ctx, &property_descriptor,
-                              HANDLE_TYPE_LEPUS_VALUE};
+      HandleScope func_scope{ctx, &property_descriptor,
+                             HANDLE_TYPE_LEPUS_VALUE};
       if (LEPUS_IsException(property_descriptor)) {
         if (!ctx->rt->gc_enable) {
           LEPUS_FreeValue(ctx, property_name);
@@ -1786,9 +1784,9 @@ const char* GetConsoleObject(LEPUSContext* ctx, const char* object_id) {
       }
       if (LEPUS_VALUE_IS_SYMBOL(property_name)) {
         auto symbol_atom = js_symbol_to_atom(ctx, property_name);
-        block_scope.PushLEPUSAtom(symbol_atom);
+        func_scope.PushLEPUSAtom(symbol_atom);
         auto str = LEPUS_AtomToString(ctx, symbol_atom);
-        block_scope.PushHandle(&str, HANDLE_TYPE_LEPUS_VALUE);
+        func_scope.PushHandle(&str, HANDLE_TYPE_LEPUS_VALUE);
         DebuggerSetPropertyStr(ctx, property_descriptor, "name", str);
       } else {
         DebuggerSetPropertyStr(ctx, property_descriptor, "name",
@@ -1796,7 +1794,7 @@ const char* GetConsoleObject(LEPUSContext* ctx, const char* object_id) {
       }
 
       auto value = GetRemoteObject(ctx, property_value, false, 0);
-      block_scope.PushHandle(&value, HANDLE_TYPE_LEPUS_VALUE);
+      func_scope.PushHandle(&value, HANDLE_TYPE_LEPUS_VALUE);
       DebuggerSetPropertyStr(ctx, property_descriptor, "value", value);
       if (!ctx->rt->gc_enable) LEPUS_FreeValue(ctx, property_name);
       return property_descriptor;

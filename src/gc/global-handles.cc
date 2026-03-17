@@ -11,13 +11,15 @@
 #include <atomic>
 
 #include "gc/base-global-handles.h"
-
-#ifdef DCHECK
-#undef DCHECK
+#ifdef DEBUG
+#if defined(ANDROID) || defined(__ANDROID__)
+#include <android/log.h>
+#endif
 #endif
 
 #define DCHECK(condition) ((void)0)
 #define DCHECK_EQ(v1, v2) ((void)0)
+#define DCHECK_NE(v1, v2) ((void)0)
 #define DCHECK_GT(v1, v2) ((void)0)
 #define DCHECK_GE(v1, v2) ((void)0)
 #define DCHECK_LT(v1, v2) ((void)0)
@@ -134,8 +136,6 @@ class Node final : public NodeBase {
   bool IsInUse() const { return state() != FREE; }
 
   bool IsStrongRetainer() const { return state() == NORMAL; }
-
-  bool IsWeakRetainer() const { return state() == WEAK; }
 
   // Accessors for next free node in the free list.
   Node* next_free() {
@@ -348,6 +348,9 @@ GlobalHandles::~GlobalHandles() { delete regular_nodes_; }
 
 LEPUSValue* GlobalHandles::Create(LEPUSValue value, bool is_weak) {
   Node* node = regular_nodes_->Allocate();
+#ifdef ENABLE_GC_DEBUG_TOOLS
+  AddCurNode(runtime_, reinterpret_cast<void*>(node), 1);
+#endif
   return node->Publish(value, is_weak);
 }
 
@@ -363,7 +366,6 @@ void GlobalHandles::SetWeak(LEPUSValue* location, void* data,
     Node* node = Node::FromLocation(reinterpret_cast<Addr*>(location));
     node->set_state(Node::State::WEAK);
     node->set_weakinfo(cb, data);
-    has_callbacks_ = true;
   }
 }
 
@@ -382,27 +384,36 @@ void GlobalHandles::SetWeakState(LEPUSValue* location) {
   }
 }
 
-void GlobalHandles::CollectAllRoots(GCWorkStack& workStack, int offset,
-                                    bool markWeak) {
-  if (handles_count() == 0) return;
+void GlobalHandles::IterateAllRoots(int local_idx, int offset) {
   for (Node* node : *regular_nodes_) {
-    if (node->IsStrongRetainer() || (markWeak && node->IsWeakRetainer())) {
-      LEPUSValue* val = (LEPUSValue*)((uint8_t*)(node->location()) + offset);
-      void* ret = LEPUS_VisitLEPUSValue(runtime(), val);
-      if (ret) workStack.push_back((address_t)ret);
+    if (node->IsStrongRetainer()) {
+      LEPUSValue* val = reinterpret_cast<LEPUSValue*>(
+          reinterpret_cast<uint8_t*>(node->location()) + offset);
+      LEPUS_VisitLEPUSValue(runtime(), val, local_idx);
     }
   }
 }
+bool GlobalHandles::IsMarkedLEPUSValue(LEPUSValue* val) {
+  if (LEPUS_VALUE_HAS_REF_COUNT((*val))) {
+    void* ptr = LEPUS_VALUE_GET_PTR((*val));
+#ifdef ENABLE_GC_DEBUG_TOOLS
+    DCHECK(ptr && check_valid_ptr(runtime(), ptr));
+#endif
+#ifndef _WIN32
+    return (reinterpret_cast<std::atomic<int>*>(ptr) - 1)
+        ->load(std::memory_order_relaxed);
+#endif
+  }
+  return true;
+}
 
 void GlobalHandles::GlobalRootsFinalizer() {
-  if (handles_count() == 0) return;
-  if (!has_callbacks_) return;
   for (Node* node : *regular_nodes_) {
     if (node->state() == Node::State::DELETING) {
       // abort();
     }
     if (node->state() == Node::State::WEAK &&
-        !LEPUS_IsMarkedLEPUSValue(runtime_, node->location())) {
+        !IsMarkedLEPUSValue(node->location())) {
       node->set_state(Node::State::DELETING);
       if (!node->cb) {
         // lynx weak handle
@@ -412,4 +423,12 @@ void GlobalHandles::GlobalRootsFinalizer() {
       }
     }
   }
+#ifdef DEBUG
+#if defined(ANDROID) || defined(__ANDROID__)
+  if (node_cnt > 0)
+    __android_log_print(
+        ANDROID_LOG_ERROR, "PRIMJS_GC",
+        "GlobalRootsFinalizer, State is DELETING, node_count: %d\n", node_cnt);
+#endif
+#endif
 }

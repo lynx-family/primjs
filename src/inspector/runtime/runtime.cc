@@ -170,7 +170,7 @@ void HandleDiscardConsoleEntries(DebuggerParams* runtime_protocols) {
   LEPUSDebuggerInfo* info = ctx->debugger_info;
   if (!ctx->rt->gc_enable) LEPUS_FreeValue(ctx, info->console.messages);
   info->console.length = 0;
-  LEPUS_HeapObjStore(ctx, &info->console.messages, LEPUS_NewArray(ctx));
+  info->console.messages = LEPUS_NewArray(ctx);
 }
 
 static LEPUSValue Evaluate(LEPUSDebuggerInfo* info, LEPUSContext* evaluate_ctx,
@@ -513,6 +513,7 @@ LEPUSValue* GetFunctionParams(LEPUSContext* ctx, LEPUSValue params,
     ret = static_cast<LEPUSValue*>(lepus_mallocz(
         ctx, sizeof(LEPUSValue) * (*argc), ALLOC_TAG_JSValueArray));
     HandleScope func_scope(ctx, ret, HANDLE_TYPE_DIR_HEAP_OBJ);
+    if (ctx->rt->gc_enable) set_heap_obj_len(ret, *argc);
     if (ret) {
       for (int32_t i = 0; i < *argc; i++) {
         ret[i] = LEPUS_UNDEFINED;
@@ -857,8 +858,8 @@ void HandleRuntimeGetHeapUsage(DebuggerParams* runtime_options) {
   HandleScope func_scope{ctx, &response, HANDLE_TYPE_LEPUS_VALUE};
   uint64_t used_size = 0, total_size = 0;
   if (ctx->gc_enable) {
-    used_size = rt->ros_->GetAllocatedSize();
-    total_size = rt->ros_->GetHeapSize();
+    used_size = rt->malloc_state.allocate_state.footprint;
+    total_size = rt->malloc_state.allocate_state.footprint_limit;
   } else {
     used_size = rt->malloc_state.malloc_size;
     total_size = used_size;

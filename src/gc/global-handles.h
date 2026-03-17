@@ -9,12 +9,11 @@
 #ifndef SRC_GC_GLOBAL_HANDLES_H_
 #define SRC_GC_GLOBAL_HANDLES_H_
 
-#include "gc/gc_work_stack.h"
+// #include <vector>
+
 #include "gc/persistent-handle.h"
-#include "gc/sizes.h"
 
 typedef uintptr_t Addr;
-typedef void (*visitor)(LEPUSValue, void*);
 
 // Global handles hold handles that are independent of stack-state and can have
 // callbacks and finalizers attached to them.
@@ -36,8 +35,9 @@ class GlobalHandles final {
   // Creates a new global handle that is alive until Destroy is called.
   LEPUSValue* Create(LEPUSValue value, bool is_weak);
 
-  void CollectAllRoots(GCWorkStack& workStack, int offset, bool markWeak);
+  void IterateAllRoots(int local_idx, int offset);
   void GlobalRootsFinalizer();
+  bool IsMarkedLEPUSValue(LEPUSValue* val);
   LEPUSRuntime* runtime() const { return runtime_; }
 
   size_t TotalSize() const;
@@ -47,7 +47,6 @@ class GlobalHandles final {
   void SetWeak(LEPUSValue* location, void* data, void (*cb)(void*));
   void ClearWeak(LEPUSValue* location);
   void SetWeakState(LEPUSValue* location);
-  void VisitRoots(visitor, void*);
 
  private:
   // Internal node structures.
@@ -56,7 +55,6 @@ class GlobalHandles final {
 
   LEPUSRuntime* const runtime_;
   bool is_marking_ = false;
-  bool has_callbacks_ = false;
 
   NodeSpace* regular_nodes_;
 };

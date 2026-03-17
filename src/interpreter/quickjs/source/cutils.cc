@@ -106,11 +106,7 @@ int dbuf_realloc(DynBuf *s, size_t new_size, int alloc_tag) {
   uint8_t *new_buf;
   if (new_size > s->allocated_size) {
     if (s->error) return -1;
-#if defined(ANDROID) || defined(__ANDROID__)
-    size = s->allocated_size * 3 + 128;
-#else
-    size = s->allocated_size * 3 + 512;
-#endif
+    size = s->allocated_size * 3;
     if (size > new_size) new_size = size;
     new_buf = static_cast<uint8_t *>(
         s->realloc_func(s->opaque, s->buf, new_size, alloc_tag));

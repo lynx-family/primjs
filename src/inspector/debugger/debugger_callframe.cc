@@ -134,12 +134,11 @@ static LEPUSValue EvaluateOnCallFrame(LEPUSContext *ctx,
   // get expression needed to be evaluated
   LEPUSValue ret = LEPUS_UNDEFINED;
   HandleScope func_scope(ctx, &ret, HANDLE_TYPE_LEPUS_VALUE);
-  const char *expression;
   {
     PCScope ps(ctx);
     ret = DebuggerEvaluate(ctx, callframe_id, params_expression);
     if (LEPUS_IsException(ret)) {
-      expression = LEPUS_ToCString(ctx, params_expression);
+      const char *expression = LEPUS_ToCString(ctx, params_expression);
       func_scope.PushHandle(reinterpret_cast<void *>(&expression),
                             HANDLE_TYPE_CSTRING);
       // do not send debugger.scriptparsed event
@@ -177,8 +176,6 @@ void HandleEvaluateOnCallFrame(DebuggerParams *debugger_options) {
   uint8_t silent = 0;
   int32_t need_preview = 0;
   bool throw_side_effect = false;
-  LEPUSValue remote_object;
-  LEPUSObject *p;
   GetEvaluateOnCallFrameParams(ctx, params, &callframe_id, &params_expression,
                                &silent, &need_preview, throw_side_effect);
 
@@ -187,11 +184,11 @@ void HandleEvaluateOnCallFrame(DebuggerParams *debugger_options) {
         info, (silent || throw_side_effect) ? 0 : info->exception_breakpoint);
     // return evaluation result
     if (callframe_id) {
-      remote_object = EvaluateOnCallFrame(ctx, callframe_id, params_expression,
-                                          need_preview);
+      LEPUSValue remote_object = EvaluateOnCallFrame(
+          ctx, callframe_id, params_expression, need_preview);
       func_scope.PushHandle(&remote_object, HANDLE_TYPE_LEPUS_VALUE);
-      p = DebuggerCreateObjFromShape(info, info->debugger_obj.result, 1,
-                                     &remote_object);
+      LEPUSObject *p = DebuggerCreateObjFromShape(
+          info, info->debugger_obj.result, 1, &remote_object);
       func_scope.PushHandle(p, HANDLE_TYPE_DIR_HEAP_OBJ);
       SendResponse(ctx, message, LEPUS_MKPTR(LEPUS_TAG_OBJECT, p));
     }
