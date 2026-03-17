@@ -43,14 +43,14 @@ declare_args() {
   # Enable primjs compatible memory management
   enable_compatible_mm = false
 
-  enable_ros_debug = false
-  enable_ros_force_gc = false
-  enable_conmark_checker = false
-  enable_gc_log = false
-  enable_asan = false
+  # Enable tracing gc debug tools
+  enable_gc_debug_tools = false
 
   # Enable force tracing gc
   enable_force_gc = false
+
+  # Enable tracing gc log
+  enable_tracing_gc_log = false
 
   gen_android_embedded = false
 
@@ -73,8 +73,10 @@ if (target_cpu != "arm64") {
   enable_compatible_mm = false
 }
 
-if (!enable_compatible_mm) {
-  enable_primjs_snapshot = false
+if (!enable_primjs_snapshot) {
+  enable_compatible_mm = false
   enable_tracing_gc = false
   enable_primjs_trace = false
+  enable_gc_debug_tools = false
+  enable_gc_debug_tools = false
 }

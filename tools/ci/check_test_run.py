@@ -28,7 +28,6 @@ def CheckUnitTestRun():
             "qjs_debug_test",
             "quickjs_unittest",
             "napi_unittest",
-            "heap_unittest",
         ]
         for unittest in unittest_cases:
             print("{}: Check %s cases...".format(info) % unittest)

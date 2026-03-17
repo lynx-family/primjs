@@ -60,6 +60,7 @@ HeapObjPtr QjsHeapExplorer::GetHandleObj(void* ptr) {
 #ifdef ENABLE_COMPATIBLE_MM
   int32_t alloc_tag = get_alloc_tag(ptr);
   switch (alloc_tag) {
+    case 0:
     case ALLOC_TAG_WITHOUT_PTR:
     case ALLOC_TAG_JSValueArray:
     case ALLOC_TAG_JSConstString:
@@ -71,7 +72,7 @@ HeapObjPtr QjsHeapExplorer::GetHandleObj(void* ptr) {
       break;
   }
 #else
-  int32_t alloc_tag = ALLOC_TAG_WITHOUT_PTR;
+  int32_t alloc_tag = 0;
 #endif
   return HeapObjPtr{ptr, static_cast<HeapObjPtr::PtrType>(alloc_tag)};
 }
@@ -292,7 +293,7 @@ void QjsHeapExplorer::ExtractHandleObjReference(LEPUSContext* ctx,
     case HeapObjPtr::kJSValueArray: {
       return ExtractValueArrayReference(
           ctx, entry, static_cast<const LEPUSValue*>(obj.ptr_),
-          sizeof(obj.ptr_) / sizeof(LEPUSValue));
+          (size_t)get_heap_obj_len(const_cast<void*>(obj.ptr_)));
     }
     default:
       break;
@@ -840,7 +841,7 @@ void QjsHeapExplorer::IterateAndExtractReference(
   generator_ = generator;
 #ifdef ENABLE_COMPATIBLE_MM
   if (context_->gc_enable) {
-    context_->rt->collector_->SetForbidGC();
+    context_->rt->gc->SetForbidGC();
   }
 #endif
   SetRootToGcRootReference();
@@ -856,7 +857,7 @@ void QjsHeapExplorer::IterateAndExtractReference(
   ExtractGcRootRuntimeReference();
 #ifdef ENABLE_COMPATIBLE_MM
   if (context_->gc_enable) {
-    context_->rt->collector_->ResetForbidGC();
+    context_->rt->gc->ResetForbidGC();
   }
 #endif
   return;

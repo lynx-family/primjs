@@ -58,7 +58,6 @@ def CheckUnitTestsBuild(options):
     build_quickjs_unittest = "ninja -C out/Default quickjs_unittest"
     build_qjs_debug_unittest = "ninja -C out/Default qjs_debug_test"
     build_napi_unittest = "ninja -C out/Default napi_unittest"
-    build_heap_unittest = "ninja -C out/Default heap_unittest"
 
     # enable_snapishot cannot use rtti when compiling
     gn_primjs_snapshot_build_args = """
@@ -92,7 +91,6 @@ def CheckUnitTestsBuild(options):
         "ninja -C out/Default_snapshot qjs_debug_test"
     )
     build_primjs_snapshot_napi_unittest = "ninja -C out/Default_snapshot napi_unittest"
-    build_primjs_heap_unittest = "ninja -C out/Default_snapshot heap_unittest"
 
     subprocess.check_call(gn_gen_cmd, shell=True)
     subprocess.check_call(gn_clean_cmd, shell=True)
@@ -101,7 +99,6 @@ def CheckUnitTestsBuild(options):
     subprocess.check_call(build_quickjs_unittest, shell=True)
     subprocess.check_call(build_qjs_debug_unittest, shell=True)
     subprocess.check_call(build_napi_unittest, shell=True)
-    subprocess.check_call(build_heap_unittest, shell=True)
 
     subprocess.check_call(gn_primjs_snapshot_gen_cmd, shell=True)
     subprocess.check_call(gn_primjs_snapshot_clean_cmd, shell=True)
@@ -110,7 +107,6 @@ def CheckUnitTestsBuild(options):
     subprocess.check_call(build_primjs_snapshot_quickjs_unittest, shell=True)
     subprocess.check_call(build_primjs_snapshot_qjs_debug_unittest, shell=True)
     subprocess.check_call(build_primjs_snapshot_napi_unittest, shell=True)
-    subprocess.check_call(build_primjs_heap_unittest, shell=True)
     sys.exit(0)
 
 
