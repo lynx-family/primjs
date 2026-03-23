@@ -23,7 +23,7 @@ class QJSValueValueSpace final {
   explicit QJSValueValueSpace(LEPUSRuntime* runtime);
   ~QJSValueValueSpace();
   void* Create();
-  void IterateAllRoots(int local_idx);
+  void CollectAllRoots(GCWorkStack& workStack);
   LEPUSRuntime* runtime() const { return runtime_; }
 
  private:

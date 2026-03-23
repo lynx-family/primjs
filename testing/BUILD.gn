@@ -9,5 +9,6 @@ group("testing") {
     "napi:napi_unittest",
     "quickjs:run_test262",
     "quickjs/compiler:quickjs_unittest",
+    "quickjs/heap:heap_unittest",
   ]
 }

@@ -11,15 +11,7 @@
 extern "C" {
 #include "quickjs/include/quickjs.h"
 }
-#ifdef ENABLE_GC_DEBUG_TOOLS
-#define DCHECK2(condition) \
-  if (!(condition)) abort();
-#if defined(ANDROID) || defined(__ANDROID__)
-#include <android/log.h>
-#endif
-#else
-#define DCHECK2(condition) ((void)0)
-#endif
+#include "gc/global-handles.h"
 
 const int kApiSystemPointerSize = sizeof(void*);
 static const int kNodeClassIdOffset = 1 * kApiSystemPointerSize;
@@ -186,7 +178,7 @@ bool PersistentBase::IsWeak() const {
 }
 
 void PersistentBase::Reset(LEPUSRuntime* runtime) {
-  if (this->IsEmpty() || !runtime) return;
+  if (this->IsEmpty()) return;
   DisposeGlobal(runtime, this->val_);
   val_ = nullptr;
 }

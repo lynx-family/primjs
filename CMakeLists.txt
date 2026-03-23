@@ -146,21 +146,28 @@ endif()
 
 set(quickjs_sources
     ${CMAKE_CURRENT_SOURCE_DIR}/src/basic/log/logging.cc
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/gc/allocator.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gc/collector.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gc/global-handles.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gc/qjsvaluevalue-space.cc
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/gc/sweeper.cc
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/gc/thread_pool.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/gc/collector.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/bignum.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gc/collector_ms.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gc/mem_map.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gc/logger.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gc/thread_pool.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gc/mrt_bitmap.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gc/page_group.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gc/page_map.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gc/ros_allocator.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gc/space.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gc/gc_tracer.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/gc/gc_marking.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/cutils.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/dtoa.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/libregexp.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/libunicode.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/primjs_monitor.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/quickjs_gc.cc
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/quickjs_queue.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/quickjs_version.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/quickjs-libc.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/quickjs.cc)

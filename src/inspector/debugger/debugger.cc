@@ -66,9 +66,10 @@ struct qjs_queue *GetDebuggerMessageQueue(LEPUSDebuggerInfo *info) {
 
 void SetDebuggerSourceCode(LEPUSContext *ctx, char *source_code) {
   if (ctx->debugger_info) {
-    ctx->debugger_info->source_code =
+    LEPUS_HeapObjStore(
+        ctx, &ctx->debugger_info->source_code,
         lepus_strndup(ctx, (const char *)source_code,
-                      strlen((char *)source_code) + 1, ALLOC_TAG_WITHOUT_PTR);
+                      strlen((char *)source_code) + 1, ALLOC_TAG_WITHOUT_PTR));
     strcpy(ctx->debugger_info->source_code, source_code);
   }
   return;
@@ -188,6 +189,7 @@ LEPUSFunctionBytecode **GetDebuggerAllFunction(LEPUSContext *ctx,
   LEPUSFunctionBytecode **all_functions = static_cast<LEPUSFunctionBytecode **>(
       lepus_mallocz(ctx, sizeof(LEPUSFunctionBytecode *) * total_size,
                     ALLOC_TAG_WITHOUT_PTR));
+  HandleScope func_scope(ctx, &all_functions, HANDLE_TYPE_HEAP_OBJ);
   if (all_functions) {
     AddFunctionBytecode(ctx, top_level_function, all_functions, use_size,
                         total_size);
@@ -230,8 +232,9 @@ void SetFunctionDebugPC2LineBufLen(LEPUSContext *ctx, LEPUSFunctionBytecode *b,
                                    uint8_t *buf, int buf_len) {
   assert(b->has_debug);
   if (buf) {
-    b->debug.pc2line_buf = static_cast<uint8_t *>(
-        lepus_mallocz(ctx, buf_len, ALLOC_TAG_WITHOUT_PTR));
+    LEPUS_HeapObjStore(ctx, &b->debug.pc2line_buf,
+                       static_cast<uint8_t *>(
+                           lepus_mallocz(ctx, buf_len, ALLOC_TAG_WITHOUT_PTR)));
     if (!b->debug.pc2line_buf) {
       b->debug.pc2line_len = 0;
       return;
@@ -252,12 +255,18 @@ void SetFunctionDebugSource(LEPUSContext *ctx, LEPUSFunctionBytecode *b,
                             const char *source, int32_t source_len) {
   assert(b->has_debug);
   b->debug.source_len = source_len;
-  b->debug.source = js_strmalloc((const char *)source, source_len);
+  if (ctx->rt->gc_enable) {
+    char *source_dst = js_strmalloc_gc(ctx, source, source_len);
+    LEPUS_HeapObjStore(ctx, &b->debug.source, (void *)source_dst);
+  } else {
+    system_free(b->debug.source);
+    b->debug.source = js_strmalloc((const char *)source, source_len);
+  }
   return;
 }
 
 void SetFunctionScript(LEPUSFunctionBytecode *b, LEPUSScriptSource *script) {
-  b->script = script;
+  LEPUS_HeapObjStoreNoCtx(&b->script, script);
 }
 
 int64_t *GetFunctionLineNums(LEPUSContext *ctx, const LEPUSFunctionBytecode *b,
@@ -367,16 +376,19 @@ LEPUSScriptSource *AddDebuggerScript(LEPUSContext *ctx, char *script_source,
     script->is_debug_file = true;
     script->end_line = end_line_num;
     script->length = source_len;
-    script->url =
-        static_cast<char *>(lepus_strdup(ctx, filename, ALLOC_TAG_WITHOUT_PTR));
-    script->source = static_cast<char *>(
-        lepus_malloc(ctx, source_len + 1, ALLOC_TAG_WITHOUT_PTR));
+    LEPUS_HeapObjStore(ctx, &script->url,
+                       static_cast<char *>(
+                           lepus_strdup(ctx, filename, ALLOC_TAG_WITHOUT_PTR)));
+    LEPUS_HeapObjStore(ctx, &script->source,
+                       static_cast<char *>(lepus_malloc(
+                           ctx, source_len + 1, ALLOC_TAG_WITHOUT_PTR)));
     if (script->source) {
       memcpy(script->source, script_source, source_len + 1);
     }
     script->source_map_url = NULL;
     ctx->debugger_info->script_num++;
     list_add_tail(&script->link, &ctx->debugger_info->script_list);
+    LEPUS_WriteBarrierNoStore(ctx, script);
     if (ctx->debugger_info->is_debugger_enabled) {
       SendScriptParsedNotification(ctx, script);
     }
@@ -478,7 +490,7 @@ void DebuggerSetPropertyStr(LEPUSContext *ctx, LEPUSValueConst this_obj,
     HandleScope func_scope{ctx->rt};
     func_scope.PushLEPUSAtom(atom);
     pr = add_property_gc(ctx, p, atom, LEPUS_PROP_C_W_E);
-    if (likely(pr)) pr->u.value = val;
+    if (likely(pr)) LEPUS_HeapObjStore(ctx, &pr->u.value, val);
     return;
   }
 #endif
@@ -509,7 +521,7 @@ LEPUSObject *DebuggerCreateObjFromShape(LEPUSDebuggerInfo *info, LEPUSValue obj,
   }
   assert(argc <= p->shape->prop_count);
   for (uint32_t i = 0, size = p->shape->prop_count; i < size; ++i) {
-    p->prop[i].u.value = argv[i];
+    LEPUS_HeapObjStore(ctx, &p->prop[i].u.value, argv[i]);
   }
   return p;
 }
@@ -570,7 +582,7 @@ QJS_STATIC void SetScriptSourceMappingUrl(LEPUSContext *ctx,
                                           LEPUSScriptSource *script) {
   char *source_map_url = FindDebuggerMagicContent(
       ctx, script->source, (char *)"sourceMappingURL", 0);
-  script->source_map_url = source_map_url;
+  LEPUS_HeapObjStore(ctx, &script->source_map_url, source_map_url);
   return;
 }
 
@@ -594,7 +606,9 @@ QJS_STATIC void SetScriptUrl(LEPUSContext *ctx, const char *filename,
                              LEPUSScriptSource *script) {
   script->url = NULL;
   if (*filename) {
-    script->url = lepus_strdup(ctx, filename, ALLOC_TAG_WITHOUT_PTR);
+    LEPUS_HeapObjStore(ctx, &script->url,
+                       static_cast<char *>(
+                           lepus_strdup(ctx, filename, ALLOC_TAG_WITHOUT_PTR)));
   } else if (script->source) {
     char *source_url = FindDebuggerMagicContent(ctx, (char *)script->source,
                                                 (char *)"sourceURL", 0);
@@ -606,6 +620,7 @@ QJS_STATIC void SetScriptUrl(LEPUSContext *ctx, const char *filename,
     } else {
       script->url = lepus_strdup(ctx, "", ALLOC_TAG_WITHOUT_PTR);
     }
+    LEPUS_WriteBarrierNoStore(ctx, script->url);
   }
   return;
 }
@@ -614,7 +629,7 @@ QJS_STATIC void SetScriptHash(LEPUSContext *ctx, LEPUSScriptSource *script) {
   script->hash = NULL;
   if (script->source) {
     char *hash = DebuggerSetScriptHash(ctx, script->source, script->id);
-    script->hash = hash;
+    LEPUS_HeapObjStore(ctx, &script->hash, hash);
   }
 }
 
@@ -694,8 +709,9 @@ QJS_HIDE void DebuggerParseScript(LEPUSContext *ctx, const char *input,
       script->id = ++ctx->rt->next_script_id;
       script->is_debug_file = (strcmp(filename, "<input>") != 0);
       script->length = input_len;
-      script->source = static_cast<char *>(
-          lepus_malloc(ctx, input_len + 1, ALLOC_TAG_WITHOUT_PTR));
+      LEPUS_HeapObjStore(ctx, &script->source,
+                         static_cast<char *>(lepus_malloc(
+                             ctx, input_len + 1, ALLOC_TAG_WITHOUT_PTR)));
       if (script->source) {
         memcpy(script->source, input, input_len + 1);
       }
@@ -705,6 +721,7 @@ QJS_HIDE void DebuggerParseScript(LEPUSContext *ctx, const char *input,
       SetScriptHash(ctx, script);
       debug_info->script_num++;
       list_add_tail(&script->link, &ctx->debugger_info->script_list);
+      LEPUS_WriteBarrierNoStore(ctx, script);
     }
   }
 
@@ -712,11 +729,13 @@ QJS_HIDE void DebuggerParseScript(LEPUSContext *ctx, const char *input,
     fd->source_len = input_len;
     if (ctx->gc_enable || err) {
       // fd->source free in js_free_function_def
-      fd->source = js_strmalloc(script->source, strlen(script->source));
+      LEPUS_HeapObjStore(
+          ctx, &fd->source,
+          js_strmalloc_gc(ctx, script->source, strlen(script->source)));
     } else {
       fd->source = script->source;
     }
-    fd->script = script;
+    LEPUS_HeapObjStore(ctx, &fd->script, script);
     int32_t view_id = GetViewID(filename);
     const char *script_url = script ? script->url : nullptr;
     if (!(script_url && strcmp(script_url, "<input>") == 0)) {
@@ -942,14 +961,18 @@ static void InitializeShape(LEPUSContext *ctx, LEPUSObject *p,
 
 static void InitFixedShapeResult(LEPUSDebuggerInfo *info) {
   LEPUSContext *ctx = info->ctx;
-  info->debugger_obj.result = LEPUS_NewObject(ctx);
+  LEPUSValue obj = LEPUS_NewObject(ctx);
+  HandleScope func_scope(ctx, &obj, HANDLE_TYPE_LEPUS_VALUE);
+  LEPUS_HeapObjStore(ctx, &info->debugger_obj.result, obj);
   LEPUSObject *p = LEPUS_VALUE_GET_OBJ(info->debugger_obj.result);
   InitializeShape(ctx, p, "result");
 }
 
 static void InitFixedShapePreviewProp(LEPUSDebuggerInfo *info) {
   LEPUSContext *ctx = info->ctx;
-  info->debugger_obj.preview_prop = LEPUS_NewObject(ctx);
+  LEPUSValue obj = LEPUS_NewObject(ctx);
+  HandleScope func_scope(ctx, &obj, HANDLE_TYPE_LEPUS_VALUE);
+  LEPUS_HeapObjStore(ctx, &info->debugger_obj.preview_prop, obj);
   LEPUSObject *p = LEPUS_VALUE_GET_OBJ(info->debugger_obj.preview_prop);
   InitializeShape(ctx, p, "name");
   InitializeShape(ctx, p, "type");
@@ -958,7 +981,9 @@ static void InitFixedShapePreviewProp(LEPUSDebuggerInfo *info) {
 
 static void InitFixedShapeBPLocation(LEPUSDebuggerInfo *info) {
   LEPUSContext *ctx = info->ctx;
-  info->debugger_obj.bp_location = LEPUS_NewObject(ctx);
+  LEPUSValue obj = LEPUS_NewObject(ctx);
+  HandleScope func_scope(ctx, &obj, HANDLE_TYPE_LEPUS_VALUE);
+  LEPUS_HeapObjStore(ctx, &info->debugger_obj.bp_location, obj);
   LEPUSObject *p = LEPUS_VALUE_GET_OBJ(info->debugger_obj.bp_location);
   InitializeShape(ctx, p, "scriptId");
   InitializeShape(ctx, p, "lineNumber");
@@ -967,7 +992,9 @@ static void InitFixedShapeBPLocation(LEPUSDebuggerInfo *info) {
 
 static void InitFixedShapeBreakpoint(LEPUSDebuggerInfo *info) {
   LEPUSContext *ctx = info->ctx;
-  info->debugger_obj.breakpoint = LEPUS_NewObject(ctx);
+  LEPUSValue obj = LEPUS_NewObject(ctx);
+  HandleScope func_scope(ctx, &obj, HANDLE_TYPE_LEPUS_VALUE);
+  LEPUS_HeapObjStore(ctx, &info->debugger_obj.breakpoint, obj);
   LEPUSObject *p = LEPUS_VALUE_GET_OBJ(info->debugger_obj.breakpoint);
   InitializeShape(ctx, p, "breakpointId");
   InitializeShape(ctx, p, "locations");
@@ -975,7 +1002,9 @@ static void InitFixedShapeBreakpoint(LEPUSDebuggerInfo *info) {
 
 static void InitFixedShapeNotification(LEPUSDebuggerInfo *info) {
   LEPUSContext *ctx = info->ctx;
-  info->debugger_obj.notification = LEPUS_NewObject(ctx);
+  LEPUSValue obj = LEPUS_NewObject(ctx);
+  HandleScope func_scope(ctx, &obj, HANDLE_TYPE_LEPUS_VALUE);
+  LEPUS_HeapObjStore(ctx, &info->debugger_obj.notification, obj);
   LEPUSObject *p = LEPUS_VALUE_GET_OBJ(info->debugger_obj.notification);
   InitializeShape(ctx, p, "method");
   InitializeShape(ctx, p, "params");
@@ -983,7 +1012,9 @@ static void InitFixedShapeNotification(LEPUSDebuggerInfo *info) {
 
 static void InitFixedShapeResponse(LEPUSDebuggerInfo *info) {
   LEPUSContext *ctx = info->ctx;
-  info->debugger_obj.response = LEPUS_NewObject(ctx);
+  LEPUSValue obj = LEPUS_NewObject(ctx);
+  HandleScope func_scope(ctx, &obj, HANDLE_TYPE_LEPUS_VALUE);
+  LEPUS_HeapObjStore(ctx, &info->debugger_obj.response, obj);
   LEPUSObject *p = LEPUS_VALUE_GET_OBJ(info->debugger_obj.response);
   InitializeShape(ctx, p, "id");
   InitializeShape(ctx, p, "result");
@@ -1002,7 +1033,7 @@ static void InitializeStringPool(LEPUSDebuggerInfo *info) {
   auto *ctx = info->ctx;
   auto &literal_pool = info->literal_pool;
 #define DebuggerInitializeStringPool(name, str) \
-  literal_pool.name = LEPUS_NewString(ctx, str);
+  LEPUS_HeapObjStore(ctx, &literal_pool.name, LEPUS_NewString(ctx, str));
   QJSDebuggerStringPool(DebuggerInitializeStringPool)
 #undef DebuggerInitializeStringPool
 }
@@ -1321,7 +1352,8 @@ QJS_HIDE void JS_AddIntrinsicConsole(LEPUSContext *ctx) {
 
           if (ctx->debugger_info &&
               LEPUS_IsNull(ctx->debugger_info->console.messages)) {
-    ctx->debugger_info->console.messages = LEPUS_NewArray(ctx);
+    LEPUS_HeapObjStore(ctx, &ctx->debugger_info->console.messages,
+                       LEPUS_NewArray(ctx));
     ctx->debugger_info->console.length = 0;
   }
 }
@@ -1342,7 +1374,9 @@ void QJSDebuggerInitialize(LEPUSContext *ctx) {
 
   auto *&info = ctx->debugger_info;
   if (!info) {
+    if (ctx->gc_enable) ctx->rt->collector_->SetForbidGC();
     info = new (ctx) LEPUSDebuggerInfo{ctx};
+    if (ctx->gc_enable) ctx->rt->collector_->ResetForbidGC();
     JS_AddIntrinsicConsole(ctx);
   }
   info->ref_count++;
@@ -1817,7 +1851,7 @@ void DeleteConsoleMessageWithURL(LEPUSContext *ctx, const char *url) {
     }
   }
   if (!ctx->rt->gc_enable) LEPUS_FreeValue(ctx, msg);
-  info->console.messages = new_msg;
+  LEPUS_HeapObjStore(ctx, &info->console.messages, new_msg);
   info->console.length = new_msg_len;
 }
 
@@ -2005,6 +2039,7 @@ void HandleDisable(DebuggerParams *debugger_options) {
     HandleScope func_scope(ctx, &result, HANDLE_TYPE_LEPUS_VALUE);
     LEPUSValue view_id_val = LEPUS_GetPropertyStr(ctx, message, "view_id");
     int32_t view_id = -1;
+    LEPUSValue val;
     if (!LEPUS_IsUndefined(view_id_val)) {
       LEPUS_ToInt32(ctx, &view_id, view_id_val);
     }
@@ -2022,7 +2057,7 @@ void HandleDisable(DebuggerParams *debugger_options) {
       if (info->is_debugger_enabled) {
         info->is_debugger_enabled -= 1;
       }
-      LEPUSValue val = LEPUS_NewObject(ctx);
+      val = LEPUS_NewObject(ctx);
       func_scope.PushHandle(&val, HANDLE_TYPE_LEPUS_VALUE);
       SendNotification(ctx, "Debugger.resumed", val);
       QuitMessageLoopOnPause(ctx);
@@ -2170,11 +2205,12 @@ void HandleSetVariableValue(DebuggerParams *debugger_options) {
     int32_t expression_len = strlen(variable_name) + strlen(new_value_str) + 6;
     char *expression = static_cast<char *>(lepus_malloc(
         ctx, (sizeof(char) * expression_len), ALLOC_TAG_WITHOUT_PTR));
+    LEPUSValue expression_val;
     if (expression) {
       func_scope.PushHandle(reinterpret_cast<void *>(expression),
                             HANDLE_TYPE_DIR_HEAP_OBJ);
       GetExpression(expression, new_value, variable_name, new_value_str);
-      LEPUSValue expression_val = LEPUS_NewString(ctx, expression);
+      expression_val = LEPUS_NewString(ctx, expression);
       func_scope.PushHandle(&expression_val, HANDLE_TYPE_LEPUS_VALUE);
       {
         PCScope ps(ctx);
@@ -2271,7 +2307,8 @@ LEPUSDebuggerInfo::LEPUSDebuggerInfo(LEPUSContext *ctx_) : ctx{ctx_} {
   HandleScope func_scope{ctx, this, HANDLE_TYPE_DIR_HEAP_OBJ};
   init_list_head(&script_list);
   init_list_head(&bytecode_list);
-  running_state.get_properties_array = LEPUS_NewArray(ctx);
+  LEPUS_HeapObjStore(ctx, &running_state.get_properties_array,
+                     LEPUS_NewArray(ctx));
   message_queue = InitQueue();
   InitializeStringPool(this);
   InitializeFixedShapeObj(this);
@@ -2352,7 +2389,7 @@ LEPUSDebuggerInfo::~LEPUSDebuggerInfo() {
 }
 
 void *LEPUSDebuggerInfo::operator new(std::size_t size, LEPUSContext *ctx) {
-  return lepus_malloc(ctx, size, ALLOC_TAG_LEPUSDebuggerInfo);
+  return lepus_malloc(ctx, size, ALLOC_TAG_WITHOUT_PTR);
 }
 
 void LEPUSDebuggerInfo::operator delete(void *ptr) {
@@ -2368,6 +2405,6 @@ void SetJSDebuggerName(LEPUSContext *ctx, const char *name) {
   if (!ctx->gc_enable) {
     LEPUS_FreeValue(ctx, info->debugger_name);
   }
-  info->debugger_name = LEPUS_NewString(ctx, name);
+  LEPUS_HeapObjStore(ctx, &info->debugger_name, LEPUS_NewString(ctx, name));
   return;
 }

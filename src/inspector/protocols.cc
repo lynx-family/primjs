@@ -302,8 +302,8 @@ static bool PauseOnNextStatement(LEPUSContext *ctx, const char *method,
     info->pause_on_next_statement = true;
     LEPUSValue params = LEPUS_GetPropertyStr(ctx, message, "params");
     LEPUSValue reason = LEPUS_GetPropertyStr(ctx, params, "reason");
-    info->pause_on_next_statement_reason =
-        const_cast<char *>(LEPUS_ToCString(ctx, reason));
+    LEPUS_HeapObjStore(ctx, &info->pause_on_next_statement_reason,
+                       const_cast<char *>(LEPUS_ToCString(ctx, reason)));
     if (!ctx->rt->gc_enable) {
       LEPUS_FreeValue(ctx, params);
       LEPUS_FreeValue(ctx, reason);

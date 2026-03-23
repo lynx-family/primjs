@@ -5,255 +5,365 @@
 #ifndef SRC_GC_COLLECTOR_H_
 #define SRC_GC_COLLECTOR_H_
 
+#include <mutex>
 #include <sstream>
 
+#include "gc/alloc_utils.h"
+#include "gc/gc_work_stack.h"
+#include "gc/sizes.h"
 #include "gc/trace-gc.h"
 #include "quickjs/include/quickjs-inner.h"
 
 enum HandleType;
 class Visitor;
 class Finalizer;
-class Sweeper;
 typedef struct JSString JSAtomStruct;
 struct LEPUSRuntime;
-typedef struct malloc_state *mstate;
 struct JSAsyncFunctionState;
 struct JSProperty;
 struct JSRegExp;
 struct BCReaderState;
 struct JSToken;
 struct ValueBuffer;
-class GarbageCollector {
- public:
-  GarbageCollector(LEPUSRuntime *rt, mstate) noexcept;
-  ~GarbageCollector();
-  // gc
-  void CollectGarbage(size_t size = 0, bool gc_state = false) noexcept;
-  void DoOnlyFinalizer() noexcept;
 
-  void Init(LEPUSRuntime *rt);
-  Visitor *GetVisitor() { return visitor; }
-  Finalizer *GetFinalizer() { return finalizer; }
-  // gc pause suppression mode
-  void SetGCPauseSuppressionMode(bool mode) {
-    gc_pause_suppression_mode_ = mode;
+force_inline void SetRunSlotHasFinalizer(LEPUSRuntime *rt, void *ptr) {
+  rt->finalizerSet->insert(ptr);
+}
+
+static no_inline void CombinedWriteBarrier(address_t new_field_value) {
+  if (!new_field_value) return;
+  // could remove atomic later?
+  ROS_GC::Bitmap *mark_bitmap =
+      ROS_GC::PageGroups::GetBitMapFromAddr(new_field_value);
+  ROSIMPL_ASSERT(mark_bitmap, "mark_bitmap is null");
+  // abort, todo , -header
+  address_t new_field_value_addr =
+      reinterpret_cast<address_t>(new_field_value) - ROS_GC::kHeaderSize;
+  if (!mark_bitmap->MarkObject(new_field_value_addr)) {
+    mark_bitmap->PushBarrierRef((address_t)new_field_value);
   }
-  bool GetGCPauseSuppressionMode() { return gc_pause_suppression_mode_; }
-  // forbid_gc
-  void SetForbidGC() { forbid_gc_++; }
-  void ResetForbidGC() { forbid_gc_--; }
+}
+force_inline void *StaticVisitRootLEPUSValue(LEPUSValue val) {
+  int64_t tag = LEPUS_VALUE_GET_TAG(val);
+  void *ptr = LEPUS_VALUE_GET_PTR(val);
+  switch (tag) {
+    case LEPUS_TAG_STRING:
+      // if (IsConstString(ptr)) return nullptr;
+      return ptr;
+    case LEPUS_TAG_SEPARABLE_STRING:
+    case LEPUS_TAG_FUNCTION_BYTECODE:
+    case LEPUS_TAG_LEPUS_REF:
+    case LEPUS_TAG_SYMBOL:
+    case LEPUS_TAG_BIG_INT:
+    case LEPUS_TAG_OBJECT: {
+      return ptr;
+    }
+    default:
+      // printf("__JS_FreeValue: unknown tag=%d\n", tag);
+      return nullptr;
+  }
+}
 
-  // for debug
-#ifdef ENABLE_GC_DEBUG_TOOLS
-  size_t mem_order_cnt;
-  std::unordered_map<void *, size_t> cur_mems;
-  std::unordered_set<void *> delete_mems[THREAD_NUM];
-  size_t delete_order_cnt;
-  std::unordered_map<void *, size_t> del_mems;
+#ifdef ENABLE_COMPATIBLE_MM
+void force_inline HeapObjStore(LEPUSContext *ctx, void *fieldAddr,
+                               void *value) {
+  *reinterpret_cast<address_t *>(fieldAddr) = (address_t)value;
+  if (UNLIKELY(ctx->con_mark_state)) {
+    CombinedWriteBarrier((address_t)value);
+  }
+}
 
-  size_t handle_order_cnt;
-  std::unordered_map<void *, size_t> cur_handles;
-  size_t qjsvalue_order_cnt;
-  std::unordered_map<void *, size_t> cur_qjsvalues;
-#endif
+void force_inline HeapObjStore(LEPUSContext *ctx, void *fieldAddr,
+                               LEPUSValue value) {
+  *reinterpret_cast<LEPUSValue *>(fieldAddr) = value;
+  if (UNLIKELY(ctx->con_mark_state)) {
+    // todo, postpone call VisitRootLEPUSValue
+    CombinedWriteBarrier((address_t)StaticVisitRootLEPUSValue(value));
+  }
+}
+void force_inline WriteBarrierNoStore(LEPUSRuntime *rt, void *value) {
+  if (UNLIKELY(rt->con_mark_state)) {
+    CombinedWriteBarrier((address_t)value);
+  }
+}
+void force_inline WriteBarrierNoStore(LEPUSContext *ctx, LEPUSValue value) {
+  if (UNLIKELY(ctx->con_mark_state)) {
+    CombinedWriteBarrier((address_t)StaticVisitRootLEPUSValue(value));
+  }
+}
+void force_inline WriteBarrierNoStore(LEPUSContext *ctx, void *value) {
+  if (UNLIKELY(ctx->con_mark_state)) {
+    CombinedWriteBarrier((address_t)value);
+  }
+}
 
-  size_t GetHandleSize() {
-#ifdef ENABLE_GC_DEBUG_TOOLS
-    return cur_handles.size();
+void force_inline HeapObjStoreNoCtx(void *fieldAddr, void *value) {
+  *reinterpret_cast<address_t *>(fieldAddr) = (address_t)value;
+  if (UNLIKELY(ROS_GC::PageGroups::GetIsConcurrentMarkingFromAddr(
+          reinterpret_cast<address_t>(fieldAddr)))) {
+    CombinedWriteBarrier((address_t)value);
+  }
+}
+void force_inline HeapObjStoreNoCtx(void *fieldAddr, LEPUSValue value) {
+  *reinterpret_cast<LEPUSValue *>(fieldAddr) = value;
+  if (UNLIKELY(ROS_GC::PageGroups::GetIsConcurrentMarkingFromAddr(
+          reinterpret_cast<address_t>(fieldAddr)))) {
+    // todo, postpone call VisitRootLEPUSValue
+    CombinedWriteBarrier((address_t)StaticVisitRootLEPUSValue(value));
+  }
+}
+void force_inline *js_malloc_rt_gc(LEPUSRuntime *rt, size_t size,
+                                   int alloc_tag) {
+  return (void *)ROS_GC::RosAllocImpl::AllocateObj(rt, size, alloc_tag);
+}
+
+void force_inline *js_realloc_rt_gc(LEPUSRuntime *rt, void *ptr, size_t size,
+                                    int alloc_tag) {
+  return (void *)ROS_GC::RosAllocImpl::ReallocateObj(rt, ptr, size, alloc_tag);
+}
+void force_inline *lepus_malloc_gc(LEPUSContext *ctx, size_t size,
+                                   int alloc_tag) {
+  void *ptr;
+  ptr = (void *)ROS_GC::RosAllocImpl::AllocateObj(ctx->rt, size, alloc_tag);
+  // ptr = js_malloc_rt_gc(ctx->rt, size, alloc_tag);
+  if (unlikely(!ptr)) {
+    LEPUS_ThrowOutOfMemory(ctx);
+    return NULL;
+  }
+  return ptr;
+}
 #else
-    return 0;
-#endif
-  }
+void force_inline HeapObjStore(LEPUSContext *ctx, void *fieldAddr,
+                               void *value) {
+  *reinterpret_cast<address_t *>(fieldAddr) = (address_t)value;
+}
+void force_inline HeapObjStore(LEPUSContext *ctx, void *fieldAddr,
+                               LEPUSValue value) {
+  *reinterpret_cast<LEPUSValue *>(fieldAddr) = value;
+}
+void force_inline WriteBarrierNoStore(LEPUSRuntime *rt, void *value) {}
+void force_inline WriteBarrierNoStore(LEPUSContext *ctx, LEPUSValue value) {}
+void force_inline WriteBarrierNoStore(LEPUSContext *ctx, void *value) {}
 
-  size_t GetQjsValueSize() {
-#ifdef ENABLE_GC_DEBUG_TOOLS
-    return cur_qjsvalues.size();
-#else
-    return 0;
-#endif
-  }
+void force_inline HeapObjStoreNoCtx(void *fieldAddr, LEPUSValue value) {
+  *reinterpret_cast<LEPUSValue *>(fieldAddr) = value;
+}
+void force_inline HeapObjStoreNoCtx(void *fieldAddr, void *value) {
+  *reinterpret_cast<address_t *>(fieldAddr) = (address_t)value;
+}
+#endif  // ENABLE_COMPATIBLE_MM
 
-  void SetMaxLimit(size_t limit);
-  size_t GetMaxLimit();
-  void AddGCDuration(int64_t gc_time) { total_duration += gc_time; }
-  int64_t GetGCDuration() { return total_duration; }
-  int js_ref_count;
-  void UpdateGCInfo(size_t heapsize_before, int64_t duration);
+static force_inline void Release_Store(void *fieldAddr, void *value) {
+  std::atomic_store_explicit(
+      reinterpret_cast<std::atomic<address_t> *>(fieldAddr), (address_t)value,
+      std::memory_order_release);
+}
+static force_inline void *Acquire_Load(void *fieldAddr) {
+  return reinterpret_cast<void *>(std::atomic_load_explicit(
+      reinterpret_cast<std::atomic<address_t> *>(fieldAddr),
+      std::memory_order_acquire));
+}
 
- private:
-  // gc
-  void MarkLiveObjects() noexcept;
-  void SweepDeadObjects() noexcept;
-#ifdef ENABLE_TRACING_GC_LOG
-  void PrintGCLog(int64_t mark_begin, int64_t mark_end) noexcept;
-#endif
-  void UpdateFootprintLimit(size_t size) noexcept;
-  void UpdateNGFootprintLimit(size_t size) noexcept;
-
-  // field
-  LEPUSRuntime *rt_;
-  int forbid_gc_;
-  bool gc_pause_suppression_mode_ = false;
-  Visitor *visitor;
-  Finalizer *finalizer;
-  Sweeper *sweeper;
-  size_t max_limit;
-#ifdef ENABLE_TRACING_GC_LOG
-  int64_t gc_begin_time;
-  int64_t last_gc_time;
-#endif
-  int64_t total_duration;
-  std::stringstream gc_info;
-  int info_size;
-};
+static force_inline void Release_Store8(void *fieldAddr, uint8_t value) {
+  std::atomic_store_explicit(
+      reinterpret_cast<std::atomic<uint8_t> *>(fieldAddr), value,
+      std::memory_order_release);
+}
+static force_inline uint8_t Acquire_Load8(void *fieldAddr) {
+  return std::atomic_load_explicit(
+      reinterpret_cast<std::atomic<uint8_t> *>(fieldAddr),
+      std::memory_order_acquire);
+}
 
 class Visitor {
  public:
-  Visitor(LEPUSRuntime *rt) noexcept
-      : rt_(rt), objs(nullptr), objs_len(0), idx(0) {
-    for (int i = 0; i < THREAD_NUM; i++) {
-      queue[i] = new Queue(rt_);
+  std::atomic<bool> doParallelScan{true};
+  static constexpr int kAtomSplitSize = 3;
+  Visitor(LEPUSRuntime *rt, Finalizer *finalizer_val) noexcept
+      : rt_(rt), finalizer(finalizer_val) {}
+  ~Visitor() {}
+  static void *StaticVisitRootLEPUSValue(LEPUSValue val) noexcept;
+  void *VisitRootLEPUSValue(LEPUSValue val) noexcept;
+  void AddObjectDuringFinalizer(void *ptr) {
+    finalizerObj_++;
+    CombinedWriteBarrier((address_t)ptr);
+  }
+  void AddObjectDuringFinalizer(LEPUSValue val) {
+    void *ptr = StaticVisitRootLEPUSValue(val);
+    if (ptr) {
+      AddObjectDuringFinalizer(ptr);
     }
   }
-  ~Visitor() {
-    for (int i = 0; i < THREAD_NUM; i++) {
-      delete queue[i];
-    }
-    if (objs != nullptr) {
-      system_free(objs);
-    }
-  }
-  void ScanRoots();
-  void VisitRootLEPUSValue(LEPUSValue *val, int local_idx) noexcept;
-  void VisitRootLEPUSValue(LEPUSValue &val, int local_idx) noexcept;
-  void AddObjectDuringGC(void *ptr) {
-    if (objs == nullptr) {
-      objs = static_cast<void **>(system_malloc(16 * sizeof(void *)));
-      objs_len = 16;
-    }
-    if (idx >= objs_len) {
-      int new_len = objs_len * 2;
-      void **new_objs =
-          static_cast<void **>(system_realloc(objs, new_len * sizeof(void *)));
-      if (!new_objs) abort();
-      objs = new_objs;
-      objs_len = new_len;
-    }
-    objs[idx] = ptr;
-    idx++;
-  }
-  void VisitObjectDuringGC() {
-    for (int i = 0; i < idx; i++) {
-      VisitRootHeapObj(objs[i], 0);
-    }
-    idx = 0;
-  }
+  bool HasObjsDuringFinalizer() { return finalizerObj_ != 0; }
+  size_t GetAsyncStackSize() { return rt_->async_obj_recoder->size(); }
+  void ReleaseFinalizerObj() { finalizerObj_ = 0; }
 
- private:
-  // private scanner
-  void ScanStack() noexcept;
-  void ScanRuntime() noexcept;
-  void ScanHandles() noexcept;
-  void ScanContext(LEPUSContext *ctx) noexcept;
+ public:
+  void ScanStack(GCWorkStack &workStack) noexcept;
+  void ScanAsyncStack(GCWorkStack &workStack) noexcept;
+  void ScanRuntime(GCWorkStack &workStack, bool isFinalRemark,
+                   bool markWeak) noexcept;
+  void ScanShapeArray(GCWorkStack &workStack) noexcept;
+  void ScanHandles(GCWorkStack &workStack) noexcept;
+  void ScanContext(GCWorkStack &workStack, bool isFinalRemark) noexcept;
 
-  // visit root
-  void VisitRoot(void *ptr, HandleType type, int local_idx) noexcept;
-  void VisitRootHeapObj(void *ptr, int local_idx) noexcept;
-  void VisitRootHeapObjForTask(Queue *q, void *ptr) noexcept;
-  void VisitRootCString(char *cstr, int local_idx) noexcept;
-  void VisitRootJSToken(JSToken *token, int local_idx) noexcept;
-  void VisitRootBCReaderState(BCReaderState *s, int local_idx) noexcept;
-  void VisitRootValueBuffer(ValueBuffer *b, int local_idx) noexcept;
-  void VisitJSAtom(JSAtom atom, int local_idx) noexcept;
+  static void GetHandlePtr(void *ptr, HandleType type,
+                           GCWorkStack &workStack) noexcept;
+  static JSString *GetCStringPtr(const char *cstr) noexcept;
+  static void GetLEPUSTokenPtr(JSToken *token, GCWorkStack &workStack) noexcept;
+  static void GetBCReaderStatePtr(BCReaderState *s,
+                                  GCWorkStack &workStack) noexcept;
+  static void GetValueBufferPtr(ValueBuffer *b,
+                                GCWorkStack &workStack) noexcept;
 
   // visitor
   /* LEPUSValue with tag -> begin */
-  void VisitEntry(void *ptr, int local_idx) noexcept;
-  void VisitLEPUSLepusRef(void *ptr, int local_idx) noexcept;
-  void VisitJShape(void *ptr, int local_idx) noexcept;
-  void VisitJSVarRef(void *ptr, int local_idx) noexcept;
-  void VisitJSFunctionBytecode(void *ptr, int local_idx) noexcept;
-  void VisitJSObject(void *ptr, int local_idx) noexcept;
+  static void VisitLEPUSLepusRef(void *ptr, GCWorkStack &workStack) noexcept;
+  static void VisitJSShape(void *ptr, GCWorkStack &workStack) noexcept;
+  static void VisitJSVarRef(void *ptr, GCWorkStack &workStack) noexcept;
+  static void VisitJSAsyncVarRef(void *ptr, GCWorkStack &workStack) noexcept;
+  static void VisitLEPUSFunctionBytecode(void *ptr,
+                                         GCWorkStack &workStack) noexcept;
+  static void VisitLEPUSObject(void *ptr, GCWorkStack &workStack) noexcept;
   /* LEPUSValue with tag -> end */
   // LEPUS_TAG_BIG_INT
   /* LEPUSObject with class_id -> begin */
-  void VisitJSBoundFunction(void *ptr,
-                            int local_idx) noexcept;  // normal_free
-  void VisitJSCFunctionDataRecord(void *ptr,
-                                  int local_idx) noexcept;  // normal_free
-  void VisitJSForInIterator(void *ptr,
-                            int local_idx) noexcept;  // normal_free
-  void VisitJSArrayBuffer(void *ptr, int local_idx) noexcept;
-  void VisitJSTypedArray(void *ptr, int local_idx) noexcept;
-  void VisitJSMapState(void *ptr, int local_idx) noexcept;
-  void VisitJSMapIteratorData(void *ptr, int local_idx) noexcept;
-  void VisitJSArrayIteratorData(void *ptr,
-                                int local_idx) noexcept;  // normal_free
-  void VisitJSRegExpStringIteratorData(void *ptr,
-                                       int local_idx) noexcept;  // normal_free
-  void VisitJSGeneratorData(void *ptr, int local_idx) noexcept;
-  void VisitJSProxyData(void *ptr, int local_idx) noexcept;    // normal_free
-  void VisitJSPromiseData(void *ptr, int local_idx) noexcept;  // normal_free
-  void VisitJSPromiseReactionData(void *ptr,
-                                  int local_idx) noexcept;  // normal_free
-  void VisitJSPromiseFunctionData(void *ptr,
-                                  int local_idx) noexcept;  // normal_free
-  void VisitJSAsyncFunctionData(void *ptr, int local_idx) noexcept;
-  void VisitJSAsyncFromSyncIteratorData(void *ptr,
-                                        int local_idx) noexcept;  // normal_free
-  void VisitJSAsyncGeneratorData(void *ptr, int local_idx) noexcept;
+  static void VisitJSBoundFunction(
+      void *ptr,
+      GCWorkStack &workStack) noexcept;  // normal_free
+  static void VisitJSCFunctionDataRecord(
+      void *ptr,
+      GCWorkStack &workStack) noexcept;  // normal_free
+  static void VisitJSForInIterator(
+      void *ptr,
+      GCWorkStack &workStack) noexcept;  // normal_free
+  static void VisitJSArrayBuffer(void *ptr, GCWorkStack &workStack) noexcept;
+  static void VisitJSTypedArray(void *ptr, GCWorkStack &workStack) noexcept;
+  static void VisitJSMapState(void *ptr, GCWorkStack &workStack) noexcept;
+  static void VisitJSMapRecord(void *ptr, GCWorkStack &workStack) noexcept;
+  static void VisitJSMapIteratorData(void *ptr,
+                                     GCWorkStack &workStack) noexcept;
+  static void VisitJSArrayIteratorData(
+      void *ptr,
+      GCWorkStack &workStack) noexcept;  // normal_free
+  static void VisitJSRegExpStringIteratorData(
+      void *ptr,
+      GCWorkStack &workStack) noexcept;  // normal_free
+  static void VisitJSGeneratorData(void *ptr, GCWorkStack &workStack) noexcept;
+  static void VisitJSProxyData(void *ptr,
+                               GCWorkStack &workStack) noexcept;  // normal_free
+  static void VisitJSPromiseData(
+      void *ptr, GCWorkStack &workStack) noexcept;  // normal_free
+  static void VisitJSPromiseReactionData(
+      void *ptr,
+      GCWorkStack &workStack) noexcept;  // normal_free
+  static void VisitJSPromiseFunctionData(
+      void *ptr,
+      GCWorkStack &workStack) noexcept;  // normal_free
+  static void VisitJSAsyncFunctionData(void *ptr,
+                                       GCWorkStack &workStack) noexcept;
+  static void VisitJSAsyncFromSyncIteratorData(
+      void *ptr,
+      GCWorkStack &workStack) noexcept;  // normal_free
+  static void VisitJSAsyncGeneratorData(void *ptr,
+                                        GCWorkStack &workStack) noexcept;
   /* LEPUSObject with class_id -> end */
   // scan context
-#ifdef ENABLE_QUICKJS_DEBUGGER
-  void VisitJSScriptSource(void *ptr, int local_idx) noexcept;
-#endif
+  static void VisitLEPUSScriptSource(void *ptr,
+                                     GCWorkStack &workStack) noexcept;
   // other
-  void VisitJSPropertyEnum(void *ptr,
-                           int local_idx) noexcept;  // normal_free
-  void VisitJSModuleDef(void *ptr, int local_idx) noexcept;
-  void VisitJSFunctionDef(void *ptr, int local_idx) noexcept;
-  void VisitJSValueArray(void *ptr, int local_idx) noexcept;
-  void VisitValueSlot(void *ptr, int local_idx) noexcept;
-  void VisitJsonStrArray(void *ptr, int local_idx) noexcept;
+  static void VisitLEPUSModuleDef(void *ptr, GCWorkStack &workStack) noexcept;
+  static void VisitJSFunctionDef(void *ptr, GCWorkStack &workStack) noexcept;
+  static void VisitJSSeparableString(void *ptr,
+                                     GCWorkStack &workStack) noexcept;
+  static void VisitLEPUSDebuggerInfo(void *, GCWorkStack &workStack) noexcept;
+  static void VisitFinalizationRegistryData(void *ptr,
+                                            GCWorkStack &workStack) noexcept;
 
-  void VisitSeparableString(void *ptr, int local_idx) noexcept;
-  void VisitDebuggerInfo(void *, int32_t) noexcept;
-  void VisitFinalizationRegistryData(void *ptr, int local_idx) noexcept;
+  static void VisitJSAsyncGeneratorRequest(void *ptr,
+                                           GCWorkStack &workStack) noexcept;
+  static void VisitWeakRefRecord(void *ptr, GCWorkStack &workStack) noexcept;
+  static void VisitFinalizationRegistryEntry(void *ptr,
+                                             GCWorkStack &workStack) noexcept;
+  static void VisitRelocEntry(void *ptr, GCWorkStack &workStack) noexcept;
+
+  static void VisitJSValueArray(void *ptr, GCWorkStack &workStack) noexcept;
+  static void VisitLabelSlotArray(void *ptr, GCWorkStack &workStack) noexcept;
+  static void VisitJSPropertyArray(void *ptr, GCWorkStack &workStack) noexcept;
+  static void VisitCallerStrSlotArray(void *ptr,
+                                      GCWorkStack &workStack) noexcept;
+  static void VisitLEPUSPropertyEnumArray(void *ptr,
+                                          GCWorkStack &workStack) noexcept;
+  static void VisitJSVarRefPtrArray(void *ptr, GCWorkStack &workStack) noexcept;
+  static void VisitJSReqModuleEntryArray(void *ptr,
+                                         GCWorkStack &workStack) noexcept;
+  static void VisitJSExportEntryArray(void *ptr,
+                                      GCWorkStack &workStack) noexcept;
+  static void VisitJSImportEntryArray(void *ptr,
+                                      GCWorkStack &workStack) noexcept;
+  static void VisitValueSlotArray(void *ptr, GCWorkStack &workStack) noexcept;
+  static void VisitJsonStrArray(void *ptr, GCWorkStack &workStack) noexcept;
+  static void VisitLEPUSBreakpointArray(void *ptr,
+                                        GCWorkStack &workStack) noexcept;
+  static void VisitAtomArray(void *ptr, GCWorkStack &workStack) noexcept;
+  static void VisitJSResolveEntryArray(void *ptr,
+                                       GCWorkStack &workStack) noexcept;
 
   // push ptr
-  void PushObjLEPUSValue(LEPUSValue &val, int local_idx) noexcept;
-  void PushObjLEPUSValue(LEPUSValue *val, int local_idx) noexcept;
-  void PushObjAtom(JSAtom atom, int local_idx) noexcept;
-  void PushObjJSAsyncFunctionState(JSAsyncFunctionState *s,
-                                   int local_idx) noexcept;
-  void PushObjJStackFrame(LEPUSStackFrame *sf, int local_idx) noexcept;
-  void PushBytecodeAtoms(const uint8_t *bc_buf, int bc_len,
-                         int use_short_opcodes, int local_idx) noexcept;
-  void PushObjJSRegExp(JSRegExp *re, int local_idx) noexcept;
-  void PushObjFunc(LEPUSObject *obj, int local_idx) noexcept;
-  void PushObjArray(LEPUSObject *obj, int local_idx) noexcept;
-  void PushObjRegExp(LEPUSObject *obj, int local_idx) noexcept;
-  void PushObjProperty(JSProperty *pr, int prop_flags, int local_idx) noexcept;
+  static no_inline void PushObjLEPUSValue(LEPUSValue val,
+                                          GCWorkStack &workStack) noexcept;
+  static void PushObjAtom(LEPUSAtom atom, GCWorkStack &workStack) noexcept;
+  static void *GetAtomObj(LEPUSAtom atom, GCWorkStack &workStack) noexcept;
+  static void PushObjLEPUSAsyncFunctionState(JSAsyncFunctionState *s,
+                                             GCWorkStack &workStack) noexcept;
+  static void PushObjLEPUSStackFrame(LEPUSStackFrame *sf,
+                                     GCWorkStack &workStack) noexcept;
+  static void PushBytecodeAtoms(const uint8_t *bc_buf, int bc_len,
+                                int use_short_opcodes,
+                                GCWorkStack &workStack) noexcept;
+  static void PushObjFunc(LEPUSObject *obj, GCWorkStack &workStack) noexcept;
+  static void PushObjRegExp(LEPUSObject *obj, GCWorkStack &workStack) noexcept;
+  static void PushObjProperty(JSProperty *pr, GCWorkStack &workStack) noexcept;
+
+  void DoFinalizer(void *ptr);
 
   // tools
-  bool IsConstString(void *ptr) {
+  static bool IsConstString(void *ptr) {
     return get_alloc_tag(ptr) == ALLOC_TAG_JSConstString;
   }
+
   // field
+ public:
   LEPUSRuntime *rt_;
-  Queue *queue[THREAD_NUM];  // for visit
-  void **objs;
-  int objs_len;
-  int idx;
+  Finalizer *finalizer;
+  int finalizerObj_{0};
 };
+
+static force_inline void WriteBarrierNoStoreCStr(LEPUSContext *ctx,
+                                                 const char *value) {
+  if (UNLIKELY(ctx->con_mark_state)) {
+    CombinedWriteBarrier((address_t)Visitor::GetCStringPtr(value));
+  }
+}
+
+static force_inline void WriteBarrierNoStoreNoCheck(LEPUSValue value) {
+  CombinedWriteBarrier((address_t)Visitor::StaticVisitRootLEPUSValue(value));
+}
+
+static __attribute__((unused)) void ReallocJsonStrArrayWB(LEPUSContext *ctx,
+                                                          const char ***str_arr,
+                                                          size_t ts) {
+  for (size_t i = 0; i < ts; ++i) {
+    CombinedWriteBarrier((address_t)Visitor::GetCStringPtr((*str_arr)[i]));
+  }
+}
 
 class Finalizer {
  public:
   Finalizer(LEPUSRuntime *rt) noexcept : rt_(rt) {}
-  void close_var_refs(LEPUSStackFrame *sf) noexcept;
   void free_atom(LEPUSRuntime *rt, JSAtomStruct *p) noexcept;
   // do finalizer
-  void DoFinalizer(void *ptr) noexcept;
+  void DoGlobalFinalizer() noexcept;
   void DoFinalizer2(void *ptr) noexcept;
 #ifdef ENABLE_LEPUSNG
   void JSLepusRefFinalizer(void *ptr) noexcept;
@@ -265,46 +375,25 @@ class Finalizer {
   void JSStringOnlyFinalizer(void *ptr) noexcept;
 #endif
   void JSSymbolFinalizer(void *ptr) noexcept;
-  void JSShapeFinalizer(void *ptr) noexcept;
-  void JSVarRefFinalizer(void *ptr) noexcept;
-  void JSFunctionBytecodeFinalizer(void *ptr) noexcept;
+  void JSShapeArrayFinalizer() noexcept;
+  void BytecodeListFinalizer() noexcept;
   void JSArrayBufferFinalizer(void *ptr) noexcept;
   void JSTypedArrayFinalizer(void *ptr) noexcept;
   void JSMapStateFinalizer(void *ptr) noexcept;
   void JSMapIteratorDataFinalizer(void *ptr) noexcept;
-  void JSGeneratorDataFinalizer(void *ptr) noexcept;
-  void JSAsyncFunctionDataFinalizer(void *ptr) noexcept;
-  void JSAsyncGeneratorDataFinalizer(void *ptr) noexcept;
   void JSModuleDefFinalizer(void *ptr) noexcept;
-  void JSFunctionDefFinalizer(void *ptr) noexcept;
   void JSSeparableStringFinalizer(void *ptr) noexcept {}
   void FinalizationRegistryDataFinalizer(void *ptr) noexcept;
   void WeakRefDataFinalizer(void *ptr) noexcept;
+  void JSGeneratorDataFinalizer(void *ptr) noexcept;
+  void JSAsyncFunctionDataFinalizer(void *ptr) noexcept;
+  void JSAsyncGeneratorDataFinalizer(void *ptr) noexcept;
+  void close_var_refs_in_finalizer(LEPUSStackFrame *sf) noexcept;
 
  private:
   LEPUSRuntime *rt_;
 };
 
-class MlockScope {
- public:
-  MlockScope(Queue **q) : queue(q) {
-#ifndef _WIN32
-    for (int i = 0; i < THREAD_NUM; i++) {
-      SYSCALL_CHECK(
-          mlock(queue[i]->GetQueue(), queue[i]->GetSize() * sizeof(uintptr_t)))
-    }
-#endif
-  }
-  ~MlockScope() {
-#ifndef _WIN32
-    for (int i = 0; i < THREAD_NUM; i++) {
-      SYSCALL_CHECK(munlock(queue[i]->GetQueue(),
-                            queue[i]->GetSize() * sizeof(uintptr_t)));
-    }
-#endif
-  }
+void JSPropertyStore(LEPUSContext *ctx, LEPUSObject *obj, JSProperty *new_prop);
 
- private:
-  Queue **queue;
-};
-#endif  // SRC_GC_COLLECTOR_H_
+#endif

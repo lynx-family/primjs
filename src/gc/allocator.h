@@ -1,285 +1,312 @@
-/*
-  This is a version of malloc/free/realloc written by
-  Doug Lea and released to the public domain, as explained at
-  http://creativecommons.org/publicdomain/zero/1.0/ Send questions,
-  comments, complaints, performance data, etc to dl@cs.oswego.edu
-* Version 2.8.6 Wed Aug 29 06:57:58 2012  Doug Lea
-   Note: There may be an updated version of this malloc obtainable at
-           ftp://gee.cs.oswego.edu/pub/misc/malloc.c
-         Check before installing!
- */
-/*
- * PackageLicenseDeclared: CC0-1.0
- */
-
-// Copyright 2023 The Lynx Authors. All rights reserved.
-// Licensed under the Apache License Version 2.0 that can be found in the
-// LICENSE file in the root directory of this source tree.
-
 #ifndef SRC_GC_ALLOCATOR_H_
 #define SRC_GC_ALLOCATOR_H_
-#include <errno.h>
-#ifndef _WIN32
-#include <pthread.h>
-#endif
-#include <stddef.h>
-#include <stdint.h>
-#include <stdio.h>
 
-#if defined(ANDROID) || defined(__ANDROID__) || defined(OS_IOS)
-#define THREAD_NUM 3
-#define CREATE_THREAD_NUM 2
-#else
-#define THREAD_NUM 6
-#define CREATE_THREAD_NUM 6
-#endif
+#include <cstdlib>
+#include <functional>
+#include <mutex>
+#include <string>
 
-typedef uint64_t binmap_t;
-typedef uint64_t bindex_t;
-typedef uint64_t flag_t;
-struct malloc_tree_chunk {
-  size_t prev_foot;
-  size_t head;
-  struct malloc_tree_chunk* fd;
-  struct malloc_tree_chunk* bk;
+#include "gc/alloc_config.h"
+#include "gc/structs.h"
 
-  struct malloc_tree_chunk* child[2];
-  struct malloc_tree_chunk* parent;
-  bindex_t index;
+#define ALLOC_MUTEX_TYPE std::mutex
+#define ALLOC_LOCK_TYPE std::lock_guard<mutex>
+#define ALLOC_CURRENT_THREAD
+
+namespace ROS_GC {
+// The allocator collects five kinds of data from the heap:
+// 1. Fragmentation related: the utilisation of the heap
+// 2. Per-mutator allocation data: this is non-atomic
+// 3. Global allocation data: this is atomic
+// 4. Allocation time statistics
+// 5. Lock contention statistics
+// These are written in the contract and every allocator implementation should
+// support them. Additional stats can be supported by adding callbacks to the
+// callback interface.
+class FragmentationRecord {
+ public:
+  // this is allocator-specific, move into allocator implementation header
+  size_t GetExternalFragmentation() const {
+    return runFreeSlots + runOverhead + freePages;
+  }
+  size_t GetInternalFragmentation() const { return internal; }
+  size_t GetRCHeader() const { return rcOverhead; }
+  size_t GetBytesInFreePages() const { return freePages; }
+  size_t GetBytesInPages() const { return totalPages; }
+  size_t GetFreeSlots() const { return runFreeSlots; }
+  size_t GetSlots() const { return runTotalSlots; }
+  size_t GetRunCacheVolume() const { return runCacheVolume; }
+  size_t GetRunOverhead() const { return runOverhead; }
+  size_t GetRun(bool isFree) const {
+    if (isFree) {
+      return freeRun;
+    } else {
+      return totalRun;
+    }
+  }
+
+  void RecordInternalFrag(size_t totalBytes, size_t requestedBytes) {
+    internal = totalBytes - requestedBytes;
+  }
+
+  void IncFreePages(size_t bytes) { freePages += bytes; }
+  void IncPages(size_t bytes) { totalPages += bytes; }
+  void IncFreeSlots(size_t bytes) { runFreeSlots += bytes; }
+  void IncSlots(size_t bytes) { runTotalSlots += bytes; }
+  void IncRunOverhead(size_t bytes) { runOverhead += bytes; }
+  void IncRunCacheVolume(size_t bytes) { runCacheVolume += bytes; }
+  void IncRun(size_t bytes, bool isFree) {
+    if (isFree) {
+      freeRun += bytes;
+    }
+    totalRun += bytes;
+  }
+
+  FragmentationRecord()
+      : internal(0),
+        freePages(0),
+        totalPages(0),
+        runFreeSlots(0),
+        runTotalSlots(0),
+        runOverhead(0),
+        rcOverhead(0),
+        runCacheVolume(0),
+        freeRun(0),
+        totalRun(0) {}
+  ~FragmentationRecord() = default;
+
+  void Reset() {
+    internal = 0;
+    freePages = 0;
+    totalPages = 0;
+    runFreeSlots = 0;
+    runTotalSlots = 0;
+    runOverhead = 0;
+    rcOverhead = 0;
+    runCacheVolume = 0;
+    freeRun = 0;
+    totalRun = 0;
+  }
+
+ private:
+  // fragmentation fields:
+  size_t internal;   // internal frag. caused by rc/gc header and alignment
+  size_t freePages;  // external frag. free pages in bytes not yet allocated
+  size_t totalPages;
+  size_t runFreeSlots;  // external frag. total bytes of the free slots
+  size_t runTotalSlots;
+  size_t runOverhead;  // external frag. total bytes of the run header and the
+                       // trailing space
+  // extra fields:
+  size_t rcOverhead;      // total bytes used by RC header
+  size_t runCacheVolume;  // bytes consumed by the cached runs
+  size_t freeRun;
+  size_t totalRun;
+};  // class FragmentationRecord
+
+class AccUnSynchedSizeField {
+ public:
+  inline size_t LoadSize() const { return val; }
+  inline void Inc(size_t param) { val += param; }
+  inline void Dec(size_t param) { val -= param; }
+  inline void Init() { val = 0; }
+  AccUnSynchedSizeField() : val(0) {}
+  ~AccUnSynchedSizeField() = default;
+
+ private:
+  size_t val;
 };
-typedef struct malloc_tree_chunk* tbinptr;
-struct malloc_segment {
-  char* base;
-  size_t size;
-  struct malloc_segment* next;
-  flag_t sflags;
+
+class AccSynchedSizeField {
+ public:
+  inline size_t LoadSize() const { return val.load(std::memory_order_relaxed); }
+  inline void Inc(size_t param) {
+    (void)val.fetch_add(param, std::memory_order_relaxed);
+  }
+  inline void Sub(size_t param) {
+    (void)val.fetch_sub(param, std::memory_order_relaxed);
+  }
+  inline void Dec(size_t param) {
+    (void)val.fetch_sub(param, std::memory_order_relaxed);
+  }
+  inline void Init() { val.store(0, std::memory_order_seq_cst); }
+  AccSynchedSizeField() : val(0) {}
+  ~AccSynchedSizeField() = default;
+
+ private:
+  std::atomic<size_t> val;
 };
-typedef struct malloc_segment msegment;
-typedef struct malloc_segment* msegmentptr;
-struct malloc_chunk {
-  size_t prev_foot;
-  size_t head;
-  struct malloc_chunk* fd;
-  struct malloc_chunk* bk;
+
+template <class SizeField>
+class AllocAccounting {
+ public:
+  inline size_t GetNetBytes() const { return netBytes.LoadSize(); }
+  inline size_t GetNetObjs() const { return netObjs.LoadSize(); }
+  inline size_t GetNetObjBytes() const { return netObjBytes.LoadSize(); }
+  inline size_t GetNetLargeObjBytes() const {
+    return netLargeObjBytes.LoadSize();
+  }
+
+  AllocAccounting() {
+    netBytes.Init();
+    netObjs.Init();
+    netObjBytes.Init();
+    netLargeObjBytes.Init();
+    totalFreedBytes.Init();
+    totalFreedObjBytes.Init();
+    totalFreedObjs.Init();
+    totalAllocdBytes.Init();
+    totalAllocdObjs.Init();
+    totalAllocdObjBytes.Init();
+  }
+  ~AllocAccounting() = default;
+  inline size_t TotalAllocdBytes() { return totalAllocdBytes.LoadSize(); }
+  inline size_t TotalFreedBytes() { return totalFreedBytes.LoadSize(); }
+  inline size_t TotalAllocdObjs() { return totalAllocdObjs.LoadSize(); }
+  inline size_t TotalFreedObjs() { return totalFreedObjs.LoadSize(); }
+  inline void AtAlloc(size_t objSize, size_t internalSize, bool isLarge) {
+    netBytes.Inc(internalSize);
+    netObjBytes.Inc(objSize);
+    netObjs.Inc(1);
+    if (UNLIKELY(isLarge)) {
+      netLargeObjBytes.Inc(objSize);
+    }
+  }
+  inline void AtFree(size_t objSize, size_t internalSize, bool isLarge) {
+    netBytes.Dec(internalSize);
+    netObjBytes.Dec(objSize);
+    netObjs.Dec(1);
+    if (UNLIKELY(isLarge)) {
+      netLargeObjBytes.Dec(objSize);
+    }
+  }
+  inline void ResetWindowTotal() {
+    totalFreedBytes.Init();
+    totalFreedObjBytes.Init();
+    totalFreedObjs.Init();
+    totalAllocdBytes.Init();
+    totalAllocdObjs.Init();
+    totalAllocdObjBytes.Init();
+  }
+
+ private:
+  SizeField netBytes;
+  SizeField netObjBytes;
+  SizeField netObjs;
+  SizeField netLargeObjBytes;  // net bytes excluding overhead
+
+  // these are for total numbers in a time window, caution there is no overflow
+  // protection
+  SizeField totalAllocdBytes;     // total bytes including overhead
+  SizeField totalAllocdObjBytes;  // total bytes excluding overhead
+  SizeField totalAllocdObjs;      // total number of objects allocated
+  SizeField totalFreedBytes;      // total bytes including overhead
+  SizeField totalFreedObjBytes;   // total bytes excluding overhead
+  SizeField totalFreedObjs;       // total number of objects freed
 };
 
-typedef struct malloc_chunk mchunk;
-typedef struct malloc_chunk* mchunkptr;
+// the allocator uses a version that does requires atomic instructions, because
+// multiple threads could do the same operation concurrently
+using SynchedAllocAccounting = AllocAccounting<AccSynchedSizeField>;
+// the mutator uses a light weight version that does not require atomic
+// instructions
+using UnsyncAllocAccounting = AllocAccounting<AccUnSynchedSizeField>;
 
-#ifndef USE_LOCKS
-#define USE_LOCKS 0
-#endif
-#define NSMALLBINS (32U)
-#define NTREEBINS (32U)
-struct malloc_state {
-  binmap_t smallmap;
-  binmap_t local_smallmap[THREAD_NUM];
-  binmap_t treemap;
-  binmap_t local_treemap[THREAD_NUM];
-  size_t dvsize;
-  size_t topsize;
-  char* least_addr;
-  mchunkptr dv;
-  mchunkptr top;
-  size_t trim_check;
-  char* mmap_cache;
-  size_t mmap_cache_size;
-  size_t release_checks;
-  size_t magic;
-  mchunkptr* smallbins;
-  mchunkptr* local_smallbins[THREAD_NUM];
-  tbinptr* treebins;
-  tbinptr* local_treebins[THREAD_NUM];
-  size_t footprint;
-  size_t max_footprint;
-  size_t footprint_limit;
-  size_t outer_heap_size;
-  size_t gc_info_threshold;
-  size_t gc_info_interval_size;
-  flag_t mflags;
-#if USE_LOCKS
-  MLOCK_T mutex;
-#endif
-  msegment seg;
-  size_t exts;
-  void** mmap_array;
-  uint32_t mmap_free_index;
-  uint32_t mmap_size;
-  uint32_t mmap_count;
-  size_t cur_malloc_size;  // malloc size after gc
-  size_t footprint_before_gc;
-#ifdef ENABLE_TRACING_GC_LOG
-  size_t malloc_size_before_gc;
-  size_t malloc_size_after_gc;
-  size_t finalizer_time;
-  size_t free_time;
-  size_t free_set_bit_time;
-  size_t free_gene_freelist_time;
-  size_t free_mmap_chunk_time;
-  size_t release_time;
-  size_t release_seg_num;
-#endif
-  void* runtime;
-  void* pool;
-  int gc_flag[THREAD_NUM];
-  int local_idx_flag[THREAD_NUM];
-#ifndef _WIN32
-  pthread_mutex_t mtx;
-#endif
-  size_t seg_count;
-  bool open_madvise;
-#if defined(ANDROID) || defined(__ANDROID__) || defined(OS_IOS)
-  char mem_name[30];
-#endif
+struct VMHeapParam {
+  size_t heapStartSize;
+  size_t heapGrowthLimit;
+  size_t heapMinFree = {0};
+  size_t heapMaxFree = {0};
+  float heapTargetUtilization = {0.0};
 };
-typedef struct malloc_state* mstate;
-void* allocate(mstate m, size_t bytes);
-void gcfree(mstate m, void* mem);
-void* reallocate(mstate m, void* oldmem, size_t bytes);
-size_t allocate_usable_size(void* mem);
-size_t allocate_usable_size_debug(void* mem);
-size_t allocate_usable_size_debug_protect(void* mem);
-void destroy_allocate_instance(mstate m);
+class AllocMutator {
+ public:
+  // virtual void Init() = 0;
+  // virtual void Fini() = 0;
+  AllocMutator() = default;
 
-int atomic_acqurie_local_idx(mstate m);
-void atomic_release_local_idx(mstate m, int local_idx);
+  virtual ~AllocMutator() = default;
+  AllocMutator(AllocMutator const &) = delete;
+  void operator=(AllocMutator const &x) = delete;
+  inline UnsyncAllocAccounting &GetAllocAccount() { return account; }
 
-void set_mark_multi(void* ptr);
-bool is_marked_multi(void* ptr);
-void set_alloc_tag(void* ptr, int alloc_tag);
-int get_alloc_tag(void* ptr);
-void set_hash_size(void* ptr, int hash_size);
-int get_hash_size(void* ptr);
-void set_heap_obj_len(void* ptr, int len);
-int get_heap_obj_len(void* ptr);
+ public:
+  // the mutator uses a light weight version that does not require atomic
+  // instructions this is currently not properly instrumented, use the
+  // global/atomic version instead
+  UnsyncAllocAccounting account;
+};  // class AllocMutator
 
-#ifdef ENABLE_GC_DEBUG_TOOLS
-#ifdef __cplusplus
-extern "C" {
+// Allocator abstract class
+class Allocator {
+ public:
+  // For methods that visit objects via callback functions.
+  using VisitorFactory = std::function<HeapAliveObjsVisitor()>;
+
+  // returns the total number of objs allocated
+  inline size_t AllocatedObjs() const { return account.GetNetObjs(); }
+
+  // returns the total bytes that has been occupied
+  // to be specific, this is the sum of internal size of all allocated objects
+  inline size_t AllocatedMemory() const { return account.GetNetBytes(); }
+
+  // returns the total size of the objects allocated
+  // the difference between requested memory and allocated memory, is that
+  // allocated memory sums internal size, whereas requested memory sums raw obj
+  // size (no header)
+  inline size_t RequestedMemory() const { return account.GetNetObjBytes(); }
+
+  inline SynchedAllocAccounting &GetAllocAccount() { return account; }
+
+  // callback before allocation
+  __attribute__((always_inline)) void PreObjAlloc(address_t objAddress,
+                                                  size_t objSize) const;
+
+  // callback after allocation
+  // objSize is the requested object size
+  // internalSize is the size including overhead
+  inline void PostObjAlloc(address_t objAddress, size_t objSize,
+                           size_t internalSize);
+
+  // callback before free. returns the object size
+  template <bool isFast = false>
+  __attribute__((always_inline)) size_t PreObjFree(address_t objAddress) const {
+    return 0;
+  };
+
+  // callback after free
+  // internalSize is the bytes occupied by the object including overhead
+  template <bool isFast = false>
+  __attribute__((always_inline)) void PostObjFree(address_t objAddress,
+                                                  size_t objSize,
+                                                  size_t internalSize) {}
+
+  virtual void Init(const VMHeapParam &) = 0;
+
+  // Allocate space for a new object of the requested size
+  virtual address_t NewObj(size_t size) = 0;
+
+  static void ReleaseResource(address_t obj) {}
+
+  virtual ~Allocator() {}
+  Allocator() = default;
+  void NewOOMException();
+
+  // Allocation tracking support, set callback
+  void SetAllocRecordingCallback(
+      std::function<void(address_t, size_t)> allocRecordingCallbackFunc) {
+    mAllocRecordingCallbackFunc = allocRecordingCallbackFunc;
+  }
+
+ public:
+  SynchedAllocAccounting account;
+
+ protected:
+  std::atomic<bool> oomeCreated;
+  ALLOC_MUTEX_TYPE globalLock;
+  // Allocation tracking support, recorder callback
+  std::function<void(address_t, size_t)> mAllocRecordingCallbackFunc = nullptr;
+};
+}  // namespace ROS_GC
+
 #endif
-void delete_cur_mems(void* runtime, void* ptr);
-void multi_delete_cur_mems(void* runtime, void* ptr, int local_idx);
-void merge_mems(void* runtime);
-void add_cur_mems(void* runtime, void* ptr);
-#ifdef __cplusplus
-}
-#endif
-#endif
-
-int64_t get_daytime();
-#ifdef ENABLE_TRACING_GC_LOG
-size_t get_malloc_size(mstate m);
-#endif
-
-#define SIZE_T_SIZE (sizeof(size_t))
-#define INT_SIZE (sizeof(int))
-#define SIZE_T_BITSIZE (sizeof(size_t) << 3)
-
-#define SIZE_T_ZERO ((size_t)0)
-#define SIZE_T_ONE ((size_t)1)
-#define SIZE_T_TWO ((size_t)2)
-#define SIZE_T_FOUR ((size_t)4)
-#define TWO_SIZE_T_SIZES (SIZE_T_SIZE << 1)
-#define FOUR_SIZE_T_SIZES (SIZE_T_SIZE << 2)
-#define SIX_SIZE_T_SIZES (FOUR_SIZE_T_SIZES + TWO_SIZE_T_SIZES)
-#define HALF_MAX_SIZE_T (MAX_SIZE_T / 2U)
-
-#define PINUSE_BIT (SIZE_T_ONE)
-#define CINUSE_BIT (SIZE_T_TWO)
-#define FLAG4_BIT (SIZE_T_FOUR)
-#define INUSE_BITS (PINUSE_BIT | CINUSE_BIT)
-#define FLAG_BITS (PINUSE_BIT | CINUSE_BIT | FLAG4_BIT)
-
-#define FENCEPOST_HEAD (INUSE_BITS | SIZE_T_SIZE)
-
-#define chunk_plus_offset(p, s) ((mchunkptr)(((char*)(p)) + (s)))
-#define chunk_minus_offset(p, s) ((mchunkptr)(((char*)(p)) - (s)))
-
-#define next_chunk(p) ((mchunkptr)(((char*)(p)) + ((p)->head & ~FLAG_BITS)))
-#define prev_chunk(p) ((mchunkptr)(((char*)(p)) - ((p)->prev_foot)))
-
-#define next_pinuse(p) ((next_chunk(p)->head) & PINUSE_BIT)
-
-#define get_foot(p, s) (((mchunkptr)((char*)(p) + (s)))->prev_foot)
-#define set_foot(p, s) (((mchunkptr)((char*)(p) + (s)))->prev_foot = (s))
-
-#define set_size_and_pinuse_of_free_chunk(p, s) \
-  ((p)->head = (s | PINUSE_BIT), set_foot(p, s))
-
-#define set_free_with_pinuse(p, s, n) \
-  (clear_pinuse(n), set_size_and_pinuse_of_free_chunk(p, s))
-
-#define overhead_for(p) (is_mmapped(p) ? MMAP_CHUNK_OVERHEAD : CHUNK_OVERHEAD)
-
-#if defined(DARWIN) || defined(_DARWIN)
-#define HAVE_MMAP 1
-#ifndef MALLOC_ALIGNMENT
-#define MALLOC_ALIGNMENT ((size_t)16U)
-#endif
-#endif /* DARWIN */
-
-#ifndef MALLOC_ALIGNMENT
-#if defined(__x86_64__) || defined(__aarch64__)
-#define MALLOC_ALIGNMENT ((size_t)(1 * sizeof(void*)))
-#else
-#define MALLOC_ALIGNMENT ((size_t)(2 * sizeof(void*)))
-#endif
-#endif /* MALLOC_ALIGNMENT */
-
-#ifndef FOOTERS
-#define FOOTERS 0
-#endif /* FOOTERS */
-
-#if FOOTERS
-#define CHUNK_OVERHEAD (TWO_SIZE_T_SIZES + 2 * INT_SIZE)
-#else /* FOOTERS */
-#define CHUNK_OVERHEAD (SIZE_T_SIZE + 2 * INT_SIZE)
-#endif /* FOOTERS */
-
-#define CHUNK_ALIGN_MASK (MALLOC_ALIGNMENT - SIZE_T_ONE)
-
-#define pad_request(req) \
-  (((req) + CHUNK_OVERHEAD + CHUNK_ALIGN_MASK) & ~CHUNK_ALIGN_MASK)
-
-#define align_offset(A)                                           \
-  ((((size_t)(A) & CHUNK_ALIGN_MASK) == 0)                        \
-       ? 0                                                        \
-       : ((MALLOC_ALIGNMENT - ((size_t)(A) & CHUNK_ALIGN_MASK)) & \
-          CHUNK_ALIGN_MASK))
-#define align_as_chunk(A) (mchunkptr)((A) + align_offset(chunk2mem(A)))
-
-#define chunk2mem(p) ((void*)((char*)(p) + (TWO_SIZE_T_SIZES + 2 * INT_SIZE)))
-
-#define segment_holds(S, A) \
-  ((char*)(A) >= S->base && (char*)(A) < S->base + S->size)
-
-#define cinuse(p) ((p)->head & CINUSE_BIT)
-#define pinuse(p) ((p)->head & PINUSE_BIT)
-#define flag4inuse(p) ((p)->head & FLAG4_BIT)
-#define is_inuse(p) (((p)->head & INUSE_BITS) != PINUSE_BIT)
-#define is_mmapped(p) (((p)->head & INUSE_BITS) == 0)
-
-#define chunksize(p) ((p)->head & ~(FLAG_BITS))
-
-#define clear_pinuse(p) ((p)->head &= ~PINUSE_BIT)
-#define set_flag4(p) ((p)->head |= FLAG4_BIT)
-#define clear_flag4(p) ((p)->head &= ~FLAG4_BIT)
-
-#define mem2chunk(mem) \
-  ((mchunkptr)((char*)(mem) - (TWO_SIZE_T_SIZES + 2 * INT_SIZE)))
-
-#define IS_UNUSED_BIT (16U)
-void init_bins(mstate m);
-void local_gcfree(mstate fm, void* mem, int local_idx);
-void* mmap_set_free(uint32_t v);
-
-size_t release_unused_segments(mstate m);
-
-bool mmap_is_free(const void* p);
-
-bool is_marked(void* ptr);
-void clear_mark(void* ptr);
-int get_tag(void* ptr);
-void local_insert_chunk(mstate m, mchunkptr mchunk, size_t size, int local_idx);
-
-#endif  // SRC_GC_ALLOCATOR_H_
