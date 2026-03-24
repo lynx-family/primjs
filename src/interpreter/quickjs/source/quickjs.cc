@@ -23507,9 +23507,9 @@ QJS_STATIC __exception int js_parse_statement_or_decl(JSParseState *s,
       if (js_parse_class(s, FALSE, JS_PARSE_EXPORT_NONE)) return -1;
       break;
 
-    case TOK_DEBUGGER:
-#ifdef ENABLE_QUICKJS_DEBUGGER
+    case TOK_DEBUGGER: {
       if (next_token(s)) goto fail;
+#ifdef ENABLE_QUICKJS_DEBUGGER
       // generate opcode: op_push_const
       LEPUSValue debugger;
       debugger = LEPUS_NewString(ctx, "debugger");
@@ -23520,8 +23520,9 @@ QJS_STATIC __exception int js_parse_statement_or_decl(JSParseState *s,
       }
       LEPUS_FreeValue(ctx, debugger);
       emit_op(s, OP_drop);
-      break;
 #endif
+      if (js_parse_expect_semi(s)) goto fail;
+    } break;
     case TOK_ENUM:
     case TOK_EXPORT:
     case TOK_EXTENDS:

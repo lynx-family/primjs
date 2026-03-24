@@ -2,6 +2,7 @@
 // Licensed under the Apache License Version 2.0 that can be found in the
 // LICENSE file in the root directory of this source tree.
 
+#include <cstring>
 #include <memory>
 
 #include "gtest/gtest.h"
@@ -31,6 +32,38 @@ TEST(QjsCompiler, Parse) {
   ASSERT_TRUE(LEPUS_VALUE_GET_TAG(ret) != LEPUS_TAG_EXCEPTION);
 
   if (!ctx->rt->gc_enable) LEPUS_FreeValue(ctx, ret);
+  LEPUS_FreeContext(ctx);
+  LEPUS_FreeRuntime(rt);
+}
+
+TEST(QjsCompiler, DebuggerStatementParse) {
+  auto *rt = LEPUS_NewRuntime();
+  auto *ctx = LEPUS_NewContext(rt);
+
+  {
+    const char *src = "debugger;";
+    LEPUSValue ret =
+        LEPUS_Eval(ctx, src, strlen(src), "", LEPUS_EVAL_FLAG_COMPILE_ONLY);
+    ASSERT_FALSE(LEPUS_IsException(ret));
+    if (!ctx->rt->gc_enable) LEPUS_FreeValue(ctx, ret);
+  }
+
+  {
+    const char *src = "debugger\nlet x = 1;";
+    LEPUSValue ret =
+        LEPUS_Eval(ctx, src, strlen(src), "", LEPUS_EVAL_FLAG_COMPILE_ONLY);
+    ASSERT_FALSE(LEPUS_IsException(ret));
+    if (!ctx->rt->gc_enable) LEPUS_FreeValue(ctx, ret);
+  }
+
+  {
+    const char *src = "debugger 1;";
+    LEPUSValue ret =
+        LEPUS_Eval(ctx, src, strlen(src), "", LEPUS_EVAL_FLAG_COMPILE_ONLY);
+    ASSERT_TRUE(LEPUS_IsException(ret));
+    if (!ctx->rt->gc_enable) LEPUS_FreeValue(ctx, ret);
+  }
+
   LEPUS_FreeContext(ctx);
   LEPUS_FreeRuntime(rt);
 }
