@@ -3835,16 +3835,16 @@ JSProperty *add_property_gc(LEPUSContext *ctx, LEPUSObject *p, JSAtom prop,
       new_sh = js_clone_shape(ctx, sh);
       if (!new_sh) return NULL;
       /* hash the cloned shape */
+      new_sh->is_hashed = TRUE;
+      js_shape_hash_link(ctx->rt, new_sh);
+      js_free_shape(p->shape);
+      HeapObjStoreShape(ctx, &p->shape, new_sh);
       {
         auto *rt = ctx->rt;
         if (2 * (rt->shape_hash_count + 1) > rt->shape_hash_size) {
           resize_shape_hash(rt, rt->shape_hash_bits + 1);
         }
       }
-      new_sh->is_hashed = TRUE;
-      js_shape_hash_link(ctx->rt, new_sh);
-      js_free_shape(p->shape);
-      HeapObjStoreShape(ctx, &p->shape, new_sh);
     }
   }
   assert(p->shape->header.ref_count == 1);

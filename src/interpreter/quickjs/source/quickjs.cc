@@ -8266,6 +8266,10 @@ JSProperty *add_property(LEPUSContext *ctx, LEPUSObject *p, JSAtom prop,
       new_sh = js_clone_shape(ctx, sh);
       if (!new_sh) return NULL;
       /* hash the cloned shape */
+      new_sh->is_hashed = TRUE;
+      js_shape_hash_link(ctx->rt, new_sh);
+      js_free_shape(ctx->rt, p->shape);
+      p->shape = new_sh;
       // resize shape_array
       {
         auto *rt = ctx->rt;
@@ -8273,10 +8277,6 @@ JSProperty *add_property(LEPUSContext *ctx, LEPUSObject *p, JSAtom prop,
           resize_shape_hash(rt, rt->shape_hash_bits + 1);
         }
       }
-      new_sh->is_hashed = TRUE;
-      js_shape_hash_link(ctx->rt, new_sh);
-      js_free_shape(ctx->rt, p->shape);
-      p->shape = new_sh;
     }
   }
   assert(p->shape->header.ref_count == 1);
