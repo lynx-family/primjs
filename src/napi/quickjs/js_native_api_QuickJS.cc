@@ -2695,8 +2695,8 @@ void napi_attach_quickjs(napi_env env, LEPUSContext* context) {
 
 #undef SET_METHOD
 
-  env->ctx = new napi_context__qjs(env, context);
   InitNapiScope(context);
+  env->ctx = new napi_context__qjs(env, context);
 }
 
 void napi_detach_quickjs(napi_env env) {

@@ -28214,9 +28214,12 @@ void InitNapiScope_GC(LEPUSContext *ctx) {
   ctx->napi_scope = new NAPIHandleScope(ctx);
 }
 void FreeNapiScope_GC(LEPUSContext *ctx) {
-  if (ctx->napi_scope) {
-    delete ctx->napi_scope;
-    ctx->napi_scope = nullptr;
+  auto *old_ptr = ctx->napi_scope;
+  if (old_ptr) {
+    delete old_ptr;
+    if (ctx->napi_scope == old_ptr) {
+      ctx->napi_scope = nullptr;
+    }
   }
 }
 
