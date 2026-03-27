@@ -1,6 +1,11 @@
 # WebAssembly Support
 
-PrimJS provides WebAssembly support through an interoperability layer that bridges JavaScript engines with WASM runtimes.
+PrimJS provides initial WebAssembly support through an interoperability layer
+that bridges JavaScript engines with WASM runtimes.
+
+The current implementation focuses on practical module loading, instantiation,
+and JavaScript-to-WASM interoperability. It is not a complete implementation
+of the WebAssembly JavaScript API.
 
 ## Architecture
 
@@ -38,21 +43,52 @@ The WASM implementation follows a layered architecture:
 
 ### WASM Runtimes
 
-- **WASM3**: Lightweight interpreter using wasm3 library. Fully supported.
+- **WASM3**: Based on the open-source wasm3 engine.
 - **Prism**: Custom WASM runtime with additional optimizations. **Note**: Prism is not open-sourced; only a stub implementation (`prism_dummy.cc`) is provided for build compatibility and cannot execute WASM.
 
 ## Supported Features
 
-### WebAssembly Objects
+### Available Today
 
-| Object | Support | Notes |
-|--------|---------|-------|
-| **WebAssembly.Module** | ✅ Full | Compiled WASM module |
-| **WebAssembly.Instance** | ✅ Full | Instantiated module with exports |
-| **WebAssembly.Memory** | ✅ Full | Linear memory buffer |
-| **WebAssembly.Table** | ✅ Full | Function reference table |
-| **WebAssembly.Global** | ✅ Full | Global variables |
-| **WebAssembly.Function** | ⚠️ Partial | Can call exported functions, but cannot create new ones via constructor |
+PrimJS currently supports the following core flows:
+
+- Binary module construction via `WebAssembly.Module`
+- Module instantiation via `WebAssembly.Instance`
+- Calling exported WASM functions from JavaScript
+- Basic interop with `WebAssembly.Memory`, `WebAssembly.Table`, and
+  `WebAssembly.Global`
+- Support function, memory, table, and global imports during instantiation
+
+### API Coverage
+
+| API | Coverage | Notes |
+|-----|----------|-------|
+| **WebAssembly.Module** | ✅ Basic support | Supports constructor-based creation from binary inputs |
+| **WebAssembly.Instance** | ✅ Basic support | Supports instantiation with imports |
+| **WebAssembly.Memory** | ✅ Basic support | Supports `buffer` and `grow()` |
+| **WebAssembly.Table** | ⚠️ Partial support | Supports core table operations, with some advanced behaviors still evolving |
+| **WebAssembly.Global** | ✅ Basic support | Supports basic creation and value access |
+| **WebAssembly.Function** | ⚠️ Partial support | Exported WASM functions are callable from JS, but full constructor-style support is not available |
+
+### Support Scope
+
+The current implementation is mainly centered around:
+
+- `new WebAssembly.Module(...)`
+- `new WebAssembly.Instance(...)`
+
+At this stage, PrimJS provides usable support for common module loading,
+instantiation, and basic interoperability scenarios. However, it does not yet
+cover the complete WebAssembly JavaScript API surface.
+
+In particular:
+
+- Some static APIs on `WebAssembly`, such as `compile`, `instantiate`,
+  `validate`, and streaming variants, are not currently exposed in the
+  open-source implementation
+- Some reflection and advanced API behaviors are still partial; for example,
+  APIs such as `WebAssembly.Module.imports(...)` and
+  `WebAssembly.Module.customSections(...)` are not fully available
 
 
 ## Building and Running
