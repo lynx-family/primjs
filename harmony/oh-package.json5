@@ -4,7 +4,7 @@
   "dependencies": {
   },
   "scripts": {
-    "prepare": "./scripts/build.py --modules primjs --publish_har --build_type Release --build_napi_adapter"
+    "prepare": "./scripts/build.py --modules primjs --publish_har --build_type Release
   },
   "devDependencies": {
   }

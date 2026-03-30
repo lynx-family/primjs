@@ -223,7 +223,9 @@ endif()
 
 set(napi_v8_sources ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/v8/js_native_api_v8.cc)
 
-set(napi_adapter_sources ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/adapter/js_native_api_adapter.cc)
+set(napi_adapter_sources
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/adapter/js_native_api_adapter.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/packages/weak-node-api/generated/weak_node_api.cpp)
 
 include_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}/src
@@ -234,7 +236,9 @@ include_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/internal
   ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/quickjs
   ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/v8
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/adapter)
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/adapter
+  ${CMAKE_CURRENT_SOURCE_DIR}/packages/weak-node-api/generated
+  ${CMAKE_CURRENT_SOURCE_DIR}/packages/weak-node-api/headers)
 
 if (ENABLE_PRIMJS_HARMONY)
   get_filename_component(PARENT_PARENT_DIR ${CMAKE_SOURCE_DIR}/../.. ABSOLUTE)
@@ -289,9 +293,9 @@ if(ENABLE_BUILD_AAR)
       "${CMAKE_CURRENT_SOURCE_DIR}/src/basic/log/primjs_logging.cc")
 
   add_library(quick SHARED ${quickjs_sources})
-  add_library(napi SHARED ${napi_sources})
+  add_library(napi SHARED ${napi_sources} ${napi_adapter_sources})
   add_library(napi_v8 SHARED ${napi_v8_sources})
-  add_library(napi_adapter SHARED ${napi_adapter_sources})
+  # add_library(napi_adapter SHARED ${napi_adapter_sources})
   if (ENABLE_PRIMJS_HARMONY)
     find_library(log_lib "hilog_ndk.z")
     find_library(libm m)
@@ -308,7 +312,7 @@ if(ENABLE_BUILD_AAR)
   endif()
   target_include_directories(napi_v8 PRIVATE ${JS_V8_HEADERS})
   target_link_libraries(napi_v8 PUBLIC ${JS_V8_LIBRARY})
-  target_link_libraries(napi_adapter napi)
+  # target_link_libraries(napi_adapter napi)
 endif()
 
 if(WIN32)

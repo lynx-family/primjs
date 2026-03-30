@@ -88,7 +88,7 @@ jobs:
           PROJECT_ROOT=$(pwd)
           ohpm config set publish_registry https://ohpm.openharmony.cn/ohpm
           pushd harmony
-          ./scripts/build.py --modules primjs --build_type Release --build_napi_adapter --version ${{ needs.get-version.outputs.version }}
+          ./scripts/build.py --modules primjs --build_type Release --version ${{ needs.get-version.outputs.version }}
           pushd primjs/build/default/outputs/default
           ohpm publish primjs.har --publish_id ${{ secrets.HARMONY_PUBLISH_ID }} --key_path $PROJECT_ROOT/publish_key
           popd
