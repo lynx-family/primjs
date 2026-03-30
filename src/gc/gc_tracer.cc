@@ -128,7 +128,8 @@ bool GCTracer::TryTriggerConcurrentPhases() {
     gc_task_type_ = GCTaskType::kDoConSweep;
     return true;
   }
-  if (cms_gc_is_running_ || ros_->GetCollector()->IsForbidGC()) {
+  if (cms_gc_is_running_ || !ros_ || !ros_->GetCollector() ||
+      ros_->GetCollector()->IsForbidGC()) {
     return false;
   }
   if (TriggerConcurrentMarking()) {
