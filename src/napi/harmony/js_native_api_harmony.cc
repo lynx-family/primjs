@@ -1076,14 +1076,20 @@ static napi_status napi_is_exception_pending(napi_env env, bool *result) {
 
 static napi_status napi_get_and_clear_last_exception(napi_env env,
                                                      napi_value *result) {
-  JSVM_Value ret = nullptr;
+  bool is_pending = false;
+  OH_JSVM_IsExceptionPending(env->ctx->vm_env_, &is_pending);
+  if (!is_pending) {
+    return napi_get_undefined(env, result);
+  }
+
+  JSVM_Value ret;
   CALL_JSVM(OH_JSVM_GetAndClearLastException(env->ctx->vm_env_, &ret));
-  bool ret_is_undefined = false;
-  CALL_JSVM(OH_JSVM_IsUndefined(env->ctx->vm_env_, ret, &ret_is_undefined));
-  *result = !ret_is_undefined ? JSValueToNapi(ret) : nullptr;
+
+  *result = JSValueToNapi(ret);
   LOGE("JSVM Exception: " << GetExceptionMessage(env->ctx->vm_env_, ret));
   return napi_clear_last_error(env);
 }
+
 static napi_status napi_is_arraybuffer(napi_env env, napi_value value,
                                        bool *result) {
   CALL_JSVM(
