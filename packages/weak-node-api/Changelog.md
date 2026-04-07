@@ -1,3 +1,8 @@
+## 0.1.0 - 2026-04-07
+- **Breaking Change**: Update module lookup APIs to use caller-provided output storage to avoid cross-DLL allocation/free issues on Windows.
+  - `napi_find_module_primjs`: changed from returning a heap-allocated `napi_module_spec_compl*` to `bool napi_find_module_primjs(const char* name, napi_module* out)`.
+  - `napi_find_module_weak`: changed to `bool napi_find_module_weak(const char* name, napi_module* out)` and forwards to the injected host implementation.
+
 ## 0.0.3 - 2026-03-11
 - **Optimization**: Set minimum OSX_DEPLOYMENT_TARGET to 10.13 for weak-node-api on macOS. Original value was 10.0, which was too old and caused x64 dynamic library linking failures with newer linkers.
 

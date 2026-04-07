@@ -1208,22 +1208,21 @@ void napi_module_register_primjs(napi_module_spec_compl* mod) {
   napi_module_register_xx(internal_mod);
 }
 
-napi_module_spec_compl* napi_find_module_primjs(const char* name) {
+bool napi_find_module_primjs(const char* name, napi_module_spec_compl* out) {
   const napi_module* mod = napi_find_module(name);
   if (!mod) {
-    return nullptr;
+    return false;
   }
-  // The user is responsible for freeing the memory of this object
-  return new napi_module_spec_compl{
-      .nm_version = mod->nm_version,
-      // The 'flags' field is lost when converting napi_module_spec_compl to
-      // napi_module, so its value cannot be obtained here.
-      .nm_flags = 0,
-      .nm_filename = mod->nm_filename,
-      .nm_register_func = mod->nm_register_func,
-      .nm_modname = mod->nm_modname,
-      .nm_link = nullptr,
-  };
+  if (!out) {
+    return false;
+  }
+  // Populate caller-provided storage to avoid cross-DLL allocation/free issues.
+  out->nm_version = mod->nm_version;
+  out->nm_filename = mod->nm_filename;
+  out->nm_register_func = mod->nm_register_func;
+  out->nm_modname = mod->nm_modname;
+  out->nm_link = nullptr;
+  return true;
 }
 
 napi_status napi_create_bigint_int64_primjs(napi_env env, int64_t value,

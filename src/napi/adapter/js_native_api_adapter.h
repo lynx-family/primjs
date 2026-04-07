@@ -429,8 +429,9 @@ typedef struct napi_module_spec_compl {
 NAPI_ADAPTER_EXTERN void napi_module_register_primjs(
     napi_module_spec_compl* mod);
 
-NAPI_ADAPTER_EXTERN napi_module_spec_compl* napi_find_module_primjs(
-    const char* name);
+// Find a module by name and write its info into 'out'. Returns true if found.
+NAPI_ADAPTER_EXTERN bool napi_find_module_primjs(const char* name,
+                                                 napi_module_spec_compl* out);
 
 NAPI_ADAPTER_EXTERN void napi_fatal_error_primjs(const char* location,
                                                  size_t location_len,
