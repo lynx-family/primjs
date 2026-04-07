@@ -233,7 +233,11 @@ function injectHostHeader(base, isInGenerated, newLines) {
   }
   if (endIndex === -1) return;
 
-  newLines.splice(endIndex, 0, "  napi_module * (*napi_find_module_weak)(const char* name);");
+  newLines.splice(
+    endIndex,
+    0,
+    "  bool (*napi_find_module_weak)(const char* name, napi_module* out);",
+  );
 }
 
 function injectWeakCpp(base, isInGenerated, newLines) {
@@ -248,14 +252,14 @@ function injectWeakCpp(base, isInGenerated, newLines) {
 
   const wrapperLines = [
     "",
-    'extern "C" napi_module*',
-    "napi_find_module_weak(const char* name) {",
+    'extern "C" bool',
+    "napi_find_module_weak(const char* name, napi_module* out) {",
     "  if (g_host.napi_find_module_weak == nullptr) {",
     "    fprintf(stderr, \"Node-API function 'napi_find_module_weak' called \"",
     "                    \"before it was injected!\\n\");",
     "    abort();",
     "  }",
-    "  return g_host.napi_find_module_weak(name);",
+    "  return g_host.napi_find_module_weak(name, out);",
     "};",
   ];
 
