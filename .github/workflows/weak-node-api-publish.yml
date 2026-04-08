@@ -71,7 +71,7 @@ jobs:
       - name: Node Setup
         uses: actions/setup-node@v4
         with:
-          node-version: '22.22.1'
+          node-version: '24.14.1'
 
       - name: Install CMake
         uses: jwlawson/actions-setup-cmake@v2
@@ -120,7 +120,7 @@ jobs:
       - name: Node Setup
         uses: actions/setup-node@v4
         with:
-          node-version: '22.22.1'
+          node-version: '24.14.1'
 
       - name: Install CMake
         uses: jwlawson/actions-setup-cmake@v2
@@ -164,7 +164,7 @@ jobs:
       - name: Node Setup
         uses: actions/setup-node@v4
         with:
-          node-version: '22.22.1'
+          node-version: '24.14.1'
           registry-url: 'https://registry.npmjs.org'
 
       - name: Check Node and npm
