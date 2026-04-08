@@ -219,7 +219,7 @@ class Space {
   }
 
   address_t Alloc(size_t reqSize, bool allowExtension, uint32_t &idx,
-                  int forceLevel);
+                  size_t rosInternalSize);
   size_t ReleaseFreePages(bool aggressive = false);
   void FreeRegion(address_t addr, size_t pgCnt, uint32_t pageIdx);
   // allocatedPageSize have updated at FreeRegion, so we just update
