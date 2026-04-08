@@ -51543,6 +51543,22 @@ void UpdateOuterObjSize(LEPUSRuntime *rt, int size) {
 #endif
 }
 
+void LEPUS_ReportExternalSize(LEPUSRuntime *rt, int64_t total_size,
+                              int64_t garbage_size) {
+#ifdef ENABLE_COMPATIBLE_MM
+  if (rt->gc_enable) {
+    int report_size = garbage_size == -1 ? total_size : garbage_size;
+    if (report_size <= 0) return;
+    const size_t report_size_value = static_cast<size_t>(report_size);
+    const size_t allocated_size = rt->ros_->GetAllocatedSize();
+    if ((garbage_size == -1 && report_size_value > allocated_size / 2) ||
+        (garbage_size != -1 && report_size_value > allocated_size / 4)) {
+      rt->collector_->RunFullCollection();
+    }
+  }
+#endif
+}
+
 int64_t NapiAdjustExternalMemory(LEPUSRuntime *rt, int64_t size) {
   int64_t adjusted_value = 0;
 #ifdef ENABLE_COMPATIBLE_MM

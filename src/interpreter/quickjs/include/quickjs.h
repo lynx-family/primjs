@@ -1683,6 +1683,9 @@ void SetObjectCtxCheckStatus(LEPUSContext *ctx, bool enable);
 bool LEPUS_PushObjectCheckTid(LEPUSContext *ctx);
 
 void UpdateOuterObjSize(LEPUSRuntime *rt, int size);
+// Pass -1 for garbage_size when recoverable external memory is unknown.
+void LEPUS_ReportExternalSize(LEPUSRuntime *rt, int64_t total_size,
+                              int64_t garbage_size);
 
 void LEPUS_SetGCObserver(LEPUSRuntime *rt, void *opaque);
 void *LEPUS_GetGCObserver(LEPUSRuntime *rt);
