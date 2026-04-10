@@ -60,7 +60,7 @@ void SpacePageManager::ReleaseAllFreePages(size_t freeBytes,
     size_t c = allocSpace.page_groups.SetRangeAndCount(page_idx, next->Cnt(),
                                                        kPReleased);
     if (c) {
-      madvise((void *)releaseBeginAddr, releaseBytes, MADV_DONTNEED);
+      madvise((void *)releaseBeginAddr, releaseBytes, MADV_ARGUMENT);
       totalReleasedBytes += ALLOCUTIL_PAGE_CNT2BYTE(c);
     }
     next = it.Next();
@@ -229,7 +229,7 @@ void Space::FreeRegion(address_t addr, size_t pgCnt, uint32_t pageIdx) {
 #if defined(ANDROID) || defined(__ANDROID__) || defined(OS_IOS)
   // todo, this may impact performance when rt instances are too many
   if (pageIdx % kReleasePhysicalMemFactor == 0) {
-    madvise((void *)addr, memSize, MADV_DONTNEED);
+    madvise((void *)addr, memSize, MADV_ARGUMENT);
   }
 #endif
   pageManager.AddPages(addr, static_cast<uint32_t>(pgCnt), pageIdx);

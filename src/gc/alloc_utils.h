@@ -1,6 +1,10 @@
 #ifndef SRC_GC_ALLOC_UTILS_H_
 #define SRC_GC_ALLOC_UTILS_H_
 
+#ifndef _WIN32
+#include <sys/mman.h>
+#endif
+
 #include <random>
 
 #include "gc/sizes.h"
@@ -62,6 +66,12 @@ constexpr T PageGroupRndDown(T x, size_t n) {
     perror("madvise failed. Process terminating.");                        \
     abort();                                                               \
   }
+
+#if defined(OS_IOS)
+#define MADV_ARGUMENT MADV_FREE
+#else
+#define MADV_ARGUMENT MADV_DONTNEED
+#endif
 
 constexpr uint32_t kAllocUtilPrefetchWrite = 1;
 #define ALLOCUTIL_PREFETCH_WRITE(address)               \

@@ -164,7 +164,7 @@ bool MemMap::ReleaseMem(address_t releaseBeginAddr, size_t size) const {
   if (releaseBeginAddr < baseAddr || releaseEndAddr > currEndAddr) {
     return false;
   }
-  ALLOCUTIL_MEM_MADVISE(releaseBeginAddr, size, MADV_DONTNEED);
+  ALLOCUTIL_MEM_MADVISE(releaseBeginAddr, size, MADV_ARGUMENT);
   return true;
 }
 
