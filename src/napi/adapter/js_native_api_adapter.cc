@@ -1221,4 +1221,21 @@ napi_status napi_get_value_bigint_words(napi_env env, napi_value value,
                                           words);
 }
 
+bool napi_find_module_primjs(const char *name, napi_module_spec_compl *out) {
+  const napi_module *mod = napi_find_module(name);
+  if (!mod) {
+    return false;
+  }
+  if (!out) {
+    return false;
+  }
+  // Populate caller-provided storage to avoid cross-DLL allocation/free issues.
+  out->nm_version = mod->nm_version;
+  out->nm_filename = mod->nm_filename;
+  out->nm_register_func = mod->nm_register_func;
+  out->nm_modname = mod->nm_modname;
+  out->nm_link = nullptr;
+  return true;
+}
+
 EXTERN_C_END
