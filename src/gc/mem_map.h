@@ -85,7 +85,7 @@ class MemMap {
   // grow the size of the usable memory
   bool Extend(size_t reqSize);
 
-  // madvise(DONTNEED) memory in the range [releaseBeginAddr, releaseBeginAddr +
+  // madvise released memory in the range [releaseBeginAddr, releaseBeginAddr +
   // size)
   bool ReleaseMem(address_t releaseBeginAddr, size_t size) const;
 

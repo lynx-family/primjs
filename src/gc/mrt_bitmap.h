@@ -40,7 +40,7 @@ class Bitmap {
   __attribute__((always_inline)) void ResetBitmap() {
     if (bitmapBegin != nullptr) {
 #ifdef __ANDROID__
-      int result = madvise(bitmapBegin, bitmapSize, MADV_DONTNEED);
+      int result = madvise(bitmapBegin, bitmapSize, MADV_ARGUMENT);
       if (result != 0) {
         // must terminate process, bitmap reset fail will cause unpredictable
         // behavior
