@@ -31199,7 +31199,8 @@ fail:
  *  |************************|********|********************************|
  */
 uint64_t LEPUS_GetPrimjsVersion() {
-  uint64_t op_num = OP_COUNT + (OP_TEMP_END - OP_TEMP_START);
+  constexpr uint64_t unexpected_cnt = 16;
+  uint64_t op_num = OP_COUNT + unexpected_cnt;
   uint64_t atom_num = JS_ATOM_END - 1;
   uint64_t primjs_version = op_num + atom_num;
   primjs_version |= VERSION_PLACEHOLDER;

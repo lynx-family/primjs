@@ -716,12 +716,6 @@ typedef enum OPCodeEnum {
 #undef DEF
 #undef FMT
   OP_TEMP_END,
-
-// The following opcode cannot be dumped into the bianry production.
-#define COMPILE_TIME_OPCODE(id, size, n_pop, n_push, f) OP_##id,
-#include "quickjs/include/quickjs-opcode.h"
-#undef COMPILE_TIME_OPCODE
-
 } OPCodeEnum;
 
 struct FinalizationRegistryContext;
