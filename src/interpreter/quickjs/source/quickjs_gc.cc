@@ -19711,11 +19711,6 @@ typedef struct JSONStringifyContext {
   StringBuffer *b;
 } JSONStringifyContext;
 
-static LEPUSValue JS_ToQuotedStringFree(LEPUSContext *ctx, LEPUSValue val) {
-  LEPUSValue r = JS_ToQuotedString(ctx, val);
-  return r;
-}
-
 static LEPUSValue js_json_check(LEPUSContext *ctx, JSONStringifyContext *jsc,
                                 LEPUSValueConst holder, LEPUSValue val,
                                 LEPUSValueConst key) {
@@ -20175,14 +20170,6 @@ exception:
 done:
   return ret;
 }
-/*
-static const LEPUSCFunctionListEntry js_json_funcs[] = {
-    LEPUS_CFUNC_DEF("parse", 2, js_json_parse),
-    LEPUS_CFUNC_DEF("stringify", 3, js_json_stringify),
-    LEPUS_PROP_STRING_DEF("[Symbol.toStringTag]", "JSON",
-                          LEPUS_PROP_CONFIGURABLE),
-};
-*/
 
 static const LEPUSCFunctionListEntry js_json_funcs_opt[] = {
     LEPUS_CFUNC_DEF("parse", 2, js_json_parse),
