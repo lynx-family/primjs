@@ -345,6 +345,22 @@ void *lepus_def_reallocate(ROS_GC::RosAllocImpl *ros, void *ptr, size_t size,
 
 struct FinalizationRegistryData;
 struct JSVarRef;
+
+typedef struct JSCoverageSlot {
+  uint32_t start_offset;
+  uint32_t end_offset;
+} JSCoverageSlot;
+
+typedef struct JSCoverageInfo {
+  struct list_head link;
+  JSAtom filename;
+  JSAtom func_name;
+  int32_t runtime_id;
+  uint32_t slot_count;
+  JSCoverageSlot *coverage_slots;
+  uint32_t *coverage_counters;
+} JSCoverageInfo;
+
 struct LEPUSRuntime {
   LEPUSMallocFunctions mf;
   const char *rt_info;
@@ -371,6 +387,7 @@ struct LEPUSRuntime {
   struct list_head gc_bytecode_list;
   struct list_head gc_obj_list;
   // <Primjs end>
+  struct list_head coverage_list;
   struct list_head tmp_obj_list;  /* used during gc */
   struct list_head free_obj_list; /* used during gc */
   struct list_head *el_next;      /* used during gc */
@@ -769,7 +786,7 @@ struct LEPUSContext {
                               const char *input, size_t input_len,
                               const char *filename, int flags, int scope_idx,
                               bool debugger_eval, LEPUSStackFrame *sf,
-                              int start_line_number);
+                              int start_line_number, int32_t runtime_id);
 
   void *user_opaque;
   // <Primjs begin>
@@ -994,6 +1011,11 @@ typedef struct LEPUSFunctionBytecode {
   uint32_t function_id;  // for lepusNG debugger encode
   LEPUSContext *ctx;
   pid_t tid;
+  int32_t runtime_id;
+  uint32_t coverage_slot_count;
+  uint32_t *coverage_counters;
+  JSCoverageSlot *coverage_slots;
+  struct JSCoverageInfo *coverage_info;
   // <Primjs end>
   struct {
     /* debug info, move to separate structure to save memory? */
@@ -1987,6 +2009,9 @@ QJS_HIDE LEPUSValue JS_ThrowReferenceErrorNotDefined_GC(LEPUSContext *ctx,
                                                         JSAtom name);
 LEPUSValue JS_ThrowTypeErrorNotFunction(LEPUSContext *ctx);
 
+QJS_HIDE int EnsureCoverageCounters(LEPUSContext *ctx,
+                                    LEPUSFunctionBytecode *b);
+
 #ifdef ENABLE_PRIMJS_SNAPSHOT
 typedef LEPUSValue (*QuickJsCallStub)(LEPUSValue this_arg,
                                       LEPUSValue new_target,
@@ -2189,7 +2214,7 @@ LEPUSValue JS_CallConstructor2_GC(LEPUSContext *ctx, LEPUSValueConst func_obj,
                                   LEPUSValueConst *argv);
 LEPUSValue JS_Eval_GC(LEPUSContext *ctx, const char *input, size_t input_len,
                       const char *filename, int eval_flags,
-                      int start_line_number);
+                      int start_line_number, int32_t runtime_id);
 LEPUSValue JS_EvalBinary_GC(LEPUSContext *ctx, const uint8_t *buf,
                             size_t buf_len, int flags);
 LEPUSValue JS_GetGlobalObject_GC(LEPUSContext *ctx);
@@ -2390,6 +2415,10 @@ QJS_HIDE void emit_op(JSParseState *s, uint8_t val);
 QJS_HIDE int emit_label(JSParseState *s, int label);
 QJS_HIDE void emit_return(JSParseState *s, BOOL hasval);
 QJS_HIDE int emit_goto(JSParseState *s, int opcode, int label);
+QJS_HIDE int emit_coverage_slot(JSParseState *s, const uint8_t *start_ptr);
+QJS_HIDE void set_coverage_slot_end(JSParseState *s, int slot_id,
+                                    const uint8_t *end_ptr);
+QJS_HIDE int emit_coverage_token_slot(JSParseState *s);
 QJS_HIDE int emit_break(JSParseState *s, JSAtom name, int is_cont);
 QJS_HIDE void optional_chain_test(JSParseState *s,
                                   int *poptional_chaining_label,
@@ -2957,7 +2986,10 @@ typedef struct JSFunctionDef {
   char *source; /* raw source, utf-8 encoded */
   int source_len;
   int source_offset;
-
+  int32_t runtime_id;
+  uint32_t coverage_slot_count;
+  uint32_t coverage_slot_size;
+  JSCoverageSlot *coverage_slots;
   LEPUSModuleDef *module; /* != NULL when parsing a module */
 } JSFunctionDef;
 
@@ -2992,7 +3024,8 @@ QJS_HIDE LEPUSValue js_module_ns_autoinit(LEPUSContext *ctx, LEPUSObject *p,
 QJS_HIDE LEPUSValue JS_EvalInternal(LEPUSContext *, LEPUSValue, const char *,
                                     size_t, const char *, int, int,
                                     bool = false, LEPUSStackFrame * = nullptr,
-                                    int start_line_num = 0);
+                                    int start_line_num = 0,
+                                    int32_t runtime_id = -1);
 #endif
 
 LEPUSValue js_array_reduce_gc(LEPUSContext *ctx, LEPUSValueConst this_val,

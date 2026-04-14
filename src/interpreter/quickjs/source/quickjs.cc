@@ -1044,6 +1044,7 @@ LEPUSRuntime *LEPUS_NewRuntime2(const LEPUSMallocFunctions *mf, void *opaque,
   init_list_head(&rt->gc_bytecode_list);
   init_list_head(&rt->gc_obj_list);
   // <Primjs end>
+  init_list_head(&rt->coverage_list);
 #ifdef DUMP_LEAKS
   init_list_head(&rt->string_list);
 #endif
@@ -1124,6 +1125,7 @@ void JS_ResetRuntimeForEffect(LEPUSRuntime *rt, const LEPUSMallocFunctions *mf,
   init_list_head(&rt->gc_bytecode_list);
   init_list_head(&rt->gc_obj_list);
   // <Primjs end>
+  init_list_head(&rt->coverage_list);
   init_list_head(&rt->async_func_sf);
 
   if (JS_InitAtoms(rt)) goto fail;
@@ -1531,6 +1533,19 @@ void LEPUS_FreeRuntime(LEPUSRuntime *rt) {
     LEPUS_RunGC(rt);
   }
 #endif
+
+  /* free coverage info — must be after GC so all bytecodes have been
+     freed and free_function_bytecode has transferred ownership to each info
+     node. */
+  list_for_each_safe(el, el1, &rt->coverage_list) {
+    JSCoverageInfo *info = list_entry(el, JSCoverageInfo, link);
+    LEPUS_FreeAtomRT(rt, info->filename);
+    LEPUS_FreeAtomRT(rt, info->func_name);
+    if (info->coverage_slots) lepus_free_rt(rt, info->coverage_slots);
+    if (info->coverage_counters) lepus_free_rt(rt, info->coverage_counters);
+    list_del(el);
+    lepus_free_rt(rt, info);
+  }
 
 #ifdef DUMP_LEAKS
   int exists_leak = 0;
@@ -14171,6 +14186,32 @@ void DebuggerCallEachOp(LEPUSContext *ctx, const uint8_t *pc,
 #endif
 
 /* argv[] is modified if (flags & JS_CALL_FLAG_COPY_ARGV) = 0. */
+/* Coverage Support */
+static int RegisterCoverageInfo(LEPUSContext *ctx, LEPUSFunctionBytecode *b);
+
+int EnsureCoverageCounters(LEPUSContext *ctx, LEPUSFunctionBytecode *b) {
+  LEPUSRuntime *rt = ctx->rt;
+  uint32_t *coverage_counters = (uint32_t *)lepus_mallocz_rt(
+      rt, sizeof(uint32_t) * b->coverage_slot_count, 0);
+  if (!coverage_counters) return 0;
+  HeapObjStore(ctx, &b->coverage_counters, coverage_counters);
+  if (b->coverage_info) {
+    HeapObjStore(ctx, &b->coverage_info->coverage_counters, coverage_counters);
+  }
+  return 1;
+}
+
+static inline void IncrementCoverageCounter(LEPUSContext *ctx,
+                                            LEPUSFunctionBytecode *b,
+                                            uint32_t coverage_slot) {
+  if (unlikely(!b->coverage_counters)) {
+    EnsureCoverageCounters(ctx, b);
+  }
+  if (b->coverage_counters && coverage_slot < b->coverage_slot_count) {
+    b->coverage_counters[coverage_slot]++;
+  }
+}
+
 QJS_STATIC LEPUSValue JS_CallInternal(LEPUSContext *caller_ctx,
                                       LEPUSValueConst func_obj,
                                       LEPUSValueConst this_obj,
@@ -14727,6 +14768,11 @@ restart:
       goto done;
       CASE(OP_return_undef) : ret_val = LEPUS_UNDEFINED;
       goto done;
+      CASE(OP_inc_coverage) : {
+        IncrementCoverageCounter(ctx, b, get_u32(pc));
+        pc += 4;
+      }
+      BREAK;
 
       CASE(OP_check_ctor_return)
           : /* return TRUE if 'this' should be returned */
@@ -18840,6 +18886,92 @@ int emit_goto(JSParseState *s, int opcode, int label) {
   return -1;
 }
 
+static inline BOOL js_coverage_enabled(JSParseState *s) {
+  return s->cur_func && s->cur_func->runtime_id > 0;
+}
+
+/* Returns TRUE iff `ptr` lies within the original source buffer
+   [source_start, source_end].  Some parser paths (e.g. synthetic default
+   class constructor parsing in js_parse_class_default_ctor) temporarily
+   point buf_ptr/buf_end at a string literal in .rodata while leaving
+   source_start/source_end unchanged.  Computing `ptr - source_start` for
+   such pointers yields a wildly out-of-range ptrdiff_t (often hundreds of
+   MB), which then wraps to a huge uint32_t (e.g. 3934648976) when stored
+   as a coverage offset.  Coverage entries derived from synthetic source
+   have no meaning in the user's source file, so we drop them. */
+static inline BOOL js_coverage_ptr_in_source(JSParseState *s,
+                                             const uint8_t *ptr) {
+  return ptr >= s->source_start && ptr <= s->source_end;
+}
+
+static uint32_t js_coverage_source_offset(JSParseState *s, const uint8_t *ptr) {
+  return (uint32_t)(ptr - s->source_start);
+}
+
+static int add_coverage_slot(JSParseState *s, const uint8_t *start_ptr) {
+  JSFunctionDef *fd;
+  JSCoverageSlot *slot;
+
+  /* Skip synthetic source (e.g. default class constructor): start_ptr is
+     not inside [source_start, source_end] so any computed offset would be
+     garbage.  We drop the slot entirely so no OP_inc_coverage is emitted
+     and no ghost range appears in the report. */
+  if (!js_coverage_enabled(s) || !js_coverage_ptr_in_source(s, start_ptr))
+    return -1;
+
+  fd = s->cur_func;
+  if (fd->coverage_slot_count >= fd->coverage_slot_size) {
+    uint32_t new_size = fd->coverage_slot_size ? fd->coverage_slot_size * 2 : 8;
+    JSCoverageSlot *new_slots = static_cast<JSCoverageSlot *>(
+        lepus_realloc(s->ctx, fd->coverage_slots, new_size * sizeof(*new_slots),
+                      ALLOC_TAG_WITHOUT_PTR));
+    if (!new_slots) return -1;
+    HeapObjStore(s->ctx, &fd->coverage_slots, new_slots);
+    fd->coverage_slot_size = new_size;
+  }
+
+  slot = &fd->coverage_slots[fd->coverage_slot_count];
+  slot->start_offset = js_coverage_source_offset(s, start_ptr);
+  slot->end_offset = slot->start_offset;
+  return (int)fd->coverage_slot_count++;
+}
+
+void set_coverage_slot_end(JSParseState *s, int slot_id,
+                           const uint8_t *end_ptr) {
+  JSFunctionDef *fd;
+  uint32_t end_offset;
+  fd = s->cur_func;
+
+  /* Defensive guard symmetric to add_coverage_slot: if end_ptr is not
+     inside the original source buffer (synthetic code path), keep
+     end_offset == start_offset so we never emit a 0xEA89XXXX-style
+     wrap-around offset. */
+  if (slot_id < 0 || !fd || ((uint32_t)slot_id >= fd->coverage_slot_count) ||
+      !js_coverage_ptr_in_source(s, end_ptr))
+    return;
+
+  end_offset = js_coverage_source_offset(s, end_ptr);
+  if (end_offset > fd->coverage_slots[slot_id].start_offset) {
+    fd->coverage_slots[slot_id].end_offset = end_offset;
+  }
+  return;
+}
+
+int emit_coverage_slot(JSParseState *s, const uint8_t *start_ptr) {
+  int slot_id = add_coverage_slot(s, start_ptr);
+  if (slot_id >= 0 && js_is_live_code(s)) {
+    emit_op(s, OP_inc_coverage_temp);
+    emit_u32(s, (uint32_t)slot_id);
+  }
+  return slot_id;
+}
+
+int emit_coverage_token_slot(JSParseState *s) {
+  int slot_id = emit_coverage_slot(s, s->token.ptr);
+  set_coverage_slot_end(s, slot_id, s->buf_ptr);
+  return slot_id;
+}
+
 /* return the constant pool index. 'val' is not duplicated. */
 int cpool_add(JSParseState *s, LEPUSValue val) {
   JSFunctionDef *fd = s->cur_func;
@@ -22408,17 +22540,20 @@ QJS_STATIC __exception int js_parse_logical_and_or(JSParseState *s, int op,
     label1 = new_label(s);
 
     for (;;) {
+      int coverage_slot;
       if (next_token(s)) return -1;
       emit_op(s, OP_dup);
       emit_goto(s, op == TOK_LAND ? OP_if_false : OP_if_true, label1);
       emit_op(s, OP_drop);
 
+      coverage_slot = emit_coverage_slot(s, s->token.ptr);
       if (op == TOK_LAND) {
         if (js_parse_expr_binary(s, 8, parse_flags & ~PF_ARROW_FUNC)) return -1;
       } else {
         if (js_parse_logical_and_or(s, TOK_LAND, parse_flags & ~PF_ARROW_FUNC))
           return -1;
       }
+      set_coverage_slot_end(s, coverage_slot, s->last_ptr);
       if (s->token.val != op) {
         if (s->token.val == TOK_DOUBLE_QUESTION_MARK)
           return js_parse_error(s, "cannot mix ?? with && or ||");
@@ -22427,6 +22562,7 @@ QJS_STATIC __exception int js_parse_logical_and_or(JSParseState *s, int op,
     }
 
     emit_label(s, label1);
+    emit_coverage_token_slot(s);
   }
   return 0;
 }
@@ -22439,6 +22575,7 @@ __exception int js_parse_cond_expr(JSParseState *s, int parse_flags) {
   if (s->token.val == TOK_DOUBLE_QUESTION_MARK) {
     label1 = new_label(s);
     for (;;) {
+      int coverage_slot;
       if (next_token(s)) return -1;
 
       emit_op(s, OP_dup);
@@ -22446,25 +22583,34 @@ __exception int js_parse_cond_expr(JSParseState *s, int parse_flags) {
       emit_goto(s, OP_if_false, label1);
       emit_op(s, OP_drop);
 
+      coverage_slot = emit_coverage_slot(s, s->token.ptr);
       if (js_parse_expr_binary(s, 8, parse_flags & ~PF_ARROW_FUNC)) return -1;
+      set_coverage_slot_end(s, coverage_slot, s->last_ptr);
       if (s->token.val != TOK_DOUBLE_QUESTION_MARK) break;
     }
     emit_label(s, label1);
+    emit_coverage_token_slot(s);
   }
   if (s->token.val == '?') {
+    int true_slot, false_slot;
     if (next_token(s)) return -1;
     label1 = emit_goto(s, OP_if_false, -1);
 
+    true_slot = emit_coverage_slot(s, s->token.ptr);
     if (js_parse_assign_expr(s, PF_IN_ACCEPTED)) return -1;
+    set_coverage_slot_end(s, true_slot, s->last_ptr);
     if (js_parse_expect(s, ':')) return -1;
 
     label2 = emit_goto(s, OP_goto, -1);
 
     emit_label(s, label1);
 
+    false_slot = emit_coverage_slot(s, s->token.ptr);
     if (js_parse_assign_expr(s, parse_flags & PF_IN_ACCEPTED)) return -1;
+    set_coverage_slot_end(s, false_slot, s->last_ptr);
 
     emit_label(s, label2);
+    emit_coverage_token_slot(s);
   }
   return 0;
 }
@@ -22576,6 +22722,7 @@ __exception int js_parse_assign_expr(JSParseState *s, int parse_flags) {
         emit_op(s, OP_drop); /* never reached */
 
         emit_label(s, label_next);
+        emit_coverage_token_slot(s);
         emit_op(s, OP_nip); /* keep the value associated with
                                done = true */
         emit_op(s, OP_nip);
@@ -22586,6 +22733,7 @@ __exception int js_parse_assign_expr(JSParseState *s, int parse_flags) {
         label_next = emit_goto(s, OP_if_false, -1);
         emit_return(s, TRUE);
         emit_label(s, label_next);
+        emit_coverage_token_slot(s);
       }
     } else {
       int label_next;
@@ -22599,6 +22747,7 @@ __exception int js_parse_assign_expr(JSParseState *s, int parse_flags) {
       label_next = emit_goto(s, OP_if_false, -1);
       emit_return(s, TRUE);
       emit_label(s, label_next);
+      emit_coverage_token_slot(s);
     }
     return 0;
   }
@@ -23238,6 +23387,8 @@ QJS_STATIC __exception int js_parse_statement_or_decl(JSParseState *s,
   LEPUSContext *ctx = s->ctx;
   JSAtom label_name;
   int tok;
+  int coverage_slot = -1;
+  const uint8_t *label_start_ptr = NULL;
 
   /* specific label handling */
   /* XXX: support multiple labels on loop statements */
@@ -23245,6 +23396,7 @@ QJS_STATIC __exception int js_parse_statement_or_decl(JSParseState *s,
   if (is_label(s)) {
     BlockEnv *be;
 
+    label_start_ptr = s->token.ptr;
     label_name = LEPUS_DupAtom(ctx, s->token.u.ident.atom);
 
     for (be = s->cur_func->top_break; be; be = be->prev) {
@@ -23260,8 +23412,10 @@ QJS_STATIC __exception int js_parse_statement_or_decl(JSParseState *s,
         s->token.val != TOK_WHILE) {
       /* labelled regular statement */
       int label_break, mask;
+      int label_coverage_slot;
       BlockEnv break_entry;
 
+      label_coverage_slot = emit_coverage_slot(s, label_start_ptr);
       label_break = new_label(s);
       push_break_entry(s->cur_func, &break_entry, label_name, label_break, -1,
                        0);
@@ -23272,11 +23426,14 @@ QJS_STATIC __exception int js_parse_statement_or_decl(JSParseState *s,
         mask = 0;
       }
       if (js_parse_statement_or_decl(s, mask)) goto fail;
+      set_coverage_slot_end(s, label_coverage_slot, s->last_ptr);
       emit_label(s, label_break);
       pop_break_entry(s->cur_func);
       goto done;
     }
   }
+
+  coverage_slot = emit_coverage_slot(s, s->token.ptr);
 
   switch (tok = s->token.val) {
     case '{':
@@ -23589,6 +23746,7 @@ QJS_STATIC __exception int js_parse_statement_or_decl(JSParseState *s,
             } else {
               label_case = emit_goto(s, OP_if_false, -1);
               emit_label(s, label1);
+              emit_coverage_token_slot(s);
               break;
             }
           }
@@ -23611,6 +23769,7 @@ QJS_STATIC __exception int js_parse_statement_or_decl(JSParseState *s,
           emit_op(s, OP_label);
           emit_u32(s, 0);
           default_label_pos = s->cur_func->byte_code.size - 4;
+          emit_coverage_token_slot(s);
         } else {
           if (label_case < 0) {
             /* falling thru direct from switch expression */
@@ -23673,6 +23832,7 @@ QJS_STATIC __exception int js_parse_statement_or_decl(JSParseState *s,
         emit_label(s, label_catch);
 
         if (s->token.val == '{') {
+          emit_coverage_token_slot(s);
           /* support optional-catch-binding feature */
           emit_op(s, OP_drop); /* pop the exception object */
         } else {
@@ -23699,6 +23859,7 @@ QJS_STATIC __exception int js_parse_statement_or_decl(JSParseState *s,
             emit_u16(s, s->cur_func->scope_level);
           }
           if (js_parse_expect(s, ')')) goto fail;
+          emit_coverage_token_slot(s);
         }
         /* XXX: should keep the address to nop it out if there is no finally
          * block */
@@ -23747,6 +23908,7 @@ QJS_STATIC __exception int js_parse_statement_or_decl(JSParseState *s,
       if (s->token.val == TOK_FINALLY) {
         int saved_eval_ret_idx;
         if (next_token(s)) goto fail;
+        emit_coverage_token_slot(s);
         /* on the stack: ret_value gosub_ret_value */
         push_break_entry(s->cur_func, &block_env, JS_ATOM_NULL, -1, -1, 2);
         if (s->cur_func->eval_ret_idx >= 0) {
@@ -23896,6 +24058,7 @@ QJS_STATIC __exception int js_parse_statement_or_decl(JSParseState *s,
       break;
   }
 done:
+  set_coverage_slot_end(s, coverage_slot, s->last_ptr);
   LEPUS_FreeAtom(ctx, label_name);
 #ifdef ENABLE_QUICKJS_DEBUGGER
   if (ctx->debugger_mode) {
@@ -25428,6 +25591,7 @@ QJS_STATIC JSFunctionDef *js_new_function_def(LEPUSContext *ctx,
     list_add_tail(&fd->link, &parent->child_list);
     fd->js_mode = parent->js_mode;
     fd->parent_scope_level = parent->scope_level;
+    fd->runtime_id = parent->runtime_id;
   }
 
   fd->is_eval = is_eval;
@@ -25558,6 +25722,7 @@ QJS_STATIC void js_free_function_def(LEPUSContext *ctx, JSFunctionDef *fd) {
 
   LEPUS_FreeAtom(ctx, fd->filename);
   dbuf_free(&fd->pc2line);
+  lepus_free(ctx, fd->coverage_slots);
 
   system_free(fd->source);
 
@@ -28476,6 +28641,12 @@ __exception int resolve_labels(LEPUSContext *ctx, JSFunctionDef *s) {
         s->should_add_slot = true;
         break;
 
+      case OP_inc_coverage_temp:
+        add_pc2line_info(s, bc_out.size, line_num);
+        dbuf_putc(&bc_out, OP_inc_coverage);
+        dbuf_put_u32(&bc_out, get_u32(bc_buf + pos + 1));
+        break;
+
       case OP_call_constructor:
         add_pc2line_info(s, bc_out.size, line_num);
         dbuf_put(&bc_out, bc_buf + pos, len);
@@ -29567,6 +29738,7 @@ LEPUSValue js_create_function(LEPUSContext *ctx, JSFunctionDef *fd) {
   is_debug_mode = ctx->debugger_mode;
 #endif
   b->function_id = 0;
+  b->runtime_id = fd->runtime_id;
   if (ctx->debuginfo_outside == 1) {
     b->function_id = ctx->next_function_id++;
   }
@@ -29577,6 +29749,14 @@ LEPUSValue js_create_function(LEPUSContext *ctx, JSFunctionDef *fd) {
   b->byte_code_len = fd->byte_code.size;
   memcpy(b->byte_code_buf, fd->byte_code.buf, fd->byte_code.size);
 
+  if (fd->coverage_slot_count) {
+    b->coverage_slots = fd->coverage_slots;
+    WriteBarrierNoStore(ctx, b->coverage_slots);
+    b->coverage_slot_count = fd->coverage_slot_count;
+    fd->coverage_slots = nullptr;
+    fd->coverage_slot_count = 0;
+    fd->coverage_slot_size = 0;
+  }
   if (!is_gc) {
     lepus_free(ctx, fd->byte_code.buf);
     fd->byte_code.buf = NULL;
@@ -29741,6 +29921,9 @@ LEPUSValue js_create_function(LEPUSContext *ctx, JSFunctionDef *fd) {
     DebuggerSetFunctionBytecodeScript(ctx, fd, b);
   }
 #endif
+  if (b->runtime_id > 0) {
+    RegisterCoverageInfo(ctx, b);
+  }
 
   if (!is_gc) lepus_free(ctx, fd);
 #ifdef TEST_BYTECODE_REWRITE
@@ -29756,6 +29939,9 @@ fail:
 
 QJS_STATIC void free_function_bytecode(LEPUSRuntime *rt,
                                        LEPUSFunctionBytecode *b) {
+  /* If coverage_info exists, it owns the shared coverage slots/counters until
+     LEPUS_FreeRuntime flushes coverage_list. */
+  bool has_coverage = (b->coverage_info != nullptr);
   int i;
 
 #if 0
@@ -29810,6 +29996,12 @@ QJS_STATIC void free_function_bytecode(LEPUSRuntime *rt,
     system_free(b->debug.source);
 #endif
   }
+
+  if (!has_coverage) {
+    if (b->coverage_counters) lepus_free_rt(rt, b->coverage_counters);
+    if (b->coverage_slots) lepus_free_rt(rt, b->coverage_slots);
+  }
+
   lepus_free_rt(rt, b);
 }
 
@@ -29994,6 +30186,7 @@ QJS_STATIC __exception int js_parse_function_decl2(
   int func_idx, lexical_func_idx = -1;
   BOOL has_opt_arg;
   BOOL create_func_var = FALSE;
+  int function_coverage_slot = -1;
 
   is_expr =
       (func_type != JS_PARSE_FUNC_STATEMENT && func_type != JS_PARSE_FUNC_VAR);
@@ -30138,6 +30331,7 @@ QJS_STATIC __exception int js_parse_function_decl2(
   fd->func_kind = func_kind;
   fd->func_type = func_type;
   fd->src_start = (const char *)ptr;
+  function_coverage_slot = emit_coverage_slot(s, ptr);
 
   if (func_type == JS_PARSE_FUNC_CLASS_CONSTRUCTOR ||
       func_type == JS_PARSE_FUNC_DERIVED_CLASS_CONSTRUCTOR) {
@@ -30411,6 +30605,7 @@ QJS_STATIC __exception int js_parse_function_decl2(
     emit_return(s, FALSE);
   }
 done:
+  set_coverage_slot_end(s, function_coverage_slot, s->last_ptr);
   s->cur_func = fd->parent;
 
   /* Reparse identifiers after the function is terminated so that the
@@ -30536,12 +30731,14 @@ QJS_STATIC __exception int js_parse_function_decl(JSParseState *s,
 
 QJS_STATIC __exception int js_parse_program(JSParseState *s) {
   JSFunctionDef *fd = s->cur_func;
-  int idx;
+  int idx, function_coverage_slot;
   fd->src_start = reinterpret_cast<const char *>(s->buf_ptr);
 
   if (next_token(s)) return -1;
 
   if (js_parse_directives(s)) return -1;
+  function_coverage_slot =
+      emit_coverage_slot(s, reinterpret_cast<const uint8_t *>(fd->src_start));
 
   fd->is_global_var = (fd->eval_type == LEPUS_EVAL_TYPE_GLOBAL) ||
                       (fd->eval_type == LEPUS_EVAL_TYPE_MODULE) ||
@@ -30556,6 +30753,7 @@ QJS_STATIC __exception int js_parse_program(JSParseState *s) {
   while (s->token.val != TOK_EOF) {
     if (js_parse_source_element(s)) return -1;
   }
+  set_coverage_slot_end(s, function_coverage_slot, s->last_ptr);
 
   if (!s->is_module) {
     /* return the value of the hidden variable eval_ret_idx  */
@@ -30664,13 +30862,11 @@ void skip_shebang(JSParseState *s) {
 }
 
 /* 'input' must be zero terminated i.e. input[input_len] = '\0'. */
-QJS_STATIC LEPUSValue __JS_EvalInternal(LEPUSContext *ctx,
-                                        LEPUSValueConst this_obj,
-                                        const char *input, size_t input_len,
-                                        const char *filename, int flags,
-                                        int scope_idx, bool debugger_eval,
-                                        LEPUSStackFrame *debugger_frame,
-                                        int start_line_number) {
+QJS_STATIC LEPUSValue __JS_EvalInternal(
+    LEPUSContext *ctx, LEPUSValueConst this_obj, const char *input,
+    size_t input_len, const char *filename, int flags, int scope_idx,
+    bool debugger_eval, LEPUSStackFrame *debugger_frame, int start_line_number,
+    int32_t runtime_id) {
   JSParseState s1, *s = &s1;
   int err, js_mode, eval_type;
   LEPUSValue fun_obj, ret_val;
@@ -30720,6 +30916,7 @@ QJS_STATIC LEPUSValue __JS_EvalInternal(LEPUSContext *ctx,
 
   if (!fd) goto fail1;
   s->cur_func = fd;
+  fd->runtime_id = b ? b->runtime_id : runtime_id;
   fd->eval_type = eval_type;
   fd->has_this_binding = (eval_type != LEPUS_EVAL_TYPE_DIRECT);
   if (eval_type == LEPUS_EVAL_TYPE_DIRECT) {
@@ -30803,13 +31000,14 @@ QJS_HIDE LEPUSValue JS_EvalInternal(LEPUSContext *ctx, LEPUSValueConst this_obj,
                                     const char *input, size_t input_len,
                                     const char *filename, int flags,
                                     int scope_idx, bool debugger_eval,
-                                    LEPUSStackFrame *sf,
-                                    int start_line_number) {
+                                    LEPUSStackFrame *sf, int start_line_number,
+                                    int32_t runtime_id) {
   if (unlikely(!ctx->eval_internal)) {
     return LEPUS_ThrowTypeError(ctx, "eval is not supported");
   }
   return ctx->eval_internal(ctx, this_obj, input, input_len, filename, flags,
-                            scope_idx, debugger_eval, sf, start_line_number);
+                            scope_idx, debugger_eval, sf, start_line_number,
+                            runtime_id);
 }
 #endif
 
@@ -30831,6 +31029,27 @@ LEPUSValue JS_EvalObject(LEPUSContext *ctx, LEPUSValueConst this_obj,
 #endif
 }
 
+static LEPUSValue EvalWithRuntimeId(LEPUSContext *ctx, const char *input,
+                                    size_t input_len, const char *filename,
+                                    int eval_flags, int start_line_number,
+                                    int32_t runtime_id) {
+  CallGCFunc(JS_Eval_GC, ctx, input, input_len, filename, eval_flags,
+             start_line_number, runtime_id);
+#ifndef NO_QUICKJS_COMPILER
+  int eval_type = eval_flags & LEPUS_EVAL_TYPE_MASK;
+  LEPUSValue ret;
+
+  assert(eval_type == LEPUS_EVAL_TYPE_GLOBAL ||
+         eval_type == LEPUS_EVAL_TYPE_MODULE);
+  ret = JS_EvalInternal(ctx, ctx->global_obj, input, input_len, filename,
+                        eval_flags, -1, false, NULL, start_line_number,
+                        runtime_id);
+  return ret;
+#else
+  return LEPUS_UNDEFINED;
+#endif
+}
+
 LEPUSValue LEPUS_Eval(LEPUSContext *ctx, const char *input, size_t input_len,
                       const char *filename, int eval_flags) {
   return LEPUS_Eval2(ctx, input, input_len, filename, eval_flags, 0);
@@ -30839,20 +31058,16 @@ LEPUSValue LEPUS_Eval(LEPUSContext *ctx, const char *input, size_t input_len,
 LEPUSValue LEPUS_Eval2(LEPUSContext *ctx, const char *input, size_t input_len,
                        const char *filename, int eval_flags,
                        int start_line_number) {
-  CallGCFunc(JS_Eval_GC, ctx, input, input_len, filename, eval_flags,
-             start_line_number);
-#ifndef NO_QUICKJS_COMPILER
-  int eval_type = eval_flags & LEPUS_EVAL_TYPE_MASK;
-  LEPUSValue ret;
+  return EvalWithRuntimeId(ctx, input, input_len, filename, eval_flags,
+                           start_line_number, -1);
+}
 
-  assert(eval_type == LEPUS_EVAL_TYPE_GLOBAL ||
-         eval_type == LEPUS_EVAL_TYPE_MODULE);
-  ret = JS_EvalInternal(ctx, ctx->global_obj, input, input_len, filename,
-                        eval_flags, -1, false, NULL, start_line_number);
-  return ret;
-#else
-  return LEPUS_UNDEFINED;
-#endif
+LEPUSValue LEPUS_Eval_WITH_COVERAGE(LEPUSContext *ctx, const char *input,
+                                    size_t input_len, const char *filename,
+                                    int eval_flags, int start_line_number,
+                                    int32_t runtime_id) {
+  return EvalWithRuntimeId(ctx, input, input_len, filename, eval_flags,
+                           start_line_number, runtime_id);
 }
 
 LEPUSValue LEPUS_EvalBinary(LEPUSContext *ctx, const uint8_t *buf,
@@ -52286,4 +52501,218 @@ void CheckObjectRt(LEPUSRuntime *rt, LEPUSValue obj) {
       CheckObjectCtx(ctx, obj);
     }
   }
+}
+
+/* Coverage Implementation */
+
+static int RegisterCoverageInfo(LEPUSContext *ctx, LEPUSFunctionBytecode *b) {
+  LEPUSRuntime *rt = ctx->rt;
+  JSCoverageInfo *info;
+
+  if (!b->coverage_slot_count || b->coverage_info) return 0;
+
+  info = (JSCoverageInfo *)lepus_mallocz_rt(rt, sizeof(JSCoverageInfo), 0);
+  if (!info) return -1;
+
+  info->filename = JS_DupAtomRT(rt, b->debug.filename);
+  info->func_name = JS_DupAtomRT(rt, b->func_name);
+  info->runtime_id = b->runtime_id;
+  info->slot_count = b->coverage_slot_count;
+  info->coverage_slots = b->coverage_slots;
+  info->coverage_counters = b->coverage_counters;
+
+  b->coverage_info = info;
+  WriteBarrierNoStore(rt, info);
+  list_add_tail(&info->link, &rt->coverage_list);
+  return 0;
+}
+
+/* Append a NUL-terminated string as a JSON-escaped string literal.
+   Callers pass strings from LEPUS_AtomToCString which are NUL-terminated
+   interned strings and cannot contain embedded NUL bytes. */
+static int CoverageAppendJSONString(DynBuf *dbuf, const char *str) {
+  const uint8_t *p = reinterpret_cast<const uint8_t *>(str ? str : "");
+  char esc[7];
+
+  dbuf_putc(dbuf, '"');
+  while (*p) {
+    switch (*p) {
+      case '\\':
+        dbuf_putstr(dbuf, "\\\\");
+        break;
+      case '"':
+        dbuf_putstr(dbuf, "\\\"");
+        break;
+      case '\b':
+        dbuf_putstr(dbuf, "\\b");
+        break;
+      case '\f':
+        dbuf_putstr(dbuf, "\\f");
+        break;
+      case '\n':
+        dbuf_putstr(dbuf, "\\n");
+        break;
+      case '\r':
+        dbuf_putstr(dbuf, "\\r");
+        break;
+      case '\t':
+        dbuf_putstr(dbuf, "\\t");
+        break;
+      default:
+        if (*p < 0x20) {
+          snprintf(esc, sizeof(esc), "\\u%04x", *p);
+          dbuf_putstr(dbuf, esc);
+        } else {
+          dbuf_putc(dbuf, *p);
+        }
+        break;
+    }
+    p++;
+  }
+  dbuf_putc(dbuf, '"');
+  return dbuf_error(dbuf) ? -1 : 0;
+}
+
+static char *CoverageWriteUint32(char *out, uint32_t value) {
+  char digits[10];
+  uint32_t digit_count = 0;
+
+  do {
+    digits[digit_count++] = static_cast<char>('0' + value % 10);
+    value /= 10;
+  } while (value != 0);
+
+  while (digit_count != 0) {
+    *out++ = digits[--digit_count];
+  }
+  return out;
+}
+
+static int CoverageAppendRangeTuple(DynBuf *dbuf, bool prepend_comma,
+                                    uint32_t start_offset, uint32_t end_offset,
+                                    uint32_t count) {
+  constexpr size_t kMaxTupleLength = 1 /* optional comma */ + 2 /* brackets */ +
+                                     2 /* separators */ +
+                                     3 * 10 /* uint32_t values */;
+  char buffer[kMaxTupleLength];
+  char *out = buffer;
+
+  if (prepend_comma) *out++ = ',';
+  *out++ = '[';
+  out = CoverageWriteUint32(out, start_offset);
+  *out++ = ',';
+  out = CoverageWriteUint32(out, end_offset);
+  *out++ = ',';
+  out = CoverageWriteUint32(out, count);
+  *out++ = ']';
+  return dbuf_put(dbuf, reinterpret_cast<const uint8_t *>(buffer),
+                  static_cast<size_t>(out - buffer));
+}
+
+static int CoverageAppendArchivedFunctionJSON(LEPUSContext *ctx, DynBuf *dbuf,
+                                              JSCoverageInfo *info) {
+  const char *func_name = NULL;
+  bool has_func_name = false;
+  int rc = -1;
+  bool first = true;
+  HandleScope coverage_scope(ctx);
+
+  if (info->func_name != JS_ATOM_NULL) {
+    func_name = LEPUS_AtomToCString(ctx, info->func_name);
+    if (!func_name) goto done;
+    coverage_scope.PushHandle(&func_name, HANDLE_TYPE_CSTRING);
+    has_func_name = true;
+  }
+
+  dbuf_putstr(dbuf, "{\"functionName\":");
+  if (CoverageAppendJSONString(dbuf, func_name ? func_name : "") != 0)
+    goto done;
+  dbuf_putstr(dbuf, ",\"ranges\":[");
+  if (dbuf_error(dbuf)) goto done;
+
+  for (uint32_t i = 0; i < info->slot_count; ++i) {
+    JSCoverageSlot *slot = &info->coverage_slots[i];
+    uint32_t counter = info->coverage_counters ? info->coverage_counters[i] : 0;
+    if (CoverageAppendRangeTuple(dbuf, !first, slot->start_offset,
+                                 slot->end_offset, counter) != 0)
+      goto done;
+    first = false;
+  }
+
+  dbuf_putstr(dbuf, "],\"isBlockCoverage\":true}");
+  if (dbuf_error(dbuf)) goto done;
+
+  rc = 0;
+done:
+  if (has_func_name && !ctx->gc_enable) LEPUS_FreeCString(ctx, func_name);
+  return rc;
+}
+
+const char *JS_GetCoverageDumpString(LEPUSContext *ctx, int32_t runtime_id,
+                                     size_t *length) {
+  DynBuf dbuf;
+  struct list_head *el;
+  const char *dump;
+  bool has_script = false;
+  bool first_function = true;
+
+  if (length) *length = 0;
+  dbuf_init(&dbuf);
+
+  dbuf_putstr(&dbuf, "{\"result\":[");
+  if (dbuf_error(&dbuf)) goto fail;
+
+  list_for_each(el, &ctx->rt->coverage_list) {
+    JSCoverageInfo *info = list_entry(el, JSCoverageInfo, link);
+    if (info->runtime_id != runtime_id) continue;
+
+    if (!has_script) {
+      const char *file_name = LEPUS_AtomToCString(ctx, info->filename);
+      if (!file_name) goto fail;
+      HandleScope script_scope(ctx, &file_name, HANDLE_TYPE_CSTRING);
+
+      dbuf_printf(
+          &dbuf, "{\"scriptId\":\"%d\",\"url\":", static_cast<int>(runtime_id));
+      if (CoverageAppendJSONString(&dbuf, file_name) != 0) {
+        if (!ctx->gc_enable) LEPUS_FreeCString(ctx, file_name);
+        goto fail;
+      }
+      if (!ctx->gc_enable) LEPUS_FreeCString(ctx, file_name);
+      dbuf_putstr(&dbuf, ",\"functions\":[");
+      if (dbuf_error(&dbuf)) goto fail;
+      has_script = true;
+    }
+
+    if (!first_function) dbuf_putc(&dbuf, ',');
+    if (dbuf_error(&dbuf) ||
+        CoverageAppendArchivedFunctionJSON(ctx, &dbuf, info) != 0) {
+      goto fail;
+    }
+    first_function = false;
+  }
+
+  if (has_script) {
+    dbuf_putstr(&dbuf, "]}");
+    if (dbuf_error(&dbuf)) goto fail;
+  }
+
+  dbuf_putstr(&dbuf, "]}");
+  dbuf_putc(&dbuf, '\0');
+  if (dbuf_error(&dbuf)) goto fail;
+
+  dump = reinterpret_cast<const char *>(dbuf.buf);
+  if (length) *length = dbuf.size - 1;
+  dbuf.buf = nullptr;
+  dbuf.size = 0;
+  dbuf.allocated_size = 0;
+  return dump;
+
+fail:
+  dbuf_free(&dbuf);
+  LEPUS_ThrowInternalError(ctx, "failed to serialize coverage");
+  return nullptr;
+}
+
+void JS_FreeCoverageDumpString(const char *dump) {
+  system_free(const_cast<char *>(dump));
 }

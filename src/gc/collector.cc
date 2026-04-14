@@ -161,6 +161,7 @@ void Visitor::VisitJSFunctionDef(void *ptr, GCWorkStack &workStack) noexcept {
 
   workStack.push_back((address_t)fd->pc2line.buf);
   workStack.push_back((address_t)fd->source);
+  workStack.push_back((address_t)fd->coverage_slots);
 }
 
 void Visitor::PushBytecodeAtoms(const uint8_t *bc_buf, int bc_len,
@@ -229,6 +230,9 @@ void Visitor::VisitLEPUSFunctionBytecode(void *ptr,
     workStack.push_back((address_t)b->debug.source);
     workStack.push_back((address_t)b->debug.caller_slots);
   }
+  workStack.push_back((address_t)b->coverage_info);
+  workStack.push_back((address_t)b->coverage_slots);
+  workStack.push_back((address_t)b->coverage_counters);
   return;
 }
 

@@ -41,6 +41,8 @@ unittest_set("quickjs_testset") {
 
   sources = [
     "test_common.cc",
+    "test_coverage.cc",
+    "test_coverage_perf.cc",
     "test_cpool_dedup.cc",
     "test_finalization_registry.cc",
     "test_parse_program.cc",

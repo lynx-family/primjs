@@ -299,6 +299,8 @@ def(scope_put_private_field, 7, 1, 1, atom_u16) /* obj value ->, emitted in phas
 // <Primjs begin>
 def(line_num, 9, 0, 0, u64) /* emitted in phase 1, removed in phase 3 */
 def(caller_str, 1, 0, 0, none)
+def(inc_coverage_temp, 5, 0, 0,
+    u32) /* emitted in phase 1, converted to inc_coverage in phase 3 */
 // <Primjs end>
 
 #if SHORT_OPCODES
@@ -370,6 +372,8 @@ DEF(is_undefined, 1, 1, 1, none)
 DEF(is_null, 1, 1, 1, none)
 DEF(is_function, 1, 1, 1, none)
 #endif
+
+DEF(inc_coverage, 5, 0, 0, u32)
 
 #undef DEF
 #undef def

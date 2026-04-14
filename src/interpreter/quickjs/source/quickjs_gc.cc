@@ -560,6 +560,7 @@ LEPUSRuntime *JS_NewRuntime2_GC(const LEPUSMallocFunctions *mf, void *opaque,
 #endif
   init_list_head(&rt->job_list);
   init_list_head(&rt->unhandled_rejections);
+  init_list_head(&rt->coverage_list);
 
 #if defined(__aarch64__) && (defined(ANDROID) || defined(__ANDROID__)) && \
     !DISABLE_NANBOX
@@ -744,6 +745,7 @@ void JS_FreeRuntime_GC(LEPUSRuntime *rt) {
   init_list_head(&rt->context_list);
   init_list_head(&rt->job_list);
   init_list_head(&rt->unhandled_rejections);
+  init_list_head(&rt->coverage_list);
 
   /* free the classes */
   rt->class_count = 0;
@@ -826,6 +828,7 @@ void JS_FreeRuntimeForEffect(LEPUSRuntime *rt) {
   rt->atom_array = NULL;
   rt->atom_hash = NULL;
   rt->shape_hash = NULL;
+  init_list_head(&rt->coverage_list);
 
   // free trace_gc data
   if (rt->global_handles_) {
@@ -10563,6 +10566,8 @@ static __exception int js_parse_statement_or_decl(JSParseState *s,
   HandleScope func_scope(ctx);
   JSAtom label_name;
   int tok;
+  int coverage_slot = -1;
+  const uint8_t *label_start_ptr = nullptr;
 
   /* specific label handling */
   /* XXX: support multiple labels on loop statements */
@@ -10570,6 +10575,7 @@ static __exception int js_parse_statement_or_decl(JSParseState *s,
   if (is_label(s)) {
     BlockEnv *be;
 
+    label_start_ptr = s->token.ptr;
     label_name = s->token.u.ident.atom;
 
     for (be = s->cur_func->top_break; be; be = be->prev) {
@@ -10585,8 +10591,10 @@ static __exception int js_parse_statement_or_decl(JSParseState *s,
         s->token.val != TOK_WHILE) {
       /* labelled regular statement */
       int label_break, mask;
+      int label_coverage_slot;
       BlockEnv break_entry;
 
+      label_coverage_slot = emit_coverage_slot(s, label_start_ptr);
       label_break = new_label(s);
       push_break_entry(s->cur_func, &break_entry, label_name, label_break, -1,
                        0);
@@ -10597,6 +10605,7 @@ static __exception int js_parse_statement_or_decl(JSParseState *s,
         mask = 0;
       }
       if (js_parse_statement_or_decl(s, mask)) goto fail;
+      set_coverage_slot_end(s, label_coverage_slot, s->last_ptr);
       emit_label(s, label_break);
       pop_break_entry(s->cur_func);
       goto done;
@@ -10605,6 +10614,7 @@ static __exception int js_parse_statement_or_decl(JSParseState *s,
 #ifdef ENABLE_QUICKJS_DEBUGGER
   LEPUSValue debugger;
 #endif
+  coverage_slot = emit_coverage_slot(s, s->token.ptr);
   switch (tok = s->token.val) {
     case '{':
       if (js_parse_block(s)) goto fail;
@@ -10916,6 +10926,7 @@ static __exception int js_parse_statement_or_decl(JSParseState *s,
             } else {
               label_case = emit_goto(s, OP_if_false, -1);
               emit_label(s, label1);
+              emit_coverage_token_slot(s);
               break;
             }
           }
@@ -10938,6 +10949,7 @@ static __exception int js_parse_statement_or_decl(JSParseState *s,
           emit_op(s, OP_label);
           emit_u32(s, 0);
           default_label_pos = s->cur_func->byte_code.size - 4;
+          emit_coverage_token_slot(s);
         } else {
           if (label_case < 0) {
             /* falling thru direct from switch expression */
@@ -11000,6 +11012,7 @@ static __exception int js_parse_statement_or_decl(JSParseState *s,
         emit_label(s, label_catch);
 
         if (s->token.val == '{') {
+          emit_coverage_token_slot(s);
           /* support optional-catch-binding feature */
           emit_op(s, OP_drop); /* pop the exception object */
         } else {
@@ -11027,6 +11040,7 @@ static __exception int js_parse_statement_or_decl(JSParseState *s,
             emit_u16(s, s->cur_func->scope_level);
           }
           if (js_parse_expect(s, ')')) goto fail;
+          emit_coverage_token_slot(s);
         }
         /* XXX: should keep the address to nop it out if there is no finally
          * block */
@@ -11075,6 +11089,7 @@ static __exception int js_parse_statement_or_decl(JSParseState *s,
       if (s->token.val == TOK_FINALLY) {
         int saved_eval_ret_idx;
         if (next_token(s)) goto fail;
+        emit_coverage_token_slot(s);
         /* on the stack: ret_value gosub_ret_value */
         push_break_entry(s->cur_func, &block_env, JS_ATOM_NULL, -1, -1, 2);
         if (s->cur_func->eval_ret_idx >= 0) {
@@ -11224,6 +11239,7 @@ static __exception int js_parse_statement_or_decl(JSParseState *s,
       break;
   }
 done:
+  set_coverage_slot_end(s, coverage_slot, s->last_ptr);
 #ifdef ENABLE_QUICKJS_DEBUGGER
   if (ctx->debugger_mode) {
     js_gen_debugger_statement(s, s->ctx);
@@ -11287,6 +11303,7 @@ JSFunctionDef *js_new_function_def_GC(LEPUSContext *ctx, JSFunctionDef *parent,
     WriteBarrierNoStore(ctx, fd);
     fd->js_mode = parent->js_mode;
     fd->parent_scope_level = parent->scope_level;
+    fd->runtime_id = parent->runtime_id;
   }
 
   fd->is_eval = is_eval;
@@ -11357,6 +11374,7 @@ __exception int js_parse_function_decl2_GC(
   int func_idx, lexical_func_idx = -1;
   BOOL has_opt_arg;
   BOOL create_func_var = FALSE;
+  int function_coverage_slot = -1;
 
   is_expr =
       (func_type != JS_PARSE_FUNC_STATEMENT && func_type != JS_PARSE_FUNC_VAR);
@@ -11496,6 +11514,7 @@ __exception int js_parse_function_decl2_GC(
   fd->func_kind = func_kind;
   fd->func_type = func_type;
   fd->src_start = (const char *)ptr;
+  function_coverage_slot = emit_coverage_slot(s, ptr);
 
   if (func_type == JS_PARSE_FUNC_CLASS_CONSTRUCTOR ||
       func_type == JS_PARSE_FUNC_DERIVED_CLASS_CONSTRUCTOR) {
@@ -11767,6 +11786,7 @@ __exception int js_parse_function_decl2_GC(
     emit_return(s, FALSE);
   }
 done:
+  set_coverage_slot_end(s, function_coverage_slot, s->last_ptr);
   HeapObjStore(ctx, &s->cur_func, fd->parent);
 
   /* Reparse identifiers after the function is terminated so that the
@@ -11892,12 +11912,14 @@ QJS_STATIC __exception int js_parse_function_decl(JSParseState *s,
 
 static __exception int js_parse_program(JSParseState *s) {
   JSFunctionDef *fd = s->cur_func;
-  int idx;
+  int idx, function_coverage_slot;
   fd->src_start = reinterpret_cast<const char *>(s->buf_ptr);
 
   if (next_token(s)) return -1;
 
   if (js_parse_directives(s)) return -1;
+  function_coverage_slot =
+      emit_coverage_slot(s, reinterpret_cast<const uint8_t *>(fd->src_start));
 
   fd->is_global_var = (fd->eval_type == LEPUS_EVAL_TYPE_GLOBAL) ||
                       (fd->eval_type == LEPUS_EVAL_TYPE_MODULE) ||
@@ -11912,6 +11934,7 @@ static __exception int js_parse_program(JSParseState *s) {
   while (s->token.val != TOK_EOF) {
     if (js_parse_source_element(s)) return -1;
   }
+  set_coverage_slot_end(s, function_coverage_slot, s->last_ptr);
 
   if (!s->is_module) {
     /* return the value of the hidden variable eval_ret_idx  */
@@ -11965,13 +11988,11 @@ LEPUSValue JS_EvalFunction_GC(LEPUSContext *ctx, LEPUSValue fun_obj,
 
 #ifndef NO_QUICKJS_COMPILER
 /* 'input' must be zero terminated i.e. input[input_len] = '\0'. */
-static LEPUSValue __JS_EvalInternal_GC(LEPUSContext *ctx,
-                                       LEPUSValueConst this_obj,
-                                       const char *input, size_t input_len,
-                                       const char *filename, int flags,
-                                       int scope_idx, bool debugger_eval,
-                                       LEPUSStackFrame *debugger_frame,
-                                       int start_line_number) {
+static LEPUSValue __JS_EvalInternal_GC(
+    LEPUSContext *ctx, LEPUSValueConst this_obj, const char *input,
+    size_t input_len, const char *filename, int flags, int scope_idx,
+    bool debugger_eval, LEPUSStackFrame *debugger_frame, int start_line_number,
+    int32_t runtime_id) {
   JSParseState s1, *s = &s1;
   int err, js_mode, eval_type;
   LEPUSValue fun_obj, ret_val;
@@ -12027,6 +12048,7 @@ static LEPUSValue __JS_EvalInternal_GC(LEPUSContext *ctx,
 
   if (!fd) goto fail1;
   HeapObjStore(ctx, &s->cur_func, fd);
+  fd->runtime_id = b ? b->runtime_id : runtime_id;
   fd->eval_type = eval_type;
   fd->has_this_binding = (eval_type != LEPUS_EVAL_TYPE_DIRECT);
   if (eval_type == LEPUS_EVAL_TYPE_DIRECT) {
@@ -12125,7 +12147,7 @@ LEPUSValue JS_EvalObject(LEPUSContext *ctx, LEPUSValueConst this_obj,
 
 LEPUSValue JS_Eval_GC(LEPUSContext *ctx, const char *input, size_t input_len,
                       const char *filename, int eval_flags,
-                      int start_line_number) {
+                      int start_line_number, int32_t runtime_id) {
 #ifndef NO_QUICKJS_COMPILER
   int eval_type = eval_flags & LEPUS_EVAL_TYPE_MASK;
   LEPUSValue ret;
@@ -12133,7 +12155,8 @@ LEPUSValue JS_Eval_GC(LEPUSContext *ctx, const char *input, size_t input_len,
   assert(eval_type == LEPUS_EVAL_TYPE_GLOBAL ||
          eval_type == LEPUS_EVAL_TYPE_MODULE);
   ret = JS_EvalInternal(ctx, ctx->global_obj, input, input_len, filename,
-                        eval_flags, -1, false, NULL, start_line_number);
+                        eval_flags, -1, false, NULL, start_line_number,
+                        runtime_id);
   return ret;
 #else
   return LEPUS_UNDEFINED;
@@ -28191,6 +28214,18 @@ void Visitor::ScanRuntime(GCWorkStack &workStack, bool isFinalRemark,
     rt_->global_handles_->CollectAllRoots(workStack, 0, markWeak);
   if (rt_->qjsvaluevalue_allocator)
     rt_->qjsvaluevalue_allocator->CollectAllRoots(workStack);
+
+  /* Coverage data outlives its function bytecode so that it can be dumped
+     after the function has been collected. Keep the list nodes and their
+     backing storage alive as runtime roots. */
+  list_for_each(el, &rt_->coverage_list) {
+    JSCoverageInfo *info = list_entry(el, JSCoverageInfo, link);
+    workStack.push_back((address_t)info);
+    PushObjAtom(info->filename, workStack);
+    PushObjAtom(info->func_name, workStack);
+    workStack.push_back((address_t)info->coverage_slots);
+    workStack.push_back((address_t)info->coverage_counters);
+  }
 }
 
 void Visitor::ScanShapeArray(GCWorkStack &workStack) noexcept {
