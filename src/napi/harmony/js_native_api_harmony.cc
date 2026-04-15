@@ -1101,19 +1101,11 @@ static napi_status napi_create_arraybuffer(napi_env env, size_t byte_length,
                                            void **data, napi_value *result) {
   JSVM_Value ab;
   void *data_buffer = nullptr;
-  CALL_JSVM(OH_JSVM_AllocateArrayBufferBackingStoreData(
-      byte_length, JSVM_UNINITIALIZED, &data_buffer));
+  CALL_JSVM(OH_JSVM_CreateArraybuffer(env->ctx->vm_env_, byte_length,
+                                      &data_buffer, &ab))
 
-  CALL_JSVM(OH_JSVM_CreateArrayBufferFromBackingStoreData(
-      env->ctx->vm_env_, data_buffer, byte_length, 0, byte_length, &ab));
-  CALL_JSVM(OH_JSVM_AddFinalizer(
-      env->ctx->vm_env_, ab, data_buffer,
-      [](JSVM_Env env, void *finalize_data, void *finalize_hint) {
-        OH_JSVM_FreeArrayBufferBackingStoreData(finalize_data);
-      },
-      nullptr, nullptr));
-  *result = JSValueToNapi(ab);
-  *data = data_buffer;
+  if (result) *result = JSValueToNapi(ab);
+  if (data) *data = data_buffer;
   return napi_clear_last_error(env);
 }
 
