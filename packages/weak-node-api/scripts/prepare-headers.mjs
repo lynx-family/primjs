@@ -286,11 +286,19 @@ function processFile(filePath) {
     return;
   }
 
-  // Normalize: #include <node_api.h> -> #include "../headers/node_api.h"
-  content = content.replace(/#\s*include\s*<node_api.h>/g, '#include "../headers/node_api.h"');
+  const isInGenerated = filePath.startsWith(generatedDst);
+  
+  if (isInGenerated) {
+    // For generated files, use shim to avoid relative path resolving issues
+    // Normalize: #include <node_api.h> -> #include "shim_weak_napi.h"
+    content = content.replace(/#\s*include\s*<node_api\.h>/g, '#include "shim_weak_napi.h"');
+  } else {
+    // For headers, directly include the sibling node_api.h
+    // Normalize: #include <node_api.h> -> #include "node_api.h"
+    content = content.replace(/#\s*include\s*<node_api\.h>/g, '#include "node_api.h"');
+  }
 
   // Comment style and insertion for generated/* files attribution
-  const isInGenerated = filePath.startsWith(generatedDst);
   const version = getUpstreamVersion();
   const attributionHeader = [
     "/*",
@@ -303,28 +311,16 @@ function processFile(filePath) {
 
   // Only include weak symbol remapping headers when USE_WEAK_SUFFIX_NAPI is
   // defined so that weak suffix symbol remapping is opt-in at compile time.
-  const defineLines = isInGenerated
-    ? [
-        "#if defined(USE_WEAK_SUFFIX_NAPI)",
-        '#include "../headers/weak_napi_defines.h"',
-        "#endif",
-      ]
-    : [
-        "#if defined(USE_WEAK_SUFFIX_NAPI)",
-        '#include "weak_napi_defines.h"',
-        "#endif",
-      ];
-  const undefLines = isInGenerated
-    ? [
-        "#if defined(USE_WEAK_SUFFIX_NAPI)",
-        '#include "../headers/weak_napi_undefs.h"',
-        "#endif",
-      ]
-    : [
-        "#if defined(USE_WEAK_SUFFIX_NAPI)",
-        '#include "weak_napi_undefs.h"',
-        "#endif",
-      ];
+  const defineLines = [
+    "#if defined(USE_WEAK_SUFFIX_NAPI)",
+    '#include "weak_napi_defines.h"',
+    "#endif",
+  ];
+  const undefLines = [
+    "#if defined(USE_WEAK_SUFFIX_NAPI)",
+    '#include "weak_napi_undefs.h"',
+    "#endif",
+  ];
 
   const lines = content.split("\n");
   const newLines = [...lines];

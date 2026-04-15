@@ -2,11 +2,11 @@
 // Licensed under the Apache License Version 2.0 that can be found in the
 // LICENSE file in the root directory of this source tree.
 
-#include "third_party/weak-node-api/generated/weak_node_api.hpp"
+#include "weak_node_api.hpp"
 #include "weak_node_api_host.h"
 
 #ifdef USE_WEAK_SUFFIX_NAPI
-#include "third_party/weak-node-api/headers/weak_napi_defines.h"
+#include "weak_napi_defines.h"
 #endif
 
 namespace primjs {
@@ -464,7 +464,7 @@ void SetupWeakNodeApiEnv() {
 }
 
 #ifdef USE_WEAK_SUFFIX_NAPI
-#include "third_party/weak-node-api/headers/weak_napi_undefs.h"
+#include "weak_napi_undefs.h"
 #endif
 
 }  // namespace napi

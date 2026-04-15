@@ -18,7 +18,6 @@
 #include <cstdlib>
 #include <string>
 
-#include "js_native_api_types.h"
 #include "napi_runtime.h"
 #include "napi_state.h"
 

@@ -1,0 +1,13 @@
+{
+  "android": {
+    "packageUrl": "https://example.com/path/to/napi-adapter.aar",
+    "libraryPath": "jni/arm64-v8a/libnapi_adapter.so"
+  },
+  "harmony": {
+    "packageUrl": "https://example.com/path/to/napi-adapter.har",
+    "libraryPaths": [
+      "package/libs/arm64-v8a/libnapi_adapter.so",
+      "libs/arm64-v8a/libnapi_adapter.so"
+    ]
+  }
+}

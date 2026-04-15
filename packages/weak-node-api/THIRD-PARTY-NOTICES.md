@@ -32,7 +32,7 @@ This package indirectly consumes the Node-API C header definitions (for example 
 
 ## 4. Binary redistribution
 
-Even if you only redistribute prebuilt binaries from this package (for example, artifacts under `prebuilt/**`) and not the original source files, you **must still** keep the following with your distribution:
+Even if you only redistribute binaries built from or derived from this package (and not the original source files), you **must still** keep the following with your distribution:
 
 - This `THIRD-PARTY-NOTICES.md` file, and
 - The full MIT license texts from:
