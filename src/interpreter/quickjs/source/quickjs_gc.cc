@@ -10435,8 +10435,7 @@ static __exception int js_parse_for_in_of(JSParseState *s, int label_name,
   }
 
   if (token_is_pseudo_keyword(s, JS_ATOM_of)) {
-    break_entry.has_iterator = is_for_of = TRUE;
-    break_entry.drop_count += 2;
+    is_for_of = TRUE;
     if (has_initializer) goto initializer_error;
   } else if (s->token.val == TOK_IN) {
     if (is_async)
@@ -10466,6 +10465,10 @@ static __exception int js_parse_for_in_of(JSParseState *s, int label_name,
       emit_op(s, OP_for_await_of_start);
     else
       emit_op(s, OP_for_of_start);
+    /* Keep the GC parser in sync with quickjs.cc: the RHS expression may
+       yield before the iterator record exists on the stack. */
+    break_entry.has_iterator = TRUE;
+    break_entry.drop_count += 2;
     /* on stack: enum_rec */
   } else {
     emit_op(s, OP_for_in_start);
