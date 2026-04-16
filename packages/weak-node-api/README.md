@@ -28,7 +28,7 @@ The package is available on NPM: [https://www.npmjs.com/package/@lynx-js/weak-no
 
 ### Node.js version
 
-- **Consumers**: Node.js >= 18 (as declared by this package's `engines.node`).
+- **Consumers**: No `engines.node` restriction is published. Install/use the package with the Node.js version required by your own environment and tooling.
 - **Maintainers**: Node.js >= 22 is required if you need to run the helper scripts that regenerate headers/sources (they rely on the upstream `weak-node-api` devDependency).
 
 ### Basic Usage

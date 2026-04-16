@@ -1,3 +1,7 @@
+## 0.0.6 - 2026-04-16
+- **Compatibility**: Remove the published `engines.node` restriction so consumers are not blocked by npm engine checks.
+- **Release Policy**: Continue to require Node.js 22+ only for maintainer workflows that run helper scripts such as `prepare:headers`.
+
 ## 0.0.5 - 2026-04-16
 - **Compatibility**: Relax consumer Node.js requirement to >= 18 (publish-time `engines.node`).
 - **Dev Dependency**: Track the upstream `weak-node-api@0.1.1` as a devDependency to avoid imposing its Node.js requirements on consumers.
