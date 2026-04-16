@@ -525,18 +525,15 @@ void MarkSweepCollector::RunFullCollection(size_t alloc_size, int eager,
 void MarkSweepCollector::DoOnlyFinalizer() {
   finalizer->DoGlobalFinalizer();
 
-  struct list_head *el, *el1;
-  list_for_each_safe(el, el1, &ros->GetRuntime()->context_list) {
-    LEPUSContext *ctx = list_entry(el, LEPUSContext, link);
-    auto &set = *ctx->obj_finalizer_recoder;
-    for (auto it = set.begin(); it != set.end(); it++) {
-      auto val = *it;
-      finalizer->JSObjectOnlyFinalizer(val);
-    }
-    set.clear();
-  }
-
   auto rt = ros->GetRuntime();
+  auto &obj_finalizer_recoder = *rt->obj_finalizer_recoder;
+  for (auto it = obj_finalizer_recoder.begin();
+       it != obj_finalizer_recoder.end(); it++) {
+    auto val = *it;
+    finalizer->JSObjectOnlyFinalizer(val);
+  }
+  obj_finalizer_recoder.clear();
+
   for (auto it = rt->finalizerSet->begin(); it != rt->finalizerSet->end();
        it++) {
     auto val = *it;
@@ -770,7 +767,7 @@ void MarkSweepCollector::DoOuterObjFinalizer() {
   TRACE_EVENT("PRIMJS_DoOuterObjFinalizer");
 
 #define FINALIZER_HANDLER(set, func)                          \
-  auto &set = *ctx->set;                                      \
+  auto &set = *set_owner->set;                                \
   for (auto it = set.begin(); it != set.end();) {             \
     auto val = *it;                                           \
     if (!ros->IsObjectMarked((address_t)(val)-kHeaderSize)) { \
@@ -781,12 +778,15 @@ void MarkSweepCollector::DoOuterObjFinalizer() {
     }                                                         \
   }
 
+  auto *rt = ros->GetRuntime();
+  auto *set_owner = rt;
+  FINALIZER_HANDLER(obj_finalizer_recoder, JSObjectFinalizer)
+
   // run outer_obj's finalizer in js thread
   struct list_head *el, *el1;
-  list_for_each_safe(el, el1, &ros->GetRuntime()->context_list) {
+  list_for_each_safe(el, el1, &rt->context_list) {
     LEPUSContext *ctx = list_entry(el, LEPUSContext, link);
-    FINALIZER_HANDLER(obj_finalizer_recoder, JSObjectFinalizer)
-
+    auto *set_owner = ctx;
     if (ctx->fr_data_finalizer_recoder) {
       FINALIZER_HANDLER(fr_data_finalizer_recoder,
                         FinalizationRegistryDataFinalizer)

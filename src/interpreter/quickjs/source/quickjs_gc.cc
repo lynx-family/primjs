@@ -531,6 +531,7 @@ LEPUSRuntime *JS_NewRuntime2_GC(const LEPUSMallocFunctions *mf, void *opaque,
   rt->ptr_handles = new PtrHandles(rt);
   rt->global_handles_ = new GlobalHandles(rt);
   rt->qjsvaluevalue_allocator = new QJSValueValueSpace(rt);
+  rt->obj_finalizer_recoder = new std::unordered_set<LEPUSObject *>();
   rt->finalizerSet = new std::unordered_set<void *>();
   rt->async_obj_recoder = new std::unordered_set<void *>();
 
@@ -734,25 +735,18 @@ void JS_FreeRuntime_GC(LEPUSRuntime *rt) {
   pthread_mutex_unlock(&runtime_mutex);
   auto pool = rt->collector_->GetThreadPool();
   if (pool) pool->WaitFinish(true);
-  struct list_head *el, *el1;
-  int i;
 
+  struct list_head *el, *el1;
   list_for_each_safe(el, el1, &rt->context_list) {
     LEPUSContext *ctx = list_entry(el, LEPUSContext, link);
     JS_FreeContext_GC(ctx);
   }
+
   init_list_head(&rt->context_list);
-
   init_list_head(&rt->job_list);
-
   init_list_head(&rt->unhandled_rejections);
 
-  /* free the classes */
-  rt->class_count = 0;
-  rt->class_array = NULL;
-
   rt->current_exception = LEPUS_NULL;
-
   /* free the atoms */
 #ifdef ENABLE_LEPUSNG
   for (int i = 0; i < rt->atom_size; i++) {
@@ -767,6 +761,9 @@ void JS_FreeRuntime_GC(LEPUSRuntime *rt) {
   rt->atom_hash = NULL;
   rt->shape_hash = NULL;
   rt->collector_->RunFinalCollection();
+  /* free the classes */
+  rt->class_count = 0;
+  rt->class_array = NULL;
 
   // free trace_gc data
   if (rt->ptr_handles) {
@@ -790,6 +787,10 @@ void JS_FreeRuntime_GC(LEPUSRuntime *rt) {
     if (rt->collector_) {
       delete rt->collector_;
       rt->collector_ = nullptr;
+    }
+    if (rt->obj_finalizer_recoder) {
+      delete rt->obj_finalizer_recoder;
+      rt->obj_finalizer_recoder = nullptr;
     }
     if (rt->finalizerSet) {
       delete rt->finalizerSet;
@@ -834,6 +835,10 @@ void JS_FreeRuntimeForEffect(LEPUSRuntime *rt) {
     if (rt->collector_) {
       delete rt->collector_;
       rt->collector_ = nullptr;
+    }
+    if (rt->obj_finalizer_recoder) {
+      delete rt->obj_finalizer_recoder;
+      rt->obj_finalizer_recoder = nullptr;
     }
     if (rt->finalizerSet) {
       delete rt->finalizerSet;
@@ -889,7 +894,6 @@ LEPUSContext *JS_NewContextRaw_GC(LEPUSRuntime *rt) {
 
   ctx = static_cast<LEPUSContext *>(system_mallocz(sizeof(LEPUSContext)));
   if (!ctx) return NULL;
-  ctx->obj_finalizer_recoder = new std::unordered_set<LEPUSObject *>();
   ctx->gc_enable = rt->gc_enable;
   ctx->ptr_handles = rt->ptr_handles;
   ctx->class_proto = static_cast<LEPUSValue *>(
@@ -988,7 +992,6 @@ void JS_FreeContext_GC(LEPUSContext *ctx) {
     delete ctx->napi_scope;
     ctx->napi_scope = nullptr;
   }
-  delete ctx->obj_finalizer_recoder;
   if (ctx->fr_data_finalizer_recoder) delete ctx->fr_data_finalizer_recoder;
   if (ctx->object_ctx_check && ctx->check_tools) {
     delete ctx->check_tools;
@@ -2192,7 +2195,7 @@ QJS_HIDE LEPUSValue JS_NewObjectFromShape_GC(LEPUSContext *ctx, JSShape *sh,
       goto set_exotic;
     default:
       if (unlikely(class_id > JS_CLASS_INIT_COUNT))
-        ctx->obj_finalizer_recoder->insert(p);
+        ctx->rt->obj_finalizer_recoder->insert(p);
     set_exotic:
       if (ctx->rt->class_array[class_id].exotic) {
         p->is_exotic = 1;
