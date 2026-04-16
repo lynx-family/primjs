@@ -5,6 +5,4 @@ vendor/**
 node_modules/
 package-lock.json
 build/
-generated/
-headers/
 prebuilt/

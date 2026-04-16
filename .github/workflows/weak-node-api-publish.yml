@@ -53,99 +53,10 @@ jobs:
             fi
           fi
 
-  weak-node-api-darwin-build:
-    if: needs.check-version-change.outputs.version_changed == 'true'
-    runs-on: macOS-latest
-    needs: check-version-change
-    steps:
-      - name: Download Source
-        uses: actions/checkout@v4.2.2
-        with:
-          path: primjs
-
-      - name: Python Setup
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.13'
-
-      - name: Node Setup
-        uses: actions/setup-node@v4
-        with:
-          node-version: '24.14.1'
-
-      - name: Install CMake
-        uses: jwlawson/actions-setup-cmake@v2
-        with:
-          cmake-version: '3.30.x'
-
-      - name: Build Darwin weak-node-api
-        run: |
-          # macOS CMake-based build, produces prebuilt/macos/**/* dylibs
-          cd $GITHUB_WORKSPACE/primjs/packages/weak-node-api
-          npm install
-          npm run build:cmake:macos
-
-      - name: Upload Darwin Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: weak_node_api_darwin
-          # Upload the macOS prebuilt layout expected by the package
-          path: primjs/packages/weak-node-api/prebuilt/macos
-
-  weak-node-api-windows-build:
-    if: needs.check-version-change.outputs.version_changed == 'true'
-    runs-on: lynx-windows-2022-large
-    strategy:
-      matrix:
-        arch: [x64]
-    needs: check-version-change
-    steps:
-      - name: Configure Git
-        shell: pwsh
-        run: |
-          git config --global core.autocrlf false
-          git config --global core.eol lf
-          git config --global http.sslBackend "schannel"
-        working-directory: ./
-      - name: Download Source
-        uses: actions/checkout@v4.2.2
-        with:
-          path: primjs
-
-      - name: Python Setup
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.13'
-
-      - name: Node Setup
-        uses: actions/setup-node@v4
-        with:
-          node-version: '24.14.1'
-
-      - name: Install CMake
-        uses: jwlawson/actions-setup-cmake@v2
-        with:
-          cmake-version: '3.30.x'
-
-      - name: Build Windows weak-node-api
-        shell: pwsh
-        run: |
-          # Windows MSVC + CMake build, produces prebuilt/win/**/* DLLs
-          cd $env:GITHUB_WORKSPACE/primjs/packages/weak-node-api
-          npm install
-          npm run build:cmake:win
-
-      - name: Upload Windows Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: weak_node_api_win
-          # Upload the Windows prebuilt layout expected by the package
-          path: primjs/packages/weak-node-api/prebuilt/win
-
   weak-node-api-publish:
     if: needs.check-version-change.outputs.version_changed == 'true'
     runs-on: macOS-latest
-    needs: [check-version-change, weak-node-api-darwin-build, weak-node-api-windows-build]
+    needs: [check-version-change]
     permissions:
       contents: read
       id-token: write
@@ -156,47 +67,11 @@ jobs:
         with:
           path: primjs
 
-      - name: Python Setup
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.13'
-
       - name: Node Setup
         uses: actions/setup-node@v4
         with:
           node-version: '24.14.1'
           registry-url: 'https://registry.npmjs.org'
-
-      - name: Check Node and npm
-        run: |
-          node --version
-          npm --version
-
-      - name: Install dependencies and prepare headers
-        run: |
-          cd $GITHUB_WORKSPACE/primjs/packages/weak-node-api
-          npm install
-          npm run prepare:headers
-
-      - name: Download Darwin Artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: weak_node_api_darwin
-          path: primjs/packages/weak-node-api/prebuilt/macos
-
-      - name: Download Windows Artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: weak_node_api_win
-          path: primjs/packages/weak-node-api/prebuilt/win
-
-      - name: List Prebuilt Artifacts
-        run: |
-          echo "Prebuilt directory contents:"
-          ls -la $GITHUB_WORKSPACE/primjs/packages/weak-node-api/prebuilt
-          echo ""
-          echo "Detailed file paths:"
-          find $GITHUB_WORKSPACE/primjs/packages/weak-node-api -path "*/node_modules" -prune -o -type f -print
 
       - name: Publish
         run: |-

@@ -12,8 +12,8 @@
 #ifndef SRC_NAPI_JS_NATIVE_API_ADAPTER_H_
 #define SRC_NAPI_JS_NATIVE_API_ADAPTER_H_
 
-#include "js_native_api.h"
 #include "napi_module.h"
+#include "shim_js_native_api.h"
 #ifdef USE_PRIMJS_NAPI
 #include "primjs_napi_defines.h"
 #endif

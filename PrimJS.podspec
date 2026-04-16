@@ -122,13 +122,29 @@ Pod::Spec.new do |s|
 
     sp.subspec "adapter" do |ssp|
       ssp.source_files = [
-        "src/napi/adapter/js_native_api_adapter.cc",
-        "src/napi/adapter/js_native_api_adapter.h",
+        "src/napi/adapter/js_native_api_adapter.{h,cc}",
+        "src/napi/adapter/weak_napi_host_generator.cc",
+        "src/napi/adapter/weak_node_api_host.h"
       ]
       ssp.public_header_files = "src/napi/adapter/js_native_api_adapter.h"
+      ssp.private_header_files = "src/napi/adapter/weak_node_api_host.h"
       ssp.dependency "PrimJS/napi/core"
       ssp.dependency "PrimJS/napi/env"
     end
+  end
+
+  s.subspec "weak_node_api" do |sp|
+    sp.source_files = [
+      "src/napi/adapter/weak_napi_host_injector.cc",
+      "packages/weak-node-api/generated/*.{h,hpp,cc,cpp}",
+      "packages/weak-node-api/headers/*.{h,hpp}",
+      "packages/weak-node-api/shim/*.{h,hpp}"
+    ]
+    sp.private_header_files = ["packages/weak-node-api/generated/*.{h,hpp}",
+                                "packages/weak-node-api/shim/*.{h,hpp}"
+                              ]
+    sp.header_mappings_dir = "."
+    sp.dependency "PrimJS/napi/adapter"
   end
 
   s.subspec "log" do |sp|

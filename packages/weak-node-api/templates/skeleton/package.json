@@ -1,0 +1,15 @@
+{
+  "name": "__PROJECT_NAME__",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "deps:android": "node scripts/fetch-libs.mjs --platform android --out vendor/android",
+    "deps:harmony": "node scripts/fetch-libs.mjs --platform harmony --out vendor/harmony"
+  },
+  "dependencies": {
+    "@lynx-js/weak-node-api": "0.0.4"
+  }
+}

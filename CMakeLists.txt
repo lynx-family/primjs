@@ -223,7 +223,11 @@ endif()
 
 set(napi_v8_sources ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/v8/js_native_api_v8.cc)
 
-set(napi_adapter_sources ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/adapter/js_native_api_adapter.cc)
+set(napi_adapter_sources
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/adapter/js_native_api_adapter.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/adapter/weak_napi_host_generator.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/adapter/weak_napi_host_injector.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/packages/weak-node-api/generated/weak_node_api.cpp)
 
 include_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}/src
@@ -234,7 +238,10 @@ include_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/internal
   ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/quickjs
   ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/v8
-  ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/adapter)
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/adapter
+  ${CMAKE_CURRENT_SOURCE_DIR}/packages/weak-node-api/generated
+  ${CMAKE_CURRENT_SOURCE_DIR}/packages/weak-node-api/shim
+  ${CMAKE_CURRENT_SOURCE_DIR}/packages/weak-node-api/defs_header)
 
 if (ENABLE_PRIMJS_HARMONY)
   get_filename_component(PARENT_PARENT_DIR ${CMAKE_SOURCE_DIR}/../.. ABSOLUTE)
