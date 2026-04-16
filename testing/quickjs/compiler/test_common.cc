@@ -635,6 +635,32 @@ TEST_F(CommonQjsTest, UnConsistentStackSize) {
   ASSERT_TRUE(!LEPUS_IsException(ret));
   if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
 }
+
+TEST_F(CommonQjsTest, YieldInForOfHeadDoesNotUnderflowStack) {
+  std::string src = R"(
+    function* test() {
+      let t = new Map();
+      for (let [key, value] of Object.entries(yield t)) {
+      }
+      return t;
+    }
+
+    const iter = test();
+    const first = iter.next();
+    Assert(first.done === false);
+    Assert(first.value.size === 0);
+
+    const second = iter.next({ foo: 1, bar: 2 });
+    Assert(second.done === true);
+    Assert(second.value.size === 0);
+  )";
+
+  auto ret = LEPUS_Eval(ctx_, src.c_str(), src.length(), "test.js",
+                        LEPUS_EVAL_TYPE_GLOBAL);
+  ASSERT_TRUE(!LEPUS_IsException(ret));
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+}
+
 TEST_F(CommonQjsTest, js_op_dec_loc) {
   std::string src = R"(
     function test() {
