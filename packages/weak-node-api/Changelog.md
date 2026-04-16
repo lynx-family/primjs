@@ -1,3 +1,8 @@
+## 0.0.5 - 2026-04-16
+- **Compatibility**: Relax consumer Node.js requirement to >= 18 (publish-time `engines.node`).
+- **Dev Dependency**: Track the upstream `weak-node-api@0.1.1` as a devDependency to avoid imposing its Node.js requirements on consumers.
+- **Docs**: Clarify consumer vs maintainer Node.js version requirements.
+
 ## 0.1.0 - 2026-04-07
 - **Breaking Change**: Update module lookup APIs to use caller-provided output storage to avoid cross-DLL allocation/free issues on Windows.
   - `napi_find_module_primjs`: changed from returning a heap-allocated `napi_module_spec_compl*` to `bool napi_find_module_primjs(const char* name, napi_module* out)`.

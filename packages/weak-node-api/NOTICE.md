@@ -10,7 +10,7 @@ It incorporates and derives from upstream open-source projects as noted below. W
   - Repository: https://github.com/callstackincubator/react-native-node-api
   - Published npm package: weak-node-api (https://www.npmjs.com/package/weak-node-api)
   - License: MIT (see https://github.com/callstackincubator/react-native-node-api/blob/main/LICENSE.md)
-  - Upstream npm version in this package: weak-node-api@0.0.3 (tracked via devDependency in package.json)
+  - Upstream npm version in this package: weak-node-api@0.1.1 (tracked via devDependency in package.json)
   - Usage: We copy selected headers and generated sources from the `weak-node-api` npm package. Our package publishes the generated sources and additional build integration.
 
 - Node-Addon-API (node-addon-api)

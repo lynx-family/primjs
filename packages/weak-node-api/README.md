@@ -26,6 +26,11 @@ npm install @lynx-js/weak-node-api
 
 The package is available on NPM: [https://www.npmjs.com/package/@lynx-js/weak-node-api](https://www.npmjs.com/package/@lynx-js/weak-node-api)
 
+### Node.js version
+
+- **Consumers**: Node.js >= 18 (as declared by this package's `engines.node`).
+- **Maintainers**: Node.js >= 22 is required if you need to run the helper scripts that regenerate headers/sources (they rely on the upstream `weak-node-api` devDependency).
+
 ### Basic Usage
 
 Your native addon can include the headers from this package and call the `_weak` suffixed functions.
@@ -115,7 +120,7 @@ On Windows you can use Visual Studio 2022 (MSVC) and CMake to build the `WeakNod
 
 - **Visual Studio 2022**: Install the "Desktop development with C++" workload.
 - **CMake**: Version >= 3.24, and make sure `cmake.exe` is available on the `PATH`.
-- **Node.js**: Version >= 22, used to run helper scripts.
+- **Node.js**: Version >= 22, required to run the helper scripts used during development/build.
 - **Architecture**: Only x64 is supported.
 
 ### Local Build

@@ -5,7 +5,7 @@ This package is closely related to the open-source project "React Native Node AP
 - Upstream project: https://github.com/callstackincubator/react-native-node-api
 - Upstream npm package: `weak-node-api` (https://www.npmjs.com/package/weak-node-api)
 - License: MIT
-- Upstream version used for derivations: weak-node-api@x.x.x (tracked via devDependency in package.json)
+- Upstream version used for derivations: weak-node-api@0.1.1 (tracked via devDependency in package.json)
 
 ## Motivation
 
