@@ -29426,7 +29426,8 @@ void Finalizer::JSObjectOnlyFinalizer(void *ptr) noexcept {
   LEPUSObject *obj = static_cast<LEPUSObject *>(ptr);
   LEPUSClassFinalizer *finalizer = rt_->class_array[obj->class_id].finalizer;
   if (finalizer) {
-    rt_->collector_->GetVisitor()->AddObjectDuringFinalizer(ptr);
+    Visitor *visitor = rt_->collector_->GetVisitor();
+    if (visitor) visitor->AddObjectDuringFinalizer(ptr);
     (*finalizer)(rt_, LEPUS_MKPTR(LEPUS_TAG_OBJECT, obj));
   }
 }
