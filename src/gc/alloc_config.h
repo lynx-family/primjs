@@ -11,7 +11,7 @@
 
 namespace ROS_GC {
 
-static constexpr uint32_t kPageSize = 4096;
+static constexpr uint32_t kPageSize = 16384;
 static constexpr uint32_t kRemarkRetryThreshold = 3;
 
 struct RunConfigType {
@@ -31,16 +31,17 @@ class RunConfig {
   RunConfig &operator=(RunConfig &&) = delete;
   ~RunConfig() = delete;
   // REMEMBER TO CHANGE THIS WHEN YOU ADD/REMOVE CONFIGS
-  static const uint32_t kRunConfigs = 53;
+  static const uint32_t kRunConfigs = 57;
 
-  // this supports a maximum of (256 * 8 == 2048 byte) run
+  // this supports a maximum of (kMaxRunConfigs * 8 byte) run
   // we need to extend this if we want to config multiple-page run
-  static const uint32_t kMaxRunConfigs = 256;
+  // for 16KB page with max slot size 8064, we need kMaxRunConfigs >= 1008
+  static const uint32_t kMaxRunConfigs = 1008;
   // change this when add/remove configs
   // this stores a config for each kind of run (represented by an index)
   static const RunConfigType kCfgs[kRunConfigs];
   // this map maps a size ((size >> 3 - 1) to be precise) to a run config
-  // this map takes 4 * kMaxRunConfigs == 1k
+  // this map takes 4 * kMaxRunConfigs == 4032 bytes (~4KB)
   static const uint32_t size2idx[kMaxRunConfigs];
 };
 }  // namespace ROS_GC
@@ -49,7 +50,6 @@ class RunConfig {
 #define ROSIMPL_RUN_IDX(size) RunConfig::size2idx[((size) >> 3) - 1]
 // this is a short cut of ROSIMPL_RUN_IDX, only works under certain configs, see
 // kCfgs def
-#define ROSIMPL_FAST_RUN_IDX(size) (((size) >> 3) - 2)
 #define ROSIMPL_RUN_SIZE(idx) (RunConfig::kCfgs[(idx)].size)
 
 #define ROSIMPL_N_CACHE_RUNS(idx) (RunConfig::kCfgs[(idx)].numCaches)
@@ -61,7 +61,7 @@ const int kRosimplDefaultMaxCacheRun = 8;  // unused
 // Heap configuration section --------------------------------------------------
 #define ROSIMPL_DEFAULT_MAX_SPACE (1ul << 29)  // 512MB
 #define ROSIMPL_DEFAULT_MAX_PAGES \
-  (ROSIMPL_DEFAULT_MAX_SPACE >> ROSALLOC_LOG_PAGE_SIZE)
+  (ROSIMPL_DEFAULT_MAX_SPACE >> kAllocUtilLogPageSize)
 
 const bool kRosimplReleasePageAtTrim = true;
 
@@ -98,7 +98,7 @@ constexpr size_t kRosDefaultPageGroupValidSize =
 constexpr size_t kRosDefaultPageCountPerGroup =
     kRosDefaultPageGroupValidSize / ALLOCUTIL_PAGE_SIZE;
 
-constexpr size_t kROSAllocLargeSize = 2016;
+constexpr size_t kROSAllocLargeSize = 8064;
 constexpr size_t kROSAllocHugeSize = kRosDefaultPageGroupValidSize;
 
 // markstack init number

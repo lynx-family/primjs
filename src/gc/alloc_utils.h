@@ -27,8 +27,8 @@ constexpr T AllocUtilRndUp(T x, size_t n) {
 }
 
 #ifndef ALLOCUTIL_PAGE_SIZE
-#define ALLOCUTIL_PAGE_SIZE (static_cast<uintptr_t>(0x1000))  // 4K page
-constexpr uint32_t kAllocUtilLogPageSize = 12;
+#define ALLOCUTIL_PAGE_SIZE (static_cast<uintptr_t>(0x4000))  // 16K page
+constexpr uint32_t kAllocUtilLogPageSize = 14;
 #endif  // ALLOCUTIL_PAGE_SIZE
 
 template <typename T>

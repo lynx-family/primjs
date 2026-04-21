@@ -53,8 +53,6 @@ class MemMap {
   // the only way to get a MemMap
   static MemMap *MapMemory(size_t reqSize, size_t initSize,
                            const Option &opt = kDefaultOptions);
-  static MemMap *CreateMemMapAtExactAddress(
-      void *addr, size_t size, const Option &opt = kDefaultOptions);
   static MemMap *CreateAlignedMemory(size_t reqSize, size_t max_capacity,
                                      const Option &opt = kDefaultOptions);
 
