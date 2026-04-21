@@ -2194,7 +2194,7 @@ QJS_HIDE LEPUSValue JS_NewObjectFromShape_GC(LEPUSContext *ctx, JSShape *sh,
       p->u.func.home_object = NULL;
       goto set_exotic;
     default:
-      if (unlikely(class_id > JS_CLASS_INIT_COUNT))
+      if (unlikely(class_id >= JS_CLASS_INIT_COUNT))
         ctx->rt->obj_finalizer_recoder->insert(p);
     set_exotic:
       if (ctx->rt->class_array[class_id].exotic) {
