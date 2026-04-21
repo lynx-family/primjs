@@ -177,7 +177,7 @@ class RunSlots {
   explicit RunSlots(uint32_t idx);
   ~RunSlots() {
 #ifdef ROSIMPL_MEMSET_AT_FREE
-    memset(this, 0, 4096 * RunConfig::kCfgs[mIdx].numPagesPerRun);
+    memset(this, 0, kPageSize * RunConfig::kCfgs[mIdx].numPagesPerRun);
 #endif
   }
   void Init();

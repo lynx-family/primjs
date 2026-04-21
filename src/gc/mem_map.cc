@@ -37,33 +37,10 @@ MemMap *MemMap::MapMemory(size_t reqSize, size_t initSize, const Option &opt) {
   return new MemMap(mappedAddr, initSize, reqSize, opt.protAll, opt.prot);
 }
 
-MemMap *MemMap::CreateMemMapAtExactAddress(void *addr, size_t size,
-                                           const Option &opt) {
-  const size_t pageSize = 4 * 1024;
-  uintptr_t uaddr = reinterpret_cast<uintptr_t>(addr);
-  if (uaddr % pageSize != 0) {
-    abort();
-  }
-
-  void *mappedAddr = nullptr;
-#ifndef _WIN32
-  mappedAddr = mmap(addr, size, opt.prot, opt.flags | MAP_FIXED, -1, 0);
-#endif
-  if (mappedAddr != MAP_FAILED &&
-      uaddr == reinterpret_cast<uintptr_t>(mappedAddr)) {
-    // MRT_PRCTL(mappedAddr, size, opt.tag);
-    return new MemMap(mappedAddr, size, size, opt.protAll, opt.prot);
-  } else {
-    abort();  // failed to map memory at the exact address
-  }
-
-  return nullptr;
-}
-
 MemMap *MemMap::CreateAlignedMemory(size_t req_size, size_t max_capacity,
                                     const Option &opt) {
   void *mapped_addr = nullptr;
-  req_size = AllocUtilRndUp(req_size, sysconf(_SC_PAGE_SIZE));
+  req_size = AllocUtilRndUp(req_size, ALLOCUTIL_PAGE_SIZE);
   // It's expected behavior that this static variable may cause multi-runtimes
   // memory focused on a certain range.
   // The advantages:
