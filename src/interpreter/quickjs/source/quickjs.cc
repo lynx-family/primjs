@@ -51383,8 +51383,8 @@ void insert_weakref_record(LEPUSContext *ctx, LEPUSObject *p,
                            struct WeakRefRecord *record) {
   HeapObjStore(ctx, &record->next_weak_ref, p->first_weak_ref);
   HeapObjStore(ctx, &p->first_weak_ref, record);
-  if (ctx->rt->obj_finalizer_recoder) {
-    ctx->rt->obj_finalizer_recoder->insert(p);
+  if (ctx->obj_finalizer_recoder) {
+    ctx->obj_finalizer_recoder->insert(p);
   }
   return;
 }
