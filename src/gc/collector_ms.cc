@@ -526,26 +526,38 @@ void MarkSweepCollector::DoOnlyFinalizer() {
   finalizer->DoGlobalFinalizer();
 
   auto rt = ros->GetRuntime();
-  auto &obj_finalizer_recoder = *rt->obj_finalizer_recoder;
-  for (auto it = obj_finalizer_recoder.begin();
-       it != obj_finalizer_recoder.end(); it++) {
-    auto val = *it;
-    finalizer->JSObjectOnlyFinalizer(val);
+  struct list_head *el, *el1;
+  list_for_each_safe(el, el1, &rt->context_list) {
+    LEPUSContext *ctx = list_entry(el, LEPUSContext, link);
+    auto &set = *ctx->obj_finalizer_recoder;
+    for (auto it = set.begin(); it != set.end(); it++) {
+      auto val = *it;
+      finalizer->JSObjectOnlyFinalizer(val);
+    }
+    set.clear();
+
+    if (ctx->fr_data_finalizer_recoder) {
+      auto &fr_set = *ctx->fr_data_finalizer_recoder;
+      for (auto it = fr_set.begin(); it != fr_set.end(); it++) {
+        auto val = *it;
+        finalizer->FinalizationRegistryDataFinalizer(val);
+      }
+      fr_set.clear();
+    }
   }
-  obj_finalizer_recoder.clear();
 
   for (auto it = rt->finalizerSet->begin(); it != rt->finalizerSet->end();
        it++) {
     auto val = *it;
     finalizer->DoFinalizer2(val);
   }
+  rt->finalizerSet->clear();
 }
 
 void MarkSweepCollector::RunFinalCollection() {
   TRACE_EVENT("PRIMJS_RunFinalCollection");
   DoOnlyFinalizer();
   DestroyThreadPool();
-  ros->ReleaseAllPageGroups();
 }
 
 bool MarkSweepCollector::EnureConcurrentIsCompleted() {
@@ -767,7 +779,7 @@ void MarkSweepCollector::DoOuterObjFinalizer() {
   TRACE_EVENT("PRIMJS_DoOuterObjFinalizer");
 
 #define FINALIZER_HANDLER(set, func)                          \
-  auto &set = *set_owner->set;                                \
+  auto &set = *ctx->set;                                      \
   for (auto it = set.begin(); it != set.end();) {             \
     auto val = *it;                                           \
     if (!ros->IsObjectMarked((address_t)(val)-kHeaderSize)) { \
@@ -778,15 +790,12 @@ void MarkSweepCollector::DoOuterObjFinalizer() {
     }                                                         \
   }
 
-  auto *rt = ros->GetRuntime();
-  auto *set_owner = rt;
-  FINALIZER_HANDLER(obj_finalizer_recoder, JSObjectFinalizer)
-
   // run outer_obj's finalizer in js thread
   struct list_head *el, *el1;
-  list_for_each_safe(el, el1, &rt->context_list) {
+  list_for_each_safe(el, el1, &ros->GetRuntime()->context_list) {
     LEPUSContext *ctx = list_entry(el, LEPUSContext, link);
-    auto *set_owner = ctx;
+    FINALIZER_HANDLER(obj_finalizer_recoder, JSObjectFinalizer)
+
     if (ctx->fr_data_finalizer_recoder) {
       FINALIZER_HANDLER(fr_data_finalizer_recoder,
                         FinalizationRegistryDataFinalizer)

@@ -461,7 +461,6 @@ struct LEPUSRuntime {
   void *(*js_malloc_rt)(LEPUSRuntime *rt, size_t size, int alloc_tag);
   void *(*js_realloc_rt)(LEPUSRuntime *rt, void *ptr, size_t size,
                          int alloc_tag);
-  std::unordered_set<LEPUSObject *> *obj_finalizer_recoder;
   std::unordered_set<void *> *finalizerSet;
   std::unordered_set<void *> *async_obj_recoder;
   size_t gc_info_threshold;
@@ -802,6 +801,7 @@ struct LEPUSContext {
   uint64_t binary_version;
   struct FinalizationRegistryContext *fg_ctx = nullptr;
   bool con_mark_state = false;
+  std::unordered_set<LEPUSObject *> *obj_finalizer_recoder;
   std::unordered_set<FinalizationRegistryData *> *fr_data_finalizer_recoder;
   CheckTools *check_tools;
 };

@@ -22,7 +22,7 @@ using namespace std;
 // not thread safe, do not call from multiple threads
 MemMap *MemMap::MapMemory(size_t reqSize, size_t initSize, const Option &opt) {
   void *mappedAddr = nullptr;
-  reqSize = AllocUtilRndUp<size_t>(reqSize, ALLOCUTIL_PAGE_SIZE);
+  reqSize = AllocUtilRndUp<size_t>(reqSize, sysconf(_SC_PAGE_SIZE));
 #ifndef _WIN32
   mappedAddr = mmap(opt.reqBase, reqSize, opt.prot, opt.flags, -1, 0);
 #endif
@@ -40,7 +40,7 @@ MemMap *MemMap::MapMemory(size_t reqSize, size_t initSize, const Option &opt) {
 MemMap *MemMap::CreateAlignedMemory(size_t req_size, size_t max_capacity,
                                     const Option &opt) {
   void *mapped_addr = nullptr;
-  req_size = AllocUtilRndUp(req_size, ALLOCUTIL_PAGE_SIZE);
+  req_size = AllocUtilRndUp(req_size, sysconf(_SC_PAGE_SIZE));
   // It's expected behavior that this static variable may cause multi-runtimes
   // memory focused on a certain range.
   // The advantages:
