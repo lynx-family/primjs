@@ -61,12 +61,23 @@ jobs:
           fetch-depth: 0
           fetch-tags: true
       - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22.14.0'
+        run: |
+          NODE_VERSION=22.14.0
+          NODE_DIR="$RUNNER_TEMP/node-v${NODE_VERSION}"
+          curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-x64.tar.xz" -o "$RUNNER_TEMP/node.tar.xz"
+          mkdir -p "$NODE_DIR"
+          tar -xJf "$RUNNER_TEMP/node.tar.xz" --strip-components=1 -C "$NODE_DIR"
+          echo "$NODE_DIR/bin" >> "$GITHUB_PATH"
+          "$NODE_DIR/bin/node" --version
+          "$NODE_DIR/bin/npm" --version
       - name: Prepare weak-node-api headers
         run: |
-          cd $GITHUB_WORKSPACE/primjs/packages/weak-node-api
+          if [ -d "$GITHUB_WORKSPACE/primjs/packages/weak-node-api" ]; then
+            REPO_ROOT="$GITHUB_WORKSPACE/primjs"
+          else
+            REPO_ROOT="$GITHUB_WORKSPACE"
+          fi
+          cd "$REPO_ROOT/packages/weak-node-api"
           npm install
           npm run prepare:headers
       - name: Get latest tag

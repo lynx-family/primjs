@@ -23,12 +23,15 @@ COPY_DIRS = [
     "packages/weak-node-api/generated",
     "packages/weak-node-api/headers",
     "packages/weak-node-api/shim",
+    "packages/weak-node-api/defs_header",
 ]
 
 COPY_FILES = [
     "packages/weak-node-api/LICENSE",
     "packages/weak-node-api/NOTICE.md",
     "packages/weak-node-api/THIRD-PARTY-NOTICES.md",
+    "src/napi/adapter/weak_napi_host_injector.cc",
+    "src/napi/adapter/weak_node_api_host.h",
 ]
 
 

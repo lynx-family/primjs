@@ -68,7 +68,12 @@ jobs:
 
     - name: Prepare weak-node-api headers
       run: |-
-        cd $GITHUB_WORKSPACE/primjs/packages/weak-node-api
+        if [ -d "$GITHUB_WORKSPACE/primjs/packages/weak-node-api" ]; then
+          REPO_ROOT="$GITHUB_WORKSPACE/primjs"
+        else
+          REPO_ROOT="$GITHUB_WORKSPACE"
+        fi
+        cd "$REPO_ROOT/packages/weak-node-api"
         npm install
         npm run prepare:headers
 
