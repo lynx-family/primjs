@@ -48,6 +48,8 @@ extern "C" {
 #include "quickjs/include/quickjs.h"
 }
 #define DEBUGGER_MAX_SCOPE_LEVEL 23
+extern const char kConsoleDerivedObjectsProp[];
+extern const char kConsoleObjectIdPrefix[];
 
 #define QJSDebuggerStringPool(V)                                \
   V(stack, "stack")                                             \
@@ -148,10 +150,81 @@ typedef struct JSDebuggerLocation {
   int64_t column{-1};
 } JSDebuggerLocation;
 
+static constexpr int32_t MAX_MESSAGE_COUNT = 1000;
+
 typedef struct JSDebuggerConsole {
   LEPUSValue messages{LEPUS_NULL};
   int32_t length{0};
+  // Ring buffer head. Logical index 0 always maps to the oldest message.
+  int32_t head{0};
+  // Bump once whenever a slot is recycled so old console objectId can失效.
+  uint32_t generations[MAX_MESSAGE_COUNT]{0};
+  // Transient context used while serializing / expanding a console object.
+  int32_t current_message_slot{-1};
+  uint32_t current_generation{0};
 } JSDebuggerConsole;
+
+uint32_t GetConsoleMessageIndex(const JSDebuggerConsole &console,
+                                int32_t logical_index);
+
+bool IsConsoleMessageSlotActive(const JSDebuggerConsole &console,
+                                uint32_t slot_index);
+
+uint32_t GetConsoleMessageGeneration(const JSDebuggerConsole &console,
+                                     uint32_t slot_index);
+
+void InvalidateConsoleMessageSlot(JSDebuggerConsole &console,
+                                  uint32_t slot_index);
+
+void InvalidateAllConsoleMessageSlots(JSDebuggerConsole &console);
+
+enum class ConsoleObjectIdType {
+  kInvalid,
+  kRoot,
+  kDerived,
+};
+
+struct ConsoleObjectIdInfo {
+  ConsoleObjectIdType type{ConsoleObjectIdType::kInvalid};
+  // Physical slot index inside the fixed-size console ring buffer.
+  uint32_t message_slot{0};
+  // Version of that slot. Incremented whenever the slot is recycled so stale
+  // console objectIds can be rejected after overflow / discard.
+  uint32_t generation{0};
+  // Root: argument index in the console message array.
+  // Derived: index inside `__debuggerConsoleObjects__`.
+  uint32_t index{0};
+};
+
+bool ParseConsoleObjectId(const char *object_id_str, ConsoleObjectIdInfo *info);
+
+class ScopedConsoleMessageContext {
+ public:
+  // Temporarily marks the console message currently being serialized or
+  // expanded. Property serialization can then decide whether to generate
+  // console-scoped objectId instead of the generic pointer-based objectId.
+  // `message_slot` identifies which ring-buffer entry is active, and
+  // `generation` identifies which incarnation of that slot is being visited.
+  ScopedConsoleMessageContext(LEPUSContext *ctx, uint32_t message_slot,
+                              uint32_t generation);
+
+  ~ScopedConsoleMessageContext();
+
+ private:
+  LEPUSContext *ctx_{nullptr};
+  int32_t previous_slot_{-1};
+  uint32_t previous_generation_{0};
+};
+
+class ScopedConsoleMessageSlot : public ScopedConsoleMessageContext {
+ public:
+  // Convenience wrapper for the common case where callers already know the
+  // console ring-buffer slot and want to snapshot that slot's current
+  // generation. This is used while emitting Runtime.consoleAPICalled replay /
+  // notification payloads so every objectId created in that scope is bound to
+  // the exact console message slot being visited.
+  ScopedConsoleMessageSlot(LEPUSContext *ctx, uint32_t message_slot);
+};
 
 struct LEPUSScriptSource {
   struct list_head link; /* ctx->debugger_info->script_list */

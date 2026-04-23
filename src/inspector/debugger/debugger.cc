@@ -1041,7 +1041,8 @@ static void InitializeStringPool(LEPUSDebuggerInfo *info) {
 #undef DebuggerInitializeStringPool
 }
 
-QJS_STATIC void OnConsoleMessageInspect(LEPUSContext *, LEPUSValue);
+QJS_STATIC void OnConsoleMessageInspect(LEPUSContext *, LEPUSValue, uint32_t);
+
 QJS_STATIC void CommonLog(LEPUSContext *ctx, LEPUSValueConst this_val, int argc,
                           LEPUSValueConst *argv, int magic) {
   auto *debugger_info = ctx->debugger_info;
@@ -1119,12 +1120,27 @@ QJS_STATIC void CommonLog(LEPUSContext *ctx, LEPUSValueConst this_val, int argc,
     if (!ctx->rt->gc_enable) LEPUS_FreeAtom(ctx, atom);
   }
 
-  int idx = debugger_info->console.length++;
+  int32_t idx = 0;
+  if (debugger_info->console.length < MAX_MESSAGE_COUNT) {
+    idx = static_cast<int32_t>(GetConsoleMessageIndex(
+        debugger_info->console, debugger_info->console.length));
+    debugger_info->console.length++;
+  } else {
+    idx = debugger_info->console.head;
+    InvalidateConsoleMessageSlot(debugger_info->console,
+                                 static_cast<uint32_t>(idx));
+    debugger_info->console.head =
+        (debugger_info->console.head + 1) % MAX_MESSAGE_COUNT;
+  }
   LEPUS_SetPropertyUint32(ctx, debugger_info->console.messages, idx,
                           LEPUS_DupValue(ctx, console_msg));
 
   LEPUSRuntime *rt = ctx->rt;
   if (ctx->debugger_info->is_runtime_enabled) {
+    // Bind remote-object serialization in this notification to the current
+    // console ring-buffer slot, so objectId generation stays inside the
+    // console message lifetime domain instead of escaping to running_state.
+    ScopedConsoleMessageSlot console_scope(ctx, static_cast<uint32_t>(idx));
     SendConsoleAPICalledNotification(ctx, &console_msg);
   }
   auto console_message_cb = rt->debugger_callbacks_.console_message;
@@ -1133,7 +1149,7 @@ QJS_STATIC void CommonLog(LEPUSContext *ctx, LEPUSValueConst this_val, int argc,
   }
 
   if (ctx->console_inspect) {
-    OnConsoleMessageInspect(ctx, console_msg);
+    OnConsoleMessageInspect(ctx, console_msg, static_cast<uint32_t>(idx));
   }
   if (!ctx->rt->gc_enable) LEPUS_FreeValue(ctx, console_msg);
   return;
@@ -1358,6 +1374,7 @@ QJS_HIDE void JS_AddIntrinsicConsole(LEPUSContext *ctx) {
     LEPUS_HeapObjStore(ctx, &ctx->debugger_info->console.messages,
                        LEPUS_NewArray(ctx));
     ctx->debugger_info->console.length = 0;
+    ctx->debugger_info->console.head = 0;
   }
 }
 
@@ -1833,7 +1850,8 @@ void DeleteConsoleMessageWithURL(LEPUSContext *ctx, const char *url) {
   HandleScope func_scope(ctx, &new_msg, HANDLE_TYPE_LEPUS_VALUE);
 
   for (int32_t i = 0; i < msg_len; i++) {
-    LEPUSValue console_message = LEPUS_GetPropertyUint32(ctx, msg, i);
+    uint32_t idx = GetConsoleMessageIndex(info->console, i);
+    LEPUSValue console_message = LEPUS_GetPropertyUint32(ctx, msg, idx);
     if (!LEPUS_IsUndefined(console_message)) {
       LEPUSValue url_val = LEPUS_GetPropertyStr(ctx, console_message, "url");
       if (!LEPUS_IsUndefined(url_val)) {
@@ -1851,8 +1869,10 @@ void DeleteConsoleMessageWithURL(LEPUSContext *ctx, const char *url) {
     }
   }
   if (!ctx->rt->gc_enable) LEPUS_FreeValue(ctx, msg);
+  InvalidateAllConsoleMessageSlots(info->console);
   LEPUS_HeapObjStore(ctx, &info->console.messages, new_msg);
   info->console.length = new_msg_len;
+  info->console.head = 0;
 }
 
 /**
@@ -1887,7 +1907,8 @@ void SendConsoleAPICalledNotification(LEPUSContext *ctx, LEPUSValue *msg) {
   func_scope.PushHandle(&v2, HANDLE_TYPE_LEPUS_VALUE);
   for (int idx = 0; idx < argc; idx++) {
     LEPUSValue v = LEPUS_GetPropertyUint32(ctx, *msg, idx);
-    v2 = GetRemoteObject(ctx, v, 0, 0);  // free v
+    v2 = GetConsoleRemoteObject(ctx, v, 0, 0,
+                                static_cast<uint32_t>(idx));  // free v
     LEPUS_SetPropertyUint32(ctx, args, idx, v2);
   }
   SendNotification(ctx, "Runtime.consoleAPICalled", params, -1);
@@ -2242,9 +2263,10 @@ QJS_HIDE void GetConsoleMessages(LEPUSContext *ctx) {
   auto length = info->console.length;
 
   for (int32_t i = 0; i < length; ++i) {
-    auto message = LEPUS_GetPropertyUint32(ctx, all_msg, i);
+    uint32_t idx = GetConsoleMessageIndex(info->console, i);
+    auto message = LEPUS_GetPropertyUint32(ctx, all_msg, idx);
     if (LEPUS_VALUE_IS_OBJECT(message)) {
-      OnConsoleMessageInspect(ctx, message);
+      OnConsoleMessageInspect(ctx, message, idx);
     }
     if (!ctx->rt->gc_enable) LEPUS_FreeValue(ctx, message);
   }
@@ -2259,7 +2281,8 @@ void SetContextConsoleInspect(LEPUSContext *ctx, bool enable) {
   return;
 }
 
-QJS_STATIC void OnConsoleMessageInspect(LEPUSContext *ctx, LEPUSValue message) {
+QJS_STATIC void OnConsoleMessageInspect(LEPUSContext *ctx, LEPUSValue message,
+                                        uint32_t message_slot) {
   LEPUSValue console_protocol = LEPUS_NewObject(ctx);
   HandleScope func_scope{ctx, &console_protocol, HANDLE_TYPE_LEPUS_VALUE};
   /*
@@ -2280,10 +2303,11 @@ QJS_STATIC void OnConsoleMessageInspect(LEPUSContext *ctx, LEPUSValue message) {
   uint32_t length = LEPUS_GetLength(ctx, message);
   LEPUSValue console_message = LEPUS_NewArray(ctx);
   func_scope.PushHandle(&console_message, HANDLE_TYPE_LEPUS_VALUE);
+  ScopedConsoleMessageSlot console_scope(ctx, message_slot);
   for (uint32_t i{0}; i < length; ++i) {
     LEPUSValue argv = LEPUS_GetPropertyUint32(ctx, message, i);
-    // argv is freed by GetRemoteObject
-    LEPUSValue remote_obj = GetRemoteObject(ctx, argv, false, false);
+    // argv is freed by GetConsoleRemoteObject
+    LEPUSValue remote_obj = GetConsoleRemoteObject(ctx, argv, false, false, i);
     HandleScope block_scope{ctx, &remote_obj, HANDLE_TYPE_LEPUS_VALUE};
     LEPUS_SetPropertyUint32(ctx, console_message, i, remote_obj);
   }

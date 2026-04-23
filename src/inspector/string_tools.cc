@@ -3,8 +3,6 @@
 // LICENSE file in the root directory of this source tree.
 
 #include <cstring>
-#include <memory>
-#include <string>
 
 #ifdef __cplusplus
 extern "C" {
@@ -22,30 +20,7 @@ static bool IsSpaceOrNewLine(char c) {
   return IsASCII(c) && c <= ' ' && (c == ' ' || (c <= 0xD && c >= 0x9));
 }
 
-static std::string StripWhiteSpace(std::string& str) {
-  std::string result = "";
-  if (!str.length()) return result;
-  size_t start = 0;
-  size_t end = str.length() - 1;
-
-  // skip white space from start
-  while (start <= end && IsSpaceOrNewLine(str[start])) ++start;
-
-  // only white space
-  if (start > end) return result;
-
-  // skip white space from end
-  while (end && IsSpaceOrNewLine(str[end])) --end;
-
-  if (!start && end == str.length() - 1) {
-    result = str;
-  } else {
-    result = str.substr(start, end + 1 - start);
-  }
-  return result;
-}
-
-static bool ContentNotSatisfied(const std::string& content, size_t pos,
+static bool ContentNotSatisfied(const char* content, size_t pos,
                                 uint8_t multi_line) {
   bool condition1 = (content[pos] != '/');
   bool condition2 = ((content[pos + 1] != '/' || multi_line) &&
@@ -56,60 +31,93 @@ static bool ContentNotSatisfied(const std::string& content, size_t pos,
   return condition1 && condition2 && condition3 && condition4;
 }
 
+static const char* FindClosingComment(const char* start) {
+  if (start == nullptr) return nullptr;
+  while (*start) {
+    if (start[0] == '*' && start[1] == '/') {
+      return start;
+    }
+    ++start;
+  }
+  return nullptr;
+}
+
 char* FindDebuggerMagicContent(LEPUSContext* ctx, char* source,
                                char* search_name, uint8_t multi_line) {
   if (source == nullptr || search_name == nullptr) return nullptr;
-  std::string content = source;
-  std::string name = search_name;
-  size_t length = content.length();
-  size_t name_length = name.length();
+  size_t length = strlen(source);
+  size_t name_length = strlen(search_name);
+  if (length == 0 || name_length == 0 || name_length > length) {
+    return nullptr;
+  }
 
-  size_t pos = length;
-  size_t equal_sign_pos = 0;
-  size_t closing_comment_pos = 0;
+  size_t value_begin = 0;
+  size_t value_end = 0;
+  bool matched = false;
 
-  while (true) {
-    pos = content.rfind(name, pos);
-    if (pos == std::string::npos) {
-      return NULL;
+  for (size_t pos = length - name_length + 1; pos-- > 0;) {
+    if (memcmp(source + pos, search_name, name_length) != 0) {
+      continue;
     }
 
     // Check for a /\/[\/*][@#][ \t]/ regexp (length of 4) before found name.
-    if (pos < 4) return NULL;
-    pos -= 4;
-    if (ContentNotSatisfied(content, pos, multi_line)) {
+    if (pos < 4) {
+      return NULL;
+    }
+    size_t prefix_pos = pos - 4;
+    if (ContentNotSatisfied(source, prefix_pos, multi_line)) {
       continue;
     }
-    equal_sign_pos = pos + 4 + name_length;
-    if (equal_sign_pos >= length) continue;
-    if (content[equal_sign_pos] != '=') continue;
-    if (multi_line) {
-      closing_comment_pos = content.find("*/", equal_sign_pos + 1);
-      if (closing_comment_pos == std::string::npos) return NULL;
+    size_t equal_sign_pos = pos + name_length;
+    if (equal_sign_pos >= length || source[equal_sign_pos] != '=') {
+      continue;
     }
+    value_begin = equal_sign_pos + 1;
+    if (multi_line) {
+      const char* closing_comment = FindClosingComment(source + value_begin);
+      if (closing_comment == nullptr) {
+        return NULL;
+      }
+      value_end = static_cast<size_t>(closing_comment - source);
+    } else {
+      value_end = length;
+    }
+    matched = true;
     break;
   }
 
-  size_t url_pos = equal_sign_pos + 1;
-  std::string match =
-      multi_line ? content.substr(url_pos, closing_comment_pos - url_pos)
-                 : content.substr(url_pos);
+  if (!matched) {
+    return NULL;
+  }
 
-  size_t newLine = match.find("\n");
-  if (newLine != std::string::npos) match = match.substr(0, newLine);
-  match = StripWhiteSpace(match);
+  const char* line_end = static_cast<const char*>(
+      memchr(source + value_begin, '\n', value_end - value_begin));
+  if (line_end != nullptr) {
+    value_end = static_cast<size_t>(line_end - source);
+  }
 
-  for (size_t i = 0; i < match.length(); ++i) {
-    char c = match[i];
+  while (value_begin < value_end && IsSpaceOrNewLine(source[value_begin])) {
+    ++value_begin;
+  }
+  while (value_begin < value_end && IsSpaceOrNewLine(source[value_end - 1])) {
+    --value_end;
+  }
+
+  size_t match_length = value_end - value_begin;
+  for (size_t i = 0; i < match_length; ++i) {
+    char c = source[value_begin + i];
     if (c == '"' || c == '\'' || c == ' ' || c == '\t') {
-      match = "";
+      match_length = 0;
       break;
     }
   }
   char* result = static_cast<char*>(lepus_malloc(
-      ctx, sizeof(char) * (match.length() + 1), ALLOC_TAG_WITHOUT_PTR));
+      ctx, sizeof(char) * (match_length + 1), ALLOC_TAG_WITHOUT_PTR));
   if (result) {
-    strcpy(result, match.c_str());
+    if (match_length > 0) {
+      memcpy(result, source + value_begin, match_length);
+    }
+    result[match_length] = '\0';
   }
   return result;
 }

@@ -31,6 +31,7 @@
 
 #include "inspector/debugger/debugger_properties.h"
 
+#include <memory>
 #include <string>
 
 #include "gc/trace-gc.h"
@@ -320,6 +321,148 @@ LEPUSValue GenerateUniqueObjId(LEPUSContext* ctx, LEPUSValue obj) {
   }
   return LEPUS_NewString(ctx, obj_id_str.c_str());
 }
+
+// Expanded child objects of a console message are stored back onto the message
+// itself instead of `running_state.get_properties_array`, so they die together
+// with the message when the ring-buffer slot is recycled.
+
+static bool HasActiveConsoleMessageContext(LEPUSContext* ctx,
+                                           uint32_t* message_slot,
+                                           uint32_t* generation) {
+  auto* info = ctx->debugger_info;
+  if (!info || info->console.current_message_slot < 0) {
+    return false;
+  }
+  if (message_slot) {
+    *message_slot = static_cast<uint32_t>(info->console.current_message_slot);
+  }
+  if (generation) {
+    *generation = info->console.current_generation;
+  }
+  return true;
+}
+
+static LEPUSValue GetConsoleMessageBySlot(LEPUSContext* ctx,
+                                          uint32_t message_slot) {
+  auto* info = ctx->debugger_info;
+  if (!info || message_slot >= static_cast<uint32_t>(MAX_MESSAGE_COUNT)) {
+    return LEPUS_UNDEFINED;
+  }
+  if (!IsConsoleMessageSlotActive(info->console, message_slot)) {
+    return LEPUS_UNDEFINED;
+  }
+  return LEPUS_GetPropertyUint32(ctx, info->console.messages, message_slot);
+}
+
+static LEPUSValue GetConsoleDerivedObjectsArray(LEPUSContext* ctx,
+                                                uint32_t message_slot) {
+  LEPUSValue message = GetConsoleMessageBySlot(ctx, message_slot);
+  if (LEPUS_IsUndefined(message)) {
+    return LEPUS_UNDEFINED;
+  }
+
+  LEPUSValue derived_objects =
+      LEPUS_GetPropertyStr(ctx, message, kConsoleDerivedObjectsProp);
+  if (LEPUS_IsUndefined(derived_objects)) {
+    // Lazily allocate the child-object registry only when the user actually
+    // expands a console object.
+    derived_objects = LEPUS_NewArray(ctx);
+    if (LEPUS_IsException(derived_objects)) {
+      derived_objects = LEPUS_UNDEFINED;
+    } else {
+      LEPUS_SetPropertyStr(ctx, message, kConsoleDerivedObjectsProp,
+                           LEPUS_DupValue(ctx, derived_objects));
+    }
+  }
+
+  if (!ctx->rt->gc_enable) {
+    LEPUS_FreeValue(ctx, message);
+  }
+  return derived_objects;
+}
+
+static LEPUSValue GenerateConsoleObjectId(LEPUSContext* ctx,
+                                          const std::string& suffix) {
+  uint32_t message_slot = 0;
+  uint32_t generation = 0;
+  if (!HasActiveConsoleMessageContext(ctx, &message_slot, &generation)) {
+    return LEPUS_UNDEFINED;
+  }
+  std::string obj_id = std::string(kConsoleObjectIdPrefix) +
+                       std::to_string(message_slot) + ":" +
+                       std::to_string(generation) + ":" + suffix;
+  return LEPUS_NewString(ctx, obj_id.c_str());
+}
+
+static LEPUSValue GenerateConsoleRootObjId(LEPUSContext* ctx,
+                                           uint32_t argument_index) {
+  return GenerateConsoleObjectId(ctx, std::to_string(argument_index));
+}
+
+static LEPUSValue GenerateConsoleDerivedObjId(LEPUSContext* ctx,
+                                              uint32_t derived_index) {
+  // Child objectId is detached from raw pointer identity. It is resolved by
+  // (message_slot, generation, derived_index), so once the message is evicted
+  // the objectId becomes invalid automatically.
+  return GenerateConsoleObjectId(
+      ctx, std::string("child:") + std::to_string(derived_index));
+}
+
+static uint32_t FindConsoleDerivedObjectIndex(LEPUSContext* ctx,
+                                              LEPUSValue derived_objects,
+                                              LEPUSValue obj) {
+  if (!LEPUS_IsObject(derived_objects) || !LEPUS_IsObject(obj)) {
+    return static_cast<uint32_t>(-1);
+  }
+
+  void* target_ptr = LEPUS_VALUE_GET_PTR(obj);
+  uint32_t derived_length = LEPUS_GetLength(ctx, derived_objects);
+  for (uint32_t i = 0; i < derived_length; ++i) {
+    LEPUSValue existing = LEPUS_GetPropertyUint32(ctx, derived_objects, i);
+    bool matched =
+        LEPUS_IsObject(existing) && LEPUS_VALUE_GET_PTR(existing) == target_ptr;
+    if (!ctx->rt->gc_enable) {
+      LEPUS_FreeValue(ctx, existing);
+    }
+    if (matched) {
+      return i;
+    }
+  }
+
+  return static_cast<uint32_t>(-1);
+}
+
+static uint32_t StoreConsoleDerivedObject(LEPUSContext* ctx, LEPUSValue obj) {
+  uint32_t message_slot = 0;
+  if (!HasActiveConsoleMessageContext(ctx, &message_slot, nullptr)) {
+    return static_cast<uint32_t>(-1);
+  }
+  LEPUSValue derived_objects = GetConsoleDerivedObjectsArray(ctx, message_slot);
+  if (LEPUS_IsUndefined(derived_objects)) {
+    return static_cast<uint32_t>(-1);
+  }
+  uint32_t existing_index =
+      FindConsoleDerivedObjectIndex(ctx, derived_objects, obj);
+  if (existing_index != static_cast<uint32_t>(-1)) {
+    if (!ctx->rt->gc_enable) {
+      LEPUS_FreeValue(ctx, derived_objects);
+    }
+    return existing_index;
+  }
+  // The derived object is reachable only from the owning console message.
+  uint32_t derived_index = LEPUS_GetLength(ctx, derived_objects);
+  LEPUS_SetPropertyUint32(ctx, derived_objects, derived_index,
+                          LEPUS_DupValue(ctx, obj));
+  if (!ctx->rt->gc_enable) {
+    LEPUS_FreeValue(ctx, derived_objects);
+  }
+  return derived_index;
+}
+
+static LEPUSValue GetRemoteObjectByContext(LEPUSContext* ctx,
+                                           LEPUSValue& property_value,
+                                           int32_t need_preview,
+                                           int32_t return_by_value);
 
 // get object subtype
 static LEPUSValue GetObjectSubtype(LEPUSContext* ctx, LEPUSValue value) {
@@ -666,7 +809,7 @@ LEPUSValue GetPromiseProperties(LEPUSContext* ctx, LEPUSValue obj,
   HandleScope func_scope(ctx, &promise_obj, HANDLE_TYPE_LEPUS_VALUE);
   LEPUSValue state = LEPUS_GetPropertyStr(ctx, promise_obj, "PromiseState");
   LEPUSValue promise_state_val =
-      GetRemoteObject(ctx, state, 0, 0);  // free state
+      GetRemoteObjectByContext(ctx, state, 0, 0);  // free state
   func_scope.PushHandle(&promise_state_val, HANDLE_TYPE_LEPUS_VALUE);
   LEPUSValue promise_state = LEPUS_NewObject(ctx);
   func_scope.PushHandle(&promise_state, HANDLE_TYPE_LEPUS_VALUE);
@@ -677,7 +820,7 @@ LEPUSValue GetPromiseProperties(LEPUSContext* ctx, LEPUSValue obj,
 
   LEPUSValue result = LEPUS_GetPropertyStr(ctx, promise_obj, "PromiseResult");
   LEPUSValue promise_result_val =
-      GetRemoteObject(ctx, result, 0, 0);  // free result
+      GetRemoteObjectByContext(ctx, result, 0, 0);  // free result
   func_scope.PushHandle(&promise_result_val, HANDLE_TYPE_LEPUS_VALUE);
   LEPUSValue promise_result = LEPUS_NewObject(ctx);
   func_scope.PushHandle(&promise_result, HANDLE_TYPE_LEPUS_VALUE);
@@ -735,7 +878,7 @@ static void GetProxyInternalProperties(LEPUSContext* ctx, LEPUSValue val,
   LEPUSValue proxy_handler = LEPUS_GetPropertyStr(ctx, proxy, "Handler");
   LEPUSValue handler = LEPUS_NewObject(ctx);
   func_scope.PushHandle(&handler, HANDLE_TYPE_LEPUS_VALUE);
-  LEPUSValue handler_val = GetRemoteObject(ctx, proxy_handler, 0, 0);
+  LEPUSValue handler_val = GetRemoteObjectByContext(ctx, proxy_handler, 0, 0);
   func_scope.PushHandle(&handler_val, HANDLE_TYPE_LEPUS_VALUE);
   LEPUSValue str = LEPUS_NewString(ctx, "[[Handler]]");
   func_scope.PushHandle(&str, HANDLE_TYPE_LEPUS_VALUE);
@@ -744,7 +887,7 @@ static void GetProxyInternalProperties(LEPUSContext* ctx, LEPUSValue val,
   LEPUS_SetPropertyUint32(ctx, ret, 0, handler);
 
   LEPUSValue proxy_target = LEPUS_GetPropertyStr(ctx, proxy, "Target");
-  LEPUSValue target_val = GetRemoteObject(ctx, proxy_target, 0, 0);
+  LEPUSValue target_val = GetRemoteObjectByContext(ctx, proxy_target, 0, 0);
   func_scope.PushHandle(&target_val, HANDLE_TYPE_LEPUS_VALUE);
   LEPUSValue target = LEPUS_NewObject(ctx);
   func_scope.PushHandle(&target, HANDLE_TYPE_LEPUS_VALUE);
@@ -755,7 +898,8 @@ static void GetProxyInternalProperties(LEPUSContext* ctx, LEPUSValue val,
   LEPUS_SetPropertyUint32(ctx, ret, 1, target);
 
   LEPUSValue proxy_is_revoked = LEPUS_GetPropertyStr(ctx, proxy, "IsRevoked");
-  LEPUSValue is_revoked_val = GetRemoteObject(ctx, proxy_is_revoked, 0, 0);
+  LEPUSValue is_revoked_val =
+      GetRemoteObjectByContext(ctx, proxy_is_revoked, 0, 0);
   func_scope.PushHandle(&is_revoked_val, HANDLE_TYPE_LEPUS_VALUE);
   LEPUSValue is_revoked = LEPUS_NewObject(ctx);
   func_scope.PushHandle(&is_revoked, HANDLE_TYPE_LEPUS_VALUE);
@@ -1265,7 +1409,8 @@ static LEPUSValue PropertyPreviewCallback(
         DebuggerSetPropertyStr(ctx, property_preview, "value", description);
       } else if (LEPUS_IsFunction(ctx, property_value)) {
         LEPUS_DupValue(ctx, property_value);
-        LEPUSValue func_value = GetRemoteObject(ctx, property_value, 0, 0);
+        LEPUSValue func_value =
+            GetRemoteObjectByContext(ctx, property_value, 0, 0);
         func_scope.PushHandle(&func_value, HANDLE_TYPE_LEPUS_VALUE);
         DebuggerSetPropertyStr(ctx, property_preview, "value", func_value);
       } else {
@@ -1377,15 +1522,21 @@ static LEPUSValue GetObjectClassName(LEPUSContext* ctx, LEPUSValue value) {
   return class_name;
 }
 
-// construct remoteObject info
-// ref:
-// https://chromedevtools.github.io/devtools-protocol/tot/Runtime/#type-RemoteObject
-LEPUSValue GetRemoteObject(LEPUSContext* ctx, LEPUSValue& property_value,
-                           int32_t need_preview,
-                           int32_t return_by_value) {  // free property_value
+// Shared implementation for debugger remote objects. Callers decide how the
+// resulting objectId should be produced: pointer-based for normal debugger
+// objects, or console-scoped for console message roots / children.
+static void PrepareRemoteObjectValue(LEPUSContext* ctx,
+                                     LEPUSValue& property_value) {
 #ifdef ENABLE_LEPUSNG
   GetLepusRefDeepCopyResult(ctx, property_value);
 #endif
+}
+
+static LEPUSValue GetRemoteObjectWithExplicitId(LEPUSContext* ctx,
+                                                LEPUSValue& property_value,
+                                                int32_t need_preview,
+                                                int32_t return_by_value,
+                                                LEPUSValue remote_obj_id) {
   LEPUSValue remote_obj =
       GeneratePropertyPreview(ctx, property_value, return_by_value);
   if (LEPUS_IsUndefined(remote_obj) && LEPUS_IsObject(property_value)) {
@@ -1394,9 +1545,10 @@ LEPUSValue GetRemoteObject(LEPUSContext* ctx, LEPUSValue& property_value,
   }
   HandleScope func_scope(ctx, &remote_obj, HANDLE_TYPE_LEPUS_VALUE);
   if (LEPUS_IsObject(property_value)) {
-    LEPUSValue remote_obj_id = GenerateUniqueObjId(ctx, property_value);
     func_scope.PushHandle(&remote_obj_id, HANDLE_TYPE_LEPUS_VALUE);
-    DebuggerSetPropertyStr(ctx, remote_obj, "objectId", remote_obj_id);
+    if (!LEPUS_IsUndefined(remote_obj_id)) {
+      DebuggerSetPropertyStr(ctx, remote_obj, "objectId", remote_obj_id);
+    }
     LEPUSValue description = GetObjectDescription(ctx, property_value);
     func_scope.PushHandle(&description, HANDLE_TYPE_LEPUS_VALUE);
     LEPUSValue class_name = GetObjectClassName(ctx, property_value);
@@ -1422,6 +1574,68 @@ LEPUSValue GetRemoteObject(LEPUSContext* ctx, LEPUSValue& property_value,
     LEPUS_FreeValue(ctx, property_value);
   }
   return remote_obj;
+}
+
+// construct remoteObject info
+// ref:
+// https://chromedevtools.github.io/devtools-protocol/tot/Runtime/#type-RemoteObject
+LEPUSValue GetRemoteObject(LEPUSContext* ctx, LEPUSValue& property_value,
+                           int32_t need_preview,
+                           int32_t return_by_value) {  // free property_value
+  PrepareRemoteObjectValue(ctx, property_value);
+  LEPUSValue remote_obj_id = LEPUS_UNDEFINED;
+  if (LEPUS_IsObject(property_value)) {
+    remote_obj_id = GenerateUniqueObjId(ctx, property_value);
+  }
+  return GetRemoteObjectWithExplicitId(ctx, property_value, need_preview,
+                                       return_by_value, remote_obj_id);
+}
+
+LEPUSValue GetConsoleRemoteObject(LEPUSContext* ctx, LEPUSValue& property_value,
+                                  int32_t need_preview, int32_t return_by_value,
+                                  uint32_t argument_index) {
+  // Used only for top-level console arguments. Their objectId points back to
+  // the original console message slot rather than `running_state`.
+  PrepareRemoteObjectValue(ctx, property_value);
+  LEPUSValue remote_obj_id = LEPUS_UNDEFINED;
+  if (LEPUS_IsObject(property_value)) {
+    remote_obj_id = GenerateConsoleRootObjId(ctx, argument_index);
+  }
+  return GetRemoteObjectWithExplicitId(ctx, property_value, need_preview,
+                                       return_by_value, remote_obj_id);
+}
+
+static LEPUSValue GetConsoleChildRemoteObject(LEPUSContext* ctx,
+                                              LEPUSValue& property_value,
+                                              int32_t need_preview,
+                                              int32_t return_by_value) {
+  // Used for objects discovered during `Runtime.getProperties` expansion of a
+  // console object. The child object is registered on the console message
+  // itself, so eviction of that message releases the whole expansion tree.
+  PrepareRemoteObjectValue(ctx, property_value);
+  LEPUSValue remote_obj_id = LEPUS_UNDEFINED;
+  if (LEPUS_IsObject(property_value)) {
+    uint32_t derived_index = StoreConsoleDerivedObject(ctx, property_value);
+    if (derived_index != static_cast<uint32_t>(-1)) {
+      remote_obj_id = GenerateConsoleDerivedObjId(ctx, derived_index);
+    }
+  }
+  return GetRemoteObjectWithExplicitId(ctx, property_value, need_preview,
+                                       return_by_value, remote_obj_id);
+}
+
+static LEPUSValue GetRemoteObjectByContext(LEPUSContext* ctx,
+                                           LEPUSValue& property_value,
+                                           int32_t need_preview,
+                                           int32_t return_by_value) {
+  // Central switch: normal debugger objects still use pointer-based objectId,
+  // while console-originated traversals stay inside the console lifetime
+  // domain.
+  if (HasActiveConsoleMessageContext(ctx, nullptr, nullptr)) {
+    return GetConsoleChildRemoteObject(ctx, property_value, need_preview,
+                                       return_by_value);
+  }
+  return GetRemoteObject(ctx, property_value, need_preview, return_by_value);
 }
 
 // This function is called to get the properties description when the object is
@@ -1463,8 +1677,8 @@ static LEPUSValue PropertyDescriptorCallback(
                          LEPUS_NewBool(ctx, enumerable));
   DebuggerSetPropertyStr(ctx, property_descriptor, "writable",
                          LEPUS_NewBool(ctx, writeable));
-  LEPUSValue value =
-      GetRemoteObject(ctx, property_value, 1, 0);  // free property_value
+  LEPUSValue value = GetRemoteObjectByContext(ctx, property_value, 1,
+                                              0);  // free property_value
   func_scope.PushHandle(&value, HANDLE_TYPE_LEPUS_VALUE);
   DebuggerSetPropertyStr(ctx, property_descriptor, "value", value);
   if (!ctx->rt->gc_enable) {
@@ -1505,11 +1719,17 @@ static LEPUSValue GetInternalProperties(LEPUSContext* ctx, LEPUSValue& val) {
 
 static void GetPropertiesparams(LEPUSContext* ctx, LEPUSValue params,
                                 uint64_t* obj_id, LEPUSValue* obj,
-                                uint8_t* own_properties) {
+                                uint8_t* own_properties,
+                                ConsoleObjectIdInfo* console_object_id) {
   LEPUSValue params_object_id = LEPUS_GetPropertyStr(ctx, params, "objectId");
   const char* object_id = LEPUS_ToCString(ctx, params_object_id);
   HandleScope func_scope(ctx, reinterpret_cast<void*>(&object_id),
                          HANDLE_TYPE_CSTRING);
+  if (console_object_id) {
+    // Parse once up front so later code can decide whether this getProperties
+    // call is expanding a console object subtree.
+    ParseConsoleObjectId(object_id, console_object_id);
+  }
   *obj = GetObjFromObjectId(ctx, object_id, obj_id);  // obj has been dupped
   LEPUSValue params_own_properties =
       LEPUS_GetPropertyStr(ctx, params, "ownProperties");
@@ -1694,16 +1914,34 @@ void HandleGetProperties(DebuggerParams* runtime_options) {
 
   uint8_t own_properties = 0;
   uint64_t obj_id = 0;
+  ConsoleObjectIdInfo console_object_id;
+  bool is_console_object_id = false;
   LEPUSValue obj = LEPUS_UNDEFINED;  // get property of this obj
-  GetPropertiesparams(ctx, params, &obj_id, &obj, &own_properties);
+  GetPropertiesparams(ctx, params, &obj_id, &obj, &own_properties,
+                      &console_object_id);
+  is_console_object_id =
+      console_object_id.type != ConsoleObjectIdType::kInvalid;
   HandleScope func_scope(ctx, &obj, HANDLE_TYPE_LEPUS_VALUE);
+
+  std::unique_ptr<ScopedConsoleMessageContext> console_scope;
+  if (is_console_object_id) {
+    // Re-enter the console lifetime domain for the whole getProperties walk.
+    console_scope.reset(new ScopedConsoleMessageContext(
+        ctx, console_object_id.message_slot, console_object_id.generation));
+  }
 
   LEPUSValue internal_properties = LEPUS_UNDEFINED;
   LEPUSValue result = LEPUS_UNDEFINED;
   func_scope.PushHandle(&result, HANDLE_TYPE_LEPUS_VALUE);
   if (LEPUS_IsUndefined(obj)) {  // this means that obj must be a frame local ,
                                  // frame closure or global scope
-    result = GetProperties(ctx, obj, obj_id);
+    if (is_console_object_id) {
+      // Expired console objectIds must fail closed instead of accidentally
+      // falling back to the global/scope object path.
+      result = LEPUS_NewArray(ctx);
+    } else {
+      result = GetProperties(ctx, obj, obj_id);
+    }
   } else {
     // Iterate the object and call pfunc for processing
     result = GetObjectProperties(ctx, obj, PropertyDescriptorCallback);
@@ -1763,12 +2001,25 @@ LEPUSValue GetSideEffectResult(LEPUSContext* ctx) {
 const char* GetConsoleObject(LEPUSContext* ctx, const char* object_id) {
   if (!ctx->debugger_info) return nullptr;
   uint64_t object_id_num = 0;
+  ConsoleObjectIdInfo console_object_id;
+  bool is_console_object_id =
+      ParseConsoleObjectId(object_id, &console_object_id);
   auto obj = GetObjFromObjectId(ctx, object_id, &object_id_num);
   LEPUSValue result = LEPUS_UNDEFINED;
 
   HandleScope func_scope{ctx, &result, HANDLE_TYPE_LEPUS_VALUE};
+  std::unique_ptr<ScopedConsoleMessageContext> console_scope;
+  if (is_console_object_id) {
+    // Keep `GetConsoleObject` consistent with Runtime.getProperties: any nested
+    // object reached from a console object should still be console-scoped.
+    console_scope.reset(new ScopedConsoleMessageContext(
+        ctx, console_object_id.message_slot, console_object_id.generation));
+  }
 
   if (LEPUS_IsUndefined(obj)) {
+    if (is_console_object_id) {
+      return nullptr;
+    }
     result = GetProperties(ctx, obj, object_id_num);
   } else {
     auto get_console_object_cb = [](LEPUSContext* ctx, LEPUSValue property_name,
@@ -1795,7 +2046,7 @@ const char* GetConsoleObject(LEPUSContext* ctx, const char* object_id) {
                                LEPUS_DupValue(ctx, property_name));
       }
 
-      auto value = GetRemoteObject(ctx, property_value, false, 0);
+      auto value = GetRemoteObjectByContext(ctx, property_value, false, 0);
       block_scope.PushHandle(&value, HANDLE_TYPE_LEPUS_VALUE);
       DebuggerSetPropertyStr(ctx, property_descriptor, "value", value);
       if (!ctx->rt->gc_enable) LEPUS_FreeValue(ctx, property_name);

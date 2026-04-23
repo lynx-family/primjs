@@ -64,6 +64,306 @@ class QjsDebugMethods : public ::testing::Test {
   LEPUSRuntime* rt_;
 };
 
+static void EvalScriptExpectNoException(LEPUSContext* ctx,
+                                        const std::string& src,
+                                        const char* filename) {
+  LEPUSValue ret = LEPUS_Eval(ctx, src.c_str(), src.size(), filename,
+                              LEPUS_EVAL_TYPE_GLOBAL);
+  if (LEPUS_IsException(ret)) {
+    lepus_std_dump_error(ctx);
+    ASSERT_FALSE(LEPUS_IsException(ret));
+  }
+  if (!ctx->rt->gc_enable) LEPUS_FreeValue(ctx, ret);
+}
+
+static bool EvalScriptToBoolExpectNoException(LEPUSContext* ctx,
+                                              const std::string& src,
+                                              const char* filename) {
+  LEPUSValue ret = LEPUS_Eval(ctx, src.c_str(), src.size(), filename,
+                              LEPUS_EVAL_TYPE_GLOBAL);
+  if (LEPUS_IsException(ret)) {
+    lepus_std_dump_error(ctx);
+    if (!ctx->rt->gc_enable) LEPUS_FreeValue(ctx, ret);
+    ADD_FAILURE() << "script threw exception: " << filename;
+    return false;
+  }
+  int32_t result = LEPUS_ToBool(ctx, ret);
+  if (!ctx->rt->gc_enable) LEPUS_FreeValue(ctx, ret);
+  if (result < 0) {
+    ADD_FAILURE() << "script bool coercion failed: " << filename;
+    return false;
+  }
+  return result != 0;
+}
+
+static void ProcessQueuedProtocolMessages(LEPUSContext* ctx) {
+  GetMessagesCB(ctx);
+}
+
+static std::string GetJsonString(LEPUSContext* ctx, LEPUSValue value) {
+  const char* c_str = LEPUS_ToCString(ctx, value);
+  if (!c_str) {
+    return "";
+  }
+  std::string result(c_str);
+  if (!ctx->rt->gc_enable) LEPUS_FreeCString(ctx, c_str);
+  return result;
+}
+
+static std::string GetJsonMethod(LEPUSContext* ctx,
+                                 const std::string& message) {
+  LEPUSValue json = LEPUS_ParseJSON(ctx, message.c_str(), message.length(), "");
+  if (!LEPUS_IsObject(json)) {
+    if (!ctx->rt->gc_enable) LEPUS_FreeValue(ctx, json);
+    return "";
+  }
+  LEPUSValue method = LEPUS_GetPropertyStr(ctx, json, "method");
+  std::string result;
+  if (LEPUS_IsString(method)) {
+    result = GetJsonString(ctx, method);
+  }
+  if (!ctx->rt->gc_enable) {
+    LEPUS_FreeValue(ctx, method);
+    LEPUS_FreeValue(ctx, json);
+  }
+  return result;
+}
+
+static bool ConsoleNotificationHasMarker(LEPUSContext* ctx,
+                                         const std::string& message,
+                                         const std::string& marker) {
+  LEPUSValue json = LEPUS_ParseJSON(ctx, message.c_str(), message.length(), "");
+  if (!LEPUS_IsObject(json)) {
+    if (!ctx->rt->gc_enable) LEPUS_FreeValue(ctx, json);
+    return false;
+  }
+  LEPUSValue params = LEPUS_GetPropertyStr(ctx, json, "params");
+  LEPUSValue args = LEPUS_IsObject(params)
+                        ? LEPUS_GetPropertyStr(ctx, params, "args")
+                        : LEPUS_UNDEFINED;
+  LEPUSValue arg0 = LEPUS_IsObject(args) ? LEPUS_GetPropertyUint32(ctx, args, 0)
+                                         : LEPUS_UNDEFINED;
+  LEPUSValue value = LEPUS_IsObject(arg0)
+                         ? LEPUS_GetPropertyStr(ctx, arg0, "value")
+                         : LEPUS_UNDEFINED;
+  bool matched = LEPUS_IsString(value) && GetJsonString(ctx, value) == marker;
+  if (!ctx->rt->gc_enable) {
+    LEPUS_FreeValue(ctx, value);
+    LEPUS_FreeValue(ctx, arg0);
+    LEPUS_FreeValue(ctx, args);
+    LEPUS_FreeValue(ctx, params);
+    LEPUS_FreeValue(ctx, json);
+  }
+  return matched;
+}
+
+static std::string PopConsoleNotificationByMarker(LEPUSContext* ctx,
+                                                  const std::string& marker) {
+  while (!QjsDebugQueue::runtime_receive_queue_.empty()) {
+    std::string message = QjsDebugQueue::runtime_receive_queue_.front();
+    QjsDebugQueue::runtime_receive_queue_.pop();
+    if (GetJsonMethod(ctx, message) == "Runtime.consoleAPICalled" &&
+        ConsoleNotificationHasMarker(ctx, message, marker)) {
+      return message;
+    }
+  }
+  ADD_FAILURE() << "missing Runtime.consoleAPICalled for marker: " << marker;
+  return "";
+}
+
+static std::string ExtractConsoleArgObjectId(LEPUSContext* ctx,
+                                             const std::string& message,
+                                             uint32_t arg_index) {
+  LEPUSValue json = LEPUS_ParseJSON(ctx, message.c_str(), message.length(), "");
+  if (!LEPUS_IsObject(json)) {
+    if (!ctx->rt->gc_enable) LEPUS_FreeValue(ctx, json);
+    return "";
+  }
+  LEPUSValue params = LEPUS_GetPropertyStr(ctx, json, "params");
+  LEPUSValue args = LEPUS_IsObject(params)
+                        ? LEPUS_GetPropertyStr(ctx, params, "args")
+                        : LEPUS_UNDEFINED;
+  LEPUSValue arg = LEPUS_IsObject(args)
+                       ? LEPUS_GetPropertyUint32(ctx, args, arg_index)
+                       : LEPUS_UNDEFINED;
+  LEPUSValue object_id = LEPUS_IsObject(arg)
+                             ? LEPUS_GetPropertyStr(ctx, arg, "objectId")
+                             : LEPUS_UNDEFINED;
+  std::string result;
+  if (LEPUS_IsString(object_id)) {
+    result = GetJsonString(ctx, object_id);
+  }
+  if (!ctx->rt->gc_enable) {
+    LEPUS_FreeValue(ctx, object_id);
+    LEPUS_FreeValue(ctx, arg);
+    LEPUS_FreeValue(ctx, args);
+    LEPUS_FreeValue(ctx, params);
+    LEPUS_FreeValue(ctx, json);
+  }
+  return result;
+}
+
+static void SendRuntimeGetProperties(LEPUSContext* ctx, int request_id,
+                                     const std::string& object_id) {
+  std::string request =
+      std::string("{\"id\":") + std::to_string(request_id) +
+      ",\"method\":\"Runtime.getProperties\",\"params\":{\"objectId\":\"" +
+      object_id +
+      "\",\"ownProperties\":true,\"accessorPropertiesOnly\":false,"
+      "\"generatePreview\":true}}";
+  QjsDebugQueue::GetSendMessageQueue().push(request);
+  ProcessQueuedProtocolMessages(ctx);
+}
+
+static std::string PopResponseById(LEPUSContext* ctx, int request_id) {
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    std::string message = QjsDebugQueue::GetReceiveMessageQueue().front();
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+    LEPUSValue json =
+        LEPUS_ParseJSON(ctx, message.c_str(), message.length(), "");
+    if (LEPUS_IsObject(json)) {
+      LEPUSValue id = LEPUS_GetPropertyStr(ctx, json, "id");
+      int32_t current_id = -1;
+      bool matched = LEPUS_IsNumber(id) &&
+                     LEPUS_ToInt32(ctx, &current_id, id) == 0 &&
+                     current_id == request_id;
+      if (!ctx->rt->gc_enable) {
+        LEPUS_FreeValue(ctx, id);
+        LEPUS_FreeValue(ctx, json);
+      }
+      if (matched) {
+        return message;
+      }
+      continue;
+    }
+    if (!ctx->rt->gc_enable) LEPUS_FreeValue(ctx, json);
+  }
+  ADD_FAILURE() << "missing response for id=" << request_id;
+  return "";
+}
+
+static LEPUSValue GetPropertiesResultArray(LEPUSContext* ctx,
+                                           const std::string& response) {
+  LEPUSValue json =
+      LEPUS_ParseJSON(ctx, response.c_str(), response.length(), "");
+  LEPUSValue result_array = LEPUS_UNDEFINED;
+  if (LEPUS_IsObject(json)) {
+    LEPUSValue result = LEPUS_GetPropertyStr(ctx, json, "result");
+    if (LEPUS_IsObject(result)) {
+      LEPUSValue array = LEPUS_GetPropertyStr(ctx, result, "result");
+      if (LEPUS_IsObject(array)) {
+        result_array = LEPUS_DupValue(ctx, array);
+      }
+      if (!ctx->rt->gc_enable) LEPUS_FreeValue(ctx, array);
+    }
+    if (!ctx->rt->gc_enable) LEPUS_FreeValue(ctx, result);
+  }
+  if (!ctx->rt->gc_enable) LEPUS_FreeValue(ctx, json);
+  return result_array;
+}
+
+static LEPUSValue FindPropertyRemoteObjectByName(LEPUSContext* ctx,
+                                                 LEPUSValue properties_array,
+                                                 const std::string& name) {
+  if (!LEPUS_IsObject(properties_array)) {
+    return LEPUS_UNDEFINED;
+  }
+  uint32_t length = LEPUS_GetLength(ctx, properties_array);
+  for (uint32_t i = 0; i < length; ++i) {
+    LEPUSValue descriptor = LEPUS_GetPropertyUint32(ctx, properties_array, i);
+    LEPUSValue property_name =
+        LEPUS_IsObject(descriptor)
+            ? LEPUS_GetPropertyStr(ctx, descriptor, "name")
+            : LEPUS_UNDEFINED;
+    bool matched = LEPUS_IsString(property_name) &&
+                   GetJsonString(ctx, property_name) == name;
+    if (matched) {
+      LEPUSValue value = LEPUS_GetPropertyStr(ctx, descriptor, "value");
+      LEPUSValue result = LEPUS_DupValue(ctx, value);
+      if (!ctx->rt->gc_enable) {
+        LEPUS_FreeValue(ctx, value);
+        LEPUS_FreeValue(ctx, property_name);
+        LEPUS_FreeValue(ctx, descriptor);
+      }
+      return result;
+    }
+    if (!ctx->rt->gc_enable) {
+      LEPUS_FreeValue(ctx, property_name);
+      LEPUS_FreeValue(ctx, descriptor);
+    }
+  }
+  return LEPUS_UNDEFINED;
+}
+
+static std::string ExtractRemoteObjectObjectId(LEPUSContext* ctx,
+                                               LEPUSValue remote_object) {
+  if (!LEPUS_IsObject(remote_object)) {
+    return "";
+  }
+  LEPUSValue object_id = LEPUS_GetPropertyStr(ctx, remote_object, "objectId");
+  std::string result;
+  if (LEPUS_IsString(object_id)) {
+    result = GetJsonString(ctx, object_id);
+  }
+  if (!ctx->rt->gc_enable) LEPUS_FreeValue(ctx, object_id);
+  return result;
+}
+
+static std::string ExtractRemoteObjectStringValue(LEPUSContext* ctx,
+                                                  LEPUSValue remote_object) {
+  if (!LEPUS_IsObject(remote_object)) {
+    return "";
+  }
+  LEPUSValue value = LEPUS_GetPropertyStr(ctx, remote_object, "value");
+  std::string result;
+  if (LEPUS_IsString(value)) {
+    result = GetJsonString(ctx, value);
+  }
+  if (!ctx->rt->gc_enable) LEPUS_FreeValue(ctx, value);
+  return result;
+}
+
+static int32_t ExtractRemoteObjectIntValue(LEPUSContext* ctx,
+                                           LEPUSValue remote_object) {
+  if (!LEPUS_IsObject(remote_object)) {
+    return -1;
+  }
+  LEPUSValue value = LEPUS_GetPropertyStr(ctx, remote_object, "value");
+  int32_t result = -1;
+  if (LEPUS_IsNumber(value)) {
+    LEPUS_ToInt32(ctx, &result, value);
+  }
+  if (!ctx->rt->gc_enable) LEPUS_FreeValue(ctx, value);
+  return result;
+}
+
+struct TestConsoleObjectIdInfo {
+  bool valid{false};
+  uint32_t message_slot{0};
+  uint32_t generation{0};
+  bool is_child{false};
+  uint32_t index{0};
+};
+
+static TestConsoleObjectIdInfo ParseConsoleObjectIdForTest(
+    const std::string& object_id) {
+  std::smatch match;
+  static const std::regex kRootPattern(R"(^console:(\d+):(\d+):(\d+)$)");
+  static const std::regex kChildPattern(R"(^console:(\d+):(\d+):child:(\d+)$)");
+
+  if (std::regex_match(object_id, match, kRootPattern)) {
+    return {true, static_cast<uint32_t>(std::stoul(match[1].str())),
+            static_cast<uint32_t>(std::stoul(match[2].str())), false,
+            static_cast<uint32_t>(std::stoul(match[3].str()))};
+  }
+  if (std::regex_match(object_id, match, kChildPattern)) {
+    return {true, static_cast<uint32_t>(std::stoul(match[1].str())),
+            static_cast<uint32_t>(std::stoul(match[2].str())), true,
+            static_cast<uint32_t>(std::stoul(match[3].str()))};
+  }
+  return {};
+}
+
 static void PrepareGetInternalProperties(LEPUSRuntime* rt, int32_t bp_line) {
   PushSetBreakpointMessages(bp_line);
   void* funcs[14] = {reinterpret_cast<void*>(PauseCBGetInternalProperties),
@@ -2072,6 +2372,91 @@ TEST_F(QjsDebugMethods, TestFindDebuggerMagicContent) {
   ASSERT_TRUE(source_url_str == "test_source_url.js");
 }
 
+static std::string ExtractMagicContentResult(LEPUSContext* ctx,
+                                             const std::string& source,
+                                             const char* search_name,
+                                             uint8_t multi_line) {
+  char* result =
+      FindDebuggerMagicContent(ctx, const_cast<char*>(source.c_str()),
+                               const_cast<char*>(search_name), multi_line);
+  std::string result_str = result ? result : "";
+  if (!ctx->rt->gc_enable) lepus_free(ctx, result);
+  return result_str;
+}
+
+TEST_F(QjsDebugMethods, TestFindDebuggerMagicContentTrimWhitespaceAndNewline) {
+  std::string source =
+      "const value = 1;\n"
+      "//# sourceMappingURL=   trimmed.js.map   \n"
+      "const value2 = 2;\n";
+
+  ASSERT_EQ(ExtractMagicContentResult(ctx_, source, "sourceMappingURL", 0),
+            "trimmed.js.map");
+}
+
+TEST_F(QjsDebugMethods, TestFindDebuggerMagicContentRejectQuotedOrSpacedValue) {
+  std::string quoted_source =
+      "//# sourceMappingURL='quoted.js.map'\n"
+      "//# sourceURL=test_source_url.js\n";
+  ASSERT_EQ(
+      ExtractMagicContentResult(ctx_, quoted_source, "sourceMappingURL", 0),
+      "");
+
+  std::string spaced_source =
+      "//# sourceMappingURL=bad value.js.map\n"
+      "//# sourceURL=test_source_url.js\n";
+  ASSERT_EQ(
+      ExtractMagicContentResult(ctx_, spaced_source, "sourceMappingURL", 0),
+      "");
+}
+
+TEST_F(QjsDebugMethods, TestFindDebuggerMagicContentSupportsMultiLineComment) {
+  std::string source =
+      "/*# sourceMappingURL=multi_line.js.map */\n"
+      "function test() { return 1; }\n";
+
+  ASSERT_EQ(ExtractMagicContentResult(ctx_, source, "sourceMappingURL", 1),
+            "multi_line.js.map");
+}
+
+TEST_F(QjsDebugMethods, TestFindDebuggerMagicContentPrefersLastValidDirective) {
+  std::string source =
+      "//# sourceMappingURL=first.js.map\n"
+      "//# sourceMappingURL=second.js.map\n"
+      "//# sourceURL=final.js\n";
+
+  ASSERT_EQ(ExtractMagicContentResult(ctx_, source, "sourceMappingURL", 0),
+            "second.js.map");
+  ASSERT_EQ(ExtractMagicContentResult(ctx_, source, "sourceURL", 0),
+            "final.js");
+}
+
+TEST_F(QjsDebugMethods,
+       TestFindDebuggerMagicContentReturnsNullForInvalidDirective) {
+  std::string missing_equal = "//# sourceMappingURL\n";
+  char* no_equal =
+      FindDebuggerMagicContent(ctx_, const_cast<char*>(missing_equal.c_str()),
+                               (char*)"sourceMappingURL", 0);
+  ASSERT_EQ(no_equal, nullptr);
+  if (!ctx_->rt->gc_enable) lepus_free(ctx_, no_equal);
+
+  std::string not_comment = "sourceMappingURL=not-comment.js.map\n";
+  char* no_comment =
+      FindDebuggerMagicContent(ctx_, const_cast<char*>(not_comment.c_str()),
+                               (char*)"sourceMappingURL", 0);
+  ASSERT_EQ(no_comment, nullptr);
+  if (!ctx_->rt->gc_enable) lepus_free(ctx_, no_comment);
+}
+
+TEST_F(QjsDebugMethods, TestFindDebuggerMagicContentHandlesLargeInput) {
+  std::string large_prefix(1 << 20, 'a');
+  std::string long_map_url = "bundle.js.map?token=" + std::string(4096, 'x');
+  std::string source = large_prefix + "\n//# sourceMappingURL=" + long_map_url;
+
+  ASSERT_EQ(ExtractMagicContentResult(ctx_, source, "sourceMappingURL", 0),
+            long_map_url);
+}
+
 static void CheckStatementPause(LEPUSContext* ctx, int32_t line_number_gt,
                                 int64_t column_number_gt,
                                 const std::string& paused_mes = "") {
@@ -2385,6 +2770,686 @@ TEST_F(QjsDebugMethods, TestConsoleAPICalled) {
     auto front = QjsDebugQueue::runtime_receive_queue_.front();
     ASSERT_TRUE(front.find("Runtime.consoleAPICalled") != std::string::npos);
     QjsDebugQueue::runtime_receive_queue_.pop();
+  }
+}
+
+TEST_F(QjsDebugMethods, TestConsoleReplayObjectIdGetProperties) {
+  std::string src = R"(
+    function emitReplayConsole() {
+      console.log("replay-marker", {
+        kind: "root",
+        child: {
+          level: 1,
+          grand: { leaf: 42 }
+        }
+      });
+    }
+    emitReplayConsole();
+  )";
+  EvalScriptExpectNoException(ctx_, src, "test_console_replay_object_id.js");
+  ASSERT_TRUE(QjsDebugQueue::runtime_receive_queue_.empty());
+
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":100,\"method\":\"Runtime.enable\",\"params\":{}}");
+  ProcessQueuedProtocolMessages(ctx_);
+
+  std::string console_notification =
+      PopConsoleNotificationByMarker(ctx_, "replay-marker");
+  std::string root_object_id =
+      ExtractConsoleArgObjectId(ctx_, console_notification, 1);
+  ASSERT_FALSE(root_object_id.empty());
+
+  SendRuntimeGetProperties(ctx_, 101, root_object_id);
+  std::string root_response = PopResponseById(ctx_, 101);
+  LEPUSValue root_properties = GetPropertiesResultArray(ctx_, root_response);
+  ASSERT_TRUE(LEPUS_IsObject(root_properties));
+
+  LEPUSValue kind_value =
+      FindPropertyRemoteObjectByName(ctx_, root_properties, "kind");
+  ASSERT_TRUE(LEPUS_IsObject(kind_value));
+  ASSERT_EQ(ExtractRemoteObjectStringValue(ctx_, kind_value), "root");
+
+  LEPUSValue child_value =
+      FindPropertyRemoteObjectByName(ctx_, root_properties, "child");
+  ASSERT_TRUE(LEPUS_IsObject(child_value));
+  std::string child_object_id = ExtractRemoteObjectObjectId(ctx_, child_value);
+  ASSERT_FALSE(child_object_id.empty());
+
+  SendRuntimeGetProperties(ctx_, 102, child_object_id);
+  std::string child_response = PopResponseById(ctx_, 102);
+  LEPUSValue child_properties = GetPropertiesResultArray(ctx_, child_response);
+  ASSERT_TRUE(LEPUS_IsObject(child_properties));
+
+  LEPUSValue level_value =
+      FindPropertyRemoteObjectByName(ctx_, child_properties, "level");
+  ASSERT_TRUE(LEPUS_IsObject(level_value));
+  ASSERT_EQ(ExtractRemoteObjectIntValue(ctx_, level_value), 1);
+
+  LEPUSValue grand_value =
+      FindPropertyRemoteObjectByName(ctx_, child_properties, "grand");
+  ASSERT_TRUE(LEPUS_IsObject(grand_value));
+  std::string grand_object_id = ExtractRemoteObjectObjectId(ctx_, grand_value);
+  ASSERT_FALSE(grand_object_id.empty());
+
+  SendRuntimeGetProperties(ctx_, 103, grand_object_id);
+  std::string grand_response = PopResponseById(ctx_, 103);
+  LEPUSValue grand_properties = GetPropertiesResultArray(ctx_, grand_response);
+  ASSERT_TRUE(LEPUS_IsObject(grand_properties));
+
+  LEPUSValue leaf_value =
+      FindPropertyRemoteObjectByName(ctx_, grand_properties, "leaf");
+  ASSERT_TRUE(LEPUS_IsObject(leaf_value));
+  ASSERT_EQ(ExtractRemoteObjectIntValue(ctx_, leaf_value), 42);
+
+  if (!ctx_->rt->gc_enable) {
+    LEPUS_FreeValue(ctx_, leaf_value);
+    LEPUS_FreeValue(ctx_, grand_properties);
+    LEPUS_FreeValue(ctx_, grand_value);
+    LEPUS_FreeValue(ctx_, level_value);
+    LEPUS_FreeValue(ctx_, child_properties);
+    LEPUS_FreeValue(ctx_, child_value);
+    LEPUS_FreeValue(ctx_, kind_value);
+    LEPUS_FreeValue(ctx_, root_properties);
+  }
+}
+
+TEST_F(QjsDebugMethods,
+       TestConsoleDerivedObjectIdStableAcrossRepeatedExpansion) {
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":110,\"method\":\"Runtime.enable\",\"params\":{}}");
+  ProcessQueuedProtocolMessages(ctx_);
+
+  std::string src = R"(
+    console.log("dedupe-marker", {
+      child: {
+        level: 1,
+        grand: { leaf: 42 }
+      }
+    });
+  )";
+  EvalScriptExpectNoException(ctx_, src, "test_console_dedupe_object_id.js");
+
+  std::string console_notification =
+      PopConsoleNotificationByMarker(ctx_, "dedupe-marker");
+  std::string root_object_id =
+      ExtractConsoleArgObjectId(ctx_, console_notification, 1);
+  ASSERT_FALSE(root_object_id.empty());
+
+  SendRuntimeGetProperties(ctx_, 111, root_object_id);
+  std::string first_root_response = PopResponseById(ctx_, 111);
+  LEPUSValue first_root_properties =
+      GetPropertiesResultArray(ctx_, first_root_response);
+  ASSERT_TRUE(LEPUS_IsObject(first_root_properties));
+
+  LEPUSValue first_child_value =
+      FindPropertyRemoteObjectByName(ctx_, first_root_properties, "child");
+  ASSERT_TRUE(LEPUS_IsObject(first_child_value));
+  std::string first_child_object_id =
+      ExtractRemoteObjectObjectId(ctx_, first_child_value);
+  ASSERT_FALSE(first_child_object_id.empty());
+
+  SendRuntimeGetProperties(ctx_, 112, root_object_id);
+  std::string second_root_response = PopResponseById(ctx_, 112);
+  LEPUSValue second_root_properties =
+      GetPropertiesResultArray(ctx_, second_root_response);
+  ASSERT_TRUE(LEPUS_IsObject(second_root_properties));
+
+  LEPUSValue second_child_value =
+      FindPropertyRemoteObjectByName(ctx_, second_root_properties, "child");
+  ASSERT_TRUE(LEPUS_IsObject(second_child_value));
+  std::string second_child_object_id =
+      ExtractRemoteObjectObjectId(ctx_, second_child_value);
+  ASSERT_FALSE(second_child_object_id.empty());
+  ASSERT_EQ(first_child_object_id, second_child_object_id);
+
+  SendRuntimeGetProperties(ctx_, 113, first_child_object_id);
+  std::string first_child_response = PopResponseById(ctx_, 113);
+  LEPUSValue first_child_properties =
+      GetPropertiesResultArray(ctx_, first_child_response);
+  ASSERT_TRUE(LEPUS_IsObject(first_child_properties));
+
+  LEPUSValue first_level_value =
+      FindPropertyRemoteObjectByName(ctx_, first_child_properties, "level");
+  ASSERT_TRUE(LEPUS_IsObject(first_level_value));
+  ASSERT_EQ(ExtractRemoteObjectIntValue(ctx_, first_level_value), 1);
+
+  LEPUSValue first_grand_value =
+      FindPropertyRemoteObjectByName(ctx_, first_child_properties, "grand");
+  ASSERT_TRUE(LEPUS_IsObject(first_grand_value));
+  std::string first_grand_object_id =
+      ExtractRemoteObjectObjectId(ctx_, first_grand_value);
+  ASSERT_FALSE(first_grand_object_id.empty());
+
+  SendRuntimeGetProperties(ctx_, 114, second_child_object_id);
+  std::string second_child_response = PopResponseById(ctx_, 114);
+  LEPUSValue second_child_properties =
+      GetPropertiesResultArray(ctx_, second_child_response);
+  ASSERT_TRUE(LEPUS_IsObject(second_child_properties));
+
+  LEPUSValue second_level_value =
+      FindPropertyRemoteObjectByName(ctx_, second_child_properties, "level");
+  ASSERT_TRUE(LEPUS_IsObject(second_level_value));
+  ASSERT_EQ(ExtractRemoteObjectIntValue(ctx_, second_level_value), 1);
+
+  LEPUSValue second_grand_value =
+      FindPropertyRemoteObjectByName(ctx_, second_child_properties, "grand");
+  ASSERT_TRUE(LEPUS_IsObject(second_grand_value));
+  std::string second_grand_object_id =
+      ExtractRemoteObjectObjectId(ctx_, second_grand_value);
+  ASSERT_FALSE(second_grand_object_id.empty());
+  ASSERT_EQ(first_grand_object_id, second_grand_object_id);
+
+  SendRuntimeGetProperties(ctx_, 115, first_grand_object_id);
+  std::string grand_response = PopResponseById(ctx_, 115);
+  LEPUSValue grand_properties = GetPropertiesResultArray(ctx_, grand_response);
+  ASSERT_TRUE(LEPUS_IsObject(grand_properties));
+
+  LEPUSValue leaf_value =
+      FindPropertyRemoteObjectByName(ctx_, grand_properties, "leaf");
+  ASSERT_TRUE(LEPUS_IsObject(leaf_value));
+  ASSERT_EQ(ExtractRemoteObjectIntValue(ctx_, leaf_value), 42);
+
+  if (!ctx_->rt->gc_enable) {
+    LEPUS_FreeValue(ctx_, leaf_value);
+    LEPUS_FreeValue(ctx_, grand_properties);
+    LEPUS_FreeValue(ctx_, second_grand_value);
+    LEPUS_FreeValue(ctx_, second_level_value);
+    LEPUS_FreeValue(ctx_, second_child_properties);
+    LEPUS_FreeValue(ctx_, first_grand_value);
+    LEPUS_FreeValue(ctx_, first_level_value);
+    LEPUS_FreeValue(ctx_, first_child_properties);
+    LEPUS_FreeValue(ctx_, second_child_value);
+    LEPUS_FreeValue(ctx_, second_root_properties);
+    LEPUS_FreeValue(ctx_, first_child_value);
+    LEPUS_FreeValue(ctx_, first_root_properties);
+  }
+}
+
+TEST_F(QjsDebugMethods, TestConsoleAliasPropertiesShareDerivedObjectId) {
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":116,\"method\":\"Runtime.enable\",\"params\":{}}");
+  ProcessQueuedProtocolMessages(ctx_);
+
+  std::string src = R"(
+    const shared = { value: 7, nested: { label: "shared" } };
+    console.log("alias-marker", {
+      first: shared,
+      second: shared,
+    });
+  )";
+  EvalScriptExpectNoException(ctx_, src, "test_console_alias_object_id.js");
+
+  std::string console_notification =
+      PopConsoleNotificationByMarker(ctx_, "alias-marker");
+  std::string root_object_id =
+      ExtractConsoleArgObjectId(ctx_, console_notification, 1);
+  ASSERT_FALSE(root_object_id.empty());
+
+  SendRuntimeGetProperties(ctx_, 117, root_object_id);
+  std::string root_response = PopResponseById(ctx_, 117);
+  LEPUSValue root_properties = GetPropertiesResultArray(ctx_, root_response);
+  ASSERT_TRUE(LEPUS_IsObject(root_properties));
+
+  LEPUSValue first_value =
+      FindPropertyRemoteObjectByName(ctx_, root_properties, "first");
+  LEPUSValue second_value =
+      FindPropertyRemoteObjectByName(ctx_, root_properties, "second");
+  ASSERT_TRUE(LEPUS_IsObject(first_value));
+  ASSERT_TRUE(LEPUS_IsObject(second_value));
+
+  std::string first_object_id = ExtractRemoteObjectObjectId(ctx_, first_value);
+  std::string second_object_id =
+      ExtractRemoteObjectObjectId(ctx_, second_value);
+  ASSERT_FALSE(first_object_id.empty());
+  ASSERT_EQ(first_object_id, second_object_id);
+
+  SendRuntimeGetProperties(ctx_, 118, first_object_id);
+  std::string alias_response = PopResponseById(ctx_, 118);
+  LEPUSValue alias_properties = GetPropertiesResultArray(ctx_, alias_response);
+  ASSERT_TRUE(LEPUS_IsObject(alias_properties));
+
+  LEPUSValue shared_value =
+      FindPropertyRemoteObjectByName(ctx_, alias_properties, "value");
+  ASSERT_TRUE(LEPUS_IsObject(shared_value));
+  ASSERT_EQ(ExtractRemoteObjectIntValue(ctx_, shared_value), 7);
+
+  LEPUSValue nested_value =
+      FindPropertyRemoteObjectByName(ctx_, alias_properties, "nested");
+  ASSERT_TRUE(LEPUS_IsObject(nested_value));
+  std::string nested_object_id =
+      ExtractRemoteObjectObjectId(ctx_, nested_value);
+  ASSERT_FALSE(nested_object_id.empty());
+
+  SendRuntimeGetProperties(ctx_, 119, second_object_id);
+  std::string alias_response_again = PopResponseById(ctx_, 119);
+  LEPUSValue alias_properties_again =
+      GetPropertiesResultArray(ctx_, alias_response_again);
+  ASSERT_TRUE(LEPUS_IsObject(alias_properties_again));
+
+  LEPUSValue nested_value_again =
+      FindPropertyRemoteObjectByName(ctx_, alias_properties_again, "nested");
+  ASSERT_TRUE(LEPUS_IsObject(nested_value_again));
+  std::string nested_object_id_again =
+      ExtractRemoteObjectObjectId(ctx_, nested_value_again);
+  ASSERT_FALSE(nested_object_id_again.empty());
+  ASSERT_EQ(nested_object_id, nested_object_id_again);
+
+  SendRuntimeGetProperties(ctx_, 120, nested_object_id);
+  std::string nested_response = PopResponseById(ctx_, 120);
+  LEPUSValue nested_properties =
+      GetPropertiesResultArray(ctx_, nested_response);
+  ASSERT_TRUE(LEPUS_IsObject(nested_properties));
+
+  LEPUSValue label_value =
+      FindPropertyRemoteObjectByName(ctx_, nested_properties, "label");
+  ASSERT_TRUE(LEPUS_IsObject(label_value));
+  ASSERT_EQ(ExtractRemoteObjectStringValue(ctx_, label_value), "shared");
+
+  if (!ctx_->rt->gc_enable) {
+    LEPUS_FreeValue(ctx_, label_value);
+    LEPUS_FreeValue(ctx_, nested_properties);
+    LEPUS_FreeValue(ctx_, nested_value_again);
+    LEPUS_FreeValue(ctx_, alias_properties_again);
+    LEPUS_FreeValue(ctx_, nested_value);
+    LEPUS_FreeValue(ctx_, shared_value);
+    LEPUS_FreeValue(ctx_, alias_properties);
+    LEPUS_FreeValue(ctx_, second_value);
+    LEPUS_FreeValue(ctx_, first_value);
+    LEPUS_FreeValue(ctx_, root_properties);
+  }
+}
+
+TEST_F(QjsDebugMethods, TestConsoleObjectIdEncodesMessageSlotAndGeneration) {
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":120,\"method\":\"Runtime.enable\",\"params\":{}}");
+  ProcessQueuedProtocolMessages(ctx_);
+
+  std::string src = R"(
+    console.log("slot-marker-0", { order: 0 });
+    console.log("slot-marker-1", { order: 1, child: { value: 11 } });
+    console.log("slot-marker-2", { order: 2 });
+  )";
+  EvalScriptExpectNoException(ctx_, src, "test_console_slot_generation.js");
+
+  std::string notification0 =
+      PopConsoleNotificationByMarker(ctx_, "slot-marker-0");
+  std::string notification1 =
+      PopConsoleNotificationByMarker(ctx_, "slot-marker-1");
+  std::string notification2 =
+      PopConsoleNotificationByMarker(ctx_, "slot-marker-2");
+
+  std::string object_id0 = ExtractConsoleArgObjectId(ctx_, notification0, 1);
+  std::string object_id1 = ExtractConsoleArgObjectId(ctx_, notification1, 1);
+  std::string object_id2 = ExtractConsoleArgObjectId(ctx_, notification2, 1);
+  TestConsoleObjectIdInfo info0 = ParseConsoleObjectIdForTest(object_id0);
+  TestConsoleObjectIdInfo info1 = ParseConsoleObjectIdForTest(object_id1);
+  TestConsoleObjectIdInfo info2 = ParseConsoleObjectIdForTest(object_id2);
+
+  ASSERT_TRUE(info0.valid);
+  ASSERT_TRUE(info1.valid);
+  ASSERT_TRUE(info2.valid);
+  ASSERT_FALSE(info0.is_child);
+  ASSERT_FALSE(info1.is_child);
+  ASSERT_FALSE(info2.is_child);
+  ASSERT_EQ(info0.message_slot, 0u);
+  ASSERT_EQ(info1.message_slot, 1u);
+  ASSERT_EQ(info2.message_slot, 2u);
+  ASSERT_EQ(info0.generation, 0u);
+  ASSERT_EQ(info1.generation, 0u);
+  ASSERT_EQ(info2.generation, 0u);
+  ASSERT_EQ(info0.index, 1u);
+  ASSERT_EQ(info1.index, 1u);
+  ASSERT_EQ(info2.index, 1u);
+
+  SendRuntimeGetProperties(ctx_, 121, object_id1);
+  std::string root_response = PopResponseById(ctx_, 121);
+  LEPUSValue root_properties = GetPropertiesResultArray(ctx_, root_response);
+  ASSERT_TRUE(LEPUS_IsObject(root_properties));
+  LEPUSValue child_value =
+      FindPropertyRemoteObjectByName(ctx_, root_properties, "child");
+  ASSERT_TRUE(LEPUS_IsObject(child_value));
+  std::string child_object_id = ExtractRemoteObjectObjectId(ctx_, child_value);
+  TestConsoleObjectIdInfo child_info =
+      ParseConsoleObjectIdForTest(child_object_id);
+  ASSERT_TRUE(child_info.valid);
+  ASSERT_TRUE(child_info.is_child);
+  ASSERT_EQ(child_info.message_slot, info1.message_slot);
+  ASSERT_EQ(child_info.generation, info1.generation);
+
+  if (!ctx_->rt->gc_enable) {
+    LEPUS_FreeValue(ctx_, child_value);
+    LEPUS_FreeValue(ctx_, root_properties);
+  }
+}
+
+TEST_F(QjsDebugMethods, TestConsoleObjectIdGenerationBumpsWhenSlotReused) {
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":130,\"method\":\"Runtime.enable\",\"params\":{}}");
+  ProcessQueuedProtocolMessages(ctx_);
+
+  std::string src = R"(
+    for (let i = 0; i <= 1000; ++i) {
+      console.log("generation-marker-" + i, {
+        order: i,
+        child: { value: i }
+      });
+    }
+  )";
+  EvalScriptExpectNoException(ctx_, src, "test_console_generation_reuse.js");
+
+  std::string stale_notification =
+      PopConsoleNotificationByMarker(ctx_, "generation-marker-0");
+  std::string reused_notification =
+      PopConsoleNotificationByMarker(ctx_, "generation-marker-1000");
+
+  std::string stale_object_id =
+      ExtractConsoleArgObjectId(ctx_, stale_notification, 1);
+  std::string reused_object_id =
+      ExtractConsoleArgObjectId(ctx_, reused_notification, 1);
+  TestConsoleObjectIdInfo stale_info =
+      ParseConsoleObjectIdForTest(stale_object_id);
+  TestConsoleObjectIdInfo reused_info =
+      ParseConsoleObjectIdForTest(reused_object_id);
+
+  ASSERT_TRUE(stale_info.valid);
+  ASSERT_TRUE(reused_info.valid);
+  ASSERT_FALSE(stale_info.is_child);
+  ASSERT_FALSE(reused_info.is_child);
+  ASSERT_EQ(stale_info.message_slot, reused_info.message_slot);
+  ASSERT_EQ(stale_info.message_slot, 0u);
+  ASSERT_EQ(stale_info.generation, 0u);
+  ASSERT_EQ(reused_info.generation, stale_info.generation + 1);
+  ASSERT_EQ(stale_info.index, 1u);
+  ASSERT_EQ(reused_info.index, 1u);
+
+  SendRuntimeGetProperties(ctx_, 131, stale_object_id);
+  std::string stale_response = PopResponseById(ctx_, 131);
+  LEPUSValue stale_properties = GetPropertiesResultArray(ctx_, stale_response);
+  ASSERT_TRUE(LEPUS_IsObject(stale_properties));
+  ASSERT_EQ(LEPUS_GetLength(ctx_, stale_properties), 0);
+
+  SendRuntimeGetProperties(ctx_, 132, reused_object_id);
+  std::string reused_response = PopResponseById(ctx_, 132);
+  LEPUSValue reused_properties =
+      GetPropertiesResultArray(ctx_, reused_response);
+  ASSERT_TRUE(LEPUS_IsObject(reused_properties));
+  LEPUSValue order_value =
+      FindPropertyRemoteObjectByName(ctx_, reused_properties, "order");
+  ASSERT_TRUE(LEPUS_IsObject(order_value));
+  ASSERT_EQ(ExtractRemoteObjectIntValue(ctx_, order_value), 1000);
+
+  LEPUSValue child_value =
+      FindPropertyRemoteObjectByName(ctx_, reused_properties, "child");
+  ASSERT_TRUE(LEPUS_IsObject(child_value));
+  std::string child_object_id = ExtractRemoteObjectObjectId(ctx_, child_value);
+  TestConsoleObjectIdInfo child_info =
+      ParseConsoleObjectIdForTest(child_object_id);
+  ASSERT_TRUE(child_info.valid);
+  ASSERT_TRUE(child_info.is_child);
+  ASSERT_EQ(child_info.message_slot, reused_info.message_slot);
+  ASSERT_EQ(child_info.generation, reused_info.generation);
+
+  if (!ctx_->rt->gc_enable) {
+    LEPUS_FreeValue(ctx_, child_value);
+    LEPUS_FreeValue(ctx_, order_value);
+    LEPUS_FreeValue(ctx_, reused_properties);
+    LEPUS_FreeValue(ctx_, stale_properties);
+  }
+}
+
+TEST_F(QjsDebugMethods, TestConsoleObjectIdInvalidAfterMessageOverflow) {
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":200,\"method\":\"Runtime.enable\",\"params\":{}}");
+  ProcessQueuedProtocolMessages(ctx_);
+
+  std::string stale_src = R"(
+    console.log("stale-marker", {
+      kind: "stale",
+      child: { value: 1 }
+    });
+  )";
+  EvalScriptExpectNoException(ctx_, stale_src,
+                              "test_console_overflow_stale.js");
+
+  std::string stale_notification =
+      PopConsoleNotificationByMarker(ctx_, "stale-marker");
+  std::string stale_root_object_id =
+      ExtractConsoleArgObjectId(ctx_, stale_notification, 1);
+  ASSERT_FALSE(stale_root_object_id.empty());
+
+  SendRuntimeGetProperties(ctx_, 201, stale_root_object_id);
+  std::string stale_root_response = PopResponseById(ctx_, 201);
+  LEPUSValue stale_root_properties =
+      GetPropertiesResultArray(ctx_, stale_root_response);
+  ASSERT_TRUE(LEPUS_IsObject(stale_root_properties));
+  LEPUSValue stale_child_value =
+      FindPropertyRemoteObjectByName(ctx_, stale_root_properties, "child");
+  ASSERT_TRUE(LEPUS_IsObject(stale_child_value));
+  std::string stale_child_object_id =
+      ExtractRemoteObjectObjectId(ctx_, stale_child_value);
+  ASSERT_FALSE(stale_child_object_id.empty());
+
+  std::string overflow_src = R"(
+    for (let i = 0; i < 1000; ++i) {
+      console.log("filler-" + i);
+    }
+    console.log("fresh-marker", {
+      kind: "fresh",
+      child: { value: 2 }
+    });
+  )";
+  EvalScriptExpectNoException(ctx_, overflow_src,
+                              "test_console_overflow_fresh.js");
+
+  std::string fresh_notification =
+      PopConsoleNotificationByMarker(ctx_, "fresh-marker");
+  std::string fresh_root_object_id =
+      ExtractConsoleArgObjectId(ctx_, fresh_notification, 1);
+  ASSERT_FALSE(fresh_root_object_id.empty());
+
+  SendRuntimeGetProperties(ctx_, 202, stale_root_object_id);
+  std::string expired_root_response = PopResponseById(ctx_, 202);
+  LEPUSValue expired_root_properties =
+      GetPropertiesResultArray(ctx_, expired_root_response);
+  ASSERT_TRUE(LEPUS_IsObject(expired_root_properties));
+  ASSERT_EQ(LEPUS_GetLength(ctx_, expired_root_properties), 0);
+
+  SendRuntimeGetProperties(ctx_, 203, stale_child_object_id);
+  std::string expired_child_response = PopResponseById(ctx_, 203);
+  LEPUSValue expired_child_properties =
+      GetPropertiesResultArray(ctx_, expired_child_response);
+  ASSERT_TRUE(LEPUS_IsObject(expired_child_properties));
+  ASSERT_EQ(LEPUS_GetLength(ctx_, expired_child_properties), 0);
+
+  SendRuntimeGetProperties(ctx_, 204, fresh_root_object_id);
+  std::string fresh_root_response = PopResponseById(ctx_, 204);
+  LEPUSValue fresh_root_properties =
+      GetPropertiesResultArray(ctx_, fresh_root_response);
+  ASSERT_TRUE(LEPUS_IsObject(fresh_root_properties));
+
+  LEPUSValue fresh_kind_value =
+      FindPropertyRemoteObjectByName(ctx_, fresh_root_properties, "kind");
+  ASSERT_TRUE(LEPUS_IsObject(fresh_kind_value));
+  ASSERT_EQ(ExtractRemoteObjectStringValue(ctx_, fresh_kind_value), "fresh");
+
+  LEPUSValue fresh_child_value =
+      FindPropertyRemoteObjectByName(ctx_, fresh_root_properties, "child");
+  ASSERT_TRUE(LEPUS_IsObject(fresh_child_value));
+  std::string fresh_child_object_id =
+      ExtractRemoteObjectObjectId(ctx_, fresh_child_value);
+  ASSERT_FALSE(fresh_child_object_id.empty());
+
+  SendRuntimeGetProperties(ctx_, 205, fresh_child_object_id);
+  std::string fresh_child_response = PopResponseById(ctx_, 205);
+  LEPUSValue fresh_child_properties =
+      GetPropertiesResultArray(ctx_, fresh_child_response);
+  ASSERT_TRUE(LEPUS_IsObject(fresh_child_properties));
+
+  LEPUSValue fresh_value =
+      FindPropertyRemoteObjectByName(ctx_, fresh_child_properties, "value");
+  ASSERT_TRUE(LEPUS_IsObject(fresh_value));
+  ASSERT_EQ(ExtractRemoteObjectIntValue(ctx_, fresh_value), 2);
+
+  if (!ctx_->rt->gc_enable) {
+    LEPUS_FreeValue(ctx_, fresh_value);
+    LEPUS_FreeValue(ctx_, fresh_child_properties);
+    LEPUS_FreeValue(ctx_, fresh_child_value);
+    LEPUS_FreeValue(ctx_, fresh_kind_value);
+    LEPUS_FreeValue(ctx_, fresh_root_properties);
+    LEPUS_FreeValue(ctx_, expired_child_properties);
+    LEPUS_FreeValue(ctx_, expired_root_properties);
+    LEPUS_FreeValue(ctx_, stale_child_value);
+    LEPUS_FreeValue(ctx_, stale_root_properties);
+  }
+}
+
+TEST_F(QjsDebugMethods, TestExpiredConsoleMessageCollectedAfterForcedGC) {
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":300,\"method\":\"Runtime.enable\",\"params\":{}}");
+  ProcessQueuedProtocolMessages(ctx_);
+
+  std::string overflow_src = R"(
+    globalThis.__consoleGcState = {
+      rootFinalized: 0,
+      childFinalized: 0,
+    };
+    globalThis.__consoleGcRegistry = new FinalizationRegistry((heldValue) => {
+      if (heldValue === "root") {
+        globalThis.__consoleGcState.rootFinalized++;
+      } else if (heldValue === "child") {
+        globalThis.__consoleGcState.childFinalized++;
+      }
+    });
+    globalThis.__consoleGcRootRefs = [];
+    globalThis.__consoleGcChildRefs = [];
+
+    for (let i = 0; i < 1005; ++i) {
+      let child = { value: i };
+      let root = {
+        kind: "batch",
+        index: i,
+        child,
+      };
+      globalThis.__consoleGcRootRefs.push(new WeakRef(root));
+      globalThis.__consoleGcChildRefs.push(new WeakRef(child));
+      globalThis.__consoleGcRegistry.register(root, "root");
+      globalThis.__consoleGcRegistry.register(child, "child");
+      console.log("gc-batch-marker-" + i, root);
+    }
+  )";
+  EvalScriptExpectNoException(ctx_, overflow_src,
+                              "test_console_gc_overflow.js");
+
+  std::string stale_notification =
+      PopConsoleNotificationByMarker(ctx_, "gc-batch-marker-0");
+  std::string stale_root_object_id =
+      ExtractConsoleArgObjectId(ctx_, stale_notification, 1);
+  ASSERT_FALSE(stale_root_object_id.empty());
+
+  std::string fresh_notification =
+      PopConsoleNotificationByMarker(ctx_, "gc-batch-marker-5");
+  std::string fresh_root_object_id =
+      ExtractConsoleArgObjectId(ctx_, fresh_notification, 1);
+  ASSERT_FALSE(fresh_root_object_id.empty());
+
+  SendRuntimeGetProperties(ctx_, 302, stale_root_object_id);
+  std::string expired_root_response = PopResponseById(ctx_, 302);
+  LEPUSValue expired_root_properties =
+      GetPropertiesResultArray(ctx_, expired_root_response);
+  ASSERT_TRUE(LEPUS_IsObject(expired_root_properties));
+  ASSERT_EQ(LEPUS_GetLength(ctx_, expired_root_properties), 0);
+
+  LEPUS_RunGC(rt_);
+  LEPUS_RunGC(rt_);
+  ASSERT_TRUE(
+      EvalScriptToBoolExpectNoException(ctx_,
+                                        R"(
+        (() => {
+          for (let i = 0; i < 5; ++i) {
+            if (globalThis.__consoleGcRootRefs[i].deref() !== undefined) {
+              return false;
+            }
+            if (globalThis.__consoleGcChildRefs[i].deref() !== undefined) {
+              return false;
+            }
+          }
+          if (globalThis.__consoleGcState.rootFinalized !== 5) {
+            return false;
+          }
+          if (globalThis.__consoleGcState.childFinalized !== 5) {
+            return false;
+          }
+          if (globalThis.__consoleGcRootRefs[5].deref() === undefined) {
+            return false;
+          }
+          if (globalThis.__consoleGcChildRefs[5].deref() === undefined) {
+            return false;
+          }
+          if (globalThis.__consoleGcRootRefs[1004].deref() === undefined) {
+            return false;
+          }
+          if (globalThis.__consoleGcChildRefs[1004].deref() === undefined) {
+            return false;
+          }
+          return true;
+        })()
+      )",
+                                        "test_console_gc_after_expire.js"));
+
+  SendRuntimeGetProperties(ctx_, 304, fresh_root_object_id);
+  std::string fresh_root_response = PopResponseById(ctx_, 304);
+  LEPUSValue fresh_root_properties =
+      GetPropertiesResultArray(ctx_, fresh_root_response);
+  ASSERT_TRUE(LEPUS_IsObject(fresh_root_properties));
+  LEPUSValue fresh_kind_value =
+      FindPropertyRemoteObjectByName(ctx_, fresh_root_properties, "kind");
+  ASSERT_TRUE(LEPUS_IsObject(fresh_kind_value));
+  ASSERT_EQ(ExtractRemoteObjectStringValue(ctx_, fresh_kind_value), "batch");
+
+  LEPUSValue fresh_index_value =
+      FindPropertyRemoteObjectByName(ctx_, fresh_root_properties, "index");
+  ASSERT_TRUE(LEPUS_IsObject(fresh_index_value));
+  ASSERT_EQ(ExtractRemoteObjectIntValue(ctx_, fresh_index_value), 5);
+
+  LEPUSValue fresh_child_value =
+      FindPropertyRemoteObjectByName(ctx_, fresh_root_properties, "child");
+  ASSERT_TRUE(LEPUS_IsObject(fresh_child_value));
+  std::string fresh_child_object_id =
+      ExtractRemoteObjectObjectId(ctx_, fresh_child_value);
+  ASSERT_FALSE(fresh_child_object_id.empty());
+
+  SendRuntimeGetProperties(ctx_, 305, fresh_child_object_id);
+  std::string fresh_child_response = PopResponseById(ctx_, 305);
+  LEPUSValue fresh_child_properties =
+      GetPropertiesResultArray(ctx_, fresh_child_response);
+  ASSERT_TRUE(LEPUS_IsObject(fresh_child_properties));
+  LEPUSValue fresh_child_inner_value =
+      FindPropertyRemoteObjectByName(ctx_, fresh_child_properties, "value");
+  ASSERT_TRUE(LEPUS_IsObject(fresh_child_inner_value));
+  ASSERT_EQ(ExtractRemoteObjectIntValue(ctx_, fresh_child_inner_value), 5);
+
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":306,\"method\":\"Runtime.discardConsoleEntries\"}");
+  ProcessQueuedProtocolMessages(ctx_);
+  EvalScriptExpectNoException(ctx_,
+                              R"(
+                                globalThis.__consoleGcRegistry = undefined;
+                                globalThis.__consoleGcRootRefs = undefined;
+                                globalThis.__consoleGcChildRefs = undefined;
+                                globalThis.__consoleGcState = undefined;
+                              )",
+                              "test_console_gc_cleanup.js");
+  LEPUS_RunGC(rt_);
+  LEPUS_RunGC(rt_);
+
+  if (!ctx_->rt->gc_enable) {
+    LEPUS_FreeValue(ctx_, fresh_child_inner_value);
+    LEPUS_FreeValue(ctx_, fresh_child_properties);
+    LEPUS_FreeValue(ctx_, fresh_child_value);
+    LEPUS_FreeValue(ctx_, fresh_index_value);
+    LEPUS_FreeValue(ctx_, fresh_kind_value);
+    LEPUS_FreeValue(ctx_, fresh_root_properties);
+    LEPUS_FreeValue(ctx_, expired_root_properties);
   }
 }
 

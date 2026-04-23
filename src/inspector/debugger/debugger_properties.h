@@ -57,6 +57,10 @@ LEPUSValue GetSideEffectResult(LEPUSContext *ctx);
 LEPUSValue GetRemoteObject(LEPUSContext *ctx, LEPUSValue &property_value,
                            int32_t need_preview, int32_t return_by_value);
 
+LEPUSValue GetConsoleRemoteObject(LEPUSContext *ctx, LEPUSValue &property_value,
+                                  int32_t need_preview, int32_t return_by_value,
+                                  uint32_t argument_index);
+
 // generate unique object id for obj
 LEPUSValue GenerateUniqueObjId(LEPUSContext *ctx, LEPUSValue obj);
 

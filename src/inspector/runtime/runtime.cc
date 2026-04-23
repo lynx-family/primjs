@@ -31,12 +31,138 @@
 
 #include "inspector/runtime/runtime.h"
 
+#include <cstdio>
+#include <cstring>
+
 #include "gc/trace-gc.h"
 #include "inspector/debugger/debugger.h"
 #include "inspector/debugger/debugger_properties.h"
 #include "inspector/debugger_inner.h"
 #include "inspector/interface.h"
 #include "inspector/protocols.h"
+
+const char kConsoleDerivedObjectsProp[] = "__debuggerConsoleObjects__";
+const char kConsoleObjectIdPrefix[] = "console:";
+
+uint32_t GetConsoleMessageIndex(const JSDebuggerConsole& console,
+                                int32_t logical_index) {
+  // Translate logical order [oldest -> newest] to physical ring-buffer slot.
+  return static_cast<uint32_t>((console.head + logical_index) %
+                               MAX_MESSAGE_COUNT);
+}
+
+bool IsConsoleMessageSlotActive(const JSDebuggerConsole& console,
+                                uint32_t slot_index) {
+  // Used by console objectId validation to reject recycled / out-of-window
+  // slots.
+  if (console.length <= 0) {
+    return false;
+  }
+  if (console.length >= MAX_MESSAGE_COUNT) {
+    return slot_index < static_cast<uint32_t>(MAX_MESSAGE_COUNT);
+  }
+  uint32_t tail = static_cast<uint32_t>((console.head + console.length) %
+                                        MAX_MESSAGE_COUNT);
+  if (console.head < static_cast<int32_t>(tail)) {
+    return slot_index >= static_cast<uint32_t>(console.head) &&
+           slot_index < tail;
+  }
+  return slot_index >= static_cast<uint32_t>(console.head) || slot_index < tail;
+}
+
+uint32_t GetConsoleMessageGeneration(const JSDebuggerConsole& console,
+                                     uint32_t slot_index) {
+  return console.generations[slot_index];
+}
+
+void InvalidateConsoleMessageSlot(JSDebuggerConsole& console,
+                                  uint32_t slot_index) {
+  ++console.generations[slot_index];
+}
+
+void InvalidateAllConsoleMessageSlots(JSDebuggerConsole& console) {
+  for (int32_t i = 0; i < MAX_MESSAGE_COUNT; ++i) {
+    ++console.generations[i];
+  }
+}
+
+bool ParseConsoleObjectId(const char* object_id_str,
+                          ConsoleObjectIdInfo* info) {
+  size_t prefix_len = strlen(kConsoleObjectIdPrefix);
+  if (strncmp(object_id_str, kConsoleObjectIdPrefix, prefix_len) != 0) {
+    return false;
+  }
+
+  unsigned int message_slot = 0;
+  unsigned int generation = 0;
+  int prefix_consumed = 0;
+  if (sscanf(object_id_str + prefix_len, "%u:%u:%n", &message_slot, &generation,
+             &prefix_consumed) != 2) {
+    return false;
+  }
+
+  const char* rest = object_id_str + prefix_len + prefix_consumed;
+  if (*rest == '\0') {
+    return false;
+  }
+
+  info->message_slot = message_slot;
+  info->generation = generation;
+  // Supported forms:
+  //   console:<slot>:<generation>:<arg_index>
+  //   console:<slot>:<generation>:child:<derived_index>
+  if (strncmp(rest, "child:", strlen("child:")) == 0) {
+    unsigned int derived_index = 0;
+    char trailing = '\0';
+    if (sscanf(rest + strlen("child:"), "%u%c", &derived_index, &trailing) !=
+        1) {
+      return false;
+    }
+    info->type = ConsoleObjectIdType::kDerived;
+    info->index = derived_index;
+    return true;
+  }
+
+  unsigned int argument_index = 0;
+  char trailing = '\0';
+  if (sscanf(rest, "%u%c", &argument_index, &trailing) != 1) {
+    return false;
+  }
+  info->type = ConsoleObjectIdType::kRoot;
+  info->index = argument_index;
+  return true;
+}
+
+ScopedConsoleMessageContext::ScopedConsoleMessageContext(LEPUSContext* ctx,
+                                                         uint32_t message_slot,
+                                                         uint32_t generation)
+    : ctx_(ctx) {
+  auto& console = ctx_->debugger_info->console;
+  // Save/restore the previous context so nested console serialization keeps the
+  // correct lifetime domain. All objectIds created under this scope should be
+  // interpreted relative to `message_slot + generation`, not the global
+  // running_state object registry.
+  previous_slot_ = console.current_message_slot;
+  previous_generation_ = console.current_generation;
+  console.current_message_slot = static_cast<int32_t>(message_slot);
+  console.current_generation = generation;
+}
+
+ScopedConsoleMessageContext::~ScopedConsoleMessageContext() {
+  auto& console = ctx_->debugger_info->console;
+  console.current_message_slot = previous_slot_;
+  console.current_generation = previous_generation_;
+}
+
+ScopedConsoleMessageSlot::ScopedConsoleMessageSlot(LEPUSContext* ctx,
+                                                   uint32_t message_slot)
+    : ScopedConsoleMessageContext(
+          ctx, message_slot,
+          // Snapshot the slot generation at scope entry. If this ring-buffer
+          // slot gets recycled later, newly generated objectIds will use a
+          // different generation and old ids will fail closed.
+          GetConsoleMessageGeneration(ctx->debugger_info->console,
+                                      message_slot)) {}
 
 typedef struct LEPUSFunctionBytecode LEPUSFunctionBytecode;
 
@@ -131,7 +257,10 @@ void HandleRuntimeEnable(DebuggerParams* runtime_options) {
 
   int32_t console_length = info->console.length;
   for (int idx = 0; idx < console_length; idx++) {
-    LEPUSValue msg = LEPUS_GetPropertyUint32(ctx, info->console.messages, idx);
+    uint32_t real_idx = GetConsoleMessageIndex(info->console, idx);
+    LEPUSValue msg =
+        LEPUS_GetPropertyUint32(ctx, info->console.messages, real_idx);
+    ScopedConsoleMessageSlot console_scope(ctx, real_idx);
     SendConsoleAPICalledNotification(ctx, &msg);
     if (!ctx->rt->gc_enable) LEPUS_FreeValue(ctx, msg);
   }
@@ -169,7 +298,9 @@ void HandleDiscardConsoleEntries(DebuggerParams* runtime_protocols) {
   LEPUSContext* ctx = runtime_protocols->ctx;
   LEPUSDebuggerInfo* info = ctx->debugger_info;
   if (!ctx->rt->gc_enable) LEPUS_FreeValue(ctx, info->console.messages);
+  InvalidateAllConsoleMessageSlots(info->console);
   info->console.length = 0;
+  info->console.head = 0;
   LEPUS_HeapObjStore(ctx, &info->console.messages, LEPUS_NewArray(ctx));
 }
 
@@ -467,6 +598,47 @@ void HandleCompileScript(DebuggerParams* runtime_options) {
 
 LEPUSValue GetObjFromObjectId(LEPUSContext* ctx, const char* object_id_str,
                               uint64_t* object_id) {
+  ConsoleObjectIdInfo console_object_id;
+  if (ParseConsoleObjectId(object_id_str, &console_object_id)) {
+    auto* info = ctx->debugger_info;
+    // Reject immediately if the ring-buffer slot has already been recycled.
+    if (!info ||
+        console_object_id.message_slot >=
+            static_cast<uint32_t>(MAX_MESSAGE_COUNT) ||
+        !IsConsoleMessageSlotActive(info->console,
+                                    console_object_id.message_slot) ||
+        GetConsoleMessageGeneration(info->console,
+                                    console_object_id.message_slot) !=
+            console_object_id.generation) {
+      return LEPUS_UNDEFINED;
+    }
+    LEPUSValue message = LEPUS_GetPropertyUint32(
+        ctx, info->console.messages, console_object_id.message_slot);
+    if (LEPUS_IsUndefined(message)) {
+      return LEPUS_UNDEFINED;
+    }
+    LEPUSValue value = LEPUS_UNDEFINED;
+    if (console_object_id.type == ConsoleObjectIdType::kRoot) {
+      value = LEPUS_GetPropertyUint32(ctx, message, console_object_id.index);
+    } else if (console_object_id.type == ConsoleObjectIdType::kDerived) {
+      // Child objects are resolved from the hidden per-message registry created
+      // during previous console-object expansion.
+      LEPUSValue derived_objects =
+          LEPUS_GetPropertyStr(ctx, message, kConsoleDerivedObjectsProp);
+      if (!LEPUS_IsUndefined(derived_objects)) {
+        value = LEPUS_GetPropertyUint32(ctx, derived_objects,
+                                        console_object_id.index);
+      }
+      if (!ctx->rt->gc_enable) LEPUS_FreeValue(ctx, derived_objects);
+    }
+    if (!ctx->rt->gc_enable) LEPUS_FreeValue(ctx, message);
+    if (!LEPUS_IsObject(value)) {
+      if (!ctx->rt->gc_enable) LEPUS_FreeValue(ctx, value);
+      return LEPUS_UNDEFINED;
+    }
+    return value;
+  }
+
   const char* obj_id_str = object_id_str;
   bool is_scope_obj_id = false;
   const int prefix_len = strlen("scope:");
