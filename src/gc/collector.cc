@@ -144,6 +144,7 @@ void Visitor::VisitJSFunctionDef(void *ptr, GCWorkStack &workStack) noexcept {
   workStack.push_back((address_t)fd->cpool);
 
   workStack.push_back((address_t)(fd->vars));
+  workStack.push_back((address_t)(fd->vars_htab));
   workStack.push_back((address_t)fd->args);
 
   if (fd->hoisted_def) {

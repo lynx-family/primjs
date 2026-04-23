@@ -2787,7 +2787,8 @@ typedef struct JSFunctionDef {
   JSAtom func_name; /* JS_ATOM_NULL if no name */
 
   JSVarDef *vars;
-  int var_size; /* allocated size for vars[] */
+  uint32_t *vars_htab; /* indexes into vars[] */
+  int var_size;        /* allocated size for vars[] */
   int var_count;
   JSVarDef *args;
   int arg_size;  /* allocated size for args[] */

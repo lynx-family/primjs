@@ -18650,11 +18650,86 @@ int find_arg(LEPUSContext *ctx, JSFunctionDef *fd, JSAtom name) {
   return -1;
 }
 
-int find_var(LEPUSContext *ctx, JSFunctionDef *fd, JSAtom name) {
-  int i;
-  for (i = fd->var_count; i-- > 0;) {
-    if (fd->vars[i].var_name == name && fd->vars[i].scope_level == 0) return i;
+QJS_STATIC uint32_t hash_bytes(uint32_t h, const void *buf, size_t len) {
+  const uint8_t *p = static_cast<const uint8_t *>(buf);
+  const uint8_t *end = p + len;
+
+  while (p < end) h = 33 * h + *p++;
+  h += h >> 5;
+  return h;
+}
+
+QJS_STATIC uint32_t hash_atom(JSAtom atom) {
+  return hash_bytes(0, &atom, sizeof(atom));
+}
+
+QJS_STATIC int update_var_htab(LEPUSContext *ctx, JSFunctionDef *fd) {
+  uint32_t i, j, k, m, *p;
+
+  if (fd->var_count < 27) return 0;
+  k = fd->var_count - 1;
+  m = fd->var_count + fd->var_count / 5;
+  if (m & (m - 1)) goto insert;
+
+  m *= 2;
+  p = static_cast<uint32_t *>(lepus_realloc(
+      ctx, fd->vars_htab, m * sizeof(*fd->vars_htab), ALLOC_TAG_WITHOUT_PTR));
+  if (!p) return -1;
+  memset(p, 0xff, m * sizeof(*p));
+  HeapObjStore(ctx, &fd->vars_htab, p);
+  k = 0;
+  m--;
+
+insert:
+  m = UINT32_MAX >> clz32(m);
+  do {
+    i = hash_atom(fd->vars[k].var_name);
+    j = 1;
+    for (;;) {
+      p = &fd->vars_htab[i & m];
+      if (*p == UINT32_MAX) break;
+      i += j;
+      j += 1;
+    }
+    *p = k++;
+  } while (k < (uint32_t)fd->var_count);
+  return 0;
+}
+
+QJS_STATIC int find_var_htab(JSFunctionDef *fd, JSAtom name) {
+  uint32_t i, j, m, *p;
+
+  i = hash_atom(name);
+  j = 1;
+  m = fd->var_count + fd->var_count / 5;
+  m = UINT32_MAX >> clz32(m);
+  for (;;) {
+    p = &fd->vars_htab[i & m];
+    if (*p == UINT32_MAX) return -1;
+    if (fd->vars[*p].var_name == name) return static_cast<int>(*p);
+    i += j;
+    j += 1;
   }
+  return -1;
+}
+
+int find_var(LEPUSContext *ctx, JSFunctionDef *fd, JSAtom name) {
+  JSVarDef *vd;
+  int i;
+
+  if (fd->vars_htab) {
+    i = find_var_htab(fd, name);
+    if (i < 0) goto not_found;
+    vd = &fd->vars[i];
+    if (vd->scope_level == 0) return i;
+  }
+
+  for (i = fd->var_count; i-- > 0;) {
+    vd = &fd->vars[i];
+    if (vd->var_name == name && vd->scope_level == 0) return i;
+  }
+
+not_found:
   return find_arg(ctx, fd, name);
 }
 
@@ -18825,6 +18900,7 @@ int add_var(LEPUSContext *ctx, JSFunctionDef *fd, JSAtom name) {
     LEPUS_DupAtom(ctx, name);
   vd->var_name = name;
   vd->func_pool_idx = -1;
+  if (update_var_htab(ctx, fd)) return -1;
   return fd->var_count - 1;
 }
 
@@ -25181,6 +25257,7 @@ QJS_STATIC void js_free_function_def(LEPUSContext *ctx, JSFunctionDef *fd) {
     LEPUS_FreeAtom(ctx, fd->vars[i].var_name);
   }
   lepus_free(ctx, fd->vars);
+  lepus_free(ctx, fd->vars_htab);
   for (i = 0; i < fd->arg_count; i++) {
     LEPUS_FreeAtom(ctx, fd->args[i].var_name);
   }
@@ -25929,9 +26006,6 @@ QJS_STATIC int resolve_scope_var(LEPUSContext *ctx, JSFunctionDef *s,
        `arguments` and function-name should not be hidden by later vars.
      */
     var_idx = find_var(ctx, s, var_name);
-    if (var_idx >= 0) {
-      var_idx = find_var(ctx, s, var_name);
-    }
 
     if (var_idx < 0 && is_pseudo_var)
       var_idx = resolve_pseudo_var(ctx, s, var_name);
@@ -29127,6 +29201,7 @@ LEPUSValue js_create_function(LEPUSContext *ctx, JSFunctionDef *fd) {
     if (!is_gc) {
       lepus_free(ctx, fd->args);
       lepus_free(ctx, fd->vars);
+      lepus_free(ctx, fd->vars_htab);
     }
   }
   b->cpool_count = fd->cpool_count;
