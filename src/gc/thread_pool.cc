@@ -30,11 +30,6 @@
     }                                                              \
   } while (false)
 
-struct CreateParam {
-  void *poolThread;
-  void *vmSource;
-};
-
 // thread pool implementation
 namespace ROS_GC {
 MplPoolThread::MplPoolThread(MplThreadPool *threadPool, const char *threadName,
@@ -48,10 +43,8 @@ MplPoolThread::MplPoolThread(MplThreadPool *threadPool, const char *threadName,
   pthread_attr_t attr;
   CHECK_PTHREAD_CALL(pthread_attr_init, (&attr), "");
   CHECK_PTHREAD_CALL(pthread_attr_setstacksize, (&attr, stackSize), stackSize);
-  CreateParam *param = (CreateParam *)malloc(sizeof(CreateParam));
-  param->poolThread = (void *)this;
   CHECK_PTHREAD_CALL(pthread_create,
-                     (&pthread, nullptr, &WorkerFunc, (void *)param),
+                     (&pthread, nullptr, &WorkerFunc, (void *)this),
                      "MplPoolThread init");
 #if defined(ANDROID) || defined(__ANDROID__)
   CHECK_PTHREAD_CALL(pthread_setname_np, (pthread, threadName),
@@ -74,9 +67,7 @@ void MplPoolThread::SetPriority(int32_t priority) {
 }
 
 void *MplPoolThread::WorkerFunc(void *param) {
-  CreateParam *createParam = reinterpret_cast<CreateParam *>(param);
-  MplPoolThread *thread =
-      reinterpret_cast<MplPoolThread *>(createParam->poolThread);
+  MplPoolThread *thread = reinterpret_cast<MplPoolThread *>(param);
   MplThreadPool *pool = thread->pool;
 
   while (!pool->IsExited()) {
