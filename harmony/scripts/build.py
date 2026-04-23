@@ -109,6 +109,18 @@ def packJsPrimjsHeaderFiles():
     cmd = " && ".join(cmds)
     check_call(cmd, shell=True, cwd=dest_path)
 
+    # copy weak-node-api header files
+    weak_node_api_src = os.path.join(PRIMJS_DIR, "packages/weak-node-api/headers")
+    weak_node_api_dest = os.path.join(HARMONY_DIR, 'primjs/src/main/weak-node-api/include')
+    if not os.path.exists(weak_node_api_dest):
+        os.makedirs(weak_node_api_dest)
+
+    cmds = [
+        f"cp -rL {weak_node_api_src}/* ./"
+    ]
+    cmd = " && ".join(cmds)
+    check_call(cmd, shell=True, cwd=weak_node_api_dest)
+
 def main(argv):
     parser = argparse.ArgumentParser()
     parser.add_argument("--verbose", action="store_true", default=False, help="verbose print")
@@ -162,6 +174,7 @@ def main(argv):
                     f"-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
                     f"-DENABLE_UNITTESTS={args.enable_ut}",
                     f"-DENABLE_NAPI_ADAPTER=true" if args.build_napi_adapter else "-DENABLE_NAPI_ADAPTER=false",
+                    f"-DUSE_WEAK_SUFFIX_NAPI=true",
                     f"{PRIMJS_DIR}/harmony/primjs",
                 ]
                 cmake_cmd = " ".join(cmake_cmd)

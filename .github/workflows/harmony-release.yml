@@ -60,6 +60,15 @@ jobs:
         with:
           fetch-depth: 0
           fetch-tags: true
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.14.0'
+      - name: Prepare weak-node-api headers
+        run: |
+          cd $GITHUB_WORKSPACE/primjs/packages/weak-node-api
+          npm install
+          npm run prepare:headers
       - name: Get latest tag
         id: get-latest-tag
         uses: ./.github/actions/get-latest-tag
