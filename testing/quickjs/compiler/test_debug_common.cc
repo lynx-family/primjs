@@ -2036,6 +2036,19 @@ TEST_F(QjsDebugMethods, TestFailToParse) {
   ASSERT_TRUE(QjsDebugQueue::GetReceiveMessageQueue().front() == gt);
 }
 
+TEST_F(QjsDebugMethods, TestFindDebuggerMagicContentWithEmptySource) {
+  char* source_map_url =
+      FindDebuggerMagicContent(ctx_, nullptr, (char*)"sourceMappingURL", 0);
+
+  ASSERT_TRUE(source_map_url == nullptr);
+  if (!ctx_->rt->gc_enable) lepus_free(ctx_, source_map_url);
+
+  char* source_url =
+      FindDebuggerMagicContent(ctx_, nullptr, (char*)"sourceURL", 0);
+  ASSERT_TRUE(source_url == nullptr);
+  if (!ctx_->rt->gc_enable) lepus_free(ctx_, source_url);
+}
+
 TEST_F(QjsDebugMethods, TestFindDebuggerMagicContent) {
   std::string source =
       "test js.map"

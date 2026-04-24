@@ -58,6 +58,7 @@ static bool ContentNotSatisfied(const std::string& content, size_t pos,
 
 char* FindDebuggerMagicContent(LEPUSContext* ctx, char* source,
                                char* search_name, uint8_t multi_line) {
+  if (source == nullptr || search_name == nullptr) return nullptr;
   std::string content = source;
   std::string name = search_name;
   size_t length = content.length();

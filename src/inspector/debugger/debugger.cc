@@ -580,9 +580,12 @@ QJS_HIDE void DebuggerSetFunctionBytecodeScript(LEPUSContext *ctx,
 
 QJS_STATIC void SetScriptSourceMappingUrl(LEPUSContext *ctx,
                                           LEPUSScriptSource *script) {
+  if (!script->source) return;
   char *source_map_url = FindDebuggerMagicContent(
       ctx, script->source, (char *)"sourceMappingURL", 0);
-  LEPUS_HeapObjStore(ctx, &script->source_map_url, source_map_url);
+  if (source_map_url) {
+    LEPUS_HeapObjStore(ctx, &script->source_map_url, source_map_url);
+  }
   return;
 }
 
