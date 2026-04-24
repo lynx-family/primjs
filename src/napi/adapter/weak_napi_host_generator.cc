@@ -3,14 +3,12 @@
 // LICENSE file in the root directory of this source tree.
 
 #include "js_native_api_adapter.h"
+#include "primjs_weak_node_api_provider.h"
 #include "weak_node_api_host.h"
 
-namespace primjs {
-namespace napi {
-
-const NodeApiRawPtrHost& GetWeakNapiRawPtrHost() {
-  static NodeApiRawPtrHost* sWeakRawPtrHost = []() {
-    auto* host = new NodeApiRawPtrHost();
+extern "C" const void* PrimJSGetWeakNodeApiRawPtrHost(void) {
+  static PrimJSNodeApiRawPtrHost* sWeakRawPtrHost = []() {
+    auto* host = new PrimJSNodeApiRawPtrHost();
     host->napi_get_undefined_rawptr =
         reinterpret_cast<void*>(napi_get_undefined_primjs);
     host->napi_get_null_rawptr = reinterpret_cast<void*>(napi_get_null_primjs);
@@ -255,8 +253,5 @@ const NodeApiRawPtrHost& GetWeakNapiRawPtrHost() {
         reinterpret_cast<void*>(napi_find_module_primjs);
     return host;
   }();
-  return *sWeakRawPtrHost;
+  return reinterpret_cast<const void*>(sWeakRawPtrHost);
 }
-
-}  // namespace napi
-}  // namespace primjs

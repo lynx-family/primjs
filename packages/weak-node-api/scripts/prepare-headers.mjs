@@ -164,6 +164,19 @@ const HEADER_GUARD_TARGET_FILES = new Set([
   "node_api.h",
 ]);
 
+const HEADER_LOCAL_INCLUDE_REWRITES = new Map([
+  ["napi.h", [["node_api.h", "./node_api.h"]]],
+  ["js_native_api.h", [["js_native_api_types.h", "./js_native_api_types.h"]]],
+  ["node_api_types.h", [["js_native_api_types.h", "./js_native_api_types.h"]]],
+  [
+    "node_api.h",
+    [
+      ["js_native_api.h", "./js_native_api.h"],
+      ["node_api_types.h", "./node_api_types.h"],
+    ],
+  ],
+]);
+
 function maybeRewriteIncludeGuard(base, content) {
   if (!HEADER_GUARD_TARGET_FILES.has(base)) {
     return content;
@@ -298,6 +311,15 @@ function processFile(filePath) {
     content = content.replace(/#\s*include\s*<node_api\.h>/g, '#include "node_api.h"');
   }
 
+  const includeRewrites = HEADER_LOCAL_INCLUDE_REWRITES.get(base) || [];
+  for (const [fromHeader, toHeader] of includeRewrites) {
+    const includePattern = new RegExp(
+      `#\\s*include\\s*"${fromHeader.replace(".", "\\.")}"`,
+      "g",
+    );
+    content = content.replace(includePattern, `#include "${toHeader}"`);
+  }
+
   // Comment style and insertion for generated/* files attribution
   const version = getUpstreamVersion();
   const attributionHeader = [
@@ -309,15 +331,16 @@ function processFile(filePath) {
     "",
   ].join("\n");
 
-  // Only include weak symbol remapping headers when USE_WEAK_SUFFIX_NAPI is
-  // defined so that weak suffix symbol remapping is opt-in at compile time.
+  // Enable weak symbol remapping when USE_WEAK_SUFFIX_NAPI is defined, or
+  // by default on Harmony where the adapter is always expected to export weak
+  // suffixed symbols.
   const defineLines = [
-    "#if defined(USE_WEAK_SUFFIX_NAPI)",
+    "#if defined(USE_WEAK_SUFFIX_NAPI) || defined(OS_HARMONY)",
     '#include "weak_napi_defines.h"',
     "#endif",
   ];
   const undefLines = [
-    "#if defined(USE_WEAK_SUFFIX_NAPI)",
+    "#if defined(USE_WEAK_SUFFIX_NAPI) || defined(OS_HARMONY)",
     '#include "weak_napi_undefs.h"',
     "#endif",
   ];

@@ -124,9 +124,13 @@ Pod::Spec.new do |s|
       ssp.source_files = [
         "src/napi/adapter/js_native_api_adapter.{h,cc}",
         "src/napi/adapter/weak_napi_host_generator.cc",
+        "src/napi/adapter/primjs_weak_node_api_provider.h",
         "src/napi/adapter/weak_node_api_host.h",
       ]
-      ssp.public_header_files = "src/napi/adapter/js_native_api_adapter.h"
+      ssp.public_header_files = [
+        "src/napi/adapter/js_native_api_adapter.h",
+        "src/napi/adapter/primjs_weak_node_api_provider.h",
+      ]
       ssp.private_header_files = [
         "src/napi/adapter/weak_node_api_host.h",
       ]

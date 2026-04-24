@@ -30,6 +30,7 @@ COPY_FILES = [
     "packages/weak-node-api/LICENSE",
     "packages/weak-node-api/NOTICE.md",
     "packages/weak-node-api/THIRD-PARTY-NOTICES.md",
+    "src/napi/adapter/primjs_weak_node_api_installer.h",
     "src/napi/adapter/weak_napi_host_injector.cc",
     "src/napi/adapter/weak_node_api_host.h",
 ]

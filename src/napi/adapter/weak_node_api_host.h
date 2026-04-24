@@ -5,18 +5,15 @@
 #ifndef SRC_NAPI_ADAPTER_WEAK_NODE_API_HOST_H_
 #define SRC_NAPI_ADAPTER_WEAK_NODE_API_HOST_H_
 
-namespace primjs {
-namespace napi {
-
 /**
- * @struct NodeApiRawPtrHost
+ * @struct PrimJSNodeApiRawPtrHost
  * @brief Raw pointer version of NodeApiHost struct.
  *
  * This struct has the same members as NodeApiHost but all are void* type,
  * initialized to nullptr. This can be useful for avoiding symbol conflicts
  * between weak_node_api and primjs napi in the same source file.
  */
-struct NodeApiRawPtrHost {
+typedef struct PrimJSNodeApiRawPtrHost {
   void* napi_get_last_error_info_rawptr = nullptr;
   void* napi_get_undefined_rawptr = nullptr;
   void* napi_get_null_rawptr = nullptr;
@@ -163,11 +160,6 @@ struct NodeApiRawPtrHost {
   void* napi_add_async_cleanup_hook_rawptr = nullptr;
   void* napi_remove_async_cleanup_hook_rawptr = nullptr;
   void* napi_find_module_rawptr = nullptr;
-};
-
-const NodeApiRawPtrHost& GetWeakNapiRawPtrHost();
-
-}  // namespace napi
-}  // namespace primjs
+} PrimJSNodeApiRawPtrHost;
 
 #endif  // SRC_NAPI_ADAPTER_WEAK_NODE_API_HOST_H_
