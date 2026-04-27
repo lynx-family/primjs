@@ -51491,6 +51491,10 @@ void LEPUS_SetFuncFileName(LEPUSContext *ctx, LEPUSValue obj,
       LEPUS_FreeAtom(ctx, b->debug.filename);
       b->debug.filename = LEPUS_DupAtom(ctx, filename_atom);
     }
+#ifdef ENABLE_QUICKJS_DEBUGGER
+    b->debug.file_name = ctx->rt->atom_array[filename_atom];
+#endif
+
     mark_children(ctx->rt, LEPUS_MKPTR(LEPUS_TAG_FUNCTION_BYTECODE, b),
                   add_child_wrapper);
   }

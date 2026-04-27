@@ -157,7 +157,8 @@ typedef struct JSDebuggerConsole {
   int32_t length{0};
   // Ring buffer head. Logical index 0 always maps to the oldest message.
   int32_t head{0};
-  // Bump once whenever a slot is recycled so old console objectId can失效.
+  // Bump once whenever a slot is recycled so old console objectIds can be
+  // invalidated.
   uint32_t generations[MAX_MESSAGE_COUNT]{0};
   // Transient context used while serializing / expanding a console object.
   int32_t current_message_slot{-1};
