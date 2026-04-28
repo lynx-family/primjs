@@ -988,8 +988,11 @@ void JS_FreeContext_GC(LEPUSContext *ctx) {
     delete ctx->napi_scope;
     ctx->napi_scope = nullptr;
   }
-  delete ctx->obj_finalizer_recoder;
-  if (ctx->fr_data_finalizer_recoder) delete ctx->fr_data_finalizer_recoder;
+
+  if (ctx->rt->collector_) {
+    ctx->rt->collector_->DoCtxFinalizer(ctx);
+  }
+
   if (ctx->object_ctx_check && ctx->check_tools) {
     delete ctx->check_tools;
   }
