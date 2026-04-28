@@ -3,6 +3,8 @@
 
 #include "gc/gc_marking.h"
 
+struct LEPUSContext;
+
 namespace ROS_GC {
 class MarkTask;
 class ConcurrentMarkTask;
@@ -53,6 +55,7 @@ class MarkSweepCollector {
                          bool forceParallel = false);
   void RunFinalCollection();
   void DoOnlyFinalizer();
+  void DoCtxFinalizer(LEPUSContext *ctx);
   void OnlyUpdateHeapSize(size_t alloc_size);
 
   bool EnureConcurrentIsCompleted();

@@ -526,32 +526,37 @@ void MarkSweepCollector::DoOnlyFinalizer() {
   finalizer->DoGlobalFinalizer();
 
   auto rt = ros->GetRuntime();
-  struct list_head *el, *el1;
-  list_for_each_safe(el, el1, &rt->context_list) {
-    LEPUSContext *ctx = list_entry(el, LEPUSContext, link);
-    auto &set = *ctx->obj_finalizer_recoder;
-    for (auto it = set.begin(); it != set.end(); it++) {
-      auto val = *it;
-      finalizer->JSObjectOnlyFinalizer(val);
-    }
-    set.clear();
-
-    if (ctx->fr_data_finalizer_recoder) {
-      auto &fr_set = *ctx->fr_data_finalizer_recoder;
-      for (auto it = fr_set.begin(); it != fr_set.end(); it++) {
-        auto val = *it;
-        finalizer->FinalizationRegistryDataFinalizer(val);
-      }
-      fr_set.clear();
-    }
-  }
-
   for (auto it = rt->finalizerSet->begin(); it != rt->finalizerSet->end();
        it++) {
     auto val = *it;
     finalizer->DoFinalizer2(val);
   }
   rt->finalizerSet->clear();
+}
+
+void MarkSweepCollector::DoCtxFinalizer(LEPUSContext *ctx) {
+  auto pool = GetThreadPool();
+  if (pool) pool->WaitFinish(true);
+
+  // Call finalizers for objects in obj_finalizer_recoder before deleting
+  if (ctx->obj_finalizer_recoder) {
+    auto &set = *ctx->obj_finalizer_recoder;
+    for (auto it = set.begin(); it != set.end(); ++it) {
+      finalizer->JSObjectOnlyFinalizer(*it);
+    }
+    delete ctx->obj_finalizer_recoder;
+    ctx->obj_finalizer_recoder = nullptr;
+  }
+
+  // Call finalizers for fr_data_finalizer_recoder before deleting
+  if (ctx->fr_data_finalizer_recoder) {
+    auto &fr_set = *ctx->fr_data_finalizer_recoder;
+    for (auto it = fr_set.begin(); it != fr_set.end(); ++it) {
+      finalizer->FinalizationRegistryDataFinalizer(*it);
+    }
+    delete ctx->fr_data_finalizer_recoder;
+    ctx->fr_data_finalizer_recoder = nullptr;
+  }
 }
 
 void MarkSweepCollector::RunFinalCollection() {
