@@ -157,7 +157,9 @@ class WASMGCPersistent : public PersistentBase {
     }
   }
 
-  virtual inline ~WASMGCPersistent() { PersistentBase::Reset(rt); }
+  virtual inline ~WASMGCPersistent() {
+    if (rt) PersistentBase::Reset(rt);
+  }
   LEPUSRuntime* GetRT() const { return rt; }
 
  private:
