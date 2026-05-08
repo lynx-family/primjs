@@ -320,6 +320,13 @@ function processFile(filePath) {
     content = content.replace(includePattern, `#include "${toHeader}"`);
   }
 
+  // Rename NAPI_EXTERN -> WEAK_NAPI_EXTERN in js_native_api.h and node_api.h so
+  // that the exported symbol-decoration macro does not collide with the one
+  // defined by the host Node-API headers at link time.
+  if (base === "js_native_api.h" || base === "node_api.h") {
+    content = content.replace(/\bNAPI_EXTERN\b/g, "WEAK_NAPI_EXTERN");
+  }
+
   // Comment style and insertion for generated/* files attribution
   const version = getUpstreamVersion();
   const attributionHeader = [

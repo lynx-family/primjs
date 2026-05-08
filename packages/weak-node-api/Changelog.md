@@ -1,3 +1,6 @@
+## 0.0.7 - 2026-05-08
+- **Compatibility**: Rename `NAPI_EXTERN` to `WEAK_NAPI_EXTERN` in the generated `js_native_api.h` and `node_api.h` to avoid collision with the host Node-API headers' macro of the same name.
+
 ## 0.0.6 - 2026-04-16
 - **Compatibility**: Remove the published `engines.node` restriction so consumers are not blocked by npm engine checks.
 - **Release Policy**: Continue to require Node.js 22+ only for maintainer workflows that run helper scripts such as `prepare:headers`.
