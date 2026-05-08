@@ -51502,7 +51502,10 @@ void LEPUS_SetFuncFileName(LEPUSContext *ctx, LEPUSValue obj,
   return;
 }
 
-void InitLynxTraceEnv(void *(*begin)(const char *), void (*end)(void *ptr)) {
+void InitLynxTraceEnv(void (*begin)(const char *, const char *, int64_t,
+                                    const char *, const char *, const char *,
+                                    const char *),
+                      void (*end)(const char *, const char *, int64_t)) {
   auto &lynx_trace = LynxTraceInstance::GetInstance();
   lynx_trace.InitBeginPtr(begin);
   lynx_trace.InitEndPtr(end);

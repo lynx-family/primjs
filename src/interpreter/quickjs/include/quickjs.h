@@ -1674,7 +1674,10 @@ LEPUSValue LEPUS_NewArrayWithArgs(LEPUSContext *, int32_t, LEPUSValue *);
 const char *LEPUS_GetStringUtf8(LEPUSContext *, const struct JSString *);
 void LEPUS_SetFuncFileName(LEPUSContext *, LEPUSValue, const char *);
 
-void InitLynxTraceEnv(void *(*)(const char *), void (*)(void *));
+void InitLynxTraceEnv(void (*)(const char *, const char *, int64_t,
+                               const char *, const char *, const char *,
+                               const char *),
+                      void (*)(const char *, const char *, int64_t));
 
 void SetObjectCtxCheckStatus(LEPUSContext *ctx, bool enable);
 bool LEPUS_PushObjectCheckTid(LEPUSContext *ctx);

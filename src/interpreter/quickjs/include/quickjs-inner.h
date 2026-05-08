@@ -3073,8 +3073,9 @@ void LEPUS_SetHeapOpaque(LEPUSContext *ctx, LEPUSValue obj, void *opaque);
 
 class LynxTraceInstance {
  public:
-  using BeginPtr = void *(*)(const char *);
-  using EndPtr = void (*)(void *);
+  using BeginPtr = void (*)(const char *, const char *, int64_t, const char *,
+                            const char *, const char *, const char *);
+  using EndPtr = void (*)(const char *, const char *, int64_t);
   static auto &GetInstance() {
     static LynxTraceInstance instance;
     return instance;
@@ -3090,22 +3091,24 @@ class LynxTraceInstance {
   EndPtr trace_end_{nullptr};
 };
 
+constexpr char INTERNAL_TRACE_CATEGORY_PRIMJS[] = "primjs";
 class TraceManager {
  public:
-  explicit TraceManager(const char *name) {
+  explicit TraceManager(const char *name) : name_(name) {
     if (auto call_begin = LynxTraceInstance::GetInstance().GetBeginPtr()) {
-      ptr = call_begin(name);
+      call_begin(INTERNAL_TRACE_CATEGORY_PRIMJS, name_, -1, nullptr, nullptr,
+                 nullptr, nullptr);
     }
   }
 
   ~TraceManager() {
     if (auto call_end = LynxTraceInstance::GetInstance().GetEndPtr()) {
-      call_end(ptr);
+      call_end(INTERNAL_TRACE_CATEGORY_PRIMJS, name_, -1);
     }
   }
 
  private:
-  void *ptr{nullptr};
+  const char *name_{nullptr};
 };
 
 #define JS_OBJECT_IS_OUTER(obj) (obj->class_id >= JS_CLASS_INIT_COUNT)
