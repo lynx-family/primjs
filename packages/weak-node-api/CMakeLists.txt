@@ -46,6 +46,7 @@ target_include_directories(${PROJECT_NAME}
   PUBLIC
     ${INCLUDE_DIR}
     ${GENERATED_SOURCE_DIR}
+    shim
 )
 
 # Apple (macOS) shared library configuration (non-Framework)

@@ -27,6 +27,7 @@
   "files": [
     "headers/**",
     "generated/**",
+    "shim/**",
     "prebuilt/**",
     "CMakeLists.txt",
     "weak-node-api-config.cmake",
