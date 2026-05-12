@@ -4647,6 +4647,30 @@ QJS_HIDE LEPUSValue JS_NewObjectProtoClassAlloc(LEPUSContext *ctx,
   return JS_NewObjectFromShape(ctx, sh, class_id);
 }
 
+QJS_STATIC LEPUSValue JS_NewObjectFromTemplate(LEPUSContext *ctx,
+                                               LEPUSValueConst tmpl,
+                                               LEPUSValue *values) {
+  LEPUSObject *tp, *p;
+  JSShape *sh;
+  LEPUSValue obj;
+  int i, prop_count;
+
+  DCHECK(LEPUS_VALUE_IS_OBJECT(tmpl));
+  tp = LEPUS_VALUE_GET_OBJ(tmpl);
+  prop_count = tp->shape->prop_count;
+  sh = js_clone_shape(ctx, tp->shape);
+  if (unlikely(!sh)) return LEPUS_EXCEPTION;
+  obj = JS_NewObjectFromShape(ctx, sh, JS_CLASS_OBJECT);
+  if (unlikely(LEPUS_IsException(obj))) return obj;
+
+  p = LEPUS_VALUE_GET_OBJ(obj);
+  for (i = 0; i < prop_count; i++) {
+    p->prop[i].u.value = values[i];
+    values[i] = LEPUS_UNDEFINED;
+  }
+  return obj;
+}
+
 LEPUSValue LEPUS_NewObjectProtoClass(LEPUSContext *ctx,
                                      LEPUSValueConst proto_val,
                                      LEPUSClassID class_id) {
@@ -14211,6 +14235,28 @@ restart:
       CASE(OP_object) : *sp++ = LEPUS_NewObject(ctx);
       if (unlikely(LEPUS_IsException(sp[-1]))) goto exception;
       BREAK;
+      CASE(OP_object_literal) : {
+        LEPUSValue obj;
+        LEPUSValueConst tmpl;
+        int idx, prop_count;
+
+        idx = get_u32(pc);
+        pc += 4;
+        tmpl = b->cpool[idx];
+        prop_count = LEPUS_VALUE_GET_OBJ(tmpl)->shape->prop_count;
+        sp -= prop_count;
+        obj = JS_NewObjectFromTemplate(ctx, tmpl, sp);
+        if (unlikely(LEPUS_IsException(obj))) {
+          int i;
+          for (i = 0; i < prop_count; i++) {
+            LEPUS_FreeValue(ctx, sp[i]);
+          }
+          goto exception;
+        }
+        sp[0] = obj;
+        sp++;
+      }
+      BREAK;
       CASE(OP_special_object) : {
         int arg = *pc++;
         switch (arg) {
@@ -19643,23 +19689,113 @@ void set_object_name_computed(JSParseState *s) {
   }
 }
 
+typedef struct JSObjectLiteralAtomList {
+  JSAtom *atoms;
+  int count;
+  int size;
+} JSObjectLiteralAtomList;
+
+QJS_STATIC void js_object_literal_atom_list_free(LEPUSContext *ctx,
+                                                 JSObjectLiteralAtomList *ol) {
+  int i;
+  for (i = 0; i < ol->count; i++) {
+    LEPUS_FreeAtom(ctx, ol->atoms[i]);
+  }
+  lepus_free(ctx, ol->atoms);
+  ol->atoms = NULL;
+  ol->count = 0;
+  ol->size = 0;
+}
+
+QJS_STATIC BOOL js_object_literal_atom_list_has(JSObjectLiteralAtomList *ol,
+                                                JSAtom atom) {
+  int i;
+  for (i = 0; i < ol->count; i++) {
+    if (ol->atoms[i] == atom) return TRUE;
+  }
+  return FALSE;
+}
+
+QJS_STATIC int js_object_literal_atom_list_add(JSParseState *s,
+                                               JSObjectLiteralAtomList *ol,
+                                               JSAtom atom) {
+  if (ol->count >= ol->size) {
+    int new_size = max_int(ol->count + 1, ol->size * 3 / 2);
+    JSAtom *new_atoms = static_cast<JSAtom *>(
+        lepus_realloc(s->ctx, ol->atoms, sizeof(JSAtom) * new_size));
+    if (!new_atoms) return -1;
+    ol->atoms = new_atoms;
+    ol->size = new_size;
+  }
+  ol->atoms[ol->count++] = LEPUS_DupAtom(s->ctx, atom);
+  return 0;
+}
+
+QJS_STATIC int js_emit_object_literal(JSParseState *s,
+                                      JSObjectLiteralAtomList *ol) {
+  LEPUSContext *ctx = s->ctx;
+  LEPUSValue tmpl;
+  LEPUSObject *p;
+  JSProperty *pr;
+  int i, idx;
+
+  if (ol->count == 0) {
+    emit_op(s, OP_object);
+    return 0;
+  }
+
+  tmpl = JS_NewObjectProtoClassAlloc(ctx, ctx->class_proto[JS_CLASS_OBJECT],
+                                     JS_CLASS_OBJECT, ol->count);
+  if (LEPUS_IsException(tmpl)) return -1;
+
+  p = LEPUS_VALUE_GET_OBJ(tmpl);
+  for (i = 0; i < ol->count; i++) {
+    pr = add_property(ctx, p, ol->atoms[i], LEPUS_PROP_C_W_E);
+    if (!pr) {
+      LEPUS_FreeValue(ctx, tmpl);
+      return -1;
+    }
+    pr->u.value = LEPUS_UNDEFINED;
+  }
+
+  idx = cpool_add(s, tmpl);
+  if (idx < 0) {
+    LEPUS_FreeValue(ctx, tmpl);
+    return -1;
+  }
+  emit_op(s, OP_object_literal);
+  emit_u32(s, idx);
+  return 0;
+}
+
+QJS_STATIC int js_flush_object_literal(JSParseState *s,
+                                       JSObjectLiteralAtomList *ol) {
+  int ret = js_emit_object_literal(s, ol);
+  js_object_literal_atom_list_free(s->ctx, ol);
+  return ret;
+}
+
 QJS_STATIC __exception int js_parse_object_literal(JSParseState *s) {
   CallGCParserFunc(js_parse_object_literal_GC, s);
   JSAtom name = JS_ATOM_NULL;
   const uint8_t *start_ptr;
   int start_line, prop_type;
-  BOOL has_proto;
+  BOOL has_proto, obj_emitted;
+  JSObjectLiteralAtomList atom_list = {};
 
   if (next_token(s)) goto fail;
-  /* XXX: add an initial length that will be patched back */
-  emit_op(s, OP_object);
   has_proto = FALSE;
+  obj_emitted = FALSE;
   while (s->token.val != '}') {
     /* specific case for getter/setter */
     start_ptr = s->token.ptr;
     start_line = s->token.line_num;
 
     if (s->token.val == TOK_ELLIPSIS) {
+      if (!obj_emitted) {
+        if (js_flush_object_literal(s, &atom_list)) goto fail;
+        obj_emitted = TRUE;
+      }
       if (next_token(s)) return -1;
       if (js_parse_assign_expr(s, PF_IN_ACCEPTED)) return -1;
       emit_op(s, OP_null); /* dummy excludeList */
@@ -19670,16 +19806,36 @@ QJS_STATIC __exception int js_parse_object_literal(JSParseState *s) {
       goto next;
     }
 
+    if (!obj_emitted) {
+      int tok = peek_token(s, TRUE);
+      if (s->token.val == '[' || s->token.val == '*' ||
+          (token_is_ident(s->token.val) &&
+           (tok == '(' || ((token_is_pseudo_keyword(s, JS_ATOM_get) ||
+                            token_is_pseudo_keyword(s, JS_ATOM_set) ||
+                            token_is_pseudo_keyword(s, JS_ATOM_async)) &&
+                           tok != ':' && tok != ',' && tok != '}')))) {
+        if (js_flush_object_literal(s, &atom_list)) goto fail;
+        obj_emitted = TRUE;
+      }
+    }
     prop_type = js_parse_property_name(s, &name, TRUE, TRUE, FALSE);
     if (prop_type < 0) goto fail;
 
     if (prop_type == PROP_TYPE_VAR) {
       /* shortcut for x: x */
+      if (!obj_emitted && js_object_literal_atom_list_has(&atom_list, name)) {
+        if (js_flush_object_literal(s, &atom_list)) goto fail;
+        obj_emitted = TRUE;
+      }
       emit_op(s, OP_scope_get_var);
       emit_atom(s, name);
       emit_u16(s, s->cur_func->scope_level);
-      emit_op(s, OP_define_field);
-      emit_atom(s, name);
+      if (obj_emitted) {
+        emit_op(s, OP_define_field);
+        emit_atom(s, name);
+      } else if (js_object_literal_atom_list_add(s, &atom_list, name)) {
+        goto fail;
+      }
     } else if (s->token.val == '(') {
       BOOL is_getset =
           (prop_type == PROP_TYPE_GET || prop_type == PROP_TYPE_SET);
@@ -19700,6 +19856,10 @@ QJS_STATIC __exception int js_parse_object_literal(JSParseState *s) {
         else if (prop_type == PROP_TYPE_ASYNC_STAR)
           func_kind = JS_FUNC_ASYNC_GENERATOR;
       }
+      if (!obj_emitted) {
+        if (js_flush_object_literal(s, &atom_list)) goto fail;
+        obj_emitted = TRUE;
+      }
       if (js_parse_function_decl(s, func_type, func_kind, JS_ATOM_NULL,
                                  start_ptr, start_line))
         goto fail;
@@ -19717,6 +19877,11 @@ QJS_STATIC __exception int js_parse_object_literal(JSParseState *s) {
       emit_u8(s, op_flags | OP_DEFINE_METHOD_ENUMERABLE);
     } else {
       if (js_parse_expect(s, ':')) goto fail;
+      if (!obj_emitted && (name == JS_ATOM_NULL || name == JS_ATOM___proto__ ||
+                           js_object_literal_atom_list_has(&atom_list, name))) {
+        if (js_flush_object_literal(s, &atom_list)) goto fail;
+        obj_emitted = TRUE;
+      }
       if (js_parse_assign_expr(s, PF_IN_ACCEPTED)) goto fail;
       if (name == JS_ATOM_NULL) {
         set_object_name_computed(s);
@@ -19730,9 +19895,14 @@ QJS_STATIC __exception int js_parse_object_literal(JSParseState *s) {
         emit_op(s, OP_set_proto);
         has_proto = TRUE;
       } else {
-        set_object_name(s, name);
-        emit_op(s, OP_define_field);
-        emit_atom(s, name);
+        if (obj_emitted) {
+          set_object_name(s, name);
+          emit_op(s, OP_define_field);
+          emit_atom(s, name);
+        } else {
+          set_object_name(s, name);
+          if (js_object_literal_atom_list_add(s, &atom_list, name)) goto fail;
+        }
       }
     }
     LEPUS_FreeAtom(s->ctx, name);
@@ -19742,9 +19912,11 @@ QJS_STATIC __exception int js_parse_object_literal(JSParseState *s) {
     if (next_token(s)) goto fail;
   }
   if (js_parse_expect(s, '}')) goto fail;
+  if (!obj_emitted && js_flush_object_literal(s, &atom_list)) goto fail;
   return 0;
 fail:
   LEPUS_FreeAtom(s->ctx, name);
+  js_object_literal_atom_list_free(s->ctx, &atom_list);
   return -1;
 }
 
@@ -25230,7 +25402,7 @@ QJS_STATIC void free_bytecode_atoms(LEPUSRuntime *rt, const uint8_t *bc_buf,
     if (use_short_opcodes)
       oi = &short_opcode_info(op);
     else
-      oi = &opcode_info[op];
+      oi = &opcode_info_for_op(op);
 
     len = oi->size;
     switch (oi->fmt) {
@@ -25357,7 +25529,7 @@ static void dump_byte_code(LEPUSContext *ctx, int pass, const uint8_t *tab,
     if (use_short_opcodes)
       oi = &short_opcode_info(op);
     else
-      oi = &opcode_info[op];
+      oi = &opcode_info_for_op(op);
     pos_next = pos + oi->size;
     if (op < OP_COUNT) {
       switch (oi->fmt) {
@@ -25428,7 +25600,7 @@ static void dump_byte_code(LEPUSContext *ctx, int pass, const uint8_t *tab,
     if (use_short_opcodes)
       oi = &short_opcode_info(op);
     else
-      oi = &opcode_info[op];
+      oi = &opcode_info_for_op(op);
     size = oi->size;
     if (pos + size > len) {
       printf("truncated opcode (0x%02x)\n", op);
@@ -26912,7 +27084,7 @@ QJS_STATIC BOOL code_match(CodeContext *s, int pos, ...) {
     for (;;) {
       if (pos >= s->bc_len) goto done;
       op = tab[pos];
-      len = opcode_info[op].size;
+      len = opcode_info_for_op(op).size;
       pos_next = pos + len;
       if (pos_next > s->bc_len) goto done;
       // <Primjs begin>
@@ -26935,7 +27107,7 @@ QJS_STATIC BOOL code_match(CodeContext *s, int pos, ...) {
     }
 
     pos++;
-    switch (opcode_info[op].fmt) {
+    switch (opcode_info_for_op(op).fmt) {
       case OP_FMT_loc8:
       case OP_FMT_u8: {
         int idx = tab[pos];
@@ -27159,7 +27331,7 @@ QJS_STATIC int skip_dead_code(
 
   for (; pos < bc_len; pos += len) {
     op = bc_buf[pos];
-    len = opcode_info[op].size;
+    len = opcode_info_for_op(op).size;
     // <Primjs begin>
     if (op == OP_line_num) {
       *linep = get_u64(bc_buf + pos + 1);
@@ -27178,7 +27350,7 @@ QJS_STATIC int skip_dead_code(
     } else {
       /* XXX: output a warning for unreachable code? */
       JSAtom atom;
-      switch (opcode_info[op].fmt) {
+      switch (opcode_info_for_op(op).fmt) {
         case OP_FMT_label:
         case OP_FMT_label_u16:
           label = get_u32(bc_buf + pos + 1);
@@ -27291,7 +27463,7 @@ __exception int resolve_variables(LEPUSContext *ctx, JSFunctionDef *s) {
   line_num = 0; /* avoid warning */
   for (pos = 0; pos < bc_len; pos = pos_next) {
     op = bc_buf[pos];
-    len = opcode_info[op].size;
+    len = opcode_info_for_op(op).size;
     pos_next = pos + len;
     switch (op) {
       case OP_line_num:
@@ -27442,7 +27614,7 @@ __exception int resolve_variables(LEPUSContext *ctx, JSFunctionDef *s) {
         label = get_u32(bc_buf + pos + 1);
         assert(label >= 0 && label < s->label_count);
         ls = &s->label_slots[label];
-        ls->pos2 = bc_out.size + opcode_info[op].size;
+        ls->pos2 = bc_out.size + opcode_info_for_op(op).size;
       }
         goto no_change;
 
@@ -27572,7 +27744,7 @@ fail:
   /* XXX: find a better solution ? */
   for (; pos < bc_len; pos = pos_next) {
     op = bc_buf[pos];
-    len = opcode_info[op].size;
+    len = opcode_info_for_op(op).size;
     pos_next = pos + len;
     dbuf_put(&bc_out, bc_buf + pos, len);
   }
@@ -27694,7 +27866,7 @@ QJS_STATIC int find_jump_target(
           // <Primjs end>
           /* fall thru */
         case OP_label:
-          pos += opcode_info[op].size;
+          pos += opcode_info_for_op(op).size;
           continue;
         case OP_goto:
           label = get_u32(s->byte_code.buf + pos + 1);
@@ -27987,7 +28159,7 @@ __exception int resolve_labels(LEPUSContext *ctx, JSFunctionDef *s) {
   for (pos = 0; pos < bc_len; pos = pos_next) {
     int val;
     op = bc_buf[pos];
-    len = opcode_info[op].size;
+    len = opcode_info_for_op(op).size;
     pos_next = pos + len;
     switch (op) {
       case OP_close_var_object: {
@@ -28896,7 +29068,11 @@ QJS_STATIC __exception int compute_stack_size_rec(LEPUSContext *ctx,
     }
     n_pop = oi->n_pop;
     /* call pops a variable number of arguments */
-    if (oi->fmt == OP_FMT_npop) {
+    if (op == OP_object_literal) {
+      int idx = get_u32(bc_buf + pos + 1);
+      LEPUSObject *tmpl = LEPUS_VALUE_GET_OBJ(fd->cpool[idx]);
+      n_pop = tmpl->shape->prop_count;
+    } else if (oi->fmt == OP_FMT_npop) {
       n_pop += get_u16(bc_buf + pos + 1);
     } else {
 #if SHORT_OPCODES

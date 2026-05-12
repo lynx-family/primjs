@@ -1403,14 +1403,24 @@ typedef struct JSOpCode {
 extern const JSOpCode opcode_info[];
 
 #if SHORT_OPCODES
+#define OP_TEMP_COUNT (OP_TEMP_END - OP_TEMP_START)
+#define OP_APPEND_FINAL_START OP_object_literal
+/*
+ * Metadata for compiler-stage bytecode, where temporary opcodes may still be
+ * present. Append-only final opcodes live after the short-opcode block in
+ * quickjs-opcode.h, but opcode_info[] includes temporary def() entries before
+ * them, so their metadata index needs the same temporary-opcode offset.
+ */
+#define opcode_info_for_op(op) \
+  opcode_info[(op) >= OP_APPEND_FINAL_START ? (op) + OP_TEMP_COUNT : (op)]
 /* After the final compilation pass, short opcodes are used. Their
    opcodes overlap with the temporary opcodes which cannot appear in
    the final bytecode. Their description is after the temporary
    opcodes in opcode_info[]. */
-#define short_opcode_info(op)                                              \
-  opcode_info[(op) >= OP_TEMP_START ? (op) + (OP_TEMP_END - OP_TEMP_START) \
-                                    : (op)]
+#define short_opcode_info(op) \
+  opcode_info[(op) >= OP_TEMP_START ? (op) + OP_TEMP_COUNT : (op)]
 #else
+#define opcode_info_for_op(op) opcode_info[op]
 #define short_opcode_info(op) opcode_info[op]
 #endif
 
@@ -1660,6 +1670,9 @@ QJS_HIDE LEPUSValue JS_NewSymbolFromAtom_GC(LEPUSContext *ctx, JSAtom descr,
                                             int atom_type);
 QJS_HIDE LEPUSValue JS_ToObject_GC(LEPUSContext *ctx, LEPUSValueConst val);
 QJS_HIDE LEPUSValue PRIM_JS_NewObject_GC(LEPUSContext *ctx);
+QJS_HIDE LEPUSValue PRIM_JS_NewObjectFromTemplate_GC(LEPUSContext *ctx,
+                                                     LEPUSValueConst tmpl,
+                                                     LEPUSValue *values);
 QJS_HIDE LEPUSValue js_build_arguments(LEPUSContext *ctx, int argc,
                                        LEPUSValueConst *argv);
 QJS_HIDE LEPUSValue js_build_arguments_gc(LEPUSContext *ctx, int argc,

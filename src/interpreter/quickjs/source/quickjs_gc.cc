@@ -2338,6 +2338,31 @@ LEPUSValue PRIM_JS_NewObject_GC(LEPUSContext *ctx) {
   return JS_NewObjectProtoClass_GC(ctx, ctx->class_proto[JS_CLASS_OBJECT],
                                    JS_CLASS_OBJECT);
 }
+
+LEPUSValue PRIM_JS_NewObjectFromTemplate_GC(LEPUSContext *ctx,
+                                            LEPUSValueConst tmpl,
+                                            LEPUSValue *values) {
+  LEPUSObject *tp, *p;
+  JSShape *sh;
+  LEPUSValue obj;
+  int i, prop_count;
+
+  DCHECK(LEPUS_VALUE_IS_OBJECT(tmpl));
+  tp = LEPUS_VALUE_GET_OBJ(tmpl);
+  prop_count = tp->shape->prop_count;
+  sh = js_clone_shape(ctx, tp->shape);
+  if (unlikely(!sh)) return LEPUS_EXCEPTION;
+  obj = JS_NewObjectFromShape_GC(ctx, sh, JS_CLASS_OBJECT);
+  if (unlikely(LEPUS_IsException(obj))) return obj;
+  HandleScope func_scope(ctx, &obj, HANDLE_TYPE_LEPUS_VALUE);
+
+  p = LEPUS_VALUE_GET_OBJ(obj);
+  for (i = 0; i < prop_count; i++) {
+    HeapObjStore(ctx, &p->prop[i].u.value, values[i]);
+    values[i] = LEPUS_UNDEFINED;
+  }
+  return obj;
+}
 // <primjs end>
 
 LEPUSValue JS_NewObject_GC(LEPUSContext *ctx) {
@@ -8902,23 +8927,104 @@ typedef struct JSParsePos {
 #define SKIP_HAS_SEMI (1 << 0)
 #define SKIP_HAS_ELLIPSIS (1 << 1)
 #define SKIP_HAS_ASSIGNMENT (1 << 2)
+typedef struct JSObjectLiteralAtomList {
+  JSAtom *atoms;
+  int count;
+  int size;
+} JSObjectLiteralAtomList;
+
+QJS_STATIC void js_object_literal_atom_list_reset_GC(
+    JSObjectLiteralAtomList *ol) {
+  ol->atoms = NULL;
+  ol->count = 0;
+  ol->size = 0;
+}
+
+QJS_STATIC BOOL js_object_literal_atom_list_has_GC(JSObjectLiteralAtomList *ol,
+                                                   JSAtom atom) {
+  int i;
+  for (i = 0; i < ol->count; i++) {
+    if (ol->atoms[i] == atom) return TRUE;
+  }
+  return FALSE;
+}
+
+QJS_STATIC int js_object_literal_atom_list_add_GC(JSParseState *s,
+                                                  JSObjectLiteralAtomList *ol,
+                                                  JSAtom atom) {
+  if (ol->count >= ol->size) {
+    int new_size = max_int(ol->count + 1, ol->size * 3 / 2);
+    JSAtom *new_atoms = static_cast<JSAtom *>(lepus_realloc(
+        s->ctx, ol->atoms, sizeof(JSAtom) * new_size, ALLOC_TAG_WITHOUT_PTR));
+    if (!new_atoms) return -1;
+    ol->atoms = new_atoms;
+    ol->size = new_size;
+  }
+  ol->atoms[ol->count++] = atom;
+  return 0;
+}
+
+QJS_STATIC int js_emit_object_literal_GC(JSParseState *s,
+                                         JSObjectLiteralAtomList *ol) {
+  LEPUSContext *ctx = s->ctx;
+  LEPUSValue tmpl;
+  LEPUSObject *p;
+  JSProperty *pr;
+  int i, idx;
+
+  if (ol->count == 0) {
+    emit_op(s, OP_object);
+    return 0;
+  }
+
+  tmpl = JS_NewObjectProtoClassAlloc(ctx, ctx->class_proto[JS_CLASS_OBJECT],
+                                     JS_CLASS_OBJECT, ol->count);
+  if (LEPUS_IsException(tmpl)) return -1;
+  HandleScope func_scope(ctx, &tmpl, HANDLE_TYPE_LEPUS_VALUE);
+
+  p = LEPUS_VALUE_GET_OBJ(tmpl);
+  for (i = 0; i < ol->count; i++) {
+    pr = add_property_gc(ctx, p, ol->atoms[i], LEPUS_PROP_C_W_E);
+    if (!pr) return -1;
+    pr->u.value = LEPUS_UNDEFINED;
+  }
+
+  idx = cpool_add(s, tmpl);
+  if (idx < 0) return -1;
+  emit_op(s, OP_object_literal);
+  emit_u32(s, idx);
+  return 0;
+}
+
+QJS_STATIC int js_flush_object_literal_GC(JSParseState *s,
+                                          JSObjectLiteralAtomList *ol) {
+  int ret = js_emit_object_literal_GC(s, ol);
+  js_object_literal_atom_list_reset_GC(ol);
+  return ret;
+}
+
 __exception int js_parse_object_literal_GC(JSParseState *s) {
   JSAtom name = JS_ATOM_NULL;
   const uint8_t *start_ptr;
   int start_line, prop_type;
-  BOOL has_proto;
+  BOOL has_proto, obj_emitted;
+  JSObjectLiteralAtomList atom_list = {};
   HandleScope func_scope(s->ctx->rt);
+  func_scope.PushHandle(&atom_list.atoms, HANDLE_TYPE_HEAP_OBJ);
 
   if (next_token(s)) goto fail;
-  /* XXX: add an initial length that will be patched back */
-  emit_op(s, OP_object);
   has_proto = FALSE;
+  obj_emitted = FALSE;
   while (s->token.val != '}') {
     /* specific case for getter/setter */
     start_ptr = s->token.ptr;
     start_line = s->token.line_num;
 
     if (s->token.val == TOK_ELLIPSIS) {
+      if (!obj_emitted) {
+        if (js_flush_object_literal_GC(s, &atom_list)) goto fail;
+        obj_emitted = TRUE;
+      }
       if (next_token(s)) return -1;
       if (js_parse_assign_expr(s, PF_IN_ACCEPTED)) return -1;
       emit_op(s, OP_null); /* dummy excludeList */
@@ -8929,6 +9035,18 @@ __exception int js_parse_object_literal_GC(JSParseState *s) {
       goto next;
     }
 
+    if (!obj_emitted) {
+      int tok = peek_token(s, TRUE);
+      if (s->token.val == '[' || s->token.val == '*' ||
+          (token_is_ident(s->token.val) &&
+           (tok == '(' || ((token_is_pseudo_keyword(s, JS_ATOM_get) ||
+                            token_is_pseudo_keyword(s, JS_ATOM_set) ||
+                            token_is_pseudo_keyword(s, JS_ATOM_async)) &&
+                           tok != ':' && tok != ',' && tok != '}')))) {
+        if (js_flush_object_literal_GC(s, &atom_list)) goto fail;
+        obj_emitted = TRUE;
+      }
+    }
     prop_type = js_parse_property_name_GC(s, &name, TRUE, TRUE, FALSE);
 
     func_scope.PushLEPUSAtom(name);
@@ -8936,11 +9054,20 @@ __exception int js_parse_object_literal_GC(JSParseState *s) {
 
     if (prop_type == PROP_TYPE_VAR) {
       /* shortcut for x: x */
+      if (!obj_emitted &&
+          js_object_literal_atom_list_has_GC(&atom_list, name)) {
+        if (js_flush_object_literal_GC(s, &atom_list)) goto fail;
+        obj_emitted = TRUE;
+      }
       emit_op(s, OP_scope_get_var);
       emit_atom(s, name);
       emit_u16(s, s->cur_func->scope_level);
-      emit_op(s, OP_define_field);
-      emit_atom(s, name);
+      if (obj_emitted) {
+        emit_op(s, OP_define_field);
+        emit_atom(s, name);
+      } else if (js_object_literal_atom_list_add_GC(s, &atom_list, name)) {
+        goto fail;
+      }
     } else if (s->token.val == '(') {
       BOOL is_getset =
           (prop_type == PROP_TYPE_GET || prop_type == PROP_TYPE_SET);
@@ -8961,6 +9088,10 @@ __exception int js_parse_object_literal_GC(JSParseState *s) {
         else if (prop_type == PROP_TYPE_ASYNC_STAR)
           func_kind = JS_FUNC_ASYNC_GENERATOR;
       }
+      if (!obj_emitted) {
+        if (js_flush_object_literal_GC(s, &atom_list)) goto fail;
+        obj_emitted = TRUE;
+      }
       if (js_parse_function_decl(s, func_type, func_kind, JS_ATOM_NULL,
                                  start_ptr, start_line))
         goto fail;
@@ -8978,6 +9109,12 @@ __exception int js_parse_object_literal_GC(JSParseState *s) {
       emit_u8(s, op_flags | OP_DEFINE_METHOD_ENUMERABLE);
     } else {
       if (js_parse_expect(s, ':')) goto fail;
+      if (!obj_emitted &&
+          (name == JS_ATOM_NULL || name == JS_ATOM___proto__ ||
+           js_object_literal_atom_list_has_GC(&atom_list, name))) {
+        if (js_flush_object_literal_GC(s, &atom_list)) goto fail;
+        obj_emitted = TRUE;
+      }
       if (js_parse_assign_expr(s, PF_IN_ACCEPTED)) goto fail;
       if (name == JS_ATOM_NULL) {
         set_object_name_computed(s);
@@ -8991,9 +9128,15 @@ __exception int js_parse_object_literal_GC(JSParseState *s) {
         emit_op(s, OP_set_proto);
         has_proto = TRUE;
       } else {
-        set_object_name(s, name);
-        emit_op(s, OP_define_field);
-        emit_atom(s, name);
+        if (obj_emitted) {
+          set_object_name(s, name);
+          emit_op(s, OP_define_field);
+          emit_atom(s, name);
+        } else {
+          set_object_name(s, name);
+          if (js_object_literal_atom_list_add_GC(s, &atom_list, name))
+            goto fail;
+        }
       }
     }
   next:
@@ -9002,6 +9145,7 @@ __exception int js_parse_object_literal_GC(JSParseState *s) {
     if (next_token(s)) goto fail;
   }
   if (js_parse_expect(s, '}')) goto fail;
+  if (!obj_emitted && js_flush_object_literal_GC(s, &atom_list)) goto fail;
   return 0;
 fail:
   return -1;

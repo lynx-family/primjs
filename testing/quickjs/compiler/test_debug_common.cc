@@ -2532,7 +2532,7 @@ TEST_F(QjsDebugMethods, TestStepStatement) {
   CheckStatementPause(ctx_, 0, 0);
   CheckStatementPause(ctx_, 0, 17);
   CheckStatementPause(ctx_, 0, 28);
-  CheckStatementPause(ctx_, 0, 42);
+  CheckStatementPause(ctx_, 0, 45);
 }
 
 TEST_F(QjsDebugMethods, TestStepStatement2) {
@@ -2581,7 +2581,7 @@ TEST_F(QjsDebugMethods, TestStepStatement2) {
   CheckStatementPause(ctx_, 2, 6);
   CheckStatementPause(ctx_, 3, 6);
   CheckStatementPause(ctx_, 3, 23);
-  CheckStatementPause(ctx_, 3, 37);
+  CheckStatementPause(ctx_, 3, 40);
   CheckStatementPause(ctx_, 3, 43);
 }
 
