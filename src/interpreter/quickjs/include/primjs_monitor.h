@@ -8,7 +8,9 @@
 #define MODULE_PRIMJS "primjs"
 #define MODULE_QUICK "quickjs"
 
+#ifndef MODULE_WASM
 #define MODULE_WASM "PrimjsWasm"
+#endif
 #define MODULE_NAPI "napi"
 #define DEFAULT_BIZ_NAME "unknown_biz_name"
 
