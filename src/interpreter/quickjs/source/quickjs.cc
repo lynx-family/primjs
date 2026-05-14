@@ -53,6 +53,7 @@ extern "C" {
 #endif
 #include <time.h>
 
+#include <atomic>
 #include <cstdint>
 #include <cstdlib>
 #if defined(ANDROID) || defined(__ANDROID__) || defined(OS_IOS) || \
@@ -561,7 +562,7 @@ QJS_STATIC LEPUSValue JS_InstantiateFunctionListItem2(LEPUSContext *ctx,
                                                       JSAtom atom,
                                                       void *opaque);
 
-static _Atomic LEPUSClassID js_class_id_alloc = JS_CLASS_INIT_COUNT;
+static std::atomic<LEPUSClassID> js_class_id_alloc{JS_CLASS_INIT_COUNT};
 #define QJSCallBackName(V)               \
   V(run_message_loop_on_pause)           \
   V(quit_message_loop_on_pause)          \
@@ -1713,20 +1714,41 @@ uintptr_t get_thread_stack_limit() {
   uintptr_t stack_limit = 0;
   void *stack;
   size_t stack_size;
-  pthread_attr_t attr;
   pthread_t tid = pthread_self();
 #if defined(APPLE) || defined(__APPLE__)
   stack = pthread_get_stackaddr_np(tid);
   stack_size = pthread_get_stacksize_np(tid);
   stack_limit = reinterpret_cast<uintptr_t>(stack) - stack_size +
                 (52 * 1024);  // reserve 52k
+#elif defined(QJS_PTHREAD_STACKADDR_NP_RETURNS_LOW_ADDR)
+  stack = pthread_get_stackaddr_np(tid);
+  auto stack_size_np = pthread_get_stacksize_np(tid);
+  if (stack != nullptr && stack_size_np > 0) {
+    uintptr_t stack_size_value = static_cast<uintptr_t>(stack_size_np);
+    uintptr_t reserve_size = 52 * 1024;
+    if (stack_size_value < reserve_size) {
+      reserve_size = stack_size_value;
+    }
+    stack_limit = reinterpret_cast<uintptr_t>(stack) + reserve_size;
+  } else {
+    pthread_attr_t attr;
+    if (pthread_getattr_np(tid, &attr) == 0) {
+      if (pthread_attr_getstack(&attr, &stack, &stack_size) == 0 &&
+          stack != nullptr && stack_size > 0) {
+        stack_limit =
+            reinterpret_cast<uintptr_t>(stack) + (52 * 1024);  // reserve 52k
+      }
+      pthread_attr_destroy(&attr);
+    }
+  }
 #else
+  pthread_attr_t attr;
   pthread_getattr_np(tid, &attr);
   pthread_attr_getstack(&attr, &stack, &stack_size);
   stack_limit =
       reinterpret_cast<uintptr_t>(stack) + (52 * 1024);  // reserve 52k
-#endif
   pthread_attr_destroy(&attr);
+#endif
   return stack_limit;
 #endif
 }
@@ -1790,7 +1812,10 @@ BOOL js_check_stack_overflow(LEPUSContext *ctx, size_t alloca_size) {
         reinterpret_cast<uintptr_t>(js_get_stack_pointer()) - alloca_size <
         stack_limit;
     if (stack_overflow) {
-      stack_limit = reinterpret_cast<uintptr_t>(get_thread_stack_limit());
+      uintptr_t thread_stack_limit = get_thread_stack_limit();
+      if (thread_stack_limit != 0) {
+        stack_limit = thread_stack_limit;
+      }
       stack_overflow =
           reinterpret_cast<uintptr_t>(js_get_stack_pointer()) - alloca_size <
           stack_limit;
@@ -3135,7 +3160,7 @@ LEPUSClassID LEPUS_NewClassID(LEPUSClassID *pclass_id) {
   /* XXX: make it thread safe */
   class_id = *pclass_id;
   if (class_id == 0) {
-    class_id = js_class_id_alloc++;
+    class_id = js_class_id_alloc.fetch_add(1, std::memory_order_relaxed);
     *pclass_id = class_id;
   }
   return class_id;

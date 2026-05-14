@@ -3209,8 +3209,16 @@ int init_bigint_name(LEPUSRuntime *rt);
 uintptr_t get_thread_stack_limit();
 
 inline uintptr_t get_thread_stack_limit2() {
-  thread_local uintptr_t stack_limit = get_thread_stack_limit();
-  return stack_limit;
+  thread_local uintptr_t stack_limit = 0;
+  if (stack_limit == 0) {
+    stack_limit = get_thread_stack_limit();
+  }
+  if (stack_limit != 0) {
+    return stack_limit;
+  }
+  // Do not cache this fallback; retry pthread stack discovery on later calls.
+  uint8_t stack_marker = 0;
+  return reinterpret_cast<uintptr_t>(&stack_marker) - 400 * 1024;
 }
 
 uint32_t map_hash_key(LEPUSContext *ctx, LEPUSValueConst key,
