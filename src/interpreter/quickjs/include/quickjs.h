@@ -1510,78 +1510,80 @@ typedef struct LEPUSCFunctionListEntry {
 #define LEPUS_CFUNC_DEF(name, length, func1)                                 \
   {                                                                          \
     name, LEPUS_PROP_WRITABLE | LEPUS_PROP_CONFIGURABLE, LEPUS_DEF_CFUNC, 0, \
-        .u.func = {                                                          \
-          length,                                                            \
-          LEPUS_CFUNC_generic,                                               \
-          {.generic = func1}                                                 \
+        .u = {                                                               \
+          .func = {length, LEPUS_CFUNC_generic, {.generic = func1}}          \
         }                                                                    \
   }
-#define LEPUS_CFUNC_MAGIC_DEF(name, length, func1, magic)                 \
-  {                                                                       \
-    name, LEPUS_PROP_WRITABLE | LEPUS_PROP_CONFIGURABLE, LEPUS_DEF_CFUNC, \
-        magic, .u.func = {                                                \
-          length,                                                         \
-          LEPUS_CFUNC_generic_magic,                                      \
-          {.generic_magic = func1}                                        \
-        }                                                                 \
+#define LEPUS_CFUNC_MAGIC_DEF(name, length, func1, magic)                    \
+  {                                                                          \
+    name, LEPUS_PROP_WRITABLE | LEPUS_PROP_CONFIGURABLE, LEPUS_DEF_CFUNC,    \
+        magic,                                                               \
+        .u =                                                                 \
+    {.func = {length, LEPUS_CFUNC_generic_magic, {.generic_magic = func1}} } \
   }
 #define LEPUS_CFUNC_SPECIAL_DEF(name, length, cproto, func1)                 \
   {                                                                          \
     name, LEPUS_PROP_WRITABLE | LEPUS_PROP_CONFIGURABLE, LEPUS_DEF_CFUNC, 0, \
-        .u.func = {                                                          \
-          length,                                                            \
-          LEPUS_CFUNC_##cproto,                                              \
-          {.cproto = func1}                                                  \
+        .u = {                                                               \
+          .func = {length, LEPUS_CFUNC_##cproto, {.cproto = func1}}          \
         }                                                                    \
   }
-#define LEPUS_ITERATOR_NEXT_DEF(name, length, func1, magic)               \
+#define LEPUS_ITERATOR_NEXT_DEF(name, length, func1, magic)                  \
+  {                                                                          \
+    name, LEPUS_PROP_WRITABLE | LEPUS_PROP_CONFIGURABLE, LEPUS_DEF_CFUNC,    \
+        magic,                                                               \
+        .u =                                                                 \
+    {.func = {length, LEPUS_CFUNC_iterator_next, {.iterator_next = func1}} } \
+  }
+#define LEPUS_CGETSET_DEF(name, fgetter, fsetter)                        \
+  {                                                                      \
+    name, LEPUS_PROP_CONFIGURABLE, LEPUS_DEF_CGETSET, 0, .u = {          \
+      .getset = {.get = {.getter = fgetter}, .set = {.setter = fsetter}} \
+    }                                                                    \
+  }
+#define LEPUS_CGETSET_MAGIC_DEF(name, fgetter, fsetter, magic)            \
   {                                                                       \
-    name, LEPUS_PROP_WRITABLE | LEPUS_PROP_CONFIGURABLE, LEPUS_DEF_CFUNC, \
-        magic, .u.func = {                                                \
-          length,                                                         \
-          LEPUS_CFUNC_iterator_next,                                      \
-          {.iterator_next = func1}                                        \
-        }                                                                 \
+    name, LEPUS_PROP_CONFIGURABLE, LEPUS_DEF_CGETSET_MAGIC, magic, .u = { \
+      .getset = {.get = {.getter_magic = fgetter},                        \
+                 .set = {.setter_magic = fsetter}}                        \
+    }                                                                     \
   }
-#define LEPUS_CGETSET_DEF(name, fgetter, fsetter)                      \
-  {                                                                    \
-    name, LEPUS_PROP_CONFIGURABLE, LEPUS_DEF_CGETSET, 0,               \
-        .u.getset.get.getter = fgetter, .u.getset.set.setter = fsetter \
+#define LEPUS_PROP_STRING_DEF(name, cstr, prop_flags)               \
+  {                                                                 \
+    name, prop_flags, LEPUS_DEF_PROP_STRING, 0, .u = {.str = cstr } \
   }
-#define LEPUS_CGETSET_MAGIC_DEF(name, fgetter, fsetter, magic)     \
+#define LEPUS_PROP_INT32_DEF(name, val, prop_flags)               \
+  {                                                               \
+    name, prop_flags, LEPUS_DEF_PROP_INT32, 0, .u = {.i32 = val } \
+  }
+#define LEPUS_PROP_INT64_DEF(name, val, prop_flags)               \
+  {                                                               \
+    name, prop_flags, LEPUS_DEF_PROP_INT64, 0, .u = {.i64 = val } \
+  }
+#define LEPUS_PROP_DOUBLE_DEF(name, val, prop_flags)               \
   {                                                                \
-    name, LEPUS_PROP_CONFIGURABLE, LEPUS_DEF_CGETSET_MAGIC, magic, \
-        .u.getset.get.getter_magic = fgetter,                      \
-        .u.getset.set.setter_magic = fsetter                       \
+    name, prop_flags, LEPUS_DEF_PROP_DOUBLE, 0, .u = {.f64 = val } \
   }
-#define LEPUS_PROP_STRING_DEF(name, cstr, prop_flags) \
-  { name, prop_flags, LEPUS_DEF_PROP_STRING, 0, .u.str = cstr }
-#define LEPUS_PROP_INT32_DEF(name, val, prop_flags) \
-  { name, prop_flags, LEPUS_DEF_PROP_INT32, 0, .u.i32 = val }
-#define LEPUS_PROP_INT64_DEF(name, val, prop_flags) \
-  { name, prop_flags, LEPUS_DEF_PROP_INT64, 0, .u.i64 = val }
-#define LEPUS_PROP_DOUBLE_DEF(name, val, prop_flags) \
-  { name, prop_flags, LEPUS_DEF_PROP_DOUBLE, 0, .u.f64 = val }
-#define LEPUS_PROP_UNDEFINED_DEF(name, prop_flags) \
-  { name, prop_flags, LEPUS_DEF_PROP_UNDEFINED, 0, .u.i32 = 0 }
-#define LEPUS_OBJECT_DEF(name, tab, len, prop_flags)                   \
-  {                                                                    \
-    name, prop_flags, LEPUS_DEF_OBJECT, 0, .u.prop_list = { tab, len } \
+#define LEPUS_PROP_UNDEFINED_DEF(name, prop_flags)                  \
+  {                                                                 \
+    name, prop_flags, LEPUS_DEF_PROP_UNDEFINED, 0, .u = {.i32 = 0 } \
+  }
+#define LEPUS_OBJECT_DEF(name, tab, len, prop_flags)                       \
+  {                                                                        \
+    name, prop_flags, LEPUS_DEF_OBJECT, 0, .u = {.prop_list = {tab, len} } \
   }
 #define LEPUS_ALIAS_DEF(name, from)                                          \
   {                                                                          \
     name, LEPUS_PROP_WRITABLE | LEPUS_PROP_CONFIGURABLE, LEPUS_DEF_ALIAS, 0, \
-        .u.alias = {                                                         \
-          from,                                                              \
-          -1                                                                 \
+        .u = {                                                               \
+          .alias = {from, -1}                                                \
         }                                                                    \
   }
 #define LEPUS_ALIAS_BASE_DEF(name, from, base)                               \
   {                                                                          \
     name, LEPUS_PROP_WRITABLE | LEPUS_PROP_CONFIGURABLE, LEPUS_DEF_ALIAS, 0, \
-        .u.alias = {                                                         \
-          from,                                                              \
-          base                                                               \
+        .u = {                                                               \
+          .alias = {from, base}                                              \
         }                                                                    \
   }
 
