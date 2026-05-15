@@ -295,7 +295,7 @@ M3Result EvaluateExpression(IM3Module i_module, void *o_expressed, u8 i_type,
   return result;
 }
 
-M3Result InitMemory(IM3Runtime io_runtime, IM3Module i_module) {
+static M3Result InitMemory(IM3Runtime io_runtime, IM3Module i_module) {
   M3Result result =
       m3Err_none;  // d_m3Assert (not io_runtime->memory->wasmPages);
 
