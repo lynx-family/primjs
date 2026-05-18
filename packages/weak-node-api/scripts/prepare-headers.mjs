@@ -341,14 +341,17 @@ function processFile(filePath) {
   // Enable weak symbol remapping when USE_WEAK_SUFFIX_NAPI is defined, or
   // by default on Harmony where the adapter is always expected to export weak
   // suffixed symbols.
+  const useRelativeWeakMacroHeaders =
+    isInGenerated && (base === "weak_node_api.cpp" || base === "weak_node_api.hpp");
+  const weakMacroHeaderPrefix = useRelativeWeakMacroHeaders ? "../headers/" : "";
   const defineLines = [
     "#if defined(USE_WEAK_SUFFIX_NAPI) || defined(OS_HARMONY)",
-    '#include "weak_napi_defines.h"',
+    `#include "${weakMacroHeaderPrefix}weak_napi_defines.h"`,
     "#endif",
   ];
   const undefLines = [
     "#if defined(USE_WEAK_SUFFIX_NAPI) || defined(OS_HARMONY)",
-    '#include "weak_napi_undefs.h"',
+    `#include "${weakMacroHeaderPrefix}weak_napi_undefs.h"`,
     "#endif",
   ];
 

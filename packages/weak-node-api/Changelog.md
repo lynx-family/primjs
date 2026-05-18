@@ -1,3 +1,6 @@
+## 0.0.8 - 2026-05-08
+- **Compatibility**: Use relative paths for `weak_napi_defines.h` and `weak_napi_undefs.h` in generated `weak_node_api.cpp` and `weak_node_api.hpp`, so source integrations do not need to expose the `headers` include directory.
+
 ## 0.0.7 - 2026-05-08
 - **Compatibility**: Rename `NAPI_EXTERN` to `WEAK_NAPI_EXTERN` in the generated `js_native_api.h` and `node_api.h` to avoid collision with the host Node-API headers' macro of the same name.
 
