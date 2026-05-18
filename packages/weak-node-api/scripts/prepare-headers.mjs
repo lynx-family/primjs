@@ -342,7 +342,10 @@ function processFile(filePath) {
   // by default on Harmony where the adapter is always expected to export weak
   // suffixed symbols.
   const useRelativeWeakMacroHeaders =
-    isInGenerated && (base === "weak_node_api.cpp" || base === "weak_node_api.hpp");
+    isInGenerated &&
+    (base === "weak_node_api.cpp" ||
+      base === "weak_node_api.hpp" ||
+      base === "NodeApiHost.hpp");
   const weakMacroHeaderPrefix = useRelativeWeakMacroHeaders ? "../headers/" : "";
   const defineLines = [
     "#if defined(USE_WEAK_SUFFIX_NAPI) || defined(OS_HARMONY)",

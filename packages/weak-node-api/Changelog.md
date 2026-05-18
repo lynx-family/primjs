@@ -1,3 +1,6 @@
+## 0.0.9 - 2026-05-08
+- **Compatibility**: Also use relative paths for `weak_napi_defines.h` and `weak_napi_undefs.h` in generated `NodeApiHost.hpp`, keeping all generated source-facing files independent of the `headers` include directory.
+
 ## 0.0.8 - 2026-05-08
 - **Compatibility**: Use relative paths for `weak_napi_defines.h` and `weak_napi_undefs.h` in generated `weak_node_api.cpp` and `weak_node_api.hpp`, so source integrations do not need to expose the `headers` include directory.
 
