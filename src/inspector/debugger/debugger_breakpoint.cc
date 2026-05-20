@@ -76,9 +76,8 @@ QJS_STATIC bool AdjustSatisfy(int32_t line, int64_t column, int32_t bp_line,
 
 QJS_HIDE bool NotInCurrentFunc(LEPUSFunctionBytecode *b, int32_t script_id,
                                int64_t bp_line) {
-  if (!b || !b->has_debug) return true;
-  if ((b->script && b->script->id != script_id) ||
-      (b->debug.line_num - 1 > bp_line) ||
+  if (!b || !b->has_debug || !b->script) return true;
+  if ((b->script->id != script_id) || (b->debug.line_num - 1 > bp_line) ||
       (b->debug.end_line_num > 0 && b->debug.end_line_num - 1 < bp_line)) {
     return true;
   }
@@ -181,7 +180,7 @@ QJS_HIDE void AdjustBreakpoint(LEPUSDebuggerInfo *info, const char *url,
   int32_t bp_column = bp->column;
   list_for_each(el, &ctx->debugger_info->bytecode_list) {
     LEPUSFunctionBytecode *b = list_entry(el, LEPUSFunctionBytecode, link);
-    if (!b->has_debug || (b->script && b->script != bsrc)) continue;
+    if (!b->has_debug || !b->script || b->script != bsrc) continue;
     if (NotInCurrentFunc(b, bp->script_id, bp->line)) continue;
 
     const uint8_t *p = b->debug.pc2line_buf,
@@ -289,7 +288,7 @@ QJS_HIDE void GetPossibleBreakpointsByScriptId(
   list_for_each(el, &ctx->debugger_info->bytecode_list) {
     LEPUSFunctionBytecode *b = list_entry(el, LEPUSFunctionBytecode, link);
     if (!b->has_debug || (end_line != -1 && b->debug.line_num - 1 > end_line) ||
-        (b->script && b->script->id != script_id) ||
+        (!b->script || b->script->id != script_id) ||
         (b->debug.end_line_num && b->debug.end_line_num - 1 < start_line))
       continue;
 
