@@ -2350,6 +2350,16 @@ QJS_HIDE void DebuggerFreeScript(LEPUSContext *ctx, LEPUSScriptSource *script) {
   ctx->debugger_info->script_num--;
   LEPUSRuntime *rt = ctx->rt;
   list_del(&script->link);
+
+  // Nullify script pointers in bytecode_list to prevent dangling references
+  struct list_head *el, *el1;
+  list_for_each_safe(el, el1, &ctx->debugger_info->bytecode_list) {
+    LEPUSFunctionBytecode *b = list_entry(el, LEPUSFunctionBytecode, link);
+    if (b->script == script) {
+      b->script = nullptr;
+    }
+  }
+
   if (ctx->gc_enable) return;
   lepus_free_rt(rt, script->url);
   lepus_free_rt(rt, script->source);
