@@ -168,6 +168,7 @@ set(quickjs_sources
     ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/libunicode.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/primjs_monitor.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/quickjs_gc.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/quickjs_parser.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/quickjs_version.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/quickjs-libc.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/quickjs.cc)

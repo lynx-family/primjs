@@ -2296,7 +2296,25 @@ QJS_HIDE int resolve_labels(LEPUSContext *ctx, JSFunctionDef *s);
 QJS_HIDE int resolve_variables(LEPUSContext *ctx, JSFunctionDef *s);
 QJS_HIDE int new_label_fd(JSFunctionDef *fd, int label);
 struct JSParseState;
-QJS_HIDE int js_parse_unary_GC(JSParseState *s, int parse_flags);
+/* allow the 'in' binary operator */
+#define PF_IN_ACCEPTED (1 << 0)
+/* allow function calls parsing in js_parse_postfix_expr() */
+#define PF_POSTFIX_CALL (1 << 1)
+/* allow arrow functions parsing in js_parse_postfix_expr() */
+#define PF_ARROW_FUNC (1 << 2)
+/* allow the exponentiation operator in js_parse_unary() */
+#define PF_POW_ALLOWED (1 << 3)
+/* forbid the exponentiation operator in js_parse_unary() */
+#define PF_POW_FORBIDDEN (1 << 4)
+#define PF_LASTEST_ISNEW (1 << 5)
+
+/* used by the iterative js_parse_unary() to mark cases where a following
+   '**' must be syntactically detected and rejected (e.g. inside `typeof`,
+   `delete`, `await`). Setting both POW bits causes
+   js_unary_maybe_consume_pow() to throw on '**' while still consuming it. */
+#define PF_POW_DETECT_FORBID (PF_POW_ALLOWED | PF_POW_FORBIDDEN)
+QJS_HIDE int js_parse_unary(JSParseState *s, int parse_flags);
+QJS_HIDE int js_parse_expr_binary(JSParseState *s, int level, int parse_flags);
 QJS_HIDE int js_parse_array_literal(JSParseState *s);
 QJS_HIDE int js_parse_cond_expr(JSParseState *s, int parse_flags);
 QJS_HIDE int js_parse_assign_expr(JSParseState *s, int parse_flags);

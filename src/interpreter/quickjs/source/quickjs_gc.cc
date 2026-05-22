@@ -53,6 +53,7 @@ extern "C" {
 
 #include <cstdint>
 #include <cstdlib>
+#include <vector>
 
 #if defined(__APPLE__)
 #include <malloc/malloc.h>
@@ -8772,18 +8773,6 @@ int seal_template_obj_GC(LEPUSContext *ctx, LEPUSValueConst obj) {
   return 0;
 }
 
-/* allow the 'in' binary operator */
-#define PF_IN_ACCEPTED (1 << 0)
-/* allow function calls parsing in js_parse_postfix_expr() */
-#define PF_POSTFIX_CALL (1 << 1)
-/* allow arrow functions parsing in js_parse_postfix_expr() */
-#define PF_ARROW_FUNC (1 << 2)
-/* allow the exponentiation operator in js_parse_unary() */
-#define PF_POW_ALLOWED (1 << 3)
-/* forbid the exponentiation operator in js_parse_unary() */
-#define PF_POW_FORBIDDEN (1 << 4)
-#define PF_LASTEST_ISNEW (1 << 5)
-
 #define PROP_TYPE_IDENT 0
 #define PROP_TYPE_VAR 1
 #define PROP_TYPE_GET 2
@@ -10089,180 +10078,6 @@ static __exception int js_parse_postfix_expr(JSParseState *s, int parse_flags) {
     }
   }
   if (optional_chaining_label >= 0) emit_label(s, optional_chaining_label);
-  return 0;
-}
-
-static __exception int js_parse_delete(JSParseState *s) {
-  JSFunctionDef *fd = s->cur_func;
-  JSAtom name;
-  int opcode;
-
-  if (next_token(s)) return -1;
-  if (js_parse_unary_GC(s, -1)) return -1;
-  switch (opcode = get_prev_opcode(fd)) {
-    case OP_get_field: {
-      HandleScope block_scope(s->ctx);
-      LEPUSValue val;
-      int ret;
-
-      name = get_u32(fd->byte_code.buf + fd->last_opcode_pos + 1);
-      block_scope.PushLEPUSAtom(name);
-      fd->byte_code.size = fd->last_opcode_pos;
-      fd->last_opcode_pos = -1;
-      val = JS_AtomToValue_GC(s->ctx, name);
-      block_scope.PushHandle(&val, HANDLE_TYPE_LEPUS_VALUE);
-      ret = emit_push_const(s, val, 1);
-      if (ret) return ret;
-    }
-      goto do_delete;
-    case OP_get_array_el:
-      fd->byte_code.size = fd->last_opcode_pos;
-      fd->last_opcode_pos = -1;
-    do_delete:
-      emit_op(s, OP_delete);
-      break;
-    case OP_scope_get_var:
-      /* 'delete this': this is not a reference */
-      name = get_u32(fd->byte_code.buf + fd->last_opcode_pos + 1);
-      if (name == JS_ATOM_this || name == JS_ATOM_new_target) goto ret_true;
-      if (fd->js_mode & JS_MODE_STRICT) {
-        return js_parse_error(
-            s, "cannot delete a direct reference in strict mode");
-      } else {
-        fd->byte_code.buf[fd->last_opcode_pos] = OP_scope_delete_var;
-      }
-      break;
-    case OP_scope_get_private_field:
-      return js_parse_error(s, "cannot delete a private class field");
-    case OP_get_super_value:
-      emit_op(s, OP_throw_var);
-      emit_atom(s, JS_ATOM_NULL);
-      emit_u8(s, JS_THROW_ERROR_DELETE_SUPER);
-      break;
-    default:
-    ret_true:
-      emit_op(s, OP_drop);
-      emit_op(s, OP_push_true);
-      break;
-  }
-  return 0;
-}
-
-/* allowed parse_flags: PF_ARROW_FUNC, PF_POW_ALLOWED, PF_POW_FORBIDDEN */
-__exception int js_parse_unary_GC(JSParseState *s, int parse_flags) {
-  int op;
-
-  switch (s->token.val) {
-    case '+':
-    case '-':
-    case '!':
-    case '~':
-    case TOK_VOID:
-      op = s->token.val;
-      if (next_token(s)) return -1;
-      if (js_parse_unary_GC(s, PF_POW_FORBIDDEN)) return -1;
-      switch (op) {
-        case '-':
-          emit_op(s, OP_neg);
-          break;
-        case '+':
-          emit_op(s, OP_plus);
-          break;
-        case '!':
-          emit_op(s, OP_lnot);
-          break;
-        case '~':
-          emit_op(s, OP_not);
-          break;
-        case TOK_VOID:
-          emit_op(s, OP_drop);
-          emit_op(s, OP_undefined);
-          break;
-        default:
-          abort();
-      }
-      parse_flags = 0;
-      break;
-    case TOK_DEC:
-    case TOK_INC: {
-      int opcode, op, scope, label;
-      JSAtom name;
-      op = s->token.val;
-      if (next_token(s)) return -1;
-      /* XXX: should parse LeftHandSideExpression */
-      if (js_parse_unary_GC(s, 0)) return -1;
-      if (get_lvalue(s, &opcode, &scope, &name, &label, NULL, TRUE, op))
-        return -1;
-      HandleScope func_scope(s->ctx->rt);
-      func_scope.PushLEPUSAtom(name);
-      emit_op(s, OP_dec + op - TOK_DEC);
-      put_lvalue(s, opcode, scope, name, label, PUT_LVALUE_KEEP_TOP, FALSE);
-    } break;
-    case TOK_TYPEOF: {
-      JSFunctionDef *fd;
-      if (next_token(s)) return -1;
-      if (js_parse_unary_GC(s, -1)) return -1;
-      /* reference access should not return an exception, so we
-         patch the get_var */
-      fd = s->cur_func;
-      if (get_prev_opcode(fd) == OP_scope_get_var) {
-        fd->byte_code.buf[fd->last_opcode_pos] = OP_scope_get_var_undef;
-      }
-      emit_op(s, OP_typeof);
-      parse_flags = 0;
-    } break;
-    case TOK_DELETE:
-      if (js_parse_delete(s)) return -1;
-      parse_flags = 0;
-      break;
-    case TOK_AWAIT:
-      if (!(s->cur_func->func_kind & JS_FUNC_ASYNC))
-        return js_parse_error(s, "unexpected 'await' keyword");
-      if (!s->cur_func->in_function_body)
-        return js_parse_error(s, "await in default expression");
-      if (next_token(s)) return -1;
-      if (js_parse_unary_GC(s, -1)) return -1;
-      emit_op(s, OP_await);
-      parse_flags = 0;
-      break;
-    default:
-      if (js_parse_postfix_expr(
-              s, (parse_flags & PF_ARROW_FUNC) | PF_POSTFIX_CALL))
-        return -1;
-      if (!s->got_lf && (s->token.val == TOK_DEC || s->token.val == TOK_INC)) {
-        int opcode, op, scope, label;
-        JSAtom name;
-        op = s->token.val;
-        if (get_lvalue(s, &opcode, &scope, &name, &label, NULL, TRUE, op))
-          return -1;
-        HandleScope func_scope(s->ctx->rt);
-        func_scope.PushLEPUSAtom(name);
-        emit_op(s, OP_post_dec + op - TOK_DEC);
-        put_lvalue(s, opcode, scope, name, label, PUT_LVALUE_KEEP_SECOND,
-                   FALSE);
-        if (next_token(s)) return -1;
-      }
-      break;
-  }
-  if (parse_flags & (PF_POW_ALLOWED | PF_POW_FORBIDDEN)) {
-    if (s->token.val == TOK_POW) {
-      /* Strict ES7 exponentiation syntax rules: To solve
-         conficting semantics between different implementations
-         regarding the precedence of prefix operators and the
-         postifx exponential, ES7 specifies that -2**2 is a
-         syntax error. */
-      if (parse_flags & PF_POW_FORBIDDEN) {
-        LEPUS_ThrowSyntaxError(
-            s->ctx,
-            "unparenthesized unary expression can't appear on "
-            "the left-hand side of '**'");
-        return -1;
-      }
-      if (next_token(s)) return -1;
-      if (js_parse_unary_GC(s, PF_POW_ALLOWED)) return -1;
-      emit_op(s, OP_pow);
-    }
-  }
   return 0;
 }
 

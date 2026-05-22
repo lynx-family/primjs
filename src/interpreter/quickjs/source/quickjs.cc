@@ -56,6 +56,7 @@ extern "C" {
 #include <atomic>
 #include <cstdint>
 #include <cstdlib>
+#include <vector>
 #if defined(ANDROID) || defined(__ANDROID__) || defined(OS_IOS) || \
     defined(OS_HARMONY)
 #include <errno.h>
@@ -19181,8 +19182,6 @@ QJS_STATIC __exception int js_parse_function_decl2(
     JSParseState *s, JSParseFunctionEnum func_type,
     JSFunctionKindEnum func_kind, JSAtom func_name, const uint8_t *ptr,
     int function_line_num, JSParseExportEnum export_flag, JSFunctionDef **pfd);
-QJS_STATIC __exception int js_parse_unary(JSParseState *s,
-                                          int exponentiation_flag);
 QJS_STATIC void push_break_entry(JSFunctionDef *fd, BlockEnv *be,
                                  JSAtom label_name, int label_break,
                                  int label_cont, int drop_count);
@@ -19205,18 +19204,6 @@ QJS_STATIC int seal_template_obj(LEPUSContext *ctx, LEPUSValueConst obj) {
   p->extensible = FALSE;
   return 0;
 }
-
-/* allow the 'in' binary operator */
-#define PF_IN_ACCEPTED (1 << 0)
-/* allow function calls parsing in js_parse_postfix_expr() */
-#define PF_POSTFIX_CALL (1 << 1)
-/* allow arrow functions parsing in js_parse_postfix_expr() */
-#define PF_ARROW_FUNC (1 << 2)
-/* allow the exponentiation operator in js_parse_unary() */
-#define PF_POW_ALLOWED (1 << 3)
-/* forbid the exponentiation operator in js_parse_unary() */
-#define PF_POW_FORBIDDEN (1 << 4)
-#define PF_LASTEST_ISNEW (1 << 5)
 
 __exception int js_parse_template(JSParseState *s, int call, int *argc) {
   LEPUSContext *ctx = s->ctx;
@@ -21850,25 +21837,28 @@ QJS_STATIC __exception int js_parse_postfix_expr(JSParseState *s,
   return 0;
 }
 
-QJS_STATIC __exception int js_parse_delete(JSParseState *s) {
+QJS_STATIC __exception int js_emit_delete_expr(JSParseState *s) {
   JSFunctionDef *fd = s->cur_func;
   JSAtom name;
   int opcode;
 
-  if (next_token(s)) return -1;
-  if (js_parse_unary(s, -1)) return -1;
   switch (opcode = get_prev_opcode(fd)) {
     case OP_get_field: {
+      HandleScope block_scope(s->ctx);
       LEPUSValue val;
       int ret;
 
       name = get_u32(fd->byte_code.buf + fd->last_opcode_pos + 1);
+      block_scope.PushLEPUSAtom(name);
       fd->byte_code.size = fd->last_opcode_pos;
       fd->last_opcode_pos = -1;
-      val = JS_AtomToValue_RC(s->ctx, name);
+      val = LEPUS_AtomToValue(s->ctx, name);
+      block_scope.PushHandle(&val, HANDLE_TYPE_LEPUS_VALUE);
       ret = emit_push_const(s, val, 1);
-      LEPUS_FreeValue(s->ctx, val);
-      LEPUS_FreeAtom(s->ctx, name);
+      if (!s->ctx->gc_enable) {
+        LEPUS_FreeValue(s->ctx, val);
+        LEPUS_FreeAtom(s->ctx, name);
+      }
       if (ret) return ret;
     }
       goto do_delete;
@@ -21905,21 +21895,30 @@ QJS_STATIC __exception int js_parse_delete(JSParseState *s) {
   return 0;
 }
 
-/* allowed parse_flags: PF_ARROW_FUNC, PF_POW_ALLOWED, PF_POW_FORBIDDEN */
-QJS_STATIC __exception int js_parse_unary(JSParseState *s, int parse_flags) {
-  CallGCParserFunc(js_parse_unary_GC, s, parse_flags);
-  int op;
+/* The iterative js_parse_unary frame stack types and helpers below are
+   shared between GC and non-GC builds. Path-specific behavior (atom/value
+   lifetime) is selected at runtime via `s->ctx->gc_enable`; HandleScope
+   is constructed unconditionally and is a no-op when GC is disabled. */
+typedef enum JSUnaryFrameKind {
+  JS_UNARY_FRAME_SIMPLE,
+  JS_UNARY_FRAME_PREFIX_UPDATE,
+  JS_UNARY_FRAME_TYPEOF,
+  JS_UNARY_FRAME_DELETE,
+  JS_UNARY_FRAME_AWAIT,
+  JS_UNARY_FRAME_POW,
+} JSUnaryFrameKind;
 
-  switch (s->token.val) {
-    case '+':
-    case '-':
-    case '!':
-    case '~':
-    case TOK_VOID:
-      op = s->token.val;
-      if (next_token(s)) return -1;
-      if (js_parse_unary(s, PF_POW_FORBIDDEN)) return -1;
-      switch (op) {
+typedef struct JSUnaryFrame {
+  JSUnaryFrameKind kind;
+  int op;
+  int post_flags;
+} JSUnaryFrame;
+
+QJS_STATIC __exception int js_apply_unary_frame(JSParseState *s,
+                                                const JSUnaryFrame &frame) {
+  switch (frame.kind) {
+    case JS_UNARY_FRAME_SIMPLE:
+      switch (frame.op) {
         case '-':
           emit_op(s, OP_neg);
           break;
@@ -21939,470 +21938,388 @@ QJS_STATIC __exception int js_parse_unary(JSParseState *s, int parse_flags) {
         default:
           abort();
       }
-      parse_flags = 0;
       break;
-    case TOK_DEC:
-    case TOK_INC: {
-      int opcode, op, scope, label;
+    case JS_UNARY_FRAME_PREFIX_UPDATE: {
+      int opcode, scope, label;
       JSAtom name;
-      op = s->token.val;
-      if (next_token(s)) return -1;
-      /* XXX: should parse LeftHandSideExpression */
-      if (js_parse_unary(s, 0)) return -1;
-      if (get_lvalue(s, &opcode, &scope, &name, &label, NULL, TRUE, op))
+      if (get_lvalue(s, &opcode, &scope, &name, &label, NULL, TRUE, frame.op))
         return -1;
-      emit_op(s, OP_dec + op - TOK_DEC);
+      HandleScope func_scope(s->ctx->rt);
+      func_scope.PushLEPUSAtom(name);
+      emit_op(s, OP_dec + frame.op - TOK_DEC);
       put_lvalue(s, opcode, scope, name, label, PUT_LVALUE_KEEP_TOP, FALSE);
     } break;
-    case TOK_TYPEOF: {
-      JSFunctionDef *fd;
-      if (next_token(s)) return -1;
-      if (js_parse_unary(s, -1)) return -1;
-      /* reference access should not return an exception, so we
-         patch the get_var */
-      fd = s->cur_func;
+    case JS_UNARY_FRAME_TYPEOF: {
+      JSFunctionDef *fd = s->cur_func;
       if (get_prev_opcode(fd) == OP_scope_get_var) {
         fd->byte_code.buf[fd->last_opcode_pos] = OP_scope_get_var_undef;
       }
       emit_op(s, OP_typeof);
-      parse_flags = 0;
     } break;
-    case TOK_DELETE:
-      if (js_parse_delete(s)) return -1;
-      parse_flags = 0;
+    case JS_UNARY_FRAME_DELETE:
+      if (js_emit_delete_expr(s)) return -1;
       break;
-    case TOK_AWAIT:
-      if (!(s->cur_func->func_kind & JS_FUNC_ASYNC))
-        return js_parse_error(s, "unexpected 'await' keyword");
-      if (!s->cur_func->in_function_body)
-        return js_parse_error(s, "await in default expression");
-      if (next_token(s)) return -1;
-      if (js_parse_unary(s, -1)) return -1;
+    case JS_UNARY_FRAME_AWAIT:
       emit_op(s, OP_await);
-      parse_flags = 0;
       break;
-    default:
-      if (js_parse_postfix_expr(
-              s, (parse_flags & PF_ARROW_FUNC) | PF_POSTFIX_CALL))
-        return -1;
-      if (!s->got_lf && (s->token.val == TOK_DEC || s->token.val == TOK_INC)) {
-        int opcode, op, scope, label;
-        JSAtom name;
-        op = s->token.val;
-        if (get_lvalue(s, &opcode, &scope, &name, &label, NULL, TRUE, op))
-          return -1;
-        emit_op(s, OP_post_dec + op - TOK_DEC);
-        put_lvalue(s, opcode, scope, name, label, PUT_LVALUE_KEEP_SECOND,
-                   FALSE);
-        if (next_token(s)) return -1;
-      }
-      break;
-  }
-  if (parse_flags & (PF_POW_ALLOWED | PF_POW_FORBIDDEN)) {
-    if (s->token.val == TOK_POW) {
-      /* Strict ES7 exponentiation syntax rules: To solve
-         conficting semantics between different implementations
-         regarding the precedence of prefix operators and the
-         postifx exponential, ES7 specifies that -2**2 is a
-         syntax error. */
-      if (parse_flags & PF_POW_FORBIDDEN) {
-        LEPUS_ThrowSyntaxError(
-            s->ctx,
-            "unparenthesized unary expression can't appear on "
-            "the left-hand side of '**'");
-        return -1;
-      }
-      if (next_token(s)) return -1;
-      if (js_parse_unary(s, PF_POW_ALLOWED)) return -1;
+    case JS_UNARY_FRAME_POW:
       emit_op(s, OP_pow);
-    }
+      break;
   }
   return 0;
 }
 
-/* allowed parse_flags: PF_ARROW_FUNC, PF_IN_ACCEPTED */
-QJS_STATIC __exception int js_parse_expr_binary(JSParseState *s, int level,
-                                                int parse_flags) {
-  int op, opcode;
-
-  if (level == 0) {
-    return js_parse_unary(s, (parse_flags & PF_ARROW_FUNC) | PF_POW_ALLOWED);
-  }
-  if (js_parse_expr_binary(s, level - 1, parse_flags)) return -1;
-  for (;;) {
-    op = s->token.val;
-    switch (level) {
-      case 1:
-        switch (op) {
-          case '*':
-            opcode = OP_mul;
-            break;
-          case '/':
-            opcode = OP_div;
-            break;
-          case '%':
-            opcode = OP_mod;
-            break;
-          default:
-            return 0;
-        }
-        break;
-      case 2:
-        switch (op) {
-          case '+':
-            opcode = OP_add;
-            break;
-          case '-':
-            opcode = OP_sub;
-            break;
-          default:
-            return 0;
-        }
-        break;
-      case 3:
-        switch (op) {
-          case TOK_SHL:
-            opcode = OP_shl;
-            break;
-          case TOK_SAR:
-            opcode = OP_sar;
-            break;
-          case TOK_SHR:
-            opcode = OP_shr;
-            break;
-          default:
-            return 0;
-        }
-        break;
-      case 4:
-        switch (op) {
-          case '<':
-            opcode = OP_lt;
-            break;
-          case '>':
-            opcode = OP_gt;
-            break;
-          case TOK_LTE:
-            opcode = OP_lte;
-            break;
-          case TOK_GTE:
-            opcode = OP_gte;
-            break;
-          case TOK_INSTANCEOF:
-            opcode = OP_instanceof;
-            break;
-          case TOK_IN:
-            if (parse_flags & PF_IN_ACCEPTED) {
-              opcode = OP_in;
-            } else {
-              return 0;
-            }
-            break;
-          default:
-            return 0;
-        }
-        break;
-      case 5:
-        switch (op) {
-          case TOK_EQ:
-            opcode = OP_eq;
-            break;
-          case TOK_NEQ:
-            opcode = OP_neq;
-            break;
-          case TOK_STRICT_EQ:
-            opcode = OP_strict_eq;
-            break;
-          case TOK_STRICT_NEQ:
-            opcode = OP_strict_neq;
-            break;
-          default:
-            return 0;
-        }
-        break;
-      case 6:
-        switch (op) {
-          case '&':
-            opcode = OP_and;
-            break;
-          default:
-            return 0;
-        }
-        break;
-      case 7:
-        switch (op) {
-          case '^':
-            opcode = OP_xor;
-            break;
-          default:
-            return 0;
-        }
-        break;
-      case 8:
-        switch (op) {
-          case '|':
-            opcode = OP_or;
-            break;
-          default:
-            return 0;
-        }
-        break;
-      default:
-        abort();
-    }
-    if (next_token(s)) return -1;
-    if (js_parse_expr_binary(s, level - 1, parse_flags & ~PF_ARROW_FUNC))
+QJS_STATIC __exception int js_unary_maybe_consume_pow(
+    JSParseState *s, int parse_flags, std::vector<JSUnaryFrame> *frames,
+    BOOL *consumed) {
+  *consumed = FALSE;
+  if ((parse_flags & (PF_POW_ALLOWED | PF_POW_FORBIDDEN)) &&
+      s->token.val == TOK_POW) {
+    if (parse_flags & PF_POW_FORBIDDEN) {
+      LEPUS_ThrowSyntaxError(s->ctx,
+                             "unparenthesized unary expression can't appear on "
+                             "the left-hand side of '**'");
       return -1;
-    emit_op(s, opcode);
+    }
+    if (next_token(s)) return -1;
+    JSUnaryFrame frame = {};
+    frame.kind = JS_UNARY_FRAME_POW;
+    /* POW frames don't propagate parse_flags on unwind: js_parse_unary()
+       skips updating cur_flags when popping a POW frame. The post_flags
+       field is intentionally left default-initialized (0). */
+    frames->push_back(frame);
+    *consumed = TRUE;
   }
   return 0;
 }
 
-/* allowed parse_flags: PF_ARROW_FUNC, PF_IN_ACCEPTED */
-QJS_STATIC __exception int js_parse_logical_and_or(JSParseState *s, int op,
-                                                   int parse_flags) {
-  int label1;
+/* allowed parse_flags: PF_ARROW_FUNC, PF_POW_ALLOWED, PF_POW_FORBIDDEN */
+__exception int js_parse_unary(JSParseState *s, int parse_flags) {
+  std::vector<JSUnaryFrame> frames;
+  int cur_flags = parse_flags;
 
-  if (op == TOK_LAND) {
-    if (js_parse_expr_binary(s, 8, parse_flags)) return -1;
-  } else {
-    if (js_parse_logical_and_or(s, TOK_LAND, parse_flags)) return -1;
-  }
-  if (s->token.val == op) {
-    label1 = new_label(s);
+  for (;;) {
+    for (;;) {
+      JSUnaryFrame frame = {};
+      switch (s->token.val) {
+        case '+':
+        case '-':
+        case '!':
+        case '~':
+        case TOK_VOID:
+          frame.kind = JS_UNARY_FRAME_SIMPLE;
+          frame.op = s->token.val;
+          frame.post_flags = 0;
+          frames.push_back(frame);
+          if (next_token(s)) return -1;
+          cur_flags = PF_POW_FORBIDDEN;
+          continue;
+        case TOK_DEC:
+        case TOK_INC:
+          frame.kind = JS_UNARY_FRAME_PREFIX_UPDATE;
+          frame.op = s->token.val;
+          frame.post_flags = cur_flags;
+          frames.push_back(frame);
+          if (next_token(s)) return -1;
+          cur_flags = 0;
+          continue;
+        case TOK_TYPEOF:
+          frame.kind = JS_UNARY_FRAME_TYPEOF;
+          frame.post_flags = 0;
+          frames.push_back(frame);
+          if (next_token(s)) return -1;
+          /* `typeof x ** y` is a syntax error per ES spec. Setting both
+             POW bits causes js_unary_maybe_consume_pow() to detect '**'
+             and throw, while suppressing PF_ARROW_FUNC has no effect here
+             since postfix only checks `cur_flags & PF_ARROW_FUNC`. */
+          cur_flags = PF_POW_DETECT_FORBID | PF_ARROW_FUNC;
+          continue;
+        case TOK_DELETE:
+          frame.kind = JS_UNARY_FRAME_DELETE;
+          frame.post_flags = 0;
+          frames.push_back(frame);
+          if (next_token(s)) return -1;
+          /* `delete x ** y` is a syntax error per ES spec, see TOK_TYPEOF. */
+          cur_flags = PF_POW_DETECT_FORBID | PF_ARROW_FUNC;
+          continue;
+        case TOK_AWAIT:
+          if (!(s->cur_func->func_kind & JS_FUNC_ASYNC))
+            return js_parse_error(s, "unexpected 'await' keyword");
+          if (!s->cur_func->in_function_body)
+            return js_parse_error(s, "await in default expression");
+          frame.kind = JS_UNARY_FRAME_AWAIT;
+          frame.post_flags = 0;
+          frames.push_back(frame);
+          if (next_token(s)) return -1;
+          /* `await x ** y` is a syntax error per ES spec, see TOK_TYPEOF. */
+          cur_flags = PF_POW_DETECT_FORBID | PF_ARROW_FUNC;
+          continue;
+        default:
+          break;
+      }
+      break;
+    }
+
+    if (js_parse_postfix_expr(s, (cur_flags & PF_ARROW_FUNC) | PF_POSTFIX_CALL))
+      return -1;
+    if (!s->got_lf && (s->token.val == TOK_DEC || s->token.val == TOK_INC)) {
+      int opcode, op, scope, label;
+      JSAtom name;
+      op = s->token.val;
+      if (get_lvalue(s, &opcode, &scope, &name, &label, NULL, TRUE, op))
+        return -1;
+      HandleScope func_scope(s->ctx->rt);
+      func_scope.PushLEPUSAtom(name);
+      emit_op(s, OP_post_dec + op - TOK_DEC);
+      put_lvalue(s, opcode, scope, name, label, PUT_LVALUE_KEEP_SECOND, FALSE);
+      if (next_token(s)) return -1;
+    }
 
     for (;;) {
-      if (next_token(s)) return -1;
-      emit_op(s, OP_dup);
-      emit_goto(s, op == TOK_LAND ? OP_if_false : OP_if_true, label1);
-      emit_op(s, OP_drop);
-
-      if (op == TOK_LAND) {
-        if (js_parse_expr_binary(s, 8, parse_flags & ~PF_ARROW_FUNC)) return -1;
-      } else {
-        if (js_parse_logical_and_or(s, TOK_LAND, parse_flags & ~PF_ARROW_FUNC))
-          return -1;
-      }
-      if (s->token.val != op) {
-        if (s->token.val == TOK_DOUBLE_QUESTION_MARK)
-          return js_parse_error(s, "cannot mix ?? with && or ||");
+      BOOL consumed_pow;
+      if (js_unary_maybe_consume_pow(s, cur_flags, &frames, &consumed_pow))
+        return -1;
+      if (consumed_pow) {
+        cur_flags = PF_POW_ALLOWED;
         break;
       }
-    }
+      if (frames.empty()) return 0;
 
-    emit_label(s, label1);
+      JSUnaryFrame frame = frames.back();
+      frames.pop_back();
+      if (js_apply_unary_frame(s, frame)) return -1;
+      if (frame.kind == JS_UNARY_FRAME_POW) continue;
+      cur_flags = frame.post_flags;
+    }
   }
-  return 0;
 }
 
-/* allowed parse_flags: PF_ARROW_FUNC, PF_IN_ACCEPTED */
-__exception int js_parse_cond_expr(JSParseState *s, int parse_flags) {
-  int label1, label2;
+QJS_STATIC BOOL js_parse_yield_has_arg(JSParseState *s) {
+  return s->token.val != ';' && s->token.val != ')' && s->token.val != ']' &&
+         s->token.val != '}' && s->token.val != ',' && s->token.val != ':' &&
+         !s->got_lf;
+}
 
-  if (js_parse_logical_and_or(s, TOK_LOR, parse_flags)) return -1;
-  if (s->token.val == TOK_DOUBLE_QUESTION_MARK) {
-    label1 = new_label(s);
-    for (;;) {
-      if (next_token(s)) return -1;
+QJS_STATIC __exception int js_emit_yield_expr(JSParseState *s, BOOL is_star) {
+  if (s->cur_func->func_kind == JS_FUNC_ASYNC_GENERATOR) {
+    int label_loop, label_return, label_next;
+    int label_return1, label_yield, label_throw, label_throw1;
+    int label_throw2;
 
-      emit_op(s, OP_dup);
-      emit_op(s, OP_is_undefined);
-      emit_goto(s, OP_if_false, label1);
+    if (is_star) {
+      label_loop = new_label(s);
+      label_yield = new_label(s);
+
+      emit_op(s, OP_for_await_of_start);
+
+      /* remove the catch offset (XXX: could avoid pushing back undefined) */
       emit_op(s, OP_drop);
-
-      if (js_parse_expr_binary(s, 8, parse_flags & ~PF_ARROW_FUNC)) return -1;
-      if (s->token.val != TOK_DOUBLE_QUESTION_MARK) break;
-    }
-    emit_label(s, label1);
-  }
-  if (s->token.val == '?') {
-    if (next_token(s)) return -1;
-    label1 = emit_goto(s, OP_if_false, -1);
-
-    if (js_parse_assign_expr(s, PF_IN_ACCEPTED)) return -1;
-    if (js_parse_expect(s, ':')) return -1;
-
-    label2 = emit_goto(s, OP_goto, -1);
-
-    emit_label(s, label1);
-
-    if (js_parse_assign_expr(s, parse_flags & PF_IN_ACCEPTED)) return -1;
-
-    emit_label(s, label2);
-  }
-  return 0;
-}
-
-/* allowed parse_flags: PF_IN_ACCEPTED */
-__exception int js_parse_assign_expr(JSParseState *s, int parse_flags) {
-  int opcode, op, scope;
-  JSAtom name0 = JS_ATOM_NULL;
-  JSAtom name;
-#ifdef ENABLE_COMPATIBLE_MM
-  HandleScope func_scope(s->ctx->rt);
-#endif
-
-  if (s->token.val == TOK_YIELD) {
-    BOOL is_star = FALSE;
-    if (!(s->cur_func->func_kind & JS_FUNC_GENERATOR))
-      return js_parse_error(s, "unexpected 'yield' keyword");
-    if (!s->cur_func->in_function_body)
-      return js_parse_error(s, "yield in default expression");
-    if (next_token(s)) return -1;
-    /* XXX: is there a better method to detect 'yield' without
-       parameters ? */
-    if (s->token.val != ';' && s->token.val != ')' && s->token.val != ']' &&
-        s->token.val != '}' && s->token.val != ',' && s->token.val != ':' &&
-        !s->got_lf) {
-      if (s->token.val == '*') {
-        is_star = TRUE;
-        if (next_token(s)) return -1;
-      }
-      if (js_parse_assign_expr(s, parse_flags)) return -1;
-    } else {
       emit_op(s, OP_undefined);
-    }
-    if (s->cur_func->func_kind == JS_FUNC_ASYNC_GENERATOR) {
-      int label_loop, label_return, label_next;
-      int label_return1, label_yield, label_throw, label_throw1;
-      int label_throw2;
 
-      if (is_star) {
-        label_loop = new_label(s);
-        label_yield = new_label(s);
+      emit_op(s, OP_undefined); /* initial value */
 
-        emit_op(s, OP_for_await_of_start);
+      emit_label(s, label_loop);
+      emit_op(s, OP_async_iterator_next);
+      emit_op(s, OP_await);
+      emit_op(s, OP_iterator_get_value_done);
+      label_next = emit_goto(s, OP_if_true, -1); /* end of loop */
+      emit_op(s, OP_await);
+      emit_label(s, label_yield);
+      emit_op(s, OP_async_yield_star);
+      emit_op(s, OP_dup);
+      label_return = emit_goto(s, OP_if_true, -1);
+      emit_op(s, OP_drop);
+      emit_goto(s, OP_goto, label_loop);
 
-        /* remove the catch offset (XXX: could avoid pushing back
-           undefined) */
-        emit_op(s, OP_drop);
-        emit_op(s, OP_undefined);
+      emit_label(s, label_return);
+      emit_op(s, OP_push_i32);
+      emit_u32(s, 2);
+      emit_op(s, OP_strict_eq);
+      label_throw = emit_goto(s, OP_if_true, -1);
 
-        emit_op(s, OP_undefined); /* initial value */
+      /* return handling */
+      emit_op(s, OP_await);
+      emit_op(s, OP_async_iterator_get);
+      emit_u8(s, 0);
+      label_return1 = emit_goto(s, OP_if_true, -1);
+      emit_op(s, OP_await);
+      emit_op(s, OP_iterator_get_value_done);
+      /* XXX: the spec does not indicate that an await should be performed in
+         case done = true, but the tests assume it */
+      emit_goto(s, OP_if_false, label_yield);
 
-        emit_label(s, label_loop);
-        emit_op(s, OP_async_iterator_next);
-        emit_op(s, OP_await);
-        emit_op(s, OP_iterator_get_value_done);
-        label_next = emit_goto(s, OP_if_true, -1); /* end of loop */
-        emit_op(s, OP_await);
-        emit_label(s, label_yield);
-        emit_op(s, OP_async_yield_star);
-        emit_op(s, OP_dup);
-        label_return = emit_goto(s, OP_if_true, -1);
-        emit_op(s, OP_drop);
-        emit_goto(s, OP_goto, label_loop);
+      emit_label(s, label_return1);
+      emit_op(s, OP_nip);
+      emit_op(s, OP_nip);
+      emit_op(s, OP_nip);
+      emit_return(s, TRUE);
 
-        emit_label(s, label_return);
-        emit_op(s, OP_push_i32);
-        emit_u32(s, 2);
-        emit_op(s, OP_strict_eq);
-        label_throw = emit_goto(s, OP_if_true, -1);
+      /* throw handling */
+      emit_label(s, label_throw);
+      emit_op(s, OP_async_iterator_get);
+      emit_u8(s, 1);
+      label_throw1 = emit_goto(s, OP_if_true, -1);
+      emit_op(s, OP_await);
+      emit_op(s, OP_iterator_get_value_done);
+      emit_goto(s, OP_if_false, label_yield);
+      /* XXX: the spec does not indicate that an await should be performed in
+         case done = true, but the tests assume it */
+      emit_op(s, OP_await);
+      emit_goto(s, OP_goto, label_next);
+      /* close the iterator and throw a type error exception */
+      emit_label(s, label_throw1);
+      emit_op(s, OP_async_iterator_get);
+      emit_u8(s, 0);
+      label_throw2 = emit_goto(s, OP_if_true, -1);
+      emit_op(s, OP_await);
+      emit_label(s, label_throw2);
+      emit_op(s, OP_async_iterator_get);
+      emit_u8(s, 2);       /* throw the type error exception */
+      emit_op(s, OP_drop); /* never reached */
 
-        /* return handling */
-        emit_op(s, OP_await);
-        emit_op(s, OP_async_iterator_get);
-        emit_u8(s, 0);
-        label_return1 = emit_goto(s, OP_if_true, -1);
-        emit_op(s, OP_await);
-        emit_op(s, OP_iterator_get_value_done);
-        /* XXX: the spec does not indicate that an await should be
-           performed in case done = true, but the tests assume it */
-        emit_goto(s, OP_if_false, label_yield);
-
-        emit_label(s, label_return1);
-        emit_op(s, OP_nip);
-        emit_op(s, OP_nip);
-        emit_op(s, OP_nip);
-        emit_return(s, TRUE);
-
-        /* throw handling */
-        emit_label(s, label_throw);
-        emit_op(s, OP_async_iterator_get);
-        emit_u8(s, 1);
-        label_throw1 = emit_goto(s, OP_if_true, -1);
-        emit_op(s, OP_await);
-        emit_op(s, OP_iterator_get_value_done);
-        emit_goto(s, OP_if_false, label_yield);
-        /* XXX: the spec does not indicate that an await should be
-           performed in case done = true, but the tests assume it */
-        emit_op(s, OP_await);
-        emit_goto(s, OP_goto, label_next);
-        /* close the iterator and throw a type error exception */
-        emit_label(s, label_throw1);
-        emit_op(s, OP_async_iterator_get);
-        emit_u8(s, 0);
-        label_throw2 = emit_goto(s, OP_if_true, -1);
-        emit_op(s, OP_await);
-        emit_label(s, label_throw2);
-        emit_op(s, OP_async_iterator_get);
-        emit_u8(s, 2);       /* throw the type error exception */
-        emit_op(s, OP_drop); /* never reached */
-
-        emit_label(s, label_next);
-        emit_op(s, OP_nip); /* keep the value associated with
-                               done = true */
-        emit_op(s, OP_nip);
-        emit_op(s, OP_nip);
-      } else {
-        emit_op(s, OP_await);
-        emit_op(s, OP_yield);
-        label_next = emit_goto(s, OP_if_false, -1);
-        emit_return(s, TRUE);
-        emit_label(s, label_next);
-      }
+      emit_label(s, label_next);
+      emit_op(s, OP_nip); /* keep the value associated with done = true */
+      emit_op(s, OP_nip);
+      emit_op(s, OP_nip);
     } else {
-      int label_next;
-      if (is_star) {
-        emit_op(s, OP_for_of_start);
-        emit_op(s, OP_drop); /* drop the catch offset */
-        emit_op(s, OP_yield_star);
-      } else {
-        emit_op(s, OP_yield);
-      }
+      emit_op(s, OP_await);
+      emit_op(s, OP_yield);
       label_next = emit_goto(s, OP_if_false, -1);
       emit_return(s, TRUE);
       emit_label(s, label_next);
     }
-    return 0;
+  } else {
+    int label_next;
+    if (is_star) {
+      emit_op(s, OP_for_of_start);
+      emit_op(s, OP_drop); /* drop the catch offset */
+      emit_op(s, OP_yield_star);
+    } else {
+      emit_op(s, OP_yield);
+    }
+    label_next = emit_goto(s, OP_if_false, -1);
+    emit_return(s, TRUE);
+    emit_label(s, label_next);
   }
-  if (s->token.val == TOK_IDENT) {
-    /* name0 is used to check for OP_set_name pattern, not duplicated */
-    name0 = s->token.u.ident.atom;
-  }
-  if (js_parse_cond_expr(s, parse_flags | PF_ARROW_FUNC)) return -1;
+  return 0;
+}
 
-  op = s->token.val;
-  if (op == '=' || (op >= TOK_MUL_ASSIGN && op <= TOK_POW_ASSIGN)) {
-    int label;
-    if (next_token(s)) return -1;
-    if (get_lvalue(s, &opcode, &scope, &name, &label, NULL, (op != '='), op) <
-        0)
-      return -1;
+typedef enum JSAssignFrameKind {
+  JS_ASSIGN_FRAME_ASSIGN,
+  JS_ASSIGN_FRAME_YIELD,
+} JSAssignFrameKind;
+
+typedef struct JSAssignFrame {
+  JSAssignFrameKind kind;
+  int opcode;
+  int op;
+  int scope;
+  int label;
+  JSAtom name;
+  JSAtom name0;
+  BOOL is_star;
+} JSAssignFrame;
+
+QJS_STATIC void js_assign_frame_stack_free_atoms(
+    JSParseState *s, std::vector<JSAssignFrame> *stack) {
+  if (!s->ctx->gc_enable) {
+    for (JSAssignFrame &frame : *stack) {
+      if (frame.kind == JS_ASSIGN_FRAME_ASSIGN && frame.name != JS_ATOM_NULL) {
+        LEPUS_FreeAtom(s->ctx, frame.name);
+      }
+    }
+  }
+  stack->clear();
+}
+
+/* allowed parse_flags: PF_IN_ACCEPTED */
+__exception int js_parse_assign_expr(JSParseState *s, int parse_flags) {
+  std::vector<JSAssignFrame> frames;
 #ifdef ENABLE_COMPATIBLE_MM
-    func_scope.PushLEPUSAtom(name);
+  HandleScope func_scope(s->ctx->rt);
 #endif
 
-    if (js_parse_assign_expr(s, parse_flags)) {
-      if (!s->ctx->gc_enable) LEPUS_FreeAtom(s->ctx, name);
-      return -1;
+  for (;;) {
+    JSAssignFrame frame = {};
+    JSAtom name0 = JS_ATOM_NULL;
+    int op;
+
+    if (s->token.val == TOK_YIELD) {
+      BOOL is_star = FALSE;
+      if (!(s->cur_func->func_kind & JS_FUNC_GENERATOR)) {
+        js_parse_error(s, "unexpected 'yield' keyword");
+        goto fail;
+      }
+      if (!s->cur_func->in_function_body) {
+        js_parse_error(s, "yield in default expression");
+        goto fail;
+      }
+      if (next_token(s)) goto fail;
+      if (js_parse_yield_has_arg(s)) {
+        if (s->token.val == '*') {
+          is_star = TRUE;
+          if (next_token(s)) goto fail;
+        }
+        frame.kind = JS_ASSIGN_FRAME_YIELD;
+        frame.is_star = is_star;
+        frames.push_back(frame);
+        continue;
+      }
+      emit_op(s, OP_undefined);
+      if (js_emit_yield_expr(s, is_star)) goto fail;
+      break;
     }
 
-    if (op == '=') {
-      if (opcode == OP_get_ref_value && name == name0) {
-        set_object_name(s, name);
+    if (s->token.val == TOK_IDENT) {
+      /* name0 is used to check for OP_set_name pattern, not duplicated */
+      name0 = s->token.u.ident.atom;
+    }
+    if (js_parse_cond_expr(s, parse_flags | PF_ARROW_FUNC)) goto fail;
+
+    op = s->token.val;
+    if (op != '=' && (op < TOK_MUL_ASSIGN || op > TOK_POW_ASSIGN)) break;
+    if (next_token(s)) goto fail;
+
+    frame.kind = JS_ASSIGN_FRAME_ASSIGN;
+    frame.op = op;
+    frame.name0 = name0;
+    if (get_lvalue(s, &frame.opcode, &frame.scope, &frame.name, &frame.label,
+                   NULL, (op != '='), op) < 0)
+      goto fail;
+#ifdef ENABLE_COMPATIBLE_MM
+    func_scope.PushLEPUSAtom(frame.name);
+#endif
+    frames.push_back(frame);
+  }
+
+  while (!frames.empty()) {
+    JSAssignFrame frame = frames.back();
+    frames.pop_back();
+    if (frame.kind == JS_ASSIGN_FRAME_YIELD) {
+      if (js_emit_yield_expr(s, frame.is_star)) goto fail;
+      continue;
+    }
+
+    if (frame.op == '=') {
+      if (frame.opcode == OP_get_ref_value && frame.name == frame.name0) {
+        set_object_name(s, frame.name);
       }
     } else {
       static const uint8_t assign_opcodes[] = {
           OP_mul, OP_div, OP_mod, OP_add, OP_sub, OP_shl,
           OP_sar, OP_shr, OP_and, OP_xor, OP_or,  OP_pow,
       };
-      op = assign_opcodes[op - TOK_MUL_ASSIGN];
-      emit_op(s, op);
+      emit_op(s, assign_opcodes[frame.op - TOK_MUL_ASSIGN]);
     }
-    put_lvalue(s, opcode, scope, name, label, PUT_LVALUE_KEEP_TOP, FALSE);
+    put_lvalue(s, frame.opcode, frame.scope, frame.name, frame.label,
+               PUT_LVALUE_KEEP_TOP, FALSE);
   }
+
   return 0;
+
+fail:
+  js_assign_frame_stack_free_atoms(s, &frames);
+  return -1;
 }
 
 /* allowed parse_flags: PF_IN_ACCEPTED */
