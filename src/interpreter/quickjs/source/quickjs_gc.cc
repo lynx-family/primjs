@@ -490,7 +490,7 @@ void InitRosGC(LEPUSRuntime *rt) {
   rt->ros_ = new ROS_GC::RosAllocImpl(rt, !concurrent_disabled());
   rt->collector_ = new ROS_GC::MarkSweepCollector(rt->ros_);
   rt->ros_->SetCollector(rt->collector_);
-  ROS_GC::VMHeapParam param = {2 * ROS_GC::kRosDefaultPageGroupSize,
+  ROS_GC::VMHeapParam param = {16 * ROS_GC::kRosDefaultPageGroupSize,
                                static_cast<size_t>(8192) * MB};
   rt->ros_->Init(param);
 }
