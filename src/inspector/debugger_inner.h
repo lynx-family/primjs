@@ -145,7 +145,6 @@ QJS_HIDE int js_is_regexp_GC(LEPUSContext *, LEPUSValueConst);
 
 void DebuggerFreeScript(LEPUSContext *ctx, LEPUSScriptSource *script);
 
-LEPUSValue GetDebuggerObjectGroup(LEPUSDebuggerInfo *info);
 // given the stack depth, return the local variables
 LEPUSValue GetLocalVariables(LEPUSContext *ctx, int32_t stack_index);
 

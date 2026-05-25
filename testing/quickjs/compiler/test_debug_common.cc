@@ -3641,4 +3641,2808 @@ TEST_F(QjsDebugMethods, TestScriptUrl) {
   }
 }
 
+// Tests for Runtime.releaseObjectGroup and Runtime.releaseObject
+// These tests verify the object group lifecycle: objects created during
+// Runtime.evaluate with an objectGroup param go into the group registry,
+// and can be released via Runtime.releaseObjectGroup or Runtime.releaseObject.
+
+TEST_F(QjsDebugMethods, TestReleaseObjectGroup) {
+  // Enable Runtime and Debugger
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":0,\"method\":\"Runtime.enable\",\"params\":{}}");
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":1,\"method\":\"Debugger.enable\",\"params\":{"
+      "\"maxScriptsCacheSize\":100000000}}");
+  const char* buf = "function trigger() {}; trigger();\n";
+  LEPUSValue ret =
+      LEPUS_Eval(ctx_, buf, strlen(buf), "setup.js", LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  // Drain setup messages
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+  }
+
+  // Evaluate an expression with objectGroup "testGroup"
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":10,\"method\":\"Runtime.evaluate\",\"params\":{"
+      "\"expression\":\"({a:1, b:2})\","
+      "\"objectGroup\":\"testGroup\"}}");
+  const char* trigger = "function t1() {}; t1();\n";
+  ret = LEPUS_Eval(ctx_, trigger, strlen(trigger), "trigger1.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  // Verify group was created and has objects
+  LEPUSDebuggerInfo* info = GetDebuggerInfo(ctx_);
+  ASSERT_TRUE(info->object_group_lengths.count("testGroup") > 0);
+  ASSERT_TRUE(info->object_group_lengths["testGroup"] > 0);
+
+  // running_state should not have grown (object went to group)
+  uint32_t running_len_before = info->running_state.get_properties_array_len;
+
+  // Drain messages
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+  }
+
+  // Release the object group
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":11,\"method\":\"Runtime.releaseObjectGroup\",\"params\":{"
+      "\"objectGroup\":\"testGroup\"}}");
+  const char* trigger2 = "function t2() {}; t2();\n";
+  ret = LEPUS_Eval(ctx_, trigger2, strlen(trigger2), "trigger2.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  // Verify group is gone
+  ASSERT_TRUE(info->object_group_lengths.count("testGroup") == 0);
+
+  // Verify running_state was not affected
+  ASSERT_EQ(info->running_state.get_properties_array_len, running_len_before);
+}
+
+TEST_F(QjsDebugMethods, TestReleaseObjectGroupMultipleGroups) {
+  // Enable Runtime and Debugger
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":0,\"method\":\"Runtime.enable\",\"params\":{}}");
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":1,\"method\":\"Debugger.enable\",\"params\":{"
+      "\"maxScriptsCacheSize\":100000000}}");
+  const char* buf = "function trigger() {}; trigger();\n";
+  LEPUSValue ret =
+      LEPUS_Eval(ctx_, buf, strlen(buf), "setup.js", LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+  }
+
+  // Create two groups
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":10,\"method\":\"Runtime.evaluate\",\"params\":{"
+      "\"expression\":\"({x:1})\","
+      "\"objectGroup\":\"groupA\"}}");
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":11,\"method\":\"Runtime.evaluate\",\"params\":{"
+      "\"expression\":\"({y:2})\","
+      "\"objectGroup\":\"groupB\"}}");
+  const char* trigger = "function t1() {}; t1();\n";
+  ret = LEPUS_Eval(ctx_, trigger, strlen(trigger), "trigger1.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  LEPUSDebuggerInfo* info = GetDebuggerInfo(ctx_);
+  ASSERT_TRUE(info->object_group_lengths.count("groupA") > 0);
+  ASSERT_TRUE(info->object_group_lengths.count("groupB") > 0);
+
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+  }
+
+  // Release only groupA
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":12,\"method\":\"Runtime.releaseObjectGroup\",\"params\":{"
+      "\"objectGroup\":\"groupA\"}}");
+  const char* trigger2 = "function t2() {}; t2();\n";
+  ret = LEPUS_Eval(ctx_, trigger2, strlen(trigger2), "trigger2.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  // groupA gone, groupB still present
+  ASSERT_TRUE(info->object_group_lengths.count("groupA") == 0);
+  ASSERT_TRUE(info->object_group_lengths.count("groupB") > 0);
+  ASSERT_TRUE(info->object_group_lengths["groupB"] > 0);
+}
+
+TEST_F(QjsDebugMethods, TestReleaseObject) {
+  // Enable Runtime and Debugger
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":0,\"method\":\"Runtime.enable\",\"params\":{}}");
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":1,\"method\":\"Debugger.enable\",\"params\":{"
+      "\"maxScriptsCacheSize\":100000000}}");
+  const char* buf = "function trigger() {}; trigger();\n";
+  LEPUSValue ret =
+      LEPUS_Eval(ctx_, buf, strlen(buf), "setup.js", LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+  }
+
+  // Evaluate with objectGroup to get a known objectId
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":10,\"method\":\"Runtime.evaluate\",\"params\":{"
+      "\"expression\":\"({releaseMe:true})\","
+      "\"objectGroup\":\"releaseTest\"}}");
+  const char* trigger = "function t1() {}; t1();\n";
+  ret = LEPUS_Eval(ctx_, trigger, strlen(trigger), "trigger1.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  // Find the objectId from the response
+  std::string object_id;
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    std::string msg = QjsDebugQueue::GetReceiveMessageQueue().front();
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+    LEPUSValue json = LEPUS_ParseJSON(ctx_, msg.c_str(), msg.length(), "");
+    HandleScope func_scope(ctx_, &json, HANDLE_TYPE_LEPUS_VALUE);
+    LEPUSValue id_val = LEPUS_GetPropertyStr(ctx_, json, "id");
+    if (!LEPUS_IsUndefined(id_val)) {
+      int32_t id = 0;
+      LEPUS_ToInt32(ctx_, &id, id_val);
+      if (id == 10) {
+        // Extract result.result.objectId
+        LEPUSValue result = LEPUS_GetPropertyStr(ctx_, json, "result");
+        LEPUSValue inner_result = LEPUS_GetPropertyStr(ctx_, result, "result");
+        LEPUSValue obj_id_val =
+            LEPUS_GetPropertyStr(ctx_, inner_result, "objectId");
+        if (LEPUS_IsString(obj_id_val)) {
+          const char* oid = LEPUS_ToCString(ctx_, obj_id_val);
+          if (oid) object_id = oid;
+          if (!ctx_->rt->gc_enable) LEPUS_FreeCString(ctx_, oid);
+        }
+        if (!ctx_->rt->gc_enable) {
+          LEPUS_FreeValue(ctx_, obj_id_val);
+          LEPUS_FreeValue(ctx_, inner_result);
+          LEPUS_FreeValue(ctx_, result);
+        }
+      }
+    }
+    if (!ctx_->rt->gc_enable) {
+      LEPUS_FreeValue(ctx_, id_val);
+      LEPUS_FreeValue(ctx_, json);
+    }
+  }
+
+  ASSERT_FALSE(object_id.empty());
+
+  LEPUSDebuggerInfo* info = GetDebuggerInfo(ctx_);
+  ASSERT_TRUE(info->object_group_lengths.count("releaseTest") > 0);
+  uint32_t group_len_before = info->object_group_lengths["releaseTest"];
+  ASSERT_TRUE(group_len_before > 0);
+
+  // Release the specific object by objectId
+  std::string release_msg =
+      "{\"id\":11,\"method\":\"Runtime.releaseObject\",\"params\":{"
+      "\"objectId\":\"" +
+      object_id + "\"}}";
+  QjsDebugQueue::GetSendMessageQueue().push(release_msg);
+  const char* trigger2 = "function t2() {}; t2();\n";
+  ret = LEPUS_Eval(ctx_, trigger2, strlen(trigger2), "trigger2.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  // The group still exists (just one slot nullified), but we got a response
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    std::string msg = QjsDebugQueue::GetReceiveMessageQueue().front();
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+    LEPUSValue json = LEPUS_ParseJSON(ctx_, msg.c_str(), msg.length(), "");
+    HandleScope func_scope(ctx_, &json, HANDLE_TYPE_LEPUS_VALUE);
+    LEPUSValue id_val = LEPUS_GetPropertyStr(ctx_, json, "id");
+    if (!LEPUS_IsUndefined(id_val)) {
+      int32_t id = 0;
+      LEPUS_ToInt32(ctx_, &id, id_val);
+      if (id == 11) {
+        // Verify we got a successful response (has "result" key)
+        LEPUSValue result = LEPUS_GetPropertyStr(ctx_, json, "result");
+        ASSERT_TRUE(LEPUS_IsObject(result));
+        if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, result);
+      }
+    }
+    if (!ctx_->rt->gc_enable) {
+      LEPUS_FreeValue(ctx_, id_val);
+      LEPUS_FreeValue(ctx_, json);
+    }
+  }
+
+  // Since this was the only object in the group, the group should be
+  // cleaned up entirely (deleted from registry when ids_set becomes empty).
+  ASSERT_EQ(info->object_group_lengths.count("releaseTest"), 0u);
+  ASSERT_EQ(info->object_group_ids.count("releaseTest"), 0u);
+
+  // The group property should no longer exist in the registry
+  LEPUSValue group_array =
+      LEPUS_GetPropertyStr(ctx_, info->object_group_registry, "releaseTest");
+  ASSERT_TRUE(LEPUS_IsUndefined(group_array));
+  if (!ctx_->rt->gc_enable) {
+    LEPUS_FreeValue(ctx_, group_array);
+  }
+
+  // The objectId should be removed from the reverse mapping
+  uint64_t obj_ptr = strtoull(object_id.c_str(), nullptr, 10);
+  ASSERT_EQ(info->object_id_to_groups.count(obj_ptr), 0u);
+}
+
+TEST_F(QjsDebugMethods, TestObjectGroupRoutingToRunningState) {
+  // Verify that objects without objectGroup still go to running_state
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":0,\"method\":\"Runtime.enable\",\"params\":{}}");
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":1,\"method\":\"Debugger.enable\",\"params\":{"
+      "\"maxScriptsCacheSize\":100000000}}");
+  const char* buf = "function trigger() {}; trigger();\n";
+  LEPUSValue ret =
+      LEPUS_Eval(ctx_, buf, strlen(buf), "setup.js", LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+  }
+
+  LEPUSDebuggerInfo* info = GetDebuggerInfo(ctx_);
+  uint32_t running_len_before = info->running_state.get_properties_array_len;
+
+  // Evaluate WITHOUT objectGroup — should go to running_state
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":10,\"method\":\"Runtime.evaluate\",\"params\":{"
+      "\"expression\":\"({noGroup:true})\"}}");
+  const char* trigger = "function t1() {}; t1();\n";
+  ret = LEPUS_Eval(ctx_, trigger, strlen(trigger), "trigger1.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  // running_state should have grown
+  ASSERT_TRUE(info->running_state.get_properties_array_len >
+              running_len_before);
+
+  // No new groups should have been created
+  ASSERT_TRUE(info->object_group_lengths.empty());
+}
+
+TEST_F(QjsDebugMethods, TestReleaseObjectGroupNonexistent) {
+  // Releasing a non-existent group should not crash
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":0,\"method\":\"Runtime.enable\",\"params\":{}}");
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":1,\"method\":\"Debugger.enable\",\"params\":{"
+      "\"maxScriptsCacheSize\":100000000}}");
+  const char* buf = "function trigger() {}; trigger();\n";
+  LEPUSValue ret =
+      LEPUS_Eval(ctx_, buf, strlen(buf), "setup.js", LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+  }
+
+  // Release a group that was never created
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":10,\"method\":\"Runtime.releaseObjectGroup\",\"params\":{"
+      "\"objectGroup\":\"nonexistent\"}}");
+  const char* trigger = "function t1() {}; t1();\n";
+  ret = LEPUS_Eval(ctx_, trigger, strlen(trigger), "trigger1.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  // Should get a response without crashing
+  bool got_response = false;
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    std::string msg = QjsDebugQueue::GetReceiveMessageQueue().front();
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+    LEPUSValue json = LEPUS_ParseJSON(ctx_, msg.c_str(), msg.length(), "");
+    HandleScope func_scope(ctx_, &json, HANDLE_TYPE_LEPUS_VALUE);
+    LEPUSValue id_val = LEPUS_GetPropertyStr(ctx_, json, "id");
+    if (!LEPUS_IsUndefined(id_val)) {
+      int32_t id = 0;
+      LEPUS_ToInt32(ctx_, &id, id_val);
+      if (id == 10) got_response = true;
+    }
+    if (!ctx_->rt->gc_enable) {
+      LEPUS_FreeValue(ctx_, id_val);
+      LEPUS_FreeValue(ctx_, json);
+    }
+  }
+  ASSERT_TRUE(got_response);
+}
+
+TEST_F(QjsDebugMethods, TestReleaseObjectWithConsoleObjectId) {
+  // Console object IDs (format "console:...") should not be affected by
+  // releaseObject — it should just return success without modifying anything
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":0,\"method\":\"Runtime.enable\",\"params\":{}}");
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":1,\"method\":\"Debugger.enable\",\"params\":{"
+      "\"maxScriptsCacheSize\":100000000}}");
+  const char* buf = "function trigger() {}; trigger();\n";
+  LEPUSValue ret =
+      LEPUS_Eval(ctx_, buf, strlen(buf), "setup.js", LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+  }
+
+  // Try to release a console-format objectId — should not crash
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":10,\"method\":\"Runtime.releaseObject\",\"params\":{"
+      "\"objectId\":\"console:0:1:0\"}}");
+  const char* trigger = "function t1() {}; t1();\n";
+  ret = LEPUS_Eval(ctx_, trigger, strlen(trigger), "trigger1.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  // Should get a response without crashing
+  bool got_response = false;
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    std::string msg = QjsDebugQueue::GetReceiveMessageQueue().front();
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+    LEPUSValue json = LEPUS_ParseJSON(ctx_, msg.c_str(), msg.length(), "");
+    HandleScope func_scope(ctx_, &json, HANDLE_TYPE_LEPUS_VALUE);
+    LEPUSValue id_val = LEPUS_GetPropertyStr(ctx_, json, "id");
+    if (!LEPUS_IsUndefined(id_val)) {
+      int32_t id = 0;
+      LEPUS_ToInt32(ctx_, &id, id_val);
+      if (id == 10) got_response = true;
+    }
+    if (!ctx_->rt->gc_enable) {
+      LEPUS_FreeValue(ctx_, id_val);
+      LEPUS_FreeValue(ctx_, json);
+    }
+  }
+  ASSERT_TRUE(got_response);
+}
+
+TEST_F(QjsDebugMethods, TestCallFunctionOnObjectGroup) {
+  // Enable Runtime and Debugger
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":0,\"method\":\"Runtime.enable\",\"params\":{}}");
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":1,\"method\":\"Debugger.enable\",\"params\":{"
+      "\"maxScriptsCacheSize\":100000000}}");
+  const char* buf = "function trigger() {}; trigger();\n";
+  LEPUSValue ret =
+      LEPUS_Eval(ctx_, buf, strlen(buf), "setup.js", LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+  }
+
+  LEPUSDebuggerInfo* info = GetDebuggerInfo(ctx_);
+  uint32_t running_len_before = info->running_state.get_properties_array_len;
+
+  // First evaluate to get an objectId to use as thisObj for callFunctionOn
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":10,\"method\":\"Runtime.evaluate\",\"params\":{"
+      "\"expression\":\"({val:42})\","
+      "\"objectGroup\":\"setupGroup\"}}");
+  const char* trigger = "function t1() {}; t1();\n";
+  ret = LEPUS_Eval(ctx_, trigger, strlen(trigger), "trigger1.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  // Extract objectId from response
+  std::string object_id;
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    std::string msg = QjsDebugQueue::GetReceiveMessageQueue().front();
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+    LEPUSValue json = LEPUS_ParseJSON(ctx_, msg.c_str(), msg.length(), "");
+    HandleScope func_scope(ctx_, &json, HANDLE_TYPE_LEPUS_VALUE);
+    LEPUSValue id_val = LEPUS_GetPropertyStr(ctx_, json, "id");
+    if (!LEPUS_IsUndefined(id_val)) {
+      int32_t id = 0;
+      LEPUS_ToInt32(ctx_, &id, id_val);
+      if (id == 10) {
+        LEPUSValue result = LEPUS_GetPropertyStr(ctx_, json, "result");
+        LEPUSValue inner_result = LEPUS_GetPropertyStr(ctx_, result, "result");
+        LEPUSValue obj_id_val =
+            LEPUS_GetPropertyStr(ctx_, inner_result, "objectId");
+        if (LEPUS_IsString(obj_id_val)) {
+          const char* oid = LEPUS_ToCString(ctx_, obj_id_val);
+          if (oid) object_id = oid;
+          if (!ctx_->rt->gc_enable) LEPUS_FreeCString(ctx_, oid);
+        }
+        if (!ctx_->rt->gc_enable) {
+          LEPUS_FreeValue(ctx_, obj_id_val);
+          LEPUS_FreeValue(ctx_, inner_result);
+          LEPUS_FreeValue(ctx_, result);
+        }
+      }
+    }
+    if (!ctx_->rt->gc_enable) {
+      LEPUS_FreeValue(ctx_, id_val);
+      LEPUS_FreeValue(ctx_, json);
+    }
+  }
+  ASSERT_FALSE(object_id.empty());
+
+  // Now call callFunctionOn with objectGroup "callGroup"
+  std::string call_msg =
+      "{\"id\":20,\"method\":\"Runtime.callFunctionOn\",\"params\":{"
+      "\"functionDeclaration\":\"function() { return {derived:true}; }\","
+      "\"objectId\":\"" +
+      object_id +
+      "\","
+      "\"objectGroup\":\"callGroup\"}}";
+  QjsDebugQueue::GetSendMessageQueue().push(call_msg);
+  const char* trigger2 = "function t2() {}; t2();\n";
+  ret = LEPUS_Eval(ctx_, trigger2, strlen(trigger2), "trigger2.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  // Verify "callGroup" was created
+  ASSERT_TRUE(info->object_group_lengths.count("callGroup") > 0);
+  ASSERT_TRUE(info->object_group_lengths["callGroup"] > 0);
+
+  // Drain messages
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+  }
+
+  // Release the callGroup
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":21,\"method\":\"Runtime.releaseObjectGroup\",\"params\":{"
+      "\"objectGroup\":\"callGroup\"}}");
+  const char* trigger3 = "function t3() {}; t3();\n";
+  ret = LEPUS_Eval(ctx_, trigger3, strlen(trigger3), "trigger3.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  // Verify callGroup is gone
+  ASSERT_TRUE(info->object_group_lengths.count("callGroup") == 0);
+}
+
+TEST_F(QjsDebugMethods, TestCallFunctionOnWithoutObjectGroup) {
+  // Verify backward compatibility: callFunctionOn without objectGroup
+  // still routes objects to running_state
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":0,\"method\":\"Runtime.enable\",\"params\":{}}");
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":1,\"method\":\"Debugger.enable\",\"params\":{"
+      "\"maxScriptsCacheSize\":100000000}}");
+  const char* buf = "function trigger() {}; trigger();\n";
+  LEPUSValue ret =
+      LEPUS_Eval(ctx_, buf, strlen(buf), "setup.js", LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+  }
+
+  LEPUSDebuggerInfo* info = GetDebuggerInfo(ctx_);
+  uint32_t running_len_before = info->running_state.get_properties_array_len;
+
+  // callFunctionOn without objectGroup
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":10,\"method\":\"Runtime.callFunctionOn\",\"params\":{"
+      "\"functionDeclaration\":\"function() { return {noGroup:true}; }\","
+      "\"executionContextId\":1}}");
+  const char* trigger = "function t1() {}; t1();\n";
+  ret = LEPUS_Eval(ctx_, trigger, strlen(trigger), "trigger1.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  // running_state should have grown (no group means fallback to running_state)
+  ASSERT_TRUE(info->running_state.get_properties_array_len >
+              running_len_before);
+
+  // No object groups should have been created
+  ASSERT_TRUE(info->object_group_lengths.count("") == 0);
+}
+
+// --- Group Inheritance Tests ---
+// Verify that Runtime.getProperties on an objectId belonging to a group
+// causes sub-objects to inherit the same group (V8 behavior).
+
+TEST_F(QjsDebugMethods, TestGetPropertiesGroupInheritance) {
+  // Enable Runtime and Debugger
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":0,\"method\":\"Runtime.enable\",\"params\":{}}");
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":1,\"method\":\"Debugger.enable\",\"params\":{"
+      "\"maxScriptsCacheSize\":100000000}}");
+  const char* buf = "function trigger() {}; trigger();\n";
+  LEPUSValue ret =
+      LEPUS_Eval(ctx_, buf, strlen(buf), "setup.js", LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+  }
+
+  LEPUSDebuggerInfo* info = GetDebuggerInfo(ctx_);
+  uint32_t running_len_before = info->running_state.get_properties_array_len;
+
+  // Evaluate an object with nested properties, using objectGroup "inherit"
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":10,\"method\":\"Runtime.evaluate\",\"params\":{"
+      "\"expression\":\"({nested: {child: 42}, arr: [1,2,3]})\","
+      "\"objectGroup\":\"inherit\"}}");
+  const char* trigger = "function t1() {}; t1();\n";
+  ret = LEPUS_Eval(ctx_, trigger, strlen(trigger), "trigger1.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  // Verify group was created
+  ASSERT_TRUE(info->object_group_lengths.count("inherit") > 0);
+  uint32_t group_len_after_eval = info->object_group_lengths["inherit"];
+  ASSERT_TRUE(group_len_after_eval > 0);
+
+  // Extract objectId from evaluate response
+  std::string object_id;
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    std::string msg = QjsDebugQueue::GetReceiveMessageQueue().front();
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+    LEPUSValue json = LEPUS_ParseJSON(ctx_, msg.c_str(), msg.length(), "");
+    HandleScope func_scope(ctx_, &json, HANDLE_TYPE_LEPUS_VALUE);
+    LEPUSValue id_val = LEPUS_GetPropertyStr(ctx_, json, "id");
+    if (!LEPUS_IsUndefined(id_val)) {
+      int32_t id = 0;
+      LEPUS_ToInt32(ctx_, &id, id_val);
+      if (id == 10) {
+        LEPUSValue result = LEPUS_GetPropertyStr(ctx_, json, "result");
+        LEPUSValue inner_result = LEPUS_GetPropertyStr(ctx_, result, "result");
+        LEPUSValue obj_id_val =
+            LEPUS_GetPropertyStr(ctx_, inner_result, "objectId");
+        if (LEPUS_IsString(obj_id_val)) {
+          const char* oid = LEPUS_ToCString(ctx_, obj_id_val);
+          if (oid) object_id = oid;
+          if (!ctx_->rt->gc_enable) LEPUS_FreeCString(ctx_, oid);
+        }
+        if (!ctx_->rt->gc_enable) {
+          LEPUS_FreeValue(ctx_, obj_id_val);
+          LEPUS_FreeValue(ctx_, inner_result);
+          LEPUS_FreeValue(ctx_, result);
+        }
+      }
+    }
+    if (!ctx_->rt->gc_enable) {
+      LEPUS_FreeValue(ctx_, id_val);
+      LEPUS_FreeValue(ctx_, json);
+    }
+  }
+  ASSERT_FALSE(object_id.empty());
+
+  // Verify parent objectId is in the reverse mapping
+  uint64_t parent_ptr = strtoull(object_id.c_str(), nullptr, 10);
+  ASSERT_TRUE(info->object_id_to_groups.count(parent_ptr) > 0);
+  ASSERT_TRUE(info->object_id_to_groups[parent_ptr].count("inherit") > 0);
+
+  // Now call getProperties on the parent — sub-objects should inherit "inherit"
+  SendRuntimeGetProperties(ctx_, 11, object_id);
+  std::string props_response = PopResponseById(ctx_, 11);
+  ASSERT_FALSE(props_response.empty());
+
+  // Group length should have grown (sub-objects added to same group)
+  ASSERT_TRUE(info->object_group_lengths["inherit"] > group_len_after_eval);
+
+  // running_state should NOT have grown (sub-objects went to group, not there)
+  ASSERT_EQ(info->running_state.get_properties_array_len, running_len_before);
+
+  // Verify sub-objects are also in the reverse mapping with same group
+  bool found_sub_object = false;
+  for (auto& [ptr, groups] : info->object_id_to_groups) {
+    if (ptr != parent_ptr && groups.count("inherit") > 0) {
+      found_sub_object = true;
+      break;
+    }
+  }
+  ASSERT_TRUE(found_sub_object);
+}
+
+TEST_F(QjsDebugMethods, TestGetPropertiesReleaseGroupFreesSubObjects) {
+  // Verify that releaseObjectGroup releases both parent and all sub-objects
+  // created via getProperties inheritance.
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":0,\"method\":\"Runtime.enable\",\"params\":{}}");
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":1,\"method\":\"Debugger.enable\",\"params\":{"
+      "\"maxScriptsCacheSize\":100000000}}");
+  const char* buf = "function trigger() {}; trigger();\n";
+  LEPUSValue ret =
+      LEPUS_Eval(ctx_, buf, strlen(buf), "setup.js", LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+  }
+
+  LEPUSDebuggerInfo* info = GetDebuggerInfo(ctx_);
+
+  // Evaluate with objectGroup "releaseInherit"
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":10,\"method\":\"Runtime.evaluate\",\"params\":{"
+      "\"expression\":\"({sub: {deep: {val: 999}}})\","
+      "\"objectGroup\":\"releaseInherit\"}}");
+  const char* trigger = "function t1() {}; t1();\n";
+  ret = LEPUS_Eval(ctx_, trigger, strlen(trigger), "trigger1.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  // Extract objectId
+  std::string object_id;
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    std::string msg = QjsDebugQueue::GetReceiveMessageQueue().front();
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+    LEPUSValue json = LEPUS_ParseJSON(ctx_, msg.c_str(), msg.length(), "");
+    HandleScope func_scope(ctx_, &json, HANDLE_TYPE_LEPUS_VALUE);
+    LEPUSValue id_val = LEPUS_GetPropertyStr(ctx_, json, "id");
+    if (!LEPUS_IsUndefined(id_val)) {
+      int32_t id = 0;
+      LEPUS_ToInt32(ctx_, &id, id_val);
+      if (id == 10) {
+        LEPUSValue result = LEPUS_GetPropertyStr(ctx_, json, "result");
+        LEPUSValue inner_result = LEPUS_GetPropertyStr(ctx_, result, "result");
+        LEPUSValue obj_id_val =
+            LEPUS_GetPropertyStr(ctx_, inner_result, "objectId");
+        if (LEPUS_IsString(obj_id_val)) {
+          const char* oid = LEPUS_ToCString(ctx_, obj_id_val);
+          if (oid) object_id = oid;
+          if (!ctx_->rt->gc_enable) LEPUS_FreeCString(ctx_, oid);
+        }
+        if (!ctx_->rt->gc_enable) {
+          LEPUS_FreeValue(ctx_, obj_id_val);
+          LEPUS_FreeValue(ctx_, inner_result);
+          LEPUS_FreeValue(ctx_, result);
+        }
+      }
+    }
+    if (!ctx_->rt->gc_enable) {
+      LEPUS_FreeValue(ctx_, id_val);
+      LEPUS_FreeValue(ctx_, json);
+    }
+  }
+  ASSERT_FALSE(object_id.empty());
+
+  // Call getProperties to create sub-objects in the same group
+  SendRuntimeGetProperties(ctx_, 11, object_id);
+  PopResponseById(ctx_, 11);
+
+  // Verify group grew and reverse mapping has entries
+  ASSERT_TRUE(info->object_group_lengths["releaseInherit"] > 1);
+  size_t reverse_map_count = 0;
+  for (auto& [ptr, groups] : info->object_id_to_groups) {
+    if (groups.count("releaseInherit") > 0) reverse_map_count++;
+  }
+  ASSERT_TRUE(reverse_map_count > 1);  // parent + at least one sub-object
+
+  // Now releaseObjectGroup — should wipe everything
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":12,\"method\":\"Runtime.releaseObjectGroup\",\"params\":{"
+      "\"objectGroup\":\"releaseInherit\"}}");
+  const char* trigger2 = "function t2() {}; t2();\n";
+  ret = LEPUS_Eval(ctx_, trigger2, strlen(trigger2), "trigger2.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  // Verify group is completely gone
+  ASSERT_EQ(info->object_group_lengths.count("releaseInherit"), 0u);
+
+  // Verify reverse mapping is cleaned up (no entries for this group)
+  for (auto& [ptr, groups] : info->object_id_to_groups) {
+    ASSERT_EQ(groups.count("releaseInherit"), 0u);
+  }
+}
+
+TEST_F(QjsDebugMethods, TestGetPropertiesWithoutGroupGoesToRunningState) {
+  // Verify that getProperties on an object NOT in any group
+  // still routes sub-objects to running_state (backward compatibility).
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":0,\"method\":\"Runtime.enable\",\"params\":{}}");
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":1,\"method\":\"Debugger.enable\",\"params\":{"
+      "\"maxScriptsCacheSize\":100000000}}");
+  const char* buf = "function trigger() {}; trigger();\n";
+  LEPUSValue ret =
+      LEPUS_Eval(ctx_, buf, strlen(buf), "setup.js", LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+  }
+
+  LEPUSDebuggerInfo* info = GetDebuggerInfo(ctx_);
+
+  // Evaluate WITHOUT objectGroup
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":10,\"method\":\"Runtime.evaluate\",\"params\":{"
+      "\"expression\":\"({noGroup: {inner: 1}})\"}}");
+  const char* trigger = "function t1() {}; t1();\n";
+  ret = LEPUS_Eval(ctx_, trigger, strlen(trigger), "trigger1.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  // Extract objectId from response
+  std::string object_id;
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    std::string msg = QjsDebugQueue::GetReceiveMessageQueue().front();
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+    LEPUSValue json = LEPUS_ParseJSON(ctx_, msg.c_str(), msg.length(), "");
+    HandleScope func_scope(ctx_, &json, HANDLE_TYPE_LEPUS_VALUE);
+    LEPUSValue id_val = LEPUS_GetPropertyStr(ctx_, json, "id");
+    if (!LEPUS_IsUndefined(id_val)) {
+      int32_t id = 0;
+      LEPUS_ToInt32(ctx_, &id, id_val);
+      if (id == 10) {
+        LEPUSValue result = LEPUS_GetPropertyStr(ctx_, json, "result");
+        LEPUSValue inner_result = LEPUS_GetPropertyStr(ctx_, result, "result");
+        LEPUSValue obj_id_val =
+            LEPUS_GetPropertyStr(ctx_, inner_result, "objectId");
+        if (LEPUS_IsString(obj_id_val)) {
+          const char* oid = LEPUS_ToCString(ctx_, obj_id_val);
+          if (oid) object_id = oid;
+          if (!ctx_->rt->gc_enable) LEPUS_FreeCString(ctx_, oid);
+        }
+        if (!ctx_->rt->gc_enable) {
+          LEPUS_FreeValue(ctx_, obj_id_val);
+          LEPUS_FreeValue(ctx_, inner_result);
+          LEPUS_FreeValue(ctx_, result);
+        }
+      }
+    }
+    if (!ctx_->rt->gc_enable) {
+      LEPUS_FreeValue(ctx_, id_val);
+      LEPUS_FreeValue(ctx_, json);
+    }
+  }
+  ASSERT_FALSE(object_id.empty());
+
+  // Object should NOT be in any reverse mapping (no group was set)
+  uint64_t parent_ptr = strtoull(object_id.c_str(), nullptr, 10);
+  ASSERT_EQ(info->object_id_to_groups.count(parent_ptr), 0u);
+
+  // Record running_state length before getProperties
+  uint32_t running_len_before = info->running_state.get_properties_array_len;
+
+  // Call getProperties — sub-objects should go to running_state
+  SendRuntimeGetProperties(ctx_, 11, object_id);
+  PopResponseById(ctx_, 11);
+
+  // running_state should have grown
+  ASSERT_TRUE(info->running_state.get_properties_array_len >
+              running_len_before);
+}
+
+TEST_F(QjsDebugMethods, TestReleaseObjectRemovesReverseMapping) {
+  // Verify that releaseObject on a parent also cleans up the reverse mapping.
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":0,\"method\":\"Runtime.enable\",\"params\":{}}");
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":1,\"method\":\"Debugger.enable\",\"params\":{"
+      "\"maxScriptsCacheSize\":100000000}}");
+  const char* buf = "function trigger() {}; trigger();\n";
+  LEPUSValue ret =
+      LEPUS_Eval(ctx_, buf, strlen(buf), "setup.js", LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+  }
+
+  LEPUSDebuggerInfo* info = GetDebuggerInfo(ctx_);
+
+  // Evaluate with objectGroup "reverseTest"
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":10,\"method\":\"Runtime.evaluate\",\"params\":{"
+      "\"expression\":\"({reverseMapTest: true})\","
+      "\"objectGroup\":\"reverseTest\"}}");
+  const char* trigger = "function t1() {}; t1();\n";
+  ret = LEPUS_Eval(ctx_, trigger, strlen(trigger), "trigger1.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  // Extract objectId
+  std::string object_id;
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    std::string msg = QjsDebugQueue::GetReceiveMessageQueue().front();
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+    LEPUSValue json = LEPUS_ParseJSON(ctx_, msg.c_str(), msg.length(), "");
+    HandleScope func_scope(ctx_, &json, HANDLE_TYPE_LEPUS_VALUE);
+    LEPUSValue id_val = LEPUS_GetPropertyStr(ctx_, json, "id");
+    if (!LEPUS_IsUndefined(id_val)) {
+      int32_t id = 0;
+      LEPUS_ToInt32(ctx_, &id, id_val);
+      if (id == 10) {
+        LEPUSValue result = LEPUS_GetPropertyStr(ctx_, json, "result");
+        LEPUSValue inner_result = LEPUS_GetPropertyStr(ctx_, result, "result");
+        LEPUSValue obj_id_val =
+            LEPUS_GetPropertyStr(ctx_, inner_result, "objectId");
+        if (LEPUS_IsString(obj_id_val)) {
+          const char* oid = LEPUS_ToCString(ctx_, obj_id_val);
+          if (oid) object_id = oid;
+          if (!ctx_->rt->gc_enable) LEPUS_FreeCString(ctx_, oid);
+        }
+        if (!ctx_->rt->gc_enable) {
+          LEPUS_FreeValue(ctx_, obj_id_val);
+          LEPUS_FreeValue(ctx_, inner_result);
+          LEPUS_FreeValue(ctx_, result);
+        }
+      }
+    }
+    if (!ctx_->rt->gc_enable) {
+      LEPUS_FreeValue(ctx_, id_val);
+      LEPUS_FreeValue(ctx_, json);
+    }
+  }
+  ASSERT_FALSE(object_id.empty());
+
+  // Verify the object is in reverse mapping
+  uint64_t parent_ptr = strtoull(object_id.c_str(), nullptr, 10);
+  ASSERT_TRUE(info->object_id_to_groups.count(parent_ptr) > 0);
+  ASSERT_TRUE(info->object_id_to_groups[parent_ptr].count("reverseTest") > 0);
+
+  // Release the specific object
+  std::string release_msg =
+      "{\"id\":11,\"method\":\"Runtime.releaseObject\",\"params\":{"
+      "\"objectId\":\"" +
+      object_id + "\"}}";
+  QjsDebugQueue::GetSendMessageQueue().push(release_msg);
+  const char* trigger2 = "function t2() {}; t2();\n";
+  ret = LEPUS_Eval(ctx_, trigger2, strlen(trigger2), "trigger2.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  // Drain response
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+  }
+
+  // Verify the object is removed from reverse mapping
+  ASSERT_EQ(info->object_id_to_groups.count(parent_ptr), 0u);
+}
+
+TEST_F(QjsDebugMethods, TestGetPropertiesDeepInheritance) {
+  // Verify group inheritance works across multiple levels of getProperties:
+  // evaluate -> getProperties(parent) -> getProperties(child)
+  // All objects at every level should be in the same group.
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":0,\"method\":\"Runtime.enable\",\"params\":{}}");
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":1,\"method\":\"Debugger.enable\",\"params\":{"
+      "\"maxScriptsCacheSize\":100000000}}");
+  const char* buf = "function trigger() {}; trigger();\n";
+  LEPUSValue ret =
+      LEPUS_Eval(ctx_, buf, strlen(buf), "setup.js", LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+  }
+
+  LEPUSDebuggerInfo* info = GetDebuggerInfo(ctx_);
+
+  // Evaluate deeply nested object
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":10,\"method\":\"Runtime.evaluate\",\"params\":{"
+      "\"expression\":\"({level1: {level2: {level3: {val: 1}}}})\","
+      "\"objectGroup\":\"deepGroup\"}}");
+  const char* trigger = "function t1() {}; t1();\n";
+  ret = LEPUS_Eval(ctx_, trigger, strlen(trigger), "trigger1.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  // Extract root objectId
+  std::string root_object_id;
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    std::string msg = QjsDebugQueue::GetReceiveMessageQueue().front();
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+    LEPUSValue json = LEPUS_ParseJSON(ctx_, msg.c_str(), msg.length(), "");
+    HandleScope func_scope(ctx_, &json, HANDLE_TYPE_LEPUS_VALUE);
+    LEPUSValue id_val = LEPUS_GetPropertyStr(ctx_, json, "id");
+    if (!LEPUS_IsUndefined(id_val)) {
+      int32_t id = 0;
+      LEPUS_ToInt32(ctx_, &id, id_val);
+      if (id == 10) {
+        LEPUSValue result = LEPUS_GetPropertyStr(ctx_, json, "result");
+        LEPUSValue inner_result = LEPUS_GetPropertyStr(ctx_, result, "result");
+        LEPUSValue obj_id_val =
+            LEPUS_GetPropertyStr(ctx_, inner_result, "objectId");
+        if (LEPUS_IsString(obj_id_val)) {
+          const char* oid = LEPUS_ToCString(ctx_, obj_id_val);
+          if (oid) root_object_id = oid;
+          if (!ctx_->rt->gc_enable) LEPUS_FreeCString(ctx_, oid);
+        }
+        if (!ctx_->rt->gc_enable) {
+          LEPUS_FreeValue(ctx_, obj_id_val);
+          LEPUS_FreeValue(ctx_, inner_result);
+          LEPUS_FreeValue(ctx_, result);
+        }
+      }
+    }
+    if (!ctx_->rt->gc_enable) {
+      LEPUS_FreeValue(ctx_, id_val);
+      LEPUS_FreeValue(ctx_, json);
+    }
+  }
+  ASSERT_FALSE(root_object_id.empty());
+
+  uint32_t group_len_after_eval = info->object_group_lengths["deepGroup"];
+
+  // getProperties on root (level 0 -> level 1 sub-objects)
+  SendRuntimeGetProperties(ctx_, 11, root_object_id);
+  std::string props_response = PopResponseById(ctx_, 11);
+  ASSERT_FALSE(props_response.empty());
+
+  uint32_t group_len_after_level1 = info->object_group_lengths["deepGroup"];
+  ASSERT_TRUE(group_len_after_level1 > group_len_after_eval);
+
+  // Extract a sub-object objectId (the "level1" property value)
+  LEPUSValue result_array = GetPropertiesResultArray(ctx_, props_response);
+  HandleScope scope(ctx_, &result_array, HANDLE_TYPE_LEPUS_VALUE);
+  std::string child_object_id;
+  if (LEPUS_IsObject(result_array)) {
+    uint32_t len = LEPUS_GetLength(ctx_, result_array);
+    for (uint32_t i = 0; i < len; i++) {
+      LEPUSValue prop = LEPUS_GetPropertyUint32(ctx_, result_array, i);
+      LEPUSValue val = LEPUS_GetPropertyStr(ctx_, prop, "value");
+      if (LEPUS_IsObject(val)) {
+        LEPUSValue oid_val = LEPUS_GetPropertyStr(ctx_, val, "objectId");
+        if (LEPUS_IsString(oid_val)) {
+          const char* oid_str = LEPUS_ToCString(ctx_, oid_val);
+          if (oid_str && child_object_id.empty()) {
+            child_object_id = oid_str;
+          }
+          if (!ctx_->rt->gc_enable) LEPUS_FreeCString(ctx_, oid_str);
+        }
+        if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, oid_val);
+      }
+      if (!ctx_->rt->gc_enable) {
+        LEPUS_FreeValue(ctx_, val);
+        LEPUS_FreeValue(ctx_, prop);
+      }
+      if (!child_object_id.empty()) break;
+    }
+  }
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, result_array);
+
+  ASSERT_FALSE(child_object_id.empty());
+
+  // Verify child is in the same group's reverse mapping
+  uint64_t child_ptr = strtoull(child_object_id.c_str(), nullptr, 10);
+  ASSERT_TRUE(info->object_id_to_groups.count(child_ptr) > 0);
+  ASSERT_TRUE(info->object_id_to_groups[child_ptr].count("deepGroup") > 0);
+
+  // getProperties on the child (level 1 -> level 2 sub-objects)
+  SendRuntimeGetProperties(ctx_, 12, child_object_id);
+  PopResponseById(ctx_, 12);
+
+  // Group should have grown further
+  ASSERT_TRUE(info->object_group_lengths["deepGroup"] > group_len_after_level1);
+
+  // Release entire group — everything should be cleaned
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":13,\"method\":\"Runtime.releaseObjectGroup\",\"params\":{"
+      "\"objectGroup\":\"deepGroup\"}}");
+  const char* trigger2 = "function t2() {}; t2();\n";
+  ret = LEPUS_Eval(ctx_, trigger2, strlen(trigger2), "trigger2.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  ASSERT_EQ(info->object_group_lengths.count("deepGroup"), 0u);
+  for (auto& [ptr, groups] : info->object_id_to_groups) {
+    ASSERT_EQ(groups.count("deepGroup"), 0u);
+  }
+}
+
+TEST_F(QjsDebugMethods, TestReleaseObjectWithInvalidObjectId) {
+  // Verify that releaseObject with non-numeric objectId does not crash
+  // or produce garbage pointer values (Issue 1: digit validation).
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":0,\"method\":\"Runtime.enable\",\"params\":{}}");
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":1,\"method\":\"Debugger.enable\",\"params\":{"
+      "\"maxScriptsCacheSize\":100000000}}");
+  const char* buf = "function trigger() {}; trigger();\n";
+  LEPUSValue ret =
+      LEPUS_Eval(ctx_, buf, strlen(buf), "setup.js", LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+  }
+
+  LEPUSDebuggerInfo* info = GetDebuggerInfo(ctx_);
+
+  // Create an object in a group so we can verify it is NOT affected
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":10,\"method\":\"Runtime.evaluate\",\"params\":{"
+      "\"expression\":\"({sentinel: 1})\","
+      "\"objectGroup\":\"invalidIdTest\"}}");
+  const char* trigger = "function t1() {}; t1();\n";
+  ret = LEPUS_Eval(ctx_, trigger, strlen(trigger), "trigger1.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+  }
+
+  // Snapshot state before invalid release attempts
+  uint32_t group_len_before = info->object_group_lengths["invalidIdTest"];
+  size_t reverse_map_size_before = info->object_id_to_groups.size();
+  ASSERT_TRUE(group_len_before > 0);
+
+  // Try releasing with various invalid objectId formats
+  // 1) Contains letters
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":11,\"method\":\"Runtime.releaseObject\",\"params\":{"
+      "\"objectId\":\"abc123\"}}");
+  const char* trigger2 = "function t2() {}; t2();\n";
+  ret = LEPUS_Eval(ctx_, trigger2, strlen(trigger2), "trigger2.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  // 2) Contains special characters
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":12,\"method\":\"Runtime.releaseObject\",\"params\":{"
+      "\"objectId\":\"123-456\"}}");
+  const char* trigger3 = "function t3() {}; t3();\n";
+  ret = LEPUS_Eval(ctx_, trigger3, strlen(trigger3), "trigger3.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  // 3) Contains dots
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":13,\"method\":\"Runtime.releaseObject\",\"params\":{"
+      "\"objectId\":\"12.34\"}}");
+  const char* trigger4 = "function t4() {}; t4();\n";
+  ret = LEPUS_Eval(ctx_, trigger4, strlen(trigger4), "trigger4.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  // Drain all responses
+  bool got_response_11 = false, got_response_12 = false,
+       got_response_13 = false;
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    std::string msg = QjsDebugQueue::GetReceiveMessageQueue().front();
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+    LEPUSValue json = LEPUS_ParseJSON(ctx_, msg.c_str(), msg.length(), "");
+    HandleScope func_scope(ctx_, &json, HANDLE_TYPE_LEPUS_VALUE);
+    LEPUSValue id_val = LEPUS_GetPropertyStr(ctx_, json, "id");
+    if (!LEPUS_IsUndefined(id_val)) {
+      int32_t id = 0;
+      LEPUS_ToInt32(ctx_, &id, id_val);
+      if (id == 11) got_response_11 = true;
+      if (id == 12) got_response_12 = true;
+      if (id == 13) got_response_13 = true;
+    }
+    if (!ctx_->rt->gc_enable) {
+      LEPUS_FreeValue(ctx_, id_val);
+      LEPUS_FreeValue(ctx_, json);
+    }
+  }
+
+  // All should have received successful responses (no crash)
+  ASSERT_TRUE(got_response_11);
+  ASSERT_TRUE(got_response_12);
+  ASSERT_TRUE(got_response_13);
+
+  // Verify state was NOT modified by invalid objectIds
+  ASSERT_EQ(info->object_group_lengths["invalidIdTest"], group_len_before);
+  ASSERT_EQ(info->object_id_to_groups.size(), reverse_map_size_before);
+}
+
+TEST_F(QjsDebugMethods, TestReleaseObjectSyncsObjectGroupIds) {
+  // Verify that releaseObject properly removes the object from
+  // object_group_ids vector (Issue 2: data consistency).
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":0,\"method\":\"Runtime.enable\",\"params\":{}}");
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":1,\"method\":\"Debugger.enable\",\"params\":{"
+      "\"maxScriptsCacheSize\":100000000}}");
+  const char* buf = "function trigger() {}; trigger();\n";
+  LEPUSValue ret =
+      LEPUS_Eval(ctx_, buf, strlen(buf), "setup.js", LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+  }
+
+  LEPUSDebuggerInfo* info = GetDebuggerInfo(ctx_);
+
+  // Create two objects in the same group
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":10,\"method\":\"Runtime.evaluate\",\"params\":{"
+      "\"expression\":\"({first: 1})\","
+      "\"objectGroup\":\"syncTest\"}}");
+  const char* trigger = "function t1() {}; t1();\n";
+  ret = LEPUS_Eval(ctx_, trigger, strlen(trigger), "trigger1.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  std::string first_object_id;
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    std::string msg = QjsDebugQueue::GetReceiveMessageQueue().front();
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+    LEPUSValue json = LEPUS_ParseJSON(ctx_, msg.c_str(), msg.length(), "");
+    HandleScope func_scope(ctx_, &json, HANDLE_TYPE_LEPUS_VALUE);
+    LEPUSValue id_val = LEPUS_GetPropertyStr(ctx_, json, "id");
+    if (!LEPUS_IsUndefined(id_val)) {
+      int32_t id = 0;
+      LEPUS_ToInt32(ctx_, &id, id_val);
+      if (id == 10) {
+        LEPUSValue result = LEPUS_GetPropertyStr(ctx_, json, "result");
+        LEPUSValue inner_result = LEPUS_GetPropertyStr(ctx_, result, "result");
+        LEPUSValue obj_id_val =
+            LEPUS_GetPropertyStr(ctx_, inner_result, "objectId");
+        if (LEPUS_IsString(obj_id_val)) {
+          const char* oid = LEPUS_ToCString(ctx_, obj_id_val);
+          if (oid) first_object_id = oid;
+          if (!ctx_->rt->gc_enable) LEPUS_FreeCString(ctx_, oid);
+        }
+        if (!ctx_->rt->gc_enable) {
+          LEPUS_FreeValue(ctx_, obj_id_val);
+          LEPUS_FreeValue(ctx_, inner_result);
+          LEPUS_FreeValue(ctx_, result);
+        }
+      }
+    }
+    if (!ctx_->rt->gc_enable) {
+      LEPUS_FreeValue(ctx_, id_val);
+      LEPUS_FreeValue(ctx_, json);
+    }
+  }
+  ASSERT_FALSE(first_object_id.empty());
+
+  // Create second object in same group
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":20,\"method\":\"Runtime.evaluate\",\"params\":{"
+      "\"expression\":\"({second: 2})\","
+      "\"objectGroup\":\"syncTest\"}}");
+  const char* trigger2 = "function t2() {}; t2();\n";
+  ret = LEPUS_Eval(ctx_, trigger2, strlen(trigger2), "trigger2.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  std::string second_object_id;
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    std::string msg = QjsDebugQueue::GetReceiveMessageQueue().front();
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+    LEPUSValue json = LEPUS_ParseJSON(ctx_, msg.c_str(), msg.length(), "");
+    HandleScope func_scope(ctx_, &json, HANDLE_TYPE_LEPUS_VALUE);
+    LEPUSValue id_val = LEPUS_GetPropertyStr(ctx_, json, "id");
+    if (!LEPUS_IsUndefined(id_val)) {
+      int32_t id = 0;
+      LEPUS_ToInt32(ctx_, &id, id_val);
+      if (id == 20) {
+        LEPUSValue result = LEPUS_GetPropertyStr(ctx_, json, "result");
+        LEPUSValue inner_result = LEPUS_GetPropertyStr(ctx_, result, "result");
+        LEPUSValue obj_id_val =
+            LEPUS_GetPropertyStr(ctx_, inner_result, "objectId");
+        if (LEPUS_IsString(obj_id_val)) {
+          const char* oid = LEPUS_ToCString(ctx_, obj_id_val);
+          if (oid) second_object_id = oid;
+          if (!ctx_->rt->gc_enable) LEPUS_FreeCString(ctx_, oid);
+        }
+        if (!ctx_->rt->gc_enable) {
+          LEPUS_FreeValue(ctx_, obj_id_val);
+          LEPUS_FreeValue(ctx_, inner_result);
+          LEPUS_FreeValue(ctx_, result);
+        }
+      }
+    }
+    if (!ctx_->rt->gc_enable) {
+      LEPUS_FreeValue(ctx_, id_val);
+      LEPUS_FreeValue(ctx_, json);
+    }
+  }
+  ASSERT_FALSE(second_object_id.empty());
+
+  // Parse pointer values
+  uint64_t first_ptr = strtoull(first_object_id.c_str(), nullptr, 10);
+  uint64_t second_ptr = strtoull(second_object_id.c_str(), nullptr, 10);
+
+  // Both should be in reverse mapping and object_group_ids
+  ASSERT_EQ(info->object_id_to_groups.count(first_ptr), 1u);
+  ASSERT_EQ(info->object_id_to_groups.count(second_ptr), 1u);
+  auto& ids_vec = info->object_group_ids["syncTest"];
+  ASSERT_EQ(ids_vec.count(first_ptr), 1u);
+  ASSERT_EQ(ids_vec.count(second_ptr), 1u);
+  size_t ids_vec_size_before = ids_vec.size();
+
+  // Release the first object
+  std::string release_msg =
+      "{\"id\":30,\"method\":\"Runtime.releaseObject\",\"params\":{"
+      "\"objectId\":\"" +
+      first_object_id + "\"}}";
+  QjsDebugQueue::GetSendMessageQueue().push(release_msg);
+  const char* trigger3 = "function t3() {}; t3();\n";
+  ret = LEPUS_Eval(ctx_, trigger3, strlen(trigger3), "trigger3.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+  }
+
+  // Verify: first_ptr removed from both object_id_to_groups AND
+  // object_group_ids
+  ASSERT_EQ(info->object_id_to_groups.count(first_ptr), 0u);
+  auto& ids_vec_after = info->object_group_ids["syncTest"];
+  ASSERT_EQ(ids_vec_after.count(first_ptr), 0u);
+  // second_ptr should still be present
+  ASSERT_EQ(info->object_id_to_groups.count(second_ptr), 1u);
+  ASSERT_EQ(ids_vec_after.count(second_ptr), 1u);
+  // Set should have shrunk by 1
+  ASSERT_EQ(ids_vec_after.size(), ids_vec_size_before - 1);
+}
+
+TEST_F(QjsDebugMethods, TestReleaseObjectThenGroupCleansUpCompletely) {
+  // Verify that releasing individual objects, then releasing the group,
+  // leaves no stale entries in any data structure.
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":0,\"method\":\"Runtime.enable\",\"params\":{}}");
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":1,\"method\":\"Debugger.enable\",\"params\":{"
+      "\"maxScriptsCacheSize\":100000000}}");
+  const char* buf = "function trigger() {}; trigger();\n";
+  LEPUSValue ret =
+      LEPUS_Eval(ctx_, buf, strlen(buf), "setup.js", LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+  }
+
+  LEPUSDebuggerInfo* info = GetDebuggerInfo(ctx_);
+
+  // Create object in group
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":10,\"method\":\"Runtime.evaluate\",\"params\":{"
+      "\"expression\":\"({combo: true})\","
+      "\"objectGroup\":\"comboTest\"}}");
+  const char* trigger = "function t1() {}; t1();\n";
+  ret = LEPUS_Eval(ctx_, trigger, strlen(trigger), "trigger1.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  std::string object_id;
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    std::string msg = QjsDebugQueue::GetReceiveMessageQueue().front();
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+    LEPUSValue json = LEPUS_ParseJSON(ctx_, msg.c_str(), msg.length(), "");
+    HandleScope func_scope(ctx_, &json, HANDLE_TYPE_LEPUS_VALUE);
+    LEPUSValue id_val = LEPUS_GetPropertyStr(ctx_, json, "id");
+    if (!LEPUS_IsUndefined(id_val)) {
+      int32_t id = 0;
+      LEPUS_ToInt32(ctx_, &id, id_val);
+      if (id == 10) {
+        LEPUSValue result = LEPUS_GetPropertyStr(ctx_, json, "result");
+        LEPUSValue inner_result = LEPUS_GetPropertyStr(ctx_, result, "result");
+        LEPUSValue obj_id_val =
+            LEPUS_GetPropertyStr(ctx_, inner_result, "objectId");
+        if (LEPUS_IsString(obj_id_val)) {
+          const char* oid = LEPUS_ToCString(ctx_, obj_id_val);
+          if (oid) object_id = oid;
+          if (!ctx_->rt->gc_enable) LEPUS_FreeCString(ctx_, oid);
+        }
+        if (!ctx_->rt->gc_enable) {
+          LEPUS_FreeValue(ctx_, obj_id_val);
+          LEPUS_FreeValue(ctx_, inner_result);
+          LEPUS_FreeValue(ctx_, result);
+        }
+      }
+    }
+    if (!ctx_->rt->gc_enable) {
+      LEPUS_FreeValue(ctx_, id_val);
+      LEPUS_FreeValue(ctx_, json);
+    }
+  }
+  ASSERT_FALSE(object_id.empty());
+
+  uint64_t obj_ptr = strtoull(object_id.c_str(), nullptr, 10);
+
+  // Release the object individually first
+  std::string release_msg =
+      "{\"id\":11,\"method\":\"Runtime.releaseObject\",\"params\":{"
+      "\"objectId\":\"" +
+      object_id + "\"}}";
+  QjsDebugQueue::GetSendMessageQueue().push(release_msg);
+  const char* trigger2 = "function t2() {}; t2();\n";
+  ret = LEPUS_Eval(ctx_, trigger2, strlen(trigger2), "trigger2.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+  }
+
+  // Object is removed from reverse mapping, and since it was the only object
+  // in this group, the group itself should be cleaned up automatically.
+  ASSERT_EQ(info->object_id_to_groups.count(obj_ptr), 0u);
+  ASSERT_EQ(info->object_group_lengths.count("comboTest"), 0u);
+  ASSERT_EQ(info->object_group_ids.count("comboTest"), 0u);
+
+  // Now release the entire group
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":12,\"method\":\"Runtime.releaseObjectGroup\",\"params\":{"
+      "\"objectGroup\":\"comboTest\"}}");
+  const char* trigger3 = "function t3() {}; t3();\n";
+  ret = LEPUS_Eval(ctx_, trigger3, strlen(trigger3), "trigger3.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+  }
+
+  // Everything should be cleaned: no crash, no stale entries
+  ASSERT_EQ(info->object_group_lengths.count("comboTest"), 0u);
+  ASSERT_EQ(info->object_group_ids.count("comboTest"), 0u);
+  for (auto& [ptr, groups] : info->object_id_to_groups) {
+    ASSERT_EQ(groups.count("comboTest"), 0u);
+  }
+}
+
+TEST_F(QjsDebugMethods, TestReleaseObjectWithEmptyObjectId) {
+  // Verify that releaseObject with empty objectId does not crash.
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":0,\"method\":\"Runtime.enable\",\"params\":{}}");
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":1,\"method\":\"Debugger.enable\",\"params\":{"
+      "\"maxScriptsCacheSize\":100000000}}");
+  const char* buf = "function trigger() {}; trigger();\n";
+  LEPUSValue ret =
+      LEPUS_Eval(ctx_, buf, strlen(buf), "setup.js", LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+  }
+
+  // Empty objectId
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":10,\"method\":\"Runtime.releaseObject\",\"params\":{"
+      "\"objectId\":\"\"}}");
+  const char* trigger = "function t1() {}; t1();\n";
+  ret = LEPUS_Eval(ctx_, trigger, strlen(trigger), "trigger1.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  // Should get a response without crash
+  bool got_response = false;
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    std::string msg = QjsDebugQueue::GetReceiveMessageQueue().front();
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+    LEPUSValue json = LEPUS_ParseJSON(ctx_, msg.c_str(), msg.length(), "");
+    HandleScope func_scope(ctx_, &json, HANDLE_TYPE_LEPUS_VALUE);
+    LEPUSValue id_val = LEPUS_GetPropertyStr(ctx_, json, "id");
+    if (!LEPUS_IsUndefined(id_val)) {
+      int32_t id = 0;
+      LEPUS_ToInt32(ctx_, &id, id_val);
+      if (id == 10) got_response = true;
+    }
+    if (!ctx_->rt->gc_enable) {
+      LEPUS_FreeValue(ctx_, id_val);
+      LEPUS_FreeValue(ctx_, json);
+    }
+  }
+  ASSERT_TRUE(got_response);
+}
+
+TEST_F(QjsDebugMethods, TestReleaseObjectGroupPreservesOtherGroupInheritance) {
+  // Verify that when the same object is assigned to two groups (groupA then
+  // groupB), releasing groupA does NOT destroy groupB's reverse mapping
+  // (object_id_to_groups should still contain groupB for inheritance).
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":0,\"method\":\"Runtime.enable\",\"params\":{}}");
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":1,\"method\":\"Debugger.enable\",\"params\":{"
+      "\"maxScriptsCacheSize\":100000000}}");
+  const char* buf = "function trigger() {}; trigger();\n";
+  LEPUSValue ret =
+      LEPUS_Eval(ctx_, buf, strlen(buf), "setup.js", LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+  }
+
+  // Create a global object that we can reference from both groups
+  const char* setup_obj = "var sharedObj = {shared: true};\n";
+  ret = LEPUS_Eval(ctx_, setup_obj, strlen(setup_obj), "shared.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  // Evaluate sharedObj with groupA
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":10,\"method\":\"Runtime.evaluate\",\"params\":{"
+      "\"expression\":\"sharedObj\","
+      "\"objectGroup\":\"groupA\"}}");
+  const char* trigger = "function t1() {}; t1();\n";
+  ret = LEPUS_Eval(ctx_, trigger, strlen(trigger), "trigger1.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  std::string shared_object_id;
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    std::string msg = QjsDebugQueue::GetReceiveMessageQueue().front();
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+    LEPUSValue json = LEPUS_ParseJSON(ctx_, msg.c_str(), msg.length(), "");
+    HandleScope func_scope(ctx_, &json, HANDLE_TYPE_LEPUS_VALUE);
+    LEPUSValue id_val = LEPUS_GetPropertyStr(ctx_, json, "id");
+    if (!LEPUS_IsUndefined(id_val)) {
+      int32_t id = 0;
+      LEPUS_ToInt32(ctx_, &id, id_val);
+      if (id == 10) {
+        LEPUSValue result = LEPUS_GetPropertyStr(ctx_, json, "result");
+        LEPUSValue inner_result = LEPUS_GetPropertyStr(ctx_, result, "result");
+        LEPUSValue obj_id_val =
+            LEPUS_GetPropertyStr(ctx_, inner_result, "objectId");
+        if (LEPUS_IsString(obj_id_val)) {
+          const char* oid = LEPUS_ToCString(ctx_, obj_id_val);
+          if (oid) shared_object_id = oid;
+          if (!ctx_->rt->gc_enable) LEPUS_FreeCString(ctx_, oid);
+        }
+        if (!ctx_->rt->gc_enable) {
+          LEPUS_FreeValue(ctx_, obj_id_val);
+          LEPUS_FreeValue(ctx_, inner_result);
+          LEPUS_FreeValue(ctx_, result);
+        }
+      }
+    }
+    if (!ctx_->rt->gc_enable) {
+      LEPUS_FreeValue(ctx_, id_val);
+      LEPUS_FreeValue(ctx_, json);
+    }
+  }
+  ASSERT_FALSE(shared_object_id.empty());
+
+  // Evaluate same sharedObj with groupB — this adds groupB to
+  // object_id_to_groups
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":11,\"method\":\"Runtime.evaluate\",\"params\":{"
+      "\"expression\":\"sharedObj\","
+      "\"objectGroup\":\"groupB\"}}");
+  const char* trigger2 = "function t2() {}; t2();\n";
+  ret = LEPUS_Eval(ctx_, trigger2, strlen(trigger2), "trigger2.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+  }
+
+  // Parse pointer value
+  uint64_t shared_ptr = strtoull(shared_object_id.c_str(), nullptr, 10);
+
+  LEPUSDebuggerInfo* info = GetDebuggerInfo(ctx_);
+
+  // Verify: object is in both groups' object_group_ids
+  ASSERT_EQ(info->object_group_ids["groupA"].count(shared_ptr), 1u);
+  ASSERT_EQ(info->object_group_ids["groupB"].count(shared_ptr), 1u);
+  // Reverse mapping should contain both groups
+  ASSERT_TRUE(info->object_id_to_groups[shared_ptr].count("groupA") > 0);
+  ASSERT_TRUE(info->object_id_to_groups[shared_ptr].count("groupB") > 0);
+
+  // Release groupA
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":12,\"method\":\"Runtime.releaseObjectGroup\",\"params\":{"
+      "\"objectGroup\":\"groupA\"}}");
+  const char* trigger3 = "function t3() {}; t3();\n";
+  ret = LEPUS_Eval(ctx_, trigger3, strlen(trigger3), "trigger3.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+  }
+
+  // groupA is gone
+  ASSERT_EQ(info->object_group_ids.count("groupA"), 0u);
+  ASSERT_EQ(info->object_group_lengths.count("groupA"), 0u);
+
+  // Key assertion: reverse mapping still contains groupB (groupA removed)
+  auto it = info->object_id_to_groups.find(shared_ptr);
+  ASSERT_NE(it, info->object_id_to_groups.end());
+  ASSERT_TRUE(it->second.count("groupB") > 0);
+  ASSERT_EQ(it->second.count("groupA"), 0u);
+
+  // groupB still has the object
+  ASSERT_EQ(info->object_group_ids["groupB"].count(shared_ptr), 1u);
+}
+
+TEST_F(QjsDebugMethods, TestReleaseObjectGroupWithMissingParam) {
+  // Verify that releaseObjectGroup without objectGroup param (undefined)
+  // does not crash and returns a valid response.
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":0,\"method\":\"Runtime.enable\",\"params\":{}}");
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":1,\"method\":\"Debugger.enable\",\"params\":{"
+      "\"maxScriptsCacheSize\":100000000}}");
+  const char* buf = "function trigger() {}; trigger();\n";
+  LEPUSValue ret =
+      LEPUS_Eval(ctx_, buf, strlen(buf), "setup.js", LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+  }
+
+  // Create an object in a group first so we can verify it's untouched
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":10,\"method\":\"Runtime.evaluate\",\"params\":{"
+      "\"expression\":\"({safe: true})\","
+      "\"objectGroup\":\"safeGroup\"}}");
+  const char* trigger = "function t1() {}; t1();\n";
+  ret = LEPUS_Eval(ctx_, trigger, strlen(trigger), "trigger1.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+  }
+
+  LEPUSDebuggerInfo* info = GetDebuggerInfo(ctx_);
+  ASSERT_TRUE(info->object_group_lengths.count("safeGroup") > 0);
+  uint32_t safe_len_before = info->object_group_lengths["safeGroup"];
+
+  // 1) Missing objectGroup entirely (no "objectGroup" key in params)
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":20,\"method\":\"Runtime.releaseObjectGroup\",\"params\":{}}");
+  const char* trigger2 = "function t2() {}; t2();\n";
+  ret = LEPUS_Eval(ctx_, trigger2, strlen(trigger2), "trigger2.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  // 2) objectGroup is null
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":21,\"method\":\"Runtime.releaseObjectGroup\",\"params\":{"
+      "\"objectGroup\":null}}");
+  const char* trigger3 = "function t3() {}; t3();\n";
+  ret = LEPUS_Eval(ctx_, trigger3, strlen(trigger3), "trigger3.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  // 3) objectGroup is a number (not a string)
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":22,\"method\":\"Runtime.releaseObjectGroup\",\"params\":{"
+      "\"objectGroup\":12345}}");
+  const char* trigger4 = "function t4() {}; t4();\n";
+  ret = LEPUS_Eval(ctx_, trigger4, strlen(trigger4), "trigger4.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  // Drain all responses
+  bool got_20 = false, got_21 = false, got_22 = false;
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    std::string msg = QjsDebugQueue::GetReceiveMessageQueue().front();
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+    LEPUSValue json = LEPUS_ParseJSON(ctx_, msg.c_str(), msg.length(), "");
+    HandleScope func_scope(ctx_, &json, HANDLE_TYPE_LEPUS_VALUE);
+    LEPUSValue id_val = LEPUS_GetPropertyStr(ctx_, json, "id");
+    if (!LEPUS_IsUndefined(id_val)) {
+      int32_t id = 0;
+      LEPUS_ToInt32(ctx_, &id, id_val);
+      if (id == 20) got_20 = true;
+      if (id == 21) got_21 = true;
+      if (id == 22) got_22 = true;
+    }
+    if (!ctx_->rt->gc_enable) {
+      LEPUS_FreeValue(ctx_, id_val);
+      LEPUS_FreeValue(ctx_, json);
+    }
+  }
+
+  // All should have received responses without crash
+  ASSERT_TRUE(got_20);
+  ASSERT_TRUE(got_21);
+  ASSERT_TRUE(got_22);
+
+  // Existing group should be completely untouched
+  ASSERT_EQ(info->object_group_lengths["safeGroup"], safe_len_before);
+}
+
+TEST_F(QjsDebugMethods, TestReleaseObjectFromRunningState) {
+  // Verify that releaseObject works for objects NOT in any group
+  // (those stored in running_state.get_properties_array).
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":0,\"method\":\"Runtime.enable\",\"params\":{}}");
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":1,\"method\":\"Debugger.enable\",\"params\":{"
+      "\"maxScriptsCacheSize\":100000000}}");
+  const char* buf = "function trigger() {}; trigger();\n";
+  LEPUSValue ret =
+      LEPUS_Eval(ctx_, buf, strlen(buf), "setup.js", LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+  }
+
+  LEPUSDebuggerInfo* info = GetDebuggerInfo(ctx_);
+  uint32_t running_len_before = info->running_state.get_properties_array_len;
+
+  // Evaluate WITHOUT objectGroup — object goes to running_state
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":10,\"method\":\"Runtime.evaluate\",\"params\":{"
+      "\"expression\":\"({runningObj: 42})\"}}");
+  const char* trigger = "function t1() {}; t1();\n";
+  ret = LEPUS_Eval(ctx_, trigger, strlen(trigger), "trigger1.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  // running_state should have grown
+  ASSERT_GT(info->running_state.get_properties_array_len, running_len_before);
+
+  // Extract objectId from response
+  std::string object_id;
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    std::string msg = QjsDebugQueue::GetReceiveMessageQueue().front();
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+    LEPUSValue json = LEPUS_ParseJSON(ctx_, msg.c_str(), msg.length(), "");
+    HandleScope func_scope(ctx_, &json, HANDLE_TYPE_LEPUS_VALUE);
+    LEPUSValue id_val = LEPUS_GetPropertyStr(ctx_, json, "id");
+    if (!LEPUS_IsUndefined(id_val)) {
+      int32_t id = 0;
+      LEPUS_ToInt32(ctx_, &id, id_val);
+      if (id == 10) {
+        LEPUSValue result = LEPUS_GetPropertyStr(ctx_, json, "result");
+        LEPUSValue inner_result = LEPUS_GetPropertyStr(ctx_, result, "result");
+        LEPUSValue obj_id_val =
+            LEPUS_GetPropertyStr(ctx_, inner_result, "objectId");
+        if (LEPUS_IsString(obj_id_val)) {
+          const char* oid = LEPUS_ToCString(ctx_, obj_id_val);
+          if (oid) object_id = oid;
+          if (!ctx_->rt->gc_enable) LEPUS_FreeCString(ctx_, oid);
+        }
+        if (!ctx_->rt->gc_enable) {
+          LEPUS_FreeValue(ctx_, obj_id_val);
+          LEPUS_FreeValue(ctx_, inner_result);
+          LEPUS_FreeValue(ctx_, result);
+        }
+      }
+    }
+    if (!ctx_->rt->gc_enable) {
+      LEPUS_FreeValue(ctx_, id_val);
+      LEPUS_FreeValue(ctx_, json);
+    }
+  }
+  ASSERT_FALSE(object_id.empty());
+
+  // Object should NOT be in any group's reverse mapping
+  uint64_t obj_ptr = strtoull(object_id.c_str(), nullptr, 10);
+  ASSERT_EQ(info->object_id_to_groups.count(obj_ptr), 0u);
+
+  // Release the object — should hit running_state fallback path
+  std::string release_msg =
+      "{\"id\":11,\"method\":\"Runtime.releaseObject\",\"params\":{"
+      "\"objectId\":\"" +
+      object_id + "\"}}";
+  QjsDebugQueue::GetSendMessageQueue().push(release_msg);
+  const char* trigger2 = "function t2() {}; t2();\n";
+  ret = LEPUS_Eval(ctx_, trigger2, strlen(trigger2), "trigger2.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  // Verify response received without crash
+  bool got_response = false;
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    std::string msg = QjsDebugQueue::GetReceiveMessageQueue().front();
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+    LEPUSValue json = LEPUS_ParseJSON(ctx_, msg.c_str(), msg.length(), "");
+    HandleScope func_scope(ctx_, &json, HANDLE_TYPE_LEPUS_VALUE);
+    LEPUSValue id_val = LEPUS_GetPropertyStr(ctx_, json, "id");
+    if (!LEPUS_IsUndefined(id_val)) {
+      int32_t id = 0;
+      LEPUS_ToInt32(ctx_, &id, id_val);
+      if (id == 11) got_response = true;
+    }
+    if (!ctx_->rt->gc_enable) {
+      LEPUS_FreeValue(ctx_, id_val);
+      LEPUS_FreeValue(ctx_, json);
+    }
+  }
+  ASSERT_TRUE(got_response);
+
+  // Verify the object was released — ReleaseObjectFromArray trims trailing
+  // undefined slots, so the array length should have shrunk back.
+  ASSERT_LE(info->running_state.get_properties_array_len, running_len_before);
+}
+
+TEST_F(QjsDebugMethods, TestEvaluateWithNonStringObjectGroup) {
+  // Verify that evaluate with non-string objectGroup (null, number)
+  // does NOT create a bogus group — objects should go to running_state.
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":0,\"method\":\"Runtime.enable\",\"params\":{}}");
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":1,\"method\":\"Debugger.enable\",\"params\":{"
+      "\"maxScriptsCacheSize\":100000000}}");
+  const char* buf = "function trigger() {}; trigger();\n";
+  LEPUSValue ret =
+      LEPUS_Eval(ctx_, buf, strlen(buf), "setup.js", LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+  }
+
+  LEPUSDebuggerInfo* info = GetDebuggerInfo(ctx_);
+  uint32_t running_len_before = info->running_state.get_properties_array_len;
+  size_t group_count_before = info->object_group_lengths.size();
+
+  // 1) objectGroup is null
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":10,\"method\":\"Runtime.evaluate\",\"params\":{"
+      "\"expression\":\"({nullGroup: 1})\","
+      "\"objectGroup\":null}}");
+  const char* trigger = "function t1() {}; t1();\n";
+  ret = LEPUS_Eval(ctx_, trigger, strlen(trigger), "trigger1.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  // 2) objectGroup is a number
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":11,\"method\":\"Runtime.evaluate\",\"params\":{"
+      "\"expression\":\"({numGroup: 2})\","
+      "\"objectGroup\":999}}");
+  const char* trigger2 = "function t2() {}; t2();\n";
+  ret = LEPUS_Eval(ctx_, trigger2, strlen(trigger2), "trigger2.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+  }
+
+  // No new groups should have been created
+  ASSERT_EQ(info->object_group_lengths.size(), group_count_before);
+
+  // Objects should have gone to running_state instead
+  ASSERT_GT(info->running_state.get_properties_array_len, running_len_before);
+}
+
+TEST_F(QjsDebugMethods, TestReleaseObjectClearsAllDuplicateSlots) {
+  // Verify that when the same object is evaluated multiple times into the same
+  // group (creating multiple DupValue'd slots), releaseObject clears ALL of
+  // them — not just the first match.
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":0,\"method\":\"Runtime.enable\",\"params\":{}}");
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":1,\"method\":\"Debugger.enable\",\"params\":{"
+      "\"maxScriptsCacheSize\":100000000}}");
+  const char* buf =
+      "var dupObj = {dup: true};\n"
+      "function trigger() {}; trigger();\n";
+  LEPUSValue ret =
+      LEPUS_Eval(ctx_, buf, strlen(buf), "setup.js", LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+  }
+
+  LEPUSDebuggerInfo* info = GetDebuggerInfo(ctx_);
+
+  // Evaluate the SAME object twice with the same objectGroup.
+  // Each evaluation will DupValue the object into the group's array.
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":10,\"method\":\"Runtime.evaluate\",\"params\":{"
+      "\"expression\":\"dupObj\","
+      "\"objectGroup\":\"dupGroup\"}}");
+  const char* trigger1 = "function t1() {}; t1();\n";
+  ret = LEPUS_Eval(ctx_, trigger1, strlen(trigger1), "trigger1.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":11,\"method\":\"Runtime.evaluate\",\"params\":{"
+      "\"expression\":\"dupObj\","
+      "\"objectGroup\":\"dupGroup\"}}");
+  const char* trigger2 = "function t2() {}; t2();\n";
+  ret = LEPUS_Eval(ctx_, trigger2, strlen(trigger2), "trigger2.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  // Extract objectId from first response
+  std::string object_id;
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    std::string msg = QjsDebugQueue::GetReceiveMessageQueue().front();
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+    LEPUSValue json = LEPUS_ParseJSON(ctx_, msg.c_str(), msg.length(), "");
+    HandleScope func_scope(ctx_, &json, HANDLE_TYPE_LEPUS_VALUE);
+    LEPUSValue id_val = LEPUS_GetPropertyStr(ctx_, json, "id");
+    if (!LEPUS_IsUndefined(id_val)) {
+      int32_t id = 0;
+      LEPUS_ToInt32(ctx_, &id, id_val);
+      if (id == 10 && object_id.empty()) {
+        LEPUSValue result = LEPUS_GetPropertyStr(ctx_, json, "result");
+        LEPUSValue inner_result = LEPUS_GetPropertyStr(ctx_, result, "result");
+        LEPUSValue obj_id_val =
+            LEPUS_GetPropertyStr(ctx_, inner_result, "objectId");
+        if (LEPUS_IsString(obj_id_val)) {
+          const char* oid = LEPUS_ToCString(ctx_, obj_id_val);
+          if (oid) object_id = oid;
+          if (!ctx_->rt->gc_enable) LEPUS_FreeCString(ctx_, oid);
+        }
+        if (!ctx_->rt->gc_enable) {
+          LEPUS_FreeValue(ctx_, obj_id_val);
+          LEPUS_FreeValue(ctx_, inner_result);
+          LEPUS_FreeValue(ctx_, result);
+        }
+      }
+    }
+    if (!ctx_->rt->gc_enable) {
+      LEPUS_FreeValue(ctx_, id_val);
+      LEPUS_FreeValue(ctx_, json);
+    }
+  }
+  ASSERT_FALSE(object_id.empty());
+
+  // The group should have at least 2 entries (same object registered twice)
+  ASSERT_GE(info->object_group_lengths["dupGroup"], 2u);
+
+  // Parse the pointer value
+  uint64_t obj_ptr = strtoull(object_id.c_str(), nullptr, 10);
+
+  // Count how many slots in the group array hold our object BEFORE release
+  LEPUSValue group_array_before =
+      LEPUS_GetPropertyStr(ctx_, info->object_group_registry, "dupGroup");
+  uint32_t array_len = LEPUS_GetLength(ctx_, group_array_before);
+  uint32_t match_count_before = 0;
+  for (uint32_t i = 0; i < array_len; i++) {
+    LEPUSValue elem = LEPUS_GetPropertyUint32(ctx_, group_array_before, i);
+    if (LEPUS_IsObject(elem)) {
+      LEPUSObject* p = LEPUS_VALUE_GET_OBJ(elem);
+      if ((uint64_t)p == obj_ptr) match_count_before++;
+    }
+    if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, elem);
+  }
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, group_array_before);
+  ASSERT_GE(match_count_before, 2u);
+
+  // Release the single object — should clear ALL duplicate slots
+  std::string release_msg =
+      "{\"id\":20,\"method\":\"Runtime.releaseObject\",\"params\":{"
+      "\"objectId\":\"" +
+      object_id + "\"}}";
+  QjsDebugQueue::GetSendMessageQueue().push(release_msg);
+  const char* trigger3 = "function t3() {}; t3();\n";
+  ret = LEPUS_Eval(ctx_, trigger3, strlen(trigger3), "trigger3.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  // Drain response
+  bool got_response = false;
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    std::string msg = QjsDebugQueue::GetReceiveMessageQueue().front();
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+    LEPUSValue json = LEPUS_ParseJSON(ctx_, msg.c_str(), msg.length(), "");
+    HandleScope func_scope(ctx_, &json, HANDLE_TYPE_LEPUS_VALUE);
+    LEPUSValue id_val = LEPUS_GetPropertyStr(ctx_, json, "id");
+    if (!LEPUS_IsUndefined(id_val)) {
+      int32_t id = 0;
+      LEPUS_ToInt32(ctx_, &id, id_val);
+      if (id == 20) got_response = true;
+    }
+    if (!ctx_->rt->gc_enable) {
+      LEPUS_FreeValue(ctx_, id_val);
+      LEPUS_FreeValue(ctx_, json);
+    }
+  }
+  ASSERT_TRUE(got_response);
+
+  // Verify ALL slots with this object are now UNDEFINED
+  LEPUSValue group_array_after =
+      LEPUS_GetPropertyStr(ctx_, info->object_group_registry, "dupGroup");
+  uint32_t match_count_after = 0;
+  // The group array may still exist (other objects could be in it)
+  if (LEPUS_IsArray(ctx_, group_array_after)) {
+    uint32_t len_after = LEPUS_GetLength(ctx_, group_array_after);
+    for (uint32_t i = 0; i < len_after; i++) {
+      LEPUSValue elem = LEPUS_GetPropertyUint32(ctx_, group_array_after, i);
+      if (LEPUS_IsObject(elem)) {
+        LEPUSObject* p = LEPUS_VALUE_GET_OBJ(elem);
+        if ((uint64_t)p == obj_ptr) match_count_after++;
+      }
+      if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, elem);
+    }
+  }
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, group_array_after);
+
+  // No remaining references to the object in the group array
+  ASSERT_EQ(match_count_after, 0u);
+
+  // Reverse mapping should be cleaned up
+  ASSERT_EQ(info->object_id_to_groups.count(obj_ptr), 0u);
+}
+
+TEST_F(QjsDebugMethods, TestReleaseObjectWithScopeObjectId) {
+  // Verify that releaseObject with "scope:" prefix objectId is correctly
+  // filtered and does not crash or modify any state.
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":0,\"method\":\"Runtime.enable\",\"params\":{}}");
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":1,\"method\":\"Debugger.enable\",\"params\":{"
+      "\"maxScriptsCacheSize\":100000000}}");
+  const char* buf = "function trigger() {}; trigger();\n";
+  LEPUSValue ret =
+      LEPUS_Eval(ctx_, buf, strlen(buf), "setup.js", LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+  }
+
+  LEPUSDebuggerInfo* info = GetDebuggerInfo(ctx_);
+  uint32_t running_len_before = info->running_state.get_properties_array_len;
+  size_t groups_before = info->object_group_lengths.size();
+
+  // Try to release scope-format objectIds — should not crash
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":10,\"method\":\"Runtime.releaseObject\",\"params\":{"
+      "\"objectId\":\"scope:0\"}}");
+  const char* trigger = "function t1() {}; t1();\n";
+  ret = LEPUS_Eval(ctx_, trigger, strlen(trigger), "trigger1.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":11,\"method\":\"Runtime.releaseObject\",\"params\":{"
+      "\"objectId\":\"scope:1\"}}");
+  const char* trigger2 = "function t2() {}; t2();\n";
+  ret = LEPUS_Eval(ctx_, trigger2, strlen(trigger2), "trigger2.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  // Should get responses without crashing
+  bool got_response_10 = false, got_response_11 = false;
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    std::string msg = QjsDebugQueue::GetReceiveMessageQueue().front();
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+    LEPUSValue json = LEPUS_ParseJSON(ctx_, msg.c_str(), msg.length(), "");
+    HandleScope func_scope(ctx_, &json, HANDLE_TYPE_LEPUS_VALUE);
+    LEPUSValue id_val = LEPUS_GetPropertyStr(ctx_, json, "id");
+    if (!LEPUS_IsUndefined(id_val)) {
+      int32_t id = 0;
+      LEPUS_ToInt32(ctx_, &id, id_val);
+      if (id == 10) got_response_10 = true;
+      if (id == 11) got_response_11 = true;
+    }
+    if (!ctx_->rt->gc_enable) {
+      LEPUS_FreeValue(ctx_, id_val);
+      LEPUS_FreeValue(ctx_, json);
+    }
+  }
+  ASSERT_TRUE(got_response_10);
+  ASSERT_TRUE(got_response_11);
+
+  // Verify no state was modified
+  ASSERT_EQ(info->running_state.get_properties_array_len, running_len_before);
+  ASSERT_EQ(info->object_group_lengths.size(), groups_before);
+}
+
+TEST_F(QjsDebugMethods, TestEvaluateWithEmptyStringObjectGroup) {
+  // Verify that evaluate with objectGroup="" routes objects to running_state,
+  // not a new group.
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":0,\"method\":\"Runtime.enable\",\"params\":{}}");
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":1,\"method\":\"Debugger.enable\",\"params\":{"
+      "\"maxScriptsCacheSize\":100000000}}");
+  const char* buf = "function trigger() {}; trigger();\n";
+  LEPUSValue ret =
+      LEPUS_Eval(ctx_, buf, strlen(buf), "setup.js", LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+  }
+
+  LEPUSDebuggerInfo* info = GetDebuggerInfo(ctx_);
+  uint32_t running_len_before = info->running_state.get_properties_array_len;
+  size_t groups_before = info->object_group_lengths.size();
+
+  // Evaluate with empty string objectGroup
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":10,\"method\":\"Runtime.evaluate\",\"params\":{"
+      "\"expression\":\"({emptyGroup:1})\","
+      "\"objectGroup\":\"\"}}");
+  const char* trigger = "function t1() {}; t1();\n";
+  ret = LEPUS_Eval(ctx_, trigger, strlen(trigger), "trigger1.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  // Verify running_state grew (object went to running_state, not a group)
+  ASSERT_GT(info->running_state.get_properties_array_len, running_len_before);
+
+  // Verify no new group was created (including no "" group)
+  ASSERT_EQ(info->object_group_lengths.size(), groups_before);
+  ASSERT_EQ(info->object_group_lengths.count(""), 0u);
+}
+
+// Pause callback for TestPausedStateOverridesObjectGroup:
+// Sends Runtime.evaluate with objectGroup during pause, then resumes.
+static void PauseCBEvaluateWithObjectGroup(LEPUSContext* ctx) {
+  std::string evaluate_msg =
+      "{\"id\":50,\"method\":\"Runtime.evaluate\",\"params\":{"
+      "\"expression\":\"({pausedObj:1})\","
+      "\"objectGroup\":\"pauseGroup\"}}";
+  std::string resume_message =
+      "{\"id\":51,\"method\":\"Debugger.resume\",\"params\":{"
+      "\"terminateOnResume\":false}}";
+  ProcessPausedMessages(ctx, evaluate_msg.c_str());
+  ProcessPausedMessages(ctx, resume_message.c_str());
+}
+
+TEST_F(QjsDebugMethods, TestPausedStateOverridesObjectGroup) {
+  // Verify that when paused, evaluate with objectGroup stores objects in
+  // pause_state (not the object group), because GenerateUniqueObjId checks
+  // pause_state.get_properties_array FIRST.
+
+  // Register custom callbacks with our pause handler
+  void* funcs[14] = {reinterpret_cast<void*>(PauseCBEvaluateWithObjectGroup),
+                     reinterpret_cast<void*>(QuitMessageLoopOnPauseCB),
+                     reinterpret_cast<void*>(GetMessagesCB),
+                     reinterpret_cast<void*>(SendResponseCB),
+                     reinterpret_cast<void*>(SendNotificationCB),
+                     nullptr,
+                     nullptr,
+                     nullptr,
+                     reinterpret_cast<void*>(ConsoleMessageCB),
+                     nullptr,
+                     nullptr,
+                     nullptr,
+                     nullptr,
+                     reinterpret_cast<void*>(IsRuntimeDevtoolOnCB)};
+  RegisterQJSDebuggerCallbacks(rt_, reinterpret_cast<void**>(funcs), 14);
+
+  // Enable Debugger + Runtime and set breakpoint
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":0,\"method\":\"Debugger.enable\",\"params\":{"
+      "\"maxScriptsCacheSize\":100000000}}");
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":1,\"method\":\"Runtime.enable\",\"params\":{}}");
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":2,\"method\":\"Debugger.setBreakpointsActive\",\"params\":{"
+      "\"active\":true}}");
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":3,\"method\":\"Debugger.setBreakpointByUrl\",\"params\":{"
+      "\"lineNumber\":2,\"url\":\"test_pause_group.js\","
+      "\"columnNumber\":0,\"condition\":\"\"}}");
+
+  // Eval code that hits the breakpoint at line 2.
+  // During pause, PauseCBEvaluateWithObjectGroup will execute
+  // Runtime.evaluate with objectGroup="pauseGroup", then resume.
+  const char* src = R"(function testPauseGroup() {
+  let x = 1;
+  return x;
+}
+testPauseGroup();
+)";
+  LEPUSValue ret = LEPUS_Eval(ctx_, src, strlen(src), "test_pause_group.js",
+                              LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  // After pause+resume cycle, verify "pauseGroup" was NOT created.
+  // Objects went to pause_state which was cleaned up by PauseStateScope RAII.
+  LEPUSDebuggerInfo* info = GetDebuggerInfo(ctx_);
+  ASSERT_EQ(info->object_group_lengths.count("pauseGroup"), 0u);
+  ASSERT_EQ(info->object_group_ids.count("pauseGroup"), 0u);
+
+  // Verify we got the evaluate response (id=50)
+  bool got_eval_response = false;
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    std::string msg = QjsDebugQueue::GetReceiveMessageQueue().front();
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+    LEPUSValue json = LEPUS_ParseJSON(ctx_, msg.c_str(), msg.length(), "");
+    HandleScope func_scope(ctx_, &json, HANDLE_TYPE_LEPUS_VALUE);
+    LEPUSValue id_val = LEPUS_GetPropertyStr(ctx_, json, "id");
+    if (!LEPUS_IsUndefined(id_val)) {
+      int32_t id = 0;
+      LEPUS_ToInt32(ctx_, &id, id_val);
+      if (id == 50) got_eval_response = true;
+    }
+    if (!ctx_->rt->gc_enable) {
+      LEPUS_FreeValue(ctx_, id_val);
+      LEPUS_FreeValue(ctx_, json);
+    }
+  }
+  ASSERT_TRUE(got_eval_response);
+}
+
+TEST_F(QjsDebugMethods, TestReleaseObjectGroupWithEmptyString) {
+  // Verify that releaseObjectGroup with objectGroup="" (empty string)
+  // does not crash, returns a response, and does not modify any state.
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":0,\"method\":\"Runtime.enable\",\"params\":{}}");
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":1,\"method\":\"Debugger.enable\",\"params\":{"
+      "\"maxScriptsCacheSize\":100000000}}");
+  const char* buf = "function trigger() {}; trigger();\n";
+  LEPUSValue ret =
+      LEPUS_Eval(ctx_, buf, strlen(buf), "setup.js", LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+  }
+
+  // Create an object in a real group so we can verify it's untouched
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":10,\"method\":\"Runtime.evaluate\",\"params\":{"
+      "\"expression\":\"({realGroup: 1})\","
+      "\"objectGroup\":\"realGroup\"}}");
+  const char* trigger = "function t1() {}; t1();\n";
+  ret = LEPUS_Eval(ctx_, trigger, strlen(trigger), "trigger1.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+  }
+
+  LEPUSDebuggerInfo* info = GetDebuggerInfo(ctx_);
+  ASSERT_TRUE(info->object_group_lengths.count("realGroup") > 0);
+  uint32_t real_len_before = info->object_group_lengths["realGroup"];
+  size_t groups_before = info->object_group_lengths.size();
+
+  // Call releaseObjectGroup with empty string
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":20,\"method\":\"Runtime.releaseObjectGroup\",\"params\":{"
+      "\"objectGroup\":\"\"}}");
+  const char* trigger2 = "function t2() {}; t2();\n";
+  ret = LEPUS_Eval(ctx_, trigger2, strlen(trigger2), "trigger2.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  // Verify we got a response
+  bool got_response = false;
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    std::string msg = QjsDebugQueue::GetReceiveMessageQueue().front();
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+    LEPUSValue json = LEPUS_ParseJSON(ctx_, msg.c_str(), msg.length(), "");
+    HandleScope func_scope(ctx_, &json, HANDLE_TYPE_LEPUS_VALUE);
+    LEPUSValue id_val = LEPUS_GetPropertyStr(ctx_, json, "id");
+    if (!LEPUS_IsUndefined(id_val)) {
+      int32_t id = 0;
+      LEPUS_ToInt32(ctx_, &id, id_val);
+      if (id == 20) got_response = true;
+    }
+    if (!ctx_->rt->gc_enable) {
+      LEPUS_FreeValue(ctx_, id_val);
+      LEPUS_FreeValue(ctx_, json);
+    }
+  }
+  ASSERT_TRUE(got_response);
+
+  // Existing group should be completely untouched
+  ASSERT_EQ(info->object_group_lengths["realGroup"], real_len_before);
+  ASSERT_EQ(info->object_group_lengths.size(), groups_before);
+}
+
+TEST_F(QjsDebugMethods, TestReleaseObjectFromMultipleGroups) {
+  // Verify that when the same object is registered in multiple groups
+  // (via repeated evaluate with different objectGroup), releaseObject
+  // cleans it up from ALL groups.
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":0,\"method\":\"Runtime.enable\",\"params\":{}}");
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":1,\"method\":\"Debugger.enable\",\"params\":{"
+      "\"maxScriptsCacheSize\":100000000}}");
+  const char* buf =
+      "var sharedObj = {multi: true};\n"
+      "function trigger() {}; trigger();\n";
+  LEPUSValue ret =
+      LEPUS_Eval(ctx_, buf, strlen(buf), "setup.js", LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+  }
+
+  // Evaluate the same object under groupA
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":10,\"method\":\"Runtime.evaluate\",\"params\":{"
+      "\"expression\":\"sharedObj\","
+      "\"objectGroup\":\"groupA\"}}");
+  const char* trigger = "function t1() {}; t1();\n";
+  ret = LEPUS_Eval(ctx_, trigger, strlen(trigger), "trigger1.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  // Evaluate the same object under groupB
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":11,\"method\":\"Runtime.evaluate\",\"params\":{"
+      "\"expression\":\"sharedObj\","
+      "\"objectGroup\":\"groupB\"}}");
+  const char* trigger2 = "function t2() {}; t2();\n";
+  ret = LEPUS_Eval(ctx_, trigger2, strlen(trigger2), "trigger2.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  // Extract objectId from one of the evaluate responses
+  std::string object_id;
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    std::string msg = QjsDebugQueue::GetReceiveMessageQueue().front();
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+    LEPUSValue json = LEPUS_ParseJSON(ctx_, msg.c_str(), msg.length(), "");
+    HandleScope func_scope(ctx_, &json, HANDLE_TYPE_LEPUS_VALUE);
+    LEPUSValue id_val = LEPUS_GetPropertyStr(ctx_, json, "id");
+    if (!LEPUS_IsUndefined(id_val)) {
+      int32_t id = 0;
+      LEPUS_ToInt32(ctx_, &id, id_val);
+      if (id == 10 && object_id.empty()) {
+        LEPUSValue result = LEPUS_GetPropertyStr(ctx_, json, "result");
+        LEPUSValue inner_result = LEPUS_GetPropertyStr(ctx_, result, "result");
+        LEPUSValue obj_id_val =
+            LEPUS_GetPropertyStr(ctx_, inner_result, "objectId");
+        if (LEPUS_IsString(obj_id_val)) {
+          const char* oid = LEPUS_ToCString(ctx_, obj_id_val);
+          if (oid) object_id = oid;
+          if (!ctx_->rt->gc_enable) LEPUS_FreeCString(ctx_, oid);
+        }
+        if (!ctx_->rt->gc_enable) {
+          LEPUS_FreeValue(ctx_, obj_id_val);
+          LEPUS_FreeValue(ctx_, inner_result);
+          LEPUS_FreeValue(ctx_, result);
+        }
+      }
+    }
+    if (!ctx_->rt->gc_enable) {
+      LEPUS_FreeValue(ctx_, id_val);
+      LEPUS_FreeValue(ctx_, json);
+    }
+  }
+  ASSERT_FALSE(object_id.empty());
+
+  // Parse pointer value
+  uint64_t obj_ptr = strtoull(object_id.c_str(), nullptr, 10);
+  ASSERT_NE(obj_ptr, 0u);
+
+  LEPUSDebuggerInfo* info = GetDebuggerInfo(ctx_);
+
+  // Verify the object is tracked in both groups
+  ASSERT_TRUE(info->object_group_ids.count("groupA") > 0);
+  ASSERT_TRUE(info->object_group_ids.count("groupB") > 0);
+  ASSERT_TRUE(info->object_group_ids["groupA"].count(obj_ptr) > 0);
+  ASSERT_TRUE(info->object_group_ids["groupB"].count(obj_ptr) > 0);
+
+  // Release the object by objectId — should remove from ALL groups
+  std::string release_msg =
+      "{\"id\":20,\"method\":\"Runtime.releaseObject\",\"params\":{"
+      "\"objectId\":\"" +
+      object_id + "\"}}";
+  QjsDebugQueue::GetSendMessageQueue().push(release_msg);
+  const char* trigger3 = "function t3() {}; t3();\n";
+  ret = LEPUS_Eval(ctx_, trigger3, strlen(trigger3), "trigger3.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  // Drain response
+  bool got_response = false;
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    std::string msg = QjsDebugQueue::GetReceiveMessageQueue().front();
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+    LEPUSValue json = LEPUS_ParseJSON(ctx_, msg.c_str(), msg.length(), "");
+    HandleScope func_scope(ctx_, &json, HANDLE_TYPE_LEPUS_VALUE);
+    LEPUSValue id_val = LEPUS_GetPropertyStr(ctx_, json, "id");
+    if (!LEPUS_IsUndefined(id_val)) {
+      int32_t id = 0;
+      LEPUS_ToInt32(ctx_, &id, id_val);
+      if (id == 20) got_response = true;
+    }
+    if (!ctx_->rt->gc_enable) {
+      LEPUS_FreeValue(ctx_, id_val);
+      LEPUS_FreeValue(ctx_, json);
+    }
+  }
+  ASSERT_TRUE(got_response);
+
+  // Verify the object is removed from reverse mapping
+  ASSERT_EQ(info->object_id_to_groups.count(obj_ptr), 0u);
+
+  // Verify the object is removed from both groups' ID sets.
+  // If a group becomes empty after removal, it should be fully cleaned up.
+  if (info->object_group_ids.count("groupA")) {
+    ASSERT_EQ(info->object_group_ids["groupA"].count(obj_ptr), 0u);
+  }
+  if (info->object_group_ids.count("groupB")) {
+    ASSERT_EQ(info->object_group_ids["groupB"].count(obj_ptr), 0u);
+  }
+
+  // Verify the object slot is nullified in both group arrays
+  LEPUSValue group_a_array =
+      LEPUS_GetPropertyStr(ctx_, info->object_group_registry, "groupA");
+  if (LEPUS_IsArray(ctx_, group_a_array)) {
+    uint32_t len = LEPUS_GetLength(ctx_, group_a_array);
+    for (uint32_t i = 0; i < len; i++) {
+      LEPUSValue elem = LEPUS_GetPropertyUint32(ctx_, group_a_array, i);
+      if (LEPUS_IsObject(elem)) {
+        LEPUSObject* p = LEPUS_VALUE_GET_OBJ(elem);
+        ASSERT_NE((uint64_t)p, obj_ptr);
+      }
+      if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, elem);
+    }
+  }
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, group_a_array);
+
+  LEPUSValue group_b_array =
+      LEPUS_GetPropertyStr(ctx_, info->object_group_registry, "groupB");
+  if (LEPUS_IsArray(ctx_, group_b_array)) {
+    uint32_t len = LEPUS_GetLength(ctx_, group_b_array);
+    for (uint32_t i = 0; i < len; i++) {
+      LEPUSValue elem = LEPUS_GetPropertyUint32(ctx_, group_b_array, i);
+      if (LEPUS_IsObject(elem)) {
+        LEPUSObject* p = LEPUS_VALUE_GET_OBJ(elem);
+        ASSERT_NE((uint64_t)p, obj_ptr);
+      }
+      if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, elem);
+    }
+  }
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, group_b_array);
+}
+
+// --- GC Root Set Tests for object_group_registry ---
+// These tests verify that object_group_registry is properly marked as a GC root
+// so objects stored in it survive garbage collection cycles.
+
+TEST_F(QjsDebugMethods, TestObjectGroupRegistrySurvivesGC) {
+  // Verify that objects in object_group_registry survive GC cycles.
+  // Without the fix in collector.cc (PushObjLEPUSValue for
+  // object_group_registry), these objects would be collected.
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":0,\"method\":\"Runtime.enable\",\"params\":{}}");
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":1,\"method\":\"Debugger.enable\",\"params\":{"
+      "\"maxScriptsCacheSize\":100000000}}");
+  const char* buf = "function trigger() {}; trigger();\n";
+  LEPUSValue ret =
+      LEPUS_Eval(ctx_, buf, strlen(buf), "setup.js", LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+  }
+
+  // Evaluate an expression with objectGroup to store objects in registry
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":10,\"method\":\"Runtime.evaluate\",\"params\":{"
+      "\"expression\":\"({gcTestProp: 'alive', nested: {inner: 42}})\","
+      "\"objectGroup\":\"gcGroup\"}}");
+  const char* trigger = "function t1() {}; t1();\n";
+  ret = LEPUS_Eval(ctx_, trigger, strlen(trigger), "trigger1.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  // Verify group was created
+  LEPUSDebuggerInfo* info = GetDebuggerInfo(ctx_);
+  ASSERT_TRUE(info->object_group_lengths.count("gcGroup") > 0);
+  ASSERT_TRUE(info->object_group_lengths["gcGroup"] > 0);
+
+  // Extract objectId from response
+  std::string object_id;
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    std::string msg = QjsDebugQueue::GetReceiveMessageQueue().front();
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+    LEPUSValue json = LEPUS_ParseJSON(ctx_, msg.c_str(), msg.length(), "");
+    HandleScope func_scope(ctx_, &json, HANDLE_TYPE_LEPUS_VALUE);
+    LEPUSValue id_val = LEPUS_GetPropertyStr(ctx_, json, "id");
+    if (!LEPUS_IsUndefined(id_val)) {
+      int32_t id = 0;
+      LEPUS_ToInt32(ctx_, &id, id_val);
+      if (id == 10) {
+        LEPUSValue result = LEPUS_GetPropertyStr(ctx_, json, "result");
+        LEPUSValue inner_result = LEPUS_GetPropertyStr(ctx_, result, "result");
+        LEPUSValue obj_id_val =
+            LEPUS_GetPropertyStr(ctx_, inner_result, "objectId");
+        if (LEPUS_IsString(obj_id_val)) {
+          const char* oid = LEPUS_ToCString(ctx_, obj_id_val);
+          if (oid) object_id = oid;
+          if (!ctx_->rt->gc_enable) LEPUS_FreeCString(ctx_, oid);
+        }
+        if (!ctx_->rt->gc_enable) {
+          LEPUS_FreeValue(ctx_, obj_id_val);
+          LEPUS_FreeValue(ctx_, inner_result);
+          LEPUS_FreeValue(ctx_, result);
+        }
+      }
+    }
+    if (!ctx_->rt->gc_enable) {
+      LEPUS_FreeValue(ctx_, id_val);
+      LEPUS_FreeValue(ctx_, json);
+    }
+  }
+  ASSERT_FALSE(object_id.empty());
+
+  // Run GC multiple times to ensure collection pressure
+  LEPUS_RunGC(rt_);
+  LEPUS_RunGC(rt_);
+  LEPUS_RunGC(rt_);
+
+  // Verify the registry object itself is still valid
+  ASSERT_TRUE(LEPUS_IsObject(info->object_group_registry));
+
+  // Verify group array is still accessible in the registry
+  LEPUSValue group_array =
+      LEPUS_GetPropertyStr(ctx_, info->object_group_registry, "gcGroup");
+  ASSERT_TRUE(LEPUS_IsArray(ctx_, group_array));
+  uint32_t len = LEPUS_GetLength(ctx_, group_array);
+  ASSERT_TRUE(len > 0);
+
+  // Verify the stored object is still alive (not collected)
+  LEPUSValue elem = LEPUS_GetPropertyUint32(ctx_, group_array, 0);
+  ASSERT_TRUE(LEPUS_IsObject(elem));
+
+  // Access a property on the stored object to confirm it's not corrupted
+  LEPUSValue prop = LEPUS_GetPropertyStr(ctx_, elem, "gcTestProp");
+  ASSERT_TRUE(LEPUS_IsString(prop));
+  const char* prop_str = LEPUS_ToCString(ctx_, prop);
+  ASSERT_STREQ(prop_str, "alive");
+  if (!ctx_->rt->gc_enable) {
+    LEPUS_FreeCString(ctx_, prop_str);
+    LEPUS_FreeValue(ctx_, prop);
+    LEPUS_FreeValue(ctx_, elem);
+    LEPUS_FreeValue(ctx_, group_array);
+  }
+
+  // Verify getProperties still works on the object after GC
+  SendRuntimeGetProperties(ctx_, 20, object_id);
+  std::string props_response = PopResponseById(ctx_, 20);
+  ASSERT_FALSE(props_response.empty());
+}
+
+TEST_F(QjsDebugMethods, TestObjectGroupRegistryMultipleGroupsSurviveGC) {
+  // Verify multiple groups with multiple objects all survive GC.
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":0,\"method\":\"Runtime.enable\",\"params\":{}}");
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":1,\"method\":\"Debugger.enable\",\"params\":{"
+      "\"maxScriptsCacheSize\":100000000}}");
+  const char* buf = "function trigger() {}; trigger();\n";
+  LEPUSValue ret =
+      LEPUS_Eval(ctx_, buf, strlen(buf), "setup.js", LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+  }
+
+  // Create multiple objects across two groups
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":10,\"method\":\"Runtime.evaluate\",\"params\":{"
+      "\"expression\":\"({gcA1: 'val1'})\","
+      "\"objectGroup\":\"gcGroupA\"}}");
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":11,\"method\":\"Runtime.evaluate\",\"params\":{"
+      "\"expression\":\"({gcA2: 'val2'})\","
+      "\"objectGroup\":\"gcGroupA\"}}");
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":12,\"method\":\"Runtime.evaluate\",\"params\":{"
+      "\"expression\":\"({gcB1: 'val3'})\","
+      "\"objectGroup\":\"gcGroupB\"}}");
+  const char* trigger = "function t1() {}; t1();\n";
+  ret = LEPUS_Eval(ctx_, trigger, strlen(trigger), "trigger1.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  LEPUSDebuggerInfo* info = GetDebuggerInfo(ctx_);
+  ASSERT_TRUE(info->object_group_lengths.count("gcGroupA") > 0);
+  ASSERT_TRUE(info->object_group_lengths.count("gcGroupB") > 0);
+  uint32_t groupA_len = info->object_group_lengths["gcGroupA"];
+  uint32_t groupB_len = info->object_group_lengths["gcGroupB"];
+  ASSERT_TRUE(groupA_len >= 2);
+  ASSERT_TRUE(groupB_len >= 1);
+
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+  }
+
+  // Run GC aggressively
+  LEPUS_RunGC(rt_);
+  LEPUS_RunGC(rt_);
+  LEPUS_RunGC(rt_);
+
+  // Verify both groups still exist and have correct lengths
+  ASSERT_TRUE(info->object_group_lengths.count("gcGroupA") > 0);
+  ASSERT_TRUE(info->object_group_lengths.count("gcGroupB") > 0);
+  ASSERT_EQ(info->object_group_lengths["gcGroupA"], groupA_len);
+  ASSERT_EQ(info->object_group_lengths["gcGroupB"], groupB_len);
+
+  // Verify objects in gcGroupA are still alive (order may vary due to
+  // recursive message processing, so check both elements order-independently)
+  LEPUSValue group_a_array =
+      LEPUS_GetPropertyStr(ctx_, info->object_group_registry, "gcGroupA");
+  ASSERT_TRUE(LEPUS_IsArray(ctx_, group_a_array));
+  LEPUSValue elem0 = LEPUS_GetPropertyUint32(ctx_, group_a_array, 0);
+  LEPUSValue elem1 = LEPUS_GetPropertyUint32(ctx_, group_a_array, 1);
+  ASSERT_TRUE(LEPUS_IsObject(elem0));
+  ASSERT_TRUE(LEPUS_IsObject(elem1));
+  // One element has "gcA1" and the other has "gcA2" (order not guaranteed)
+  LEPUSValue prop_a1_on_0 = LEPUS_GetPropertyStr(ctx_, elem0, "gcA1");
+  LEPUSValue prop_a1_on_1 = LEPUS_GetPropertyStr(ctx_, elem1, "gcA1");
+  ASSERT_TRUE(LEPUS_IsString(prop_a1_on_0) || LEPUS_IsString(prop_a1_on_1));
+  LEPUSValue prop_a2_on_0 = LEPUS_GetPropertyStr(ctx_, elem0, "gcA2");
+  LEPUSValue prop_a2_on_1 = LEPUS_GetPropertyStr(ctx_, elem1, "gcA2");
+  ASSERT_TRUE(LEPUS_IsString(prop_a2_on_0) || LEPUS_IsString(prop_a2_on_1));
+  if (!ctx_->rt->gc_enable) {
+    LEPUS_FreeValue(ctx_, prop_a1_on_0);
+    LEPUS_FreeValue(ctx_, prop_a1_on_1);
+    LEPUS_FreeValue(ctx_, prop_a2_on_0);
+    LEPUS_FreeValue(ctx_, prop_a2_on_1);
+    LEPUS_FreeValue(ctx_, elem0);
+    LEPUS_FreeValue(ctx_, elem1);
+    LEPUS_FreeValue(ctx_, group_a_array);
+  }
+
+  // Verify objects in gcGroupB are still alive
+  LEPUSValue group_b_array =
+      LEPUS_GetPropertyStr(ctx_, info->object_group_registry, "gcGroupB");
+  ASSERT_TRUE(LEPUS_IsArray(ctx_, group_b_array));
+  LEPUSValue elem_b0 = LEPUS_GetPropertyUint32(ctx_, group_b_array, 0);
+  ASSERT_TRUE(LEPUS_IsObject(elem_b0));
+  LEPUSValue prop_b0 = LEPUS_GetPropertyStr(ctx_, elem_b0, "gcB1");
+  ASSERT_TRUE(LEPUS_IsString(prop_b0));
+  if (!ctx_->rt->gc_enable) {
+    LEPUS_FreeValue(ctx_, prop_b0);
+    LEPUS_FreeValue(ctx_, elem_b0);
+    LEPUS_FreeValue(ctx_, group_b_array);
+  }
+
+  // Release groupA, run GC, verify groupB still survives
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":20,\"method\":\"Runtime.releaseObjectGroup\",\"params\":{"
+      "\"objectGroup\":\"gcGroupA\"}}");
+  const char* trigger2 = "function t2() {}; t2();\n";
+  ret = LEPUS_Eval(ctx_, trigger2, strlen(trigger2), "trigger2.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  LEPUS_RunGC(rt_);
+  LEPUS_RunGC(rt_);
+
+  // groupA should be gone
+  ASSERT_EQ(info->object_group_lengths.count("gcGroupA"), 0u);
+
+  // groupB should still be alive
+  ASSERT_TRUE(info->object_group_lengths.count("gcGroupB") > 0);
+  LEPUSValue group_b_after =
+      LEPUS_GetPropertyStr(ctx_, info->object_group_registry, "gcGroupB");
+  ASSERT_TRUE(LEPUS_IsArray(ctx_, group_b_after));
+  LEPUSValue elem_b_after = LEPUS_GetPropertyUint32(ctx_, group_b_after, 0);
+  ASSERT_TRUE(LEPUS_IsObject(elem_b_after));
+  LEPUSValue prop_b_after = LEPUS_GetPropertyStr(ctx_, elem_b_after, "gcB1");
+  ASSERT_TRUE(LEPUS_IsString(prop_b_after));
+  if (!ctx_->rt->gc_enable) {
+    LEPUS_FreeValue(ctx_, prop_b_after);
+    LEPUS_FreeValue(ctx_, elem_b_after);
+    LEPUS_FreeValue(ctx_, group_b_after);
+  }
+}
+
+TEST_F(QjsDebugMethods, TestObjectGroupInheritanceSurvivesGC) {
+  // Verify that sub-objects created via getProperties group inheritance
+  // also survive GC when stored in the group registry.
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":0,\"method\":\"Runtime.enable\",\"params\":{}}");
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":1,\"method\":\"Debugger.enable\",\"params\":{"
+      "\"maxScriptsCacheSize\":100000000}}");
+  const char* buf = "function trigger() {}; trigger();\n";
+  LEPUSValue ret =
+      LEPUS_Eval(ctx_, buf, strlen(buf), "setup.js", LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+  }
+
+  // Evaluate a deeply nested object with group
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":10,\"method\":\"Runtime.evaluate\",\"params\":{"
+      "\"expression\":\"({level1: {level2: {deepVal: 999}}})\","
+      "\"objectGroup\":\"gcInherit\"}}");
+  const char* trigger = "function t1() {}; t1();\n";
+  ret = LEPUS_Eval(ctx_, trigger, strlen(trigger), "trigger1.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  // Extract objectId
+  std::string object_id;
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    std::string msg = QjsDebugQueue::GetReceiveMessageQueue().front();
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+    LEPUSValue json = LEPUS_ParseJSON(ctx_, msg.c_str(), msg.length(), "");
+    HandleScope func_scope(ctx_, &json, HANDLE_TYPE_LEPUS_VALUE);
+    LEPUSValue id_val = LEPUS_GetPropertyStr(ctx_, json, "id");
+    if (!LEPUS_IsUndefined(id_val)) {
+      int32_t id = 0;
+      LEPUS_ToInt32(ctx_, &id, id_val);
+      if (id == 10) {
+        LEPUSValue result = LEPUS_GetPropertyStr(ctx_, json, "result");
+        LEPUSValue inner_result = LEPUS_GetPropertyStr(ctx_, result, "result");
+        LEPUSValue obj_id_val =
+            LEPUS_GetPropertyStr(ctx_, inner_result, "objectId");
+        if (LEPUS_IsString(obj_id_val)) {
+          const char* oid = LEPUS_ToCString(ctx_, obj_id_val);
+          if (oid) object_id = oid;
+          if (!ctx_->rt->gc_enable) LEPUS_FreeCString(ctx_, oid);
+        }
+        if (!ctx_->rt->gc_enable) {
+          LEPUS_FreeValue(ctx_, obj_id_val);
+          LEPUS_FreeValue(ctx_, inner_result);
+          LEPUS_FreeValue(ctx_, result);
+        }
+      }
+    }
+    if (!ctx_->rt->gc_enable) {
+      LEPUS_FreeValue(ctx_, id_val);
+      LEPUS_FreeValue(ctx_, json);
+    }
+  }
+  ASSERT_FALSE(object_id.empty());
+
+  LEPUSDebuggerInfo* info = GetDebuggerInfo(ctx_);
+  uint32_t group_len_before_props = info->object_group_lengths["gcInherit"];
+
+  // Call getProperties to trigger group inheritance for sub-objects
+  SendRuntimeGetProperties(ctx_, 11, object_id);
+  std::string props_response = PopResponseById(ctx_, 11);
+  ASSERT_FALSE(props_response.empty());
+
+  // Group should have grown due to inheritance
+  uint32_t group_len_after_props = info->object_group_lengths["gcInherit"];
+  ASSERT_TRUE(group_len_after_props > group_len_before_props);
+
+  // Run GC aggressively
+  LEPUS_RunGC(rt_);
+  LEPUS_RunGC(rt_);
+  LEPUS_RunGC(rt_);
+
+  // Verify registry and group are still intact
+  ASSERT_TRUE(LEPUS_IsObject(info->object_group_registry));
+  LEPUSValue group_array =
+      LEPUS_GetPropertyStr(ctx_, info->object_group_registry, "gcInherit");
+  ASSERT_TRUE(LEPUS_IsArray(ctx_, group_array));
+  uint32_t len_after_gc = LEPUS_GetLength(ctx_, group_array);
+  ASSERT_EQ(len_after_gc, group_len_after_props);
+
+  // Verify all objects in the group array are still valid
+  for (uint32_t i = 0; i < len_after_gc; i++) {
+    LEPUSValue elem = LEPUS_GetPropertyUint32(ctx_, group_array, i);
+    ASSERT_TRUE(LEPUS_IsObject(elem));
+    if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, elem);
+  }
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, group_array);
+
+  // Verify getProperties still works on the parent after GC
+  SendRuntimeGetProperties(ctx_, 12, object_id);
+  std::string props_response2 = PopResponseById(ctx_, 12);
+  ASSERT_FALSE(props_response2.empty());
+}
+
+TEST_F(QjsDebugMethods, TestObjectGroupRegistryGCThenRelease) {
+  // Verify that GC followed by releaseObjectGroup works correctly —
+  // the release should still clean up properly after GC has run.
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":0,\"method\":\"Runtime.enable\",\"params\":{}}");
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":1,\"method\":\"Debugger.enable\",\"params\":{"
+      "\"maxScriptsCacheSize\":100000000}}");
+  const char* buf = "function trigger() {}; trigger();\n";
+  LEPUSValue ret =
+      LEPUS_Eval(ctx_, buf, strlen(buf), "setup.js", LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+  }
+
+  // Create objects in a group
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":10,\"method\":\"Runtime.evaluate\",\"params\":{"
+      "\"expression\":\"({gcRelease: 'test'})\","
+      "\"objectGroup\":\"gcReleaseGroup\"}}");
+  const char* trigger = "function t1() {}; t1();\n";
+  ret = LEPUS_Eval(ctx_, trigger, strlen(trigger), "trigger1.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  LEPUSDebuggerInfo* info = GetDebuggerInfo(ctx_);
+  ASSERT_TRUE(info->object_group_lengths.count("gcReleaseGroup") > 0);
+
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty()) {
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+  }
+
+  // Run GC first
+  LEPUS_RunGC(rt_);
+  LEPUS_RunGC(rt_);
+
+  // Now release the group — this should not crash or cause UAF
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":20,\"method\":\"Runtime.releaseObjectGroup\",\"params\":{"
+      "\"objectGroup\":\"gcReleaseGroup\"}}");
+  const char* trigger2 = "function t2() {}; t2();\n";
+  ret = LEPUS_Eval(ctx_, trigger2, strlen(trigger2), "trigger2.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  // Verify group was cleaned up
+  ASSERT_EQ(info->object_group_lengths.count("gcReleaseGroup"), 0u);
+  ASSERT_EQ(info->object_group_ids.count("gcReleaseGroup"), 0u);
+
+  // Registry should still be valid
+  ASSERT_TRUE(LEPUS_IsObject(info->object_group_registry));
+
+  // Run GC again — should not crash
+  LEPUS_RunGC(rt_);
+}
+
+TEST_F(QjsDebugMethods, TestRuntimeDisableClearsObjectGroupState) {
+  // Enable Runtime and Debugger
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":0,\"method\":\"Runtime.enable\",\"params\":{}}");
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":1,\"method\":\"Debugger.enable\",\"params\":{"
+      "\"maxScriptsCacheSize\":100000000}}");
+  const char* buf = "function trigger() {}; trigger();\n";
+  LEPUSValue ret =
+      LEPUS_Eval(ctx_, buf, strlen(buf), "setup.js", LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty())
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+
+  // Create objects in two groups
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":10,\"method\":\"Runtime.evaluate\",\"params\":{"
+      "\"expression\":\"({x:1})\",\"objectGroup\":\"groupA\"}}");
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":11,\"method\":\"Runtime.evaluate\",\"params\":{"
+      "\"expression\":\"({y:2})\",\"objectGroup\":\"groupB\"}}");
+  const char* trigger = "function t1() {}; t1();\n";
+  ret = LEPUS_Eval(ctx_, trigger, strlen(trigger), "t1.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  // Verify groups exist
+  LEPUSDebuggerInfo* info = GetDebuggerInfo(ctx_);
+  ASSERT_TRUE(info->object_group_lengths.count("groupA") > 0);
+  ASSERT_TRUE(info->object_group_lengths.count("groupB") > 0);
+  ASSERT_FALSE(info->object_id_to_groups.empty());
+  ASSERT_FALSE(info->object_group_ids.empty());
+
+  // Drain messages
+  while (!QjsDebugQueue::GetReceiveMessageQueue().empty())
+    QjsDebugQueue::GetReceiveMessageQueue().pop();
+
+  // Send Runtime.disable
+  QjsDebugQueue::GetSendMessageQueue().push(
+      "{\"id\":20,\"method\":\"Runtime.disable\",\"params\":{}}");
+  const char* trigger2 = "function t2() {}; t2();\n";
+  ret = LEPUS_Eval(ctx_, trigger2, strlen(trigger2), "t2.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  // Verify all object_group state is cleared
+  ASSERT_TRUE(info->object_group_lengths.empty());
+  ASSERT_TRUE(info->object_id_to_groups.empty());
+  ASSERT_TRUE(info->object_group_ids.empty());
+  ASSERT_TRUE(info->current_object_groups.empty());
+
+  // Verify registry is a fresh empty object (no properties from old groups)
+  LEPUSValue group_a =
+      LEPUS_GetPropertyStr(ctx_, info->object_group_registry, "groupA");
+  ASSERT_TRUE(LEPUS_IsUndefined(group_a));
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, group_a);
+
+  LEPUSValue group_b =
+      LEPUS_GetPropertyStr(ctx_, info->object_group_registry, "groupB");
+  ASSERT_TRUE(LEPUS_IsUndefined(group_b));
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, group_b);
+}
+
 }  // namespace qjs_debug_test

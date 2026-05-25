@@ -302,19 +302,47 @@ QJS_HIDE LEPUSValue GetGeneratorFuncName(LEPUSContext* ctx, LEPUSValue obj) {
   }
 }
 
+// Generate a unique objectId (pointer as string) for a RemoteObject and keep
+// the object alive by DupValue'ing it into one of three storage tiers:
+//   1. pause_state: debugger is paused — freed automatically on resume.
+//   2. object_group_registry: running with an active objectGroup — freed by
+//      Runtime.releaseObjectGroup / releaseObject.
+//   3. running_state: running without group — fallback, never explicitly freed.
 LEPUSValue GenerateUniqueObjId(LEPUSContext* ctx, LEPUSValue obj) {
   LEPUSObject* p = LEPUS_VALUE_GET_OBJ(obj);
   auto obj_id = (uint64_t)p;
   std::string obj_id_str = std::to_string(obj_id);
-  auto* debugger_info = ctx->debugger_info;
-  auto& state = debugger_info->pause_state;
+  auto* info = ctx->debugger_info;
+  auto& state = info->pause_state;
   // dup obj
   if (LEPUS_IsArray(ctx, state.get_properties_array)) {
+    // Paused: store in pause_state (RAII cleanup via PauseStateScope)
     LEPUS_SetPropertyUint32(ctx, state.get_properties_array,
                             state.get_properties_array_len++,
                             LEPUS_DupValue(ctx, obj));
+  } else if (!info->current_object_groups.empty()) {
+    // Running with active objectGroup(s): store in each group's array
+    for (const std::string& group : info->current_object_groups) {
+      LEPUSValue group_array =
+          LEPUS_GetPropertyStr(ctx, info->object_group_registry, group.c_str());
+      HandleScope group_scope(ctx, &group_array, HANDLE_TYPE_LEPUS_VALUE);
+      if (!LEPUS_IsArray(ctx, group_array)) {
+        if (!ctx->rt->gc_enable) LEPUS_FreeValue(ctx, group_array);
+        group_array = LEPUS_NewArray(ctx);
+        LEPUS_SetPropertyStr(ctx, info->object_group_registry, group.c_str(),
+                             LEPUS_DupValue(ctx, group_array));
+        info->object_group_lengths[group] = 0;
+      }
+      uint32_t& len = info->object_group_lengths[group];
+      LEPUS_SetPropertyUint32(ctx, group_array, len++,
+                              LEPUS_DupValue(ctx, obj));
+      if (!ctx->rt->gc_enable) LEPUS_FreeValue(ctx, group_array);
+      info->object_id_to_groups[obj_id].insert(group);
+      info->object_group_ids[group].insert(obj_id);
+    }
   } else {
-    auto& running_state = debugger_info->running_state;
+    // Running without group: existing fallback
+    auto& running_state = info->running_state;
     LEPUS_SetPropertyUint32(ctx, running_state.get_properties_array,
                             running_state.get_properties_array_len++,
                             LEPUS_DupValue(ctx, obj));
@@ -1922,6 +1950,17 @@ void HandleGetProperties(DebuggerParams* runtime_options) {
   is_console_object_id =
       console_object_id.type != ConsoleObjectIdType::kInvalid;
   HandleScope func_scope(ctx, &obj, HANDLE_TYPE_LEPUS_VALUE);
+
+  // Inherit ALL parent object's groups so sub-properties are released together.
+  auto* info = ctx->debugger_info;
+  std::unique_ptr<ScopedObjectGroup> obj_group_scope;
+  if (obj_id != 0 && !is_console_object_id) {
+    auto it = info->object_id_to_groups.find(obj_id);
+    if (it != info->object_id_to_groups.end() && !it->second.empty()) {
+      std::vector<std::string> groups(it->second.begin(), it->second.end());
+      obj_group_scope.reset(new ScopedObjectGroup(info, std::move(groups)));
+    }
+  }
 
   std::unique_ptr<ScopedConsoleMessageContext> console_scope;
   if (is_console_object_id) {

@@ -2333,6 +2333,7 @@ LEPUSDebuggerInfo::LEPUSDebuggerInfo(LEPUSContext *ctx_) : ctx{ctx_} {
   init_list_head(&bytecode_list);
   LEPUS_HeapObjStore(ctx, &running_state.get_properties_array,
                      LEPUS_NewArray(ctx));
+  LEPUS_HeapObjStore(ctx, &object_group_registry, LEPUS_NewObject(ctx));
   message_queue = InitQueue();
   InitializeStringPool(this);
   InitializeFixedShapeObj(this);
@@ -2408,6 +2409,7 @@ LEPUSDebuggerInfo::~LEPUSDebuggerInfo() {
       LEPUS_FreeCString(ctx, pause_on_next_statement_reason);
     }
     LEPUS_FreeValue(ctx, running_state.get_properties_array);
+    LEPUS_FreeValue(ctx, object_group_registry);
     LEPUS_FreeValue(ctx, console.messages);
     FreeFixedShapeObj(this);
     FreeStringPool(this);

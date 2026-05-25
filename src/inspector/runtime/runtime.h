@@ -84,6 +84,14 @@ void HandleRuntimeDisable(DebuggerParams*);
 
 void HandleRuntimeGetHeapUsage(DebuggerParams*);
 
+// ref:
+// https://chromedevtools.github.io/devtools-protocol/tot/Runtime/#method-releaseObject
+void HandleReleaseObject(DebuggerParams*);
+
+// ref:
+// https://chromedevtools.github.io/devtools-protocol/tot/Runtime/#method-releaseObjectGroup
+void HandleReleaseObjectGroup(DebuggerParams*);
+
 // given object id, return the real obj
 LEPUSValue GetObjFromObjectId(LEPUSContext* ctx, const char* object_id_str,
                               uint64_t*);

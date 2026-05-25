@@ -42,6 +42,8 @@
 #include <memory>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
+#include <vector>
 
 #include "quickjs/include/list.h"
 extern "C" {
@@ -314,6 +316,20 @@ struct LEPUSDebuggerInfo {
   struct DebuggerSuspendedState
       pause_state;  // need update when restart runframe
   struct DebuggerSuspendedState running_state;
+  // Object group tracking for Runtime.releaseObjectGroup.
+  // JS Object: property name = group name, property value = JS Array of
+  // objects.
+  LEPUSValue object_group_registry{LEPUS_NULL};
+  // Length of each group's array (avoids repeated LEPUS_GetLength calls).
+  std::unordered_map<std::string, uint32_t> object_group_lengths;
+  // Reverse mapping: object pointer -> all groups it belongs to.
+  std::unordered_map<uint64_t, std::unordered_set<std::string>>
+      object_id_to_groups;
+  // Per-group set of object pointers (O(1) insert/erase on releaseObject).
+  std::unordered_map<std::string, std::unordered_set<uint64_t>>
+      object_group_ids;
+  // Currently active objectGroup names, set by ScopedObjectGroup RAII.
+  std::vector<std::string> current_object_groups;
   struct DebuggerLiteralPool literal_pool;
   struct DebuggerFixeShapeObj debugger_obj;
   JSDebuggerConsole console;  // use for console.xxx

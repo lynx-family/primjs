@@ -93,6 +93,8 @@ const debug_function_type &GetDebugFunctionMap() {
       {"Runtime.runScript", HandleRunScript},
       {"Runtime.setAsyncCallStackDepth", HandleSetAsyncCallStackDepth},
       {"Runtime.getHeapUsage", HandleRuntimeGetHeapUsage},
+      {"Runtime.releaseObject", HandleReleaseObject},
+      {"Runtime.releaseObjectGroup", HandleReleaseObjectGroup},
       // HeapProfiler begin
       {"HeapProfiler.takeHeapSnapshot", HandleHeapProfilerProtocols},
       // HeapProfiler end

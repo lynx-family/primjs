@@ -32,7 +32,11 @@
 #include "inspector/runtime/runtime.h"
 
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
+#include <memory>
+#include <string>
+#include <vector>
 
 #include "gc/trace-gc.h"
 #include "inspector/debugger/debugger.h"
@@ -288,6 +292,15 @@ void HandleRuntimeDisable(DebuggerParams* runtime_options) {
     SetSessionEnableState(ctx, view_id, RUNTIME_DISABLE);
   }
 
+  // Reset object group state to prevent memory leak on reconnect.
+  LEPUSDebuggerInfo* info = ctx->debugger_info;
+  if (!ctx->rt->gc_enable) LEPUS_FreeValue(ctx, info->object_group_registry);
+  LEPUS_HeapObjStore(ctx, &info->object_group_registry, LEPUS_NewObject(ctx));
+  info->object_group_lengths.clear();
+  info->object_id_to_groups.clear();
+  info->object_group_ids.clear();
+  info->current_object_groups.clear();
+
   LEPUSValue result = LEPUS_NewObject(ctx);
   HandleScope func_scope(ctx, &result, HANDLE_TYPE_LEPUS_VALUE);
   SendResponse(ctx, message, result);
@@ -302,6 +315,179 @@ void HandleDiscardConsoleEntries(DebuggerParams* runtime_protocols) {
   info->console.length = 0;
   info->console.head = 0;
   LEPUS_HeapObjStore(ctx, &info->console.messages, LEPUS_NewArray(ctx));
+}
+
+// https://chromedevtools.github.io/devtools-protocol/tot/Runtime/#method-releaseObjectGroup
+void HandleReleaseObjectGroup(DebuggerParams* params) {
+  LEPUSContext* ctx = params->ctx;
+  LEPUSValue message = params->message;
+  LEPUSDebuggerInfo* info = ctx->debugger_info;
+
+  LEPUSValue msg_params = LEPUS_GetPropertyStr(ctx, message, "params");
+  LEPUSValue object_group_val =
+      LEPUS_GetPropertyStr(ctx, msg_params, "objectGroup");
+  const char* object_group = LEPUS_ToCString(ctx, object_group_val);
+  HandleScope func_scope(ctx, reinterpret_cast<void*>(&object_group),
+                         HANDLE_TYPE_CSTRING);
+
+  if (LEPUS_IsString(object_group_val) && object_group &&
+      object_group[0] != '\0') {
+    LEPUSValue group_array =
+        LEPUS_GetPropertyStr(ctx, info->object_group_registry, object_group);
+    func_scope.PushHandle(&group_array, HANDLE_TYPE_LEPUS_VALUE);
+    if (LEPUS_IsArray(ctx, group_array)) {
+      // Delete property from registry — drops the registry's reference
+      LEPUSAtom atom = LEPUS_NewAtom(ctx, object_group);
+      LEPUS_DeleteProperty(ctx, info->object_group_registry, atom, 0);
+      if (!ctx->rt->gc_enable) LEPUS_FreeAtom(ctx, atom);
+      // Free the Get-produced reference after DeleteProperty to avoid
+      // any ambiguity about dangling pointers.
+      if (!ctx->rt->gc_enable) LEPUS_FreeValue(ctx, group_array);
+    } else {
+      if (!ctx->rt->gc_enable) LEPUS_FreeValue(ctx, group_array);
+    }
+    // Clean up reverse mapping entries for this group using per-group ID list
+    std::string group_str(object_group);
+    auto ids_it = info->object_group_ids.find(group_str);
+    if (ids_it != info->object_group_ids.end()) {
+      for (uint64_t obj_id : ids_it->second) {
+        auto map_it = info->object_id_to_groups.find(obj_id);
+        if (map_it != info->object_id_to_groups.end()) {
+          map_it->second.erase(group_str);
+          if (map_it->second.empty()) {
+            info->object_id_to_groups.erase(map_it);
+          }
+        }
+      }
+      info->object_group_ids.erase(ids_it);
+    }
+    info->object_group_lengths.erase(group_str);
+  }
+
+  if (!ctx->rt->gc_enable) {
+    LEPUS_FreeCString(ctx, object_group);
+    LEPUS_FreeValue(ctx, object_group_val);
+    LEPUS_FreeValue(ctx, msg_params);
+  }
+
+  LEPUSValue result = LEPUS_NewObject(ctx);
+  func_scope.PushHandle(&result, HANDLE_TYPE_LEPUS_VALUE);
+  SendResponse(ctx, message, result);
+}
+
+// Helper: scan an array for ALL slots matching the pointer and nullify them.
+// The same object may have been DupValue'd into the array multiple times
+// (e.g. repeated evaluate with the same group), so we must release every slot.
+// Returns the new effective length after shrinking trailing undefined slots.
+static uint32_t ReleaseObjectFromArray(LEPUSContext* ctx, LEPUSValue array,
+                                       uint64_t target_ptr) {
+  if (!LEPUS_IsArray(ctx, array)) return 0;
+  HandleScope func_scope(ctx, &array, HANDLE_TYPE_LEPUS_VALUE);
+  bool found = false;
+  uint32_t len = LEPUS_GetLength(ctx, array);
+  LEPUSValue elem = LEPUS_UNDEFINED;
+  func_scope.PushHandle(&elem, HANDLE_TYPE_LEPUS_VALUE);
+  for (uint32_t i = 0; i < len; ++i) {
+    elem = LEPUS_GetPropertyUint32(ctx, array, i);
+    if (LEPUS_IsObject(elem)) {
+      LEPUSObject* p = LEPUS_VALUE_GET_OBJ(elem);
+      if ((uint64_t)p == target_ptr) {
+        if (!ctx->rt->gc_enable) LEPUS_FreeValue(ctx, elem);
+        LEPUS_SetPropertyUint32(ctx, array, i, LEPUS_UNDEFINED);
+        found = true;
+        continue;
+      }
+    }
+    if (!ctx->rt->gc_enable) LEPUS_FreeValue(ctx, elem);
+  }
+  // Shrink trailing undefined slots to prevent unbounded array growth.
+  if (found) {
+    while (len > 0) {
+      elem = LEPUS_GetPropertyUint32(ctx, array, len - 1);
+      bool is_undef = LEPUS_IsUndefined(elem);
+      if (!ctx->rt->gc_enable) LEPUS_FreeValue(ctx, elem);
+      if (!is_undef) break;
+      --len;
+    }
+    LEPUS_SetPropertyStr(ctx, array, "length",
+                         LEPUS_NewInt32(ctx, (int32_t)len));
+  }
+  return len;
+}
+
+// https://chromedevtools.github.io/devtools-protocol/tot/Runtime/#method-releaseObject
+void HandleReleaseObject(DebuggerParams* params) {
+  LEPUSContext* ctx = params->ctx;
+  LEPUSValue message = params->message;
+  LEPUSDebuggerInfo* info = ctx->debugger_info;
+
+  LEPUSValue msg_params = LEPUS_GetPropertyStr(ctx, message, "params");
+  LEPUSValue object_id_val = LEPUS_GetPropertyStr(ctx, msg_params, "objectId");
+  const char* object_id_str = LEPUS_ToCString(ctx, object_id_val);
+  HandleScope func_scope(ctx, reinterpret_cast<void*>(&object_id_str),
+                         HANDLE_TYPE_CSTRING);
+
+  // Skip console object IDs (managed by console ring-buffer) and scope IDs
+  // (transient, only valid while paused). Only release heap object pointers.
+  if (object_id_str && object_id_str[0] != '\0' &&
+      strncmp(object_id_str, kConsoleObjectIdPrefix,
+              strlen(kConsoleObjectIdPrefix)) != 0 &&
+      strncmp(object_id_str, "scope:", 6) != 0) {
+    char* end_ptr = nullptr;
+    uint64_t target_ptr = strtoull(object_id_str, &end_ptr, 10);
+    bool valid_id = (end_ptr && *end_ptr == '\0' && end_ptr != object_id_str);
+    if (valid_id) {
+      // O(1) lookup via multi-value reverse mapping.
+      std::vector<std::string> affected_groups;
+      auto groups_it = info->object_id_to_groups.find(target_ptr);
+      if (groups_it != info->object_id_to_groups.end()) {
+        affected_groups.assign(groups_it->second.begin(),
+                               groups_it->second.end());
+      }
+
+      if (!affected_groups.empty()) {
+        LEPUSValue group_array = LEPUS_UNDEFINED;
+        func_scope.PushHandle(&group_array, HANDLE_TYPE_LEPUS_VALUE);
+        for (auto& group_name : affected_groups) {
+          group_array = LEPUS_GetPropertyStr(ctx, info->object_group_registry,
+                                             group_name.c_str());
+          uint32_t new_len =
+              ReleaseObjectFromArray(ctx, group_array, target_ptr);
+          if (!ctx->rt->gc_enable) LEPUS_FreeValue(ctx, group_array);
+          auto& ids_set = info->object_group_ids[group_name];
+          ids_set.erase(target_ptr);
+          // Clean up empty group to prevent unbounded growth of holes.
+          if (ids_set.empty()) {
+            LEPUSAtom atom = LEPUS_NewAtom(ctx, group_name.c_str());
+            LEPUS_DeleteProperty(ctx, info->object_group_registry, atom, 0);
+            if (!ctx->rt->gc_enable) LEPUS_FreeAtom(ctx, atom);
+            info->object_group_ids.erase(group_name);
+            info->object_group_lengths.erase(group_name);
+          } else {
+            info->object_group_lengths[group_name] = new_len;
+          }
+        }
+      } else {
+        // Not in any group: fallback to running_state.
+        uint32_t new_len = ReleaseObjectFromArray(
+            ctx, info->running_state.get_properties_array, target_ptr);
+        info->running_state.get_properties_array_len = new_len;
+      }
+
+      // Clean up reverse mapping (no-op if key doesn't exist).
+      info->object_id_to_groups.erase(target_ptr);
+    }
+  }
+
+  if (!ctx->rt->gc_enable) {
+    LEPUS_FreeCString(ctx, object_id_str);
+    LEPUS_FreeValue(ctx, object_id_val);
+    LEPUS_FreeValue(ctx, msg_params);
+  }
+
+  LEPUSValue result = LEPUS_NewObject(ctx);
+  func_scope.PushHandle(&result, HANDLE_TYPE_LEPUS_VALUE);
+  SendResponse(ctx, message, result);
 }
 
 static LEPUSValue Evaluate(LEPUSDebuggerInfo* info, LEPUSContext* evaluate_ctx,
@@ -421,6 +607,18 @@ void HandleEvaluate(DebuggerParams* runtime_options) {
     func_scope.PushHandle(&params_object_group, HANDLE_TYPE_LEPUS_VALUE);
     GetEvaluateParam(ctx, params, &expression, &silent, &context_id,
                      &throw_side_effect, &preview, &params_object_group);
+
+    // Activate object group scope so objects created during evaluation
+    // are tracked under this group for later release.
+    std::unique_ptr<ScopedObjectGroup> obj_group_scope;
+    if (LEPUS_IsString(params_object_group)) {
+      const char* group_cstr = LEPUS_ToCString(ctx, params_object_group);
+      if (group_cstr && group_cstr[0] != '\0') {
+        obj_group_scope.reset(
+            new ScopedObjectGroup(info, std::string(group_cstr)));
+      }
+      if (!ctx->rt->gc_enable) LEPUS_FreeCString(ctx, group_cstr);
+    }
 
     LEPUSContext* evaluate_ctx = ctx;
     if (context_id != -1) {
@@ -719,7 +917,8 @@ static void GetCallFunctionOnParams(LEPUSContext* ctx, LEPUSValue params,
                                     LEPUSValue* this_obj,
                                     LEPUSContext** call_ctx,
                                     uint8_t* return_by_value, int32_t* argc,
-                                    LEPUSValue** argments, uint8_t* silent) {
+                                    LEPUSValue** argments, uint8_t* silent,
+                                    LEPUSValue* params_object_group) {
   // params function declaration
   LEPUSValue params_function_declaration =
       LEPUS_GetPropertyStr(ctx, params, "functionDeclaration");
@@ -763,6 +962,8 @@ static void GetCallFunctionOnParams(LEPUSContext* ctx, LEPUSValue params,
   if (!LEPUS_IsUndefined(params_silent)) {
     *silent = LEPUS_VALUE_GET_BOOL(params_silent);
   }
+  // params object group
+  *params_object_group = LEPUS_GetPropertyStr(ctx, params, "objectGroup");
   if (!ctx->rt->gc_enable) LEPUS_FreeValue(ctx, params);
 }
 
@@ -833,9 +1034,23 @@ void HandleCallFunctionOn(DebuggerParams* runtime_options) {
                           HANDLE_TYPE_HEAP_OBJ);
     uint8_t silent = 0;
     LEPUSContext* call_ctx = ctx;
+    LEPUSValue params_object_group = LEPUS_UNDEFINED;
+    func_scope.PushHandle(&params_object_group, HANDLE_TYPE_LEPUS_VALUE);
     GetCallFunctionOnParams(ctx, params, &function_declaration, &this_obj,
                             &call_ctx, &return_by_value, &argc, &argments,
-                            &silent);
+                            &silent, &params_object_group);
+
+    // Activate object group scope so objects created during call are
+    // tracked under this group for later release.
+    std::unique_ptr<ScopedObjectGroup> obj_group_scope;
+    if (LEPUS_IsString(params_object_group)) {
+      const char* group_cstr = LEPUS_ToCString(ctx, params_object_group);
+      if (group_cstr && group_cstr[0] != '\0') {
+        obj_group_scope.reset(
+            new ScopedObjectGroup(info, std::string(group_cstr)));
+      }
+      if (!ctx->rt->gc_enable) LEPUS_FreeCString(ctx, group_cstr);
+    }
 
     ExceptionBreakpointScope es(info, silent ? 0 : info->exception_breakpoint);
     LEPUSValue remote_object = CallFunctionOn(
@@ -845,6 +1060,7 @@ void HandleCallFunctionOn(DebuggerParams* runtime_options) {
                                                 1, &remote_object);
     func_scope.PushHandle(p, HANDLE_TYPE_DIR_HEAP_OBJ);
     SendResponse(ctx, message, LEPUS_MKPTR(LEPUS_TAG_OBJECT, p));
+    if (!ctx->rt->gc_enable) LEPUS_FreeValue(ctx, params_object_group);
   }
 }
 

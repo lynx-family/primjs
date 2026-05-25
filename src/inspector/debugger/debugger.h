@@ -46,6 +46,9 @@ extern "C" {
 #include <stdlib.h>
 #include <string.h>
 
+#include <string>
+#include <vector>
+
 #include "inspector/debugger_inner.h"
 #include "quickjs/include/quickjs-inner.h"
 
@@ -186,6 +189,33 @@ class PauseStateScope {
 
  private:
   LEPUSDebuggerInfo *info_;
+};
+
+// RAII guard that sets info->current_object_groups for the duration of a
+// protocol handler, so that GenerateUniqueObjId knows which group(s) to
+// register newly created RemoteObject references into.  On destruction the
+// previous group state is restored, enabling correct nesting.
+class ScopedObjectGroup {
+ public:
+  // Single-group (HandleEvaluate, HandleCallFunctionOn)
+  ScopedObjectGroup(LEPUSDebuggerInfo *info, std::string group)
+      : info_(info), previous_(std::move(info->current_object_groups)) {
+    info_->current_object_groups.clear();
+    info_->current_object_groups.push_back(std::move(group));
+  }
+  // Multi-group (HandleGetProperties — inherit all parent groups)
+  ScopedObjectGroup(LEPUSDebuggerInfo *info, std::vector<std::string> groups)
+      : info_(info), previous_(std::move(info->current_object_groups)) {
+    info_->current_object_groups = std::move(groups);
+  }
+  ~ScopedObjectGroup() { info_->current_object_groups = std::move(previous_); }
+
+  ScopedObjectGroup(const ScopedObjectGroup &) = delete;
+  ScopedObjectGroup &operator=(const ScopedObjectGroup &) = delete;
+
+ private:
+  LEPUSDebuggerInfo *info_;
+  std::vector<std::string> previous_;
 };
 
 /*

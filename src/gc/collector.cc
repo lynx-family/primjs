@@ -253,6 +253,7 @@ void Visitor::VisitLEPUSDebuggerInfo(void *ptr,
   }
   PushObjLEPUSValue(info->pause_state.get_properties_array, workStack);
   PushObjLEPUSValue(info->running_state.get_properties_array, workStack);
+  PushObjLEPUSValue(info->object_group_registry, workStack);
   workStack.push_back((address_t)info->source_code);
   PushObjLEPUSValue(info->console.messages, workStack);
   workStack.push_back((address_t)info->bps);
