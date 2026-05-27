@@ -54,6 +54,7 @@ extern "C" {
 #include <time.h>
 
 #include <atomic>
+#include <cstddef>
 #include <cstdint>
 #include <cstdlib>
 #if defined(ANDROID) || defined(__ANDROID__) || defined(OS_IOS) || \
@@ -788,6 +789,445 @@ void *lepus_realloc2(LEPUSContext *ctx, void *ptr, size_t size, size_t *pslack,
   return ret;
 }
 
+#ifndef NO_QUICKJS_COMPILER
+typedef struct JSParseZoneChunk {
+  struct JSParseZoneChunk *next;
+  size_t size;
+  size_t used;
+} JSParseZoneChunk;
+
+struct JSParseZone {
+  JSParseZoneChunk *chunks;
+  size_t chunk_size;
+};
+
+typedef struct JSParseZoneDynBufHeader {
+  size_t size;
+} JSParseZoneDynBufHeader;
+
+QJS_STATIC size_t js_parse_zone_align(size_t size) {
+  const size_t align = alignof(std::max_align_t);
+  if (size > SIZE_MAX - align + 1) return 0;
+  return (size + align - 1) & ~(align - 1);
+}
+
+QJS_STATIC size_t js_parse_zone_align_down(size_t size) {
+  const size_t align = alignof(std::max_align_t);
+  return size & ~(align - 1);
+}
+
+QJS_STATIC size_t js_parse_zone_extra_slack(size_t size, size_t available) {
+  size_t slack = size >> 1;
+
+  if (slack > 4096) slack = 4096;
+  if (slack > available) slack = available;
+  return js_parse_zone_align_down(slack);
+}
+
+QJS_STATIC uint8_t *js_parse_zone_chunk_data(JSParseZoneChunk *chunk) {
+  const uintptr_t align = alignof(std::max_align_t);
+  uintptr_t ptr = reinterpret_cast<uintptr_t>(chunk + 1);
+  ptr = (ptr + align - 1) & ~(align - 1);
+  return reinterpret_cast<uint8_t *>(ptr);
+}
+
+QJS_STATIC JSParseZoneChunk *js_parse_zone_find_head_tail_chunk(
+    JSParseZone *zone, const void *ptr, size_t old_size_aligned) {
+  JSParseZoneChunk *chunk = zone->chunks;
+
+  if (chunk == nullptr || old_size_aligned == 0 ||
+      old_size_aligned > chunk->used)
+    return nullptr;
+  uint8_t *chunk_data = js_parse_zone_chunk_data(chunk);
+  const uint8_t *old_ptr = static_cast<const uint8_t *>(ptr);
+  if (old_ptr == chunk_data + chunk->used - old_size_aligned) return chunk;
+  return nullptr;
+}
+
+QJS_HIDE JSParseZone *js_parse_zone_new(LEPUSContext *ctx) {
+  JSParseZone *zone = static_cast<JSParseZone *>(system_mallocz(sizeof(*zone)));
+  if (!zone) {
+    LEPUS_ThrowOutOfMemory(ctx);
+    return nullptr;
+  }
+  zone->chunk_size = 16 * 1024;
+  return zone;
+}
+
+QJS_HIDE void js_parse_zone_free(LEPUSContext *ctx, JSParseZone *zone) {
+  JSParseZoneChunk *chunk, *next;
+
+  (void)ctx;
+  if (!zone) return;
+  for (chunk = zone->chunks; chunk != nullptr; chunk = next) {
+    next = chunk->next;
+    system_free(chunk);
+  }
+  system_free(zone);
+}
+
+QJS_STATIC JSParseZoneChunk *js_parse_zone_new_chunk(LEPUSContext *ctx,
+                                                     JSParseZone *zone,
+                                                     size_t min_size,
+                                                     int alloc_tag) {
+  JSParseZoneChunk *chunk;
+  size_t size = zone->chunk_size;
+
+  min_size = js_parse_zone_align(min_size);
+  if (min_size == 0) {
+    LEPUS_ThrowOutOfMemory(ctx);
+    return nullptr;
+  }
+  if (min_size > zone->chunk_size / 4 || size < min_size) size = min_size;
+  if (size > SIZE_MAX - sizeof(*chunk) - alignof(std::max_align_t)) {
+    LEPUS_ThrowOutOfMemory(ctx);
+    return nullptr;
+  }
+
+  (void)alloc_tag;
+  chunk = static_cast<JSParseZoneChunk *>(
+      system_malloc(sizeof(*chunk) + size + alignof(std::max_align_t)));
+  if (!chunk) {
+    LEPUS_ThrowOutOfMemory(ctx);
+    return nullptr;
+  }
+  chunk->next = zone->chunks;
+  chunk->size = size;
+  chunk->used = 0;
+  zone->chunks = chunk;
+  return chunk;
+}
+
+QJS_STATIC void *js_parse_zone_malloc_internal(LEPUSContext *ctx,
+                                               JSParseZone *zone, size_t size,
+                                               size_t *pslack, int alloc_tag) {
+  JSParseZoneChunk *chunk;
+  uint8_t *ptr;
+  size_t size_aligned;
+  size_t slack = 0;
+
+  if (size == 0) size = 1;
+  size_aligned = js_parse_zone_align(size);
+  if (size_aligned == 0) {
+    LEPUS_ThrowOutOfMemory(ctx);
+    return nullptr;
+  }
+  chunk = zone->chunks;
+  if (chunk == nullptr || size_aligned > chunk->size - chunk->used) {
+    chunk = js_parse_zone_new_chunk(ctx, zone, size_aligned, alloc_tag);
+    if (!chunk) return nullptr;
+  }
+  if (pslack) {
+    slack = js_parse_zone_extra_slack(size,
+                                      chunk->size - chunk->used - size_aligned);
+    *pslack = size_aligned - size + slack;
+  }
+  ptr = js_parse_zone_chunk_data(chunk) + chunk->used;
+  chunk->used += size_aligned + slack;
+  return ptr;
+}
+
+QJS_STATIC void *js_parse_zone_malloc(LEPUSContext *ctx, JSParseZone *zone,
+                                      size_t size, int alloc_tag) {
+  return js_parse_zone_malloc_internal(ctx, zone, size, nullptr, alloc_tag);
+}
+
+QJS_STATIC void *js_parse_zone_mallocz(LEPUSContext *ctx, JSParseZone *zone,
+                                       size_t size, int alloc_tag) {
+  void *ptr = js_parse_zone_malloc(ctx, zone, size, alloc_tag);
+  if (ptr) memset(ptr, 0, size);
+  return ptr;
+}
+
+QJS_STATIC void *js_parse_zone_realloc(LEPUSContext *ctx, JSParseZone *zone,
+                                       const void *ptr, size_t old_size,
+                                       size_t size, size_t *pslack,
+                                       int alloc_tag) {
+  JSParseZoneChunk *chunk;
+  void *new_ptr;
+  size_t old_size_aligned;
+  size_t size_aligned;
+
+  if (pslack) *pslack = 0;
+  /* Zone allocations are released as a whole with the parse zone.  A zero-size
+     realloc follows realloc/free semantics and is not an OOM signal. */
+  if (size == 0) return nullptr;
+  if (ptr == nullptr)
+    return js_parse_zone_malloc_internal(ctx, zone, size, pslack, alloc_tag);
+  old_size_aligned = js_parse_zone_align(old_size);
+  size_aligned = js_parse_zone_align(size);
+  chunk = js_parse_zone_find_head_tail_chunk(zone, ptr, old_size_aligned);
+  if (size_aligned != 0 && chunk != nullptr &&
+      size_aligned <= chunk->size - chunk->used + old_size_aligned) {
+    size_t base_used = chunk->used - old_size_aligned;
+    size_t slack = 0;
+    if (pslack) {
+      slack = js_parse_zone_extra_slack(size,
+                                        chunk->size - base_used - size_aligned);
+      *pslack = size_aligned - size + slack;
+    }
+    chunk->used = base_used + size_aligned + slack;
+    return const_cast<void *>(ptr);
+  }
+  new_ptr = js_parse_zone_malloc_internal(ctx, zone, size, pslack, alloc_tag);
+  if (new_ptr && ptr && old_size) {
+    memcpy(new_ptr, ptr, old_size < size ? old_size : size);
+  }
+  return new_ptr;
+}
+
+QJS_HIDE void *js_parse_realloc2(LEPUSContext *ctx, JSFunctionDef *fd,
+                                 void *ptr, size_t old_size, size_t size,
+                                 size_t *pslack, int alloc_tag) {
+  assert(fd && fd->parse_zone);
+  return js_parse_zone_realloc(ctx, fd->parse_zone, ptr, old_size, size, pslack,
+                               alloc_tag);
+}
+
+QJS_HIDE void *js_parse_mallocz(LEPUSContext *ctx, JSFunctionDef *fd,
+                                size_t size, int alloc_tag) {
+  assert(fd && fd->parse_zone);
+  return js_parse_zone_mallocz(ctx, fd->parse_zone, size, alloc_tag);
+}
+
+QJS_STATIC inline void js_parse_ptr_store(void *field_addr, void *ptr) {
+  *reinterpret_cast<address_t *>(field_addr) = reinterpret_cast<address_t>(ptr);
+}
+
+QJS_STATIC size_t js_parse_zone_dynbuf_header_size() {
+  return js_parse_zone_align(sizeof(JSParseZoneDynBufHeader));
+}
+
+QJS_STATIC JSParseZoneDynBufHeader *js_parse_zone_dynbuf_header(void *ptr) {
+  return reinterpret_cast<JSParseZoneDynBufHeader *>(
+      static_cast<uint8_t *>(ptr) - js_parse_zone_dynbuf_header_size());
+}
+
+QJS_STATIC void *js_parse_dbuf_realloc(void *opaque, void *ptr, size_t size,
+                                       int alloc_tag) {
+  JSFunctionDef *fd = static_cast<JSFunctionDef *>(opaque);
+  LEPUSContext *ctx = fd->ctx;
+  JSParseZone *zone = fd->parse_zone;
+  JSParseZoneDynBufHeader *header;
+  JSParseZoneDynBufHeader *old_header = nullptr;
+  uint8_t *new_ptr;
+  size_t header_size;
+  size_t old_alloc_size;
+  size_t old_alloc_size_aligned;
+  size_t new_alloc_size;
+  size_t new_alloc_size_aligned;
+
+  if (size == 0) return nullptr;
+  header_size = js_parse_zone_dynbuf_header_size();
+  if (header_size == 0 || size > SIZE_MAX - header_size) {
+    LEPUS_ThrowOutOfMemory(ctx);
+    return nullptr;
+  }
+  new_alloc_size = header_size + size;
+  if (ptr) {
+    old_header = js_parse_zone_dynbuf_header(ptr);
+    if (old_header->size <= SIZE_MAX - header_size) {
+      old_alloc_size = header_size + old_header->size;
+      old_alloc_size_aligned = js_parse_zone_align(old_alloc_size);
+      new_alloc_size_aligned = js_parse_zone_align(new_alloc_size);
+      JSParseZoneChunk *chunk = js_parse_zone_find_head_tail_chunk(
+          zone, old_header, old_alloc_size_aligned);
+      if (new_alloc_size_aligned != 0 && chunk != nullptr &&
+          new_alloc_size_aligned <=
+              chunk->size - chunk->used + old_alloc_size_aligned) {
+        chunk->used =
+            chunk->used - old_alloc_size_aligned + new_alloc_size_aligned;
+        old_header->size = size;
+        return ptr;
+      }
+    }
+  }
+  header = static_cast<JSParseZoneDynBufHeader *>(
+      js_parse_zone_malloc(ctx, zone, new_alloc_size, alloc_tag));
+  if (!header) return nullptr;
+  header->size = size;
+  new_ptr = reinterpret_cast<uint8_t *>(header) + header_size;
+  if (ptr) {
+    memcpy(new_ptr, ptr, old_header->size < size ? old_header->size : size);
+  }
+  if (!ctx->gc_enable) WriteBarrierNoStore(ctx->rt, new_ptr);
+  return new_ptr;
+}
+
+QJS_STATIC inline BOOL js_parse_dbuf_is_zone_allocated(const DynBuf *s) {
+  return s->realloc_func == js_parse_dbuf_realloc;
+}
+
+QJS_HIDE void js_parse_dbuf_free(DynBuf *s) {
+  if (js_parse_dbuf_is_zone_allocated(s)) {
+    memset(s, 0, sizeof(*s));
+  } else {
+    dbuf_free(s);
+  }
+}
+
+#ifdef QJS_UNITTEST
+int js_parse_zone_unit_test(LEPUSContext *ctx) {
+  JSParseZone *zone = js_parse_zone_new(ctx);
+  uint8_t *initial;
+  uint8_t *grown;
+  size_t slack;
+  size_t usable_size;
+  int i;
+
+  if (!zone) return -1;
+  initial = static_cast<uint8_t *>(
+      js_parse_zone_malloc(ctx, zone, 32, ALLOC_TAG_WITHOUT_PTR));
+  if (!initial) {
+    js_parse_zone_free(ctx, zone);
+    return -1;
+  }
+  if ((reinterpret_cast<uintptr_t>(initial) %
+       static_cast<uintptr_t>(alignof(std::max_align_t))) != 0) {
+    js_parse_zone_free(ctx, zone);
+    return -1;
+  }
+  for (i = 0; i < 32; i++) initial[i] = static_cast<uint8_t>(i);
+
+  grown = static_cast<uint8_t *>(js_parse_zone_realloc(
+      ctx, zone, initial, 32, 96, &slack, ALLOC_TAG_WITHOUT_PTR));
+  if (!grown) {
+    js_parse_zone_free(ctx, zone);
+    return -1;
+  }
+  if (slack == 0) {
+    js_parse_zone_free(ctx, zone);
+    return -1;
+  }
+  usable_size = 96 + slack;
+  grown[usable_size - 1] = 0xaa;
+  for (i = 0; i < 32; i++) {
+    if (grown[i] != static_cast<uint8_t>(i)) {
+      js_parse_zone_free(ctx, zone);
+      return -1;
+    }
+  }
+  if (js_parse_zone_realloc(ctx, zone, grown, usable_size, usable_size + 16,
+                            &slack, ALLOC_TAG_WITHOUT_PTR) != grown) {
+    js_parse_zone_free(ctx, zone);
+    return -1;
+  }
+  if (grown[usable_size - 1] != 0xaa) {
+    js_parse_zone_free(ctx, zone);
+    return -1;
+  }
+  if (js_parse_zone_realloc(ctx, zone, grown, usable_size + 16 + slack, 0,
+                            nullptr, ALLOC_TAG_WITHOUT_PTR) != nullptr) {
+    js_parse_zone_free(ctx, zone);
+    return -1;
+  }
+
+  js_parse_zone_free(ctx, zone);
+  return 0;
+}
+
+int js_parse_zone_dynbuf_unit_test(LEPUSContext *ctx) {
+  JSParseZone *zone = js_parse_zone_new(ctx);
+  JSFunctionDef fd;
+  DynBuf dbuf;
+  uint8_t *old_buf;
+  int i;
+  size_t new_size;
+
+  if (!zone) return -1;
+  memset(&fd, 0, sizeof(fd));
+  fd.ctx = ctx;
+  fd.parse_zone = zone;
+  fd.owns_parse_zone = TRUE;
+  dbuf_init2(&dbuf, &fd, js_parse_dbuf_realloc);
+  for (i = 0; i < 1024; i++) {
+    if (dbuf_putc(&dbuf, static_cast<uint8_t>(i)) < 0) {
+      js_parse_zone_free(ctx, zone);
+      return -1;
+    }
+  }
+  if ((reinterpret_cast<uintptr_t>(dbuf.buf) %
+       static_cast<uintptr_t>(alignof(std::max_align_t))) != 0) {
+    js_parse_zone_free(ctx, zone);
+    return -1;
+  }
+  new_size = dbuf.allocated_size + 1024;
+  old_buf = dbuf.buf;
+  if (dbuf_realloc(&dbuf, new_size, ALLOC_TAG_WITHOUT_PTR) < 0) {
+    js_parse_zone_free(ctx, zone);
+    return -1;
+  }
+  if (dbuf.buf != old_buf) {
+    js_parse_zone_free(ctx, zone);
+    return -1;
+  }
+  for (i = 0; i < 1024; i++) {
+    if (dbuf.buf[i] != static_cast<uint8_t>(i)) {
+      js_parse_zone_free(ctx, zone);
+      return -1;
+    }
+  }
+  js_parse_dbuf_free(&dbuf);
+  if (dbuf.buf != nullptr || dbuf.size != 0 || dbuf.allocated_size != 0) {
+    memset(&fd, 0, sizeof(fd));
+    memset(&dbuf, 0, sizeof(dbuf));
+    js_parse_zone_free(ctx, zone);
+    return -1;
+  }
+  memset(&fd, 0, sizeof(fd));
+  memset(&dbuf, 0, sizeof(dbuf));
+  js_parse_zone_free(ctx, zone);
+  return 0;
+}
+
+int js_parse_zone_gc_unit_test(LEPUSContext *ctx) {
+  BOOL old_gc_enable = ctx->gc_enable;
+  JSParseZone *zone = nullptr;
+  JSFunctionDef fd;
+  DynBuf dbuf;
+  uint8_t *buf;
+  int ret = -1;
+  int i;
+
+  ctx->gc_enable = TRUE;
+  zone = js_parse_zone_new(ctx);
+  if (!zone) goto done;
+
+  memset(&fd, 0, sizeof(fd));
+  fd.ctx = ctx;
+  fd.parse_zone = zone;
+  fd.owns_parse_zone = TRUE;
+
+  js_parse_dbuf_init(&fd, &dbuf);
+  if (!js_parse_dbuf_is_zone_allocated(&dbuf)) goto done;
+  for (i = 0; i < 256; i++) {
+    if (dbuf_putc(&dbuf, static_cast<uint8_t>(i)) < 0) goto done;
+  }
+  for (i = 0; i < 256; i++) {
+    if (dbuf.buf[i] != static_cast<uint8_t>(i)) goto done;
+  }
+  js_parse_dbuf_free(&dbuf);
+  if (dbuf.buf != nullptr || dbuf.size != 0 || dbuf.allocated_size != 0)
+    goto done;
+
+  buf = static_cast<uint8_t *>(js_parse_realloc2(
+      ctx, &fd, nullptr, 0, 64, nullptr, ALLOC_TAG_WITHOUT_PTR));
+  if (!buf) goto done;
+  for (i = 0; i < 64; i++) buf[i] = static_cast<uint8_t>(i);
+
+  ret = 0;
+
+done:
+  memset(&fd, 0, sizeof(fd));
+  memset(&dbuf, 0, sizeof(dbuf));
+  buf = nullptr;
+  if (zone) js_parse_zone_free(ctx, zone);
+  ctx->gc_enable = old_gc_enable;
+  return ret;
+}
+#endif
+#endif
+
 size_t lepus_malloc_usable_size(LEPUSContext *ctx, const void *ptr) {
   return lepus_malloc_usable_size_rt(ctx->rt, ptr);
 }
@@ -832,6 +1272,13 @@ char *lepus_strdup(LEPUSContext *ctx, const char *str,
 QJS_STATIC inline void js_dbuf_init(LEPUSContext *ctx, DynBuf *s) {
   dbuf_init2(s, ctx->rt, (DynBufReallocFunc *)lepus_dbuf_realloc_rt);
 }
+
+#ifndef NO_QUICKJS_COMPILER
+QJS_HIDE void js_parse_dbuf_init(JSFunctionDef *fd, DynBuf *s) {
+  assert(fd && fd->parse_zone);
+  dbuf_init2(s, fd, js_parse_dbuf_realloc);
+}
+#endif
 
 static JSClassShortDef const js_std_class_def[] = {
     {JS_ATOM_Object, NULL, NULL},                       /* JS_CLASS_OBJECT */
@@ -18570,12 +19017,12 @@ int new_label_fd(JSFunctionDef *fd, int label) {
 
       /* XXX: potential arithmetic overflow */
       new_size = fd->label_size * 3 / 2 + 4;
-      new_tab = static_cast<LabelSlot *>(
-          lepus_realloc2(fd->ctx, fd->label_slots, new_size * sizeof(*new_tab),
-                         &slack, ALLOC_TAG_LabelSlotArray));
+      new_tab = static_cast<LabelSlot *>(js_parse_realloc2(
+          fd->ctx, fd, fd->label_slots, fd->label_size * sizeof(*new_tab),
+          new_size * sizeof(*new_tab), &slack, ALLOC_TAG_LabelSlotArray));
       if (!new_tab) return -1;
       new_size += slack / sizeof(*new_tab);
-      HeapObjStore(fd->ctx, &fd->label_slots, new_tab);
+      js_parse_ptr_store(&fd->label_slots, new_tab);
       fd->label_size = new_size;
     }
     label = fd->label_count++;
@@ -18584,7 +19031,7 @@ int new_label_fd(JSFunctionDef *fd, int label) {
     ls->pos = -1;
     ls->pos2 = -1;
     ls->addr = -1;
-    ls->first_reloc = NULL;
+    ls->first_reloc = nullptr;
   }
   return label;
 }
@@ -18626,12 +19073,12 @@ int cpool_add(JSParseState *s, LEPUSValue val) {
     LEPUSValue *new_tab;
     /* XXX: potential arithmetic overflow */
     new_size = max_int(fd->cpool_count + 1, fd->cpool_size * 3 / 2);
-    new_tab = static_cast<LEPUSValue *>(
-        lepus_realloc2(s->ctx, fd->cpool, new_size * sizeof(LEPUSValue), &slack,
-                       ALLOC_TAG_JSValueArray));
+    new_tab = static_cast<LEPUSValue *>(js_parse_realloc2(
+        s->ctx, fd, fd->cpool, fd->cpool_size * sizeof(LEPUSValue),
+        new_size * sizeof(LEPUSValue), &slack, ALLOC_TAG_JSValueArray));
     if (!new_tab) return -1;
     new_size += slack / sizeof(*new_tab);
-    HeapObjStore(s->ctx, &fd->cpool, new_tab);
+    js_parse_ptr_store(&fd->cpool, new_tab);
     fd->cpool_size = new_size;
   }
   HeapObjStore(s->ctx, &fd->cpool[fd->cpool_count++], val);
@@ -18690,18 +19137,22 @@ QJS_STATIC uint32_t hash_atom(JSAtom atom) {
 
 QJS_STATIC int update_var_htab(LEPUSContext *ctx, JSFunctionDef *fd) {
   uint32_t i, j, k, m, *p;
+  size_t old_size;
 
   if (fd->var_count < 27) return 0;
   k = fd->var_count - 1;
   m = fd->var_count + fd->var_count / 5;
   if (m & (m - 1)) goto insert;
 
+  old_size = fd->vars_htab_size * sizeof(*fd->vars_htab);
   m *= 2;
-  p = static_cast<uint32_t *>(lepus_realloc(
-      ctx, fd->vars_htab, m * sizeof(*fd->vars_htab), ALLOC_TAG_WITHOUT_PTR));
+  p = static_cast<uint32_t *>(js_parse_realloc2(
+      ctx, fd, fd->vars_htab, old_size, m * sizeof(*fd->vars_htab), nullptr,
+      ALLOC_TAG_WITHOUT_PTR));
   if (!p) return -1;
   memset(p, 0xff, m * sizeof(*p));
-  HeapObjStore(ctx, &fd->vars_htab, p);
+  js_parse_ptr_store(&fd->vars_htab, p);
+  fd->vars_htab_size = m;
   k = 0;
   m--;
 
@@ -18839,20 +19290,15 @@ int push_scope(JSParseState *s) {
       JSVarScope *new_buf;
       /* XXX: potential arithmetic overflow */
       new_size = max_int(fd->scope_count + 1, fd->scope_size * 3 / 2);
-      if (fd->scopes == fd->def_scope_array) {
-        new_buf = static_cast<JSVarScope *>(
-            lepus_realloc2(s->ctx, NULL, new_size * sizeof(*fd->scopes), &slack,
-                           ALLOC_TAG_WITHOUT_PTR));
-        if (!new_buf) return -1;
-        memcpy(new_buf, fd->scopes, fd->scope_count * sizeof(*fd->scopes));
-      } else {
-        new_buf = static_cast<JSVarScope *>(
-            lepus_realloc2(s->ctx, fd->scopes, new_size * sizeof(*fd->scopes),
-                           &slack, ALLOC_TAG_WITHOUT_PTR));
-        if (!new_buf) return -1;
-      }
+      size_t old_size = (fd->scopes == fd->def_scope_array ? fd->scope_count
+                                                           : fd->scope_size) *
+                        sizeof(*fd->scopes);
+      new_buf = static_cast<JSVarScope *>(js_parse_realloc2(
+          s->ctx, fd, fd->scopes, old_size, new_size * sizeof(*fd->scopes),
+          &slack, ALLOC_TAG_WITHOUT_PTR));
+      if (!new_buf) return -1;
       new_size += slack / sizeof(*new_buf);
-      HeapObjStore(s->ctx, &fd->scopes, new_buf);
+      js_parse_ptr_store(&fd->scopes, new_buf);
       fd->scope_size = new_size;
     }
     fd->scope_count++;
@@ -18909,16 +19355,16 @@ int add_var(LEPUSContext *ctx, JSFunctionDef *fd, JSAtom name) {
     JSVarDef *new_buf;
     new_size =
         fd->var_count == 0 ? 4 : max_int(fd->var_count + 1, fd->var_size * 2);
-    new_buf = static_cast<JSVarDef *>(
-        lepus_realloc2(ctx, fd->vars, new_size * sizeof(*fd->vars), &slack,
-                       ALLOC_TAG_WITHOUT_PTR));
+    new_buf = static_cast<JSVarDef *>(js_parse_realloc2(
+        ctx, fd, fd->vars, fd->var_size * sizeof(*fd->vars),
+        new_size * sizeof(*fd->vars), &slack, ALLOC_TAG_WITHOUT_PTR));
     if (!new_buf) return -1;
     new_size += slack / sizeof(*new_buf);
-    HeapObjStore(ctx, &fd->vars, new_buf);
+    js_parse_ptr_store(&fd->vars, new_buf);
     fd->var_size = new_size;
   }
   vd = &fd->vars[fd->var_count++];
-  js_memset(ctx->rt, vd, 0, sizeof(*vd));
+  memset(vd, 0, sizeof(*vd));
 #ifdef ENABLE_COMPATIBLE_MM
   if (UNLIKELY(!ctx->gc_enable))
 #endif
@@ -18998,16 +19444,16 @@ int add_arg(LEPUSContext *ctx, JSFunctionDef *fd, JSAtom name) {
     size_t slack;
     JSVarDef *new_buf;
     new_size = max_int(fd->arg_count + 1, fd->arg_size * 3 / 2);
-    new_buf = static_cast<JSVarDef *>(
-        lepus_realloc2(ctx, fd->args, new_size * sizeof(*fd->args), &slack,
-                       ALLOC_TAG_WITHOUT_PTR));
+    new_buf = static_cast<JSVarDef *>(js_parse_realloc2(
+        ctx, fd, fd->args, fd->arg_size * sizeof(*fd->args),
+        new_size * sizeof(*fd->args), &slack, ALLOC_TAG_WITHOUT_PTR));
     if (!new_buf) return -1;
     new_size += slack / sizeof(*new_buf);
-    HeapObjStore(ctx, &fd->args, new_buf);
+    js_parse_ptr_store(&fd->args, new_buf);
     fd->arg_size = new_size;
   }
   vd = &fd->args[fd->arg_count++];
-  js_memset(ctx->rt, vd, 0, sizeof(*vd));
+  memset(vd, 0, sizeof(*vd));
   vd->var_name = LEPUS_DupAtom(ctx, name);
   vd->func_pool_idx = -1;
   return fd->arg_count - 1;
@@ -19025,12 +19471,12 @@ JSHoistedDef *add_hoisted_def(LEPUSContext *ctx, JSFunctionDef *s,
     size_t slack;
     JSHoistedDef *new_tab;
     new_size = max_int(s->hoisted_def_count + 1, s->hoisted_def_size * 3 / 2);
-    new_tab = static_cast<JSHoistedDef *>(lepus_realloc2(
-        ctx, s->hoisted_def, new_size * sizeof(s->hoisted_def[0]), &slack,
-        ALLOC_TAG_WITHOUT_PTR));
+    new_tab = static_cast<JSHoistedDef *>(js_parse_realloc2(
+        ctx, s, s->hoisted_def, s->hoisted_def_size * sizeof(s->hoisted_def[0]),
+        new_size * sizeof(s->hoisted_def[0]), &slack, ALLOC_TAG_WITHOUT_PTR));
     if (!new_tab) return NULL;
     new_size += slack / sizeof(*new_tab);
-    HeapObjStore(ctx, &s->hoisted_def, new_tab);
+    js_parse_ptr_store(&s->hoisted_def, new_tab);
     s->hoisted_def_size = new_size;
   }
   hf = &s->hoisted_def[s->hoisted_def_count++];
@@ -19883,8 +20329,6 @@ QJS_STATIC __exception int emit_class_init_start(JSParseState *s,
   if (!cf->fields_init_fd) return -1;
 
   HeapObjStore(s->ctx, &s->cur_func, cf->fields_init_fd);
-  HandleScope func_scope(s->ctx, &cf->fields_init_fd->byte_code.buf,
-                         HANDLE_TYPE_HEAP_OBJ);
 
   /* XXX: would be better to add the code only if needed, maybe in a
      later pass */
@@ -25164,11 +25608,26 @@ QJS_STATIC JSFunctionDef *js_new_function_def(LEPUSContext *ctx,
                                               const char *filename,
                                               int line_num) {
   JSFunctionDef *fd;
+  JSParseZone *parse_zone;
+  BOOL owns_parse_zone;
 
+  if (parent) {
+    parse_zone = parent->parse_zone;
+    owns_parse_zone = FALSE;
+  } else {
+    parse_zone = js_parse_zone_new(ctx);
+    if (!parse_zone) return nullptr;
+    owns_parse_zone = TRUE;
+  }
   fd = static_cast<JSFunctionDef *>(lepus_mallocz(ctx, sizeof(*fd)));
-  if (!fd) return NULL;
+  if (!fd) {
+    if (owns_parse_zone) js_parse_zone_free(ctx, parse_zone);
+    return nullptr;
+  }
 
   fd->ctx = ctx;
+  fd->parse_zone = parse_zone;
+  fd->owns_parse_zone = owns_parse_zone;
   init_list_head(&fd->child_list);
 
   /* insert in parent list */
@@ -25182,7 +25641,7 @@ QJS_STATIC JSFunctionDef *js_new_function_def(LEPUSContext *ctx,
 
   fd->is_eval = is_eval;
   fd->is_func_expr = is_func_expr;
-  js_dbuf_init(ctx, &fd->byte_code);
+  js_parse_dbuf_init(fd, &fd->byte_code);
   fd->last_opcode_pos = -1;
   fd->func_name = JS_ATOM_NULL;
   fd->var_object_idx = -1;
@@ -25209,7 +25668,7 @@ QJS_STATIC JSFunctionDef *js_new_function_def(LEPUSContext *ctx,
   fd->filename = LEPUS_NewAtom(ctx, filename);
   fd->line_num = line_num;
 
-  js_dbuf_init(ctx, &fd->pc2line);
+  js_parse_dbuf_init(fd, &fd->pc2line);
   // fd->pc2line_last_line_num = line_num;
   // fd->pc2line_last_pc = 0;
   fd->last_opcode_line_num = line_num;
@@ -25253,6 +25712,9 @@ QJS_STATIC void free_bytecode_atoms(LEPUSRuntime *rt, const uint8_t *bc_buf,
 QJS_STATIC void js_free_function_def(LEPUSContext *ctx, JSFunctionDef *fd) {
   int i;
   struct list_head *el, *el1;
+  JSParseZone *parse_zone = fd->parse_zone;
+  BOOL zone_allocated = parse_zone && !ctx->gc_enable;
+  BOOL owns_parse_zone = fd->owns_parse_zone && !ctx->gc_enable;
 
   /* free the child functions */
   list_for_each_safe(el, el1, &fd->child_list) {
@@ -25263,10 +25725,12 @@ QJS_STATIC void js_free_function_def(LEPUSContext *ctx, JSFunctionDef *fd) {
 
   free_bytecode_atoms(ctx->rt, fd->byte_code.buf, fd->byte_code.size,
                       fd->use_short_opcodes);
-  dbuf_free(&fd->byte_code);
-  lepus_free(ctx, fd->jump_slots);
-  lepus_free(ctx, fd->label_slots);
-  lepus_free(ctx, fd->line_number_slots);
+  js_parse_dbuf_free(&fd->byte_code);
+  if (!zone_allocated) {
+    lepus_free(ctx, fd->jump_slots);
+    lepus_free(ctx, fd->label_slots);
+    lepus_free(ctx, fd->line_number_slots);
+  }
 
   if (fd->caller_slots)
     free_caller_slot(ctx->rt, fd->caller_slots, fd->caller_count);
@@ -25274,35 +25738,36 @@ QJS_STATIC void js_free_function_def(LEPUSContext *ctx, JSFunctionDef *fd) {
   for (i = 0; i < fd->cpool_count; i++) {
     LEPUS_FreeValue(ctx, fd->cpool[i]);
   }
-  lepus_free(ctx, fd->cpool);
+  if (!zone_allocated) lepus_free(ctx, fd->cpool);
 
   LEPUS_FreeAtom(ctx, fd->func_name);
 
   for (i = 0; i < fd->var_count; i++) {
     LEPUS_FreeAtom(ctx, fd->vars[i].var_name);
   }
-  lepus_free(ctx, fd->vars);
-  lepus_free(ctx, fd->vars_htab);
+  if (!zone_allocated) lepus_free(ctx, fd->vars);
+  if (!zone_allocated) lepus_free(ctx, fd->vars_htab);
   for (i = 0; i < fd->arg_count; i++) {
     LEPUS_FreeAtom(ctx, fd->args[i].var_name);
   }
-  lepus_free(ctx, fd->args);
+  if (!zone_allocated) lepus_free(ctx, fd->args);
 
   for (i = 0; i < fd->hoisted_def_count; i++) {
     LEPUS_FreeAtom(ctx, fd->hoisted_def[i].var_name);
   }
-  lepus_free(ctx, fd->hoisted_def);
+  if (!zone_allocated) lepus_free(ctx, fd->hoisted_def);
 
   for (i = 0; i < fd->closure_var_count; i++) {
     LEPUSClosureVar *cv = &fd->closure_var[i];
     LEPUS_FreeAtom(ctx, cv->var_name);
   }
-  lepus_free(ctx, fd->closure_var);
+  if (!zone_allocated) lepus_free(ctx, fd->closure_var);
 
-  if (fd->scopes != fd->def_scope_array) lepus_free(ctx, fd->scopes);
+  if (!zone_allocated && fd->scopes != fd->def_scope_array)
+    lepus_free(ctx, fd->scopes);
 
   LEPUS_FreeAtom(ctx, fd->filename);
-  dbuf_free(&fd->pc2line);
+  js_parse_dbuf_free(&fd->pc2line);
 
   system_free(fd->source);
 
@@ -25311,6 +25776,77 @@ QJS_STATIC void js_free_function_def(LEPUSContext *ctx, JSFunctionDef *fd) {
     list_del(&fd->link);
   }
   lepus_free(ctx, fd);
+  if (owns_parse_zone) js_parse_zone_free(ctx, parse_zone);
+}
+
+QJS_HIDE void js_parse_zone_release_function_def(LEPUSContext *ctx,
+                                                 JSFunctionDef *fd) {
+  JSParseZone *parse_zone;
+  BOOL owns_parse_zone;
+  JSFunctionDef *cur;
+
+  if (!fd || !fd->parse_zone) return;
+
+  parse_zone = fd->parse_zone;
+  owns_parse_zone = fd->owns_parse_zone;
+
+  cur = fd;
+  while (cur) {
+    JSFunctionDef *next = nullptr;
+    if (!list_empty(&cur->child_list)) {
+      next = list_entry(cur->child_list.next, JSFunctionDef, link);
+    } else {
+      JSFunctionDef *scan = cur;
+      while (scan != fd) {
+        JSFunctionDef *parent = scan->parent;
+        if (parent && scan->link.next != &parent->child_list) {
+          next = list_entry(scan->link.next, JSFunctionDef, link);
+          break;
+        }
+        scan = parent;
+      }
+    }
+
+    js_parse_dbuf_free(&cur->byte_code);
+    js_parse_dbuf_free(&cur->pc2line);
+
+    cur->jump_slots = nullptr;
+    cur->jump_count = 0;
+    cur->jump_size = 0;
+    cur->label_slots = nullptr;
+    cur->label_count = 0;
+    cur->label_size = 0;
+    cur->line_number_slots = nullptr;
+    cur->line_number_count = 0;
+    cur->line_number_size = 0;
+    cur->cpool = nullptr;
+    cur->cpool_count = 0;
+    cur->cpool_size = 0;
+    cur->vars = nullptr;
+    cur->var_count = 0;
+    cur->var_size = 0;
+    cur->vars_htab = nullptr;
+    cur->vars_htab_size = 0;
+    cur->args = nullptr;
+    cur->arg_count = 0;
+    cur->arg_size = 0;
+    cur->hoisted_def = nullptr;
+    cur->hoisted_def_count = 0;
+    cur->hoisted_def_size = 0;
+    cur->closure_var = nullptr;
+    cur->closure_var_count = 0;
+    cur->closure_var_size = 0;
+    if (cur->scopes != cur->def_scope_array) {
+      cur->scopes = cur->def_scope_array;
+      cur->scope_size = countof(cur->def_scope_array);
+    }
+
+    cur->parse_zone = nullptr;
+    cur->owns_parse_zone = FALSE;
+    cur = next;
+  }
+
+  if (owns_parse_zone) js_parse_zone_free(ctx, parse_zone);
 }
 
 #ifdef DUMP_BYTECODE
@@ -25736,12 +26272,12 @@ int add_closure_var(LEPUSContext *ctx, JSFunctionDef *s, BOOL is_local,
     int new_size;
     size_t slack;
     new_size = max_int(s->closure_var_count + 1, s->closure_var_size * 3 / 2);
-    new_tab = static_cast<LEPUSClosureVar *>(
-        lepus_realloc2(ctx, s->closure_var, new_size * sizeof(LEPUSClosureVar),
-                       &slack, ALLOC_TAG_WITHOUT_PTR));
+    new_tab = static_cast<LEPUSClosureVar *>(js_parse_realloc2(
+        ctx, s, s->closure_var, s->closure_var_size * sizeof(LEPUSClosureVar),
+        new_size * sizeof(LEPUSClosureVar), &slack, ALLOC_TAG_WITHOUT_PTR));
     if (!new_tab) return -1;
     new_size += slack / sizeof(*new_tab);
-    HeapObjStore(ctx, &s->closure_var, new_tab);
+    js_parse_ptr_store(&s->closure_var, new_tab);
     s->closure_var_size = new_size;
   }
   cv = &s->closure_var[s->closure_var_count++];
@@ -27146,8 +27682,7 @@ QJS_STATIC void instantiate_hoisted_definitions(LEPUSContext *ctx,
     s->label_slots[label_next].pos2 = bc->size;
   }
 
-  if (is_rc) lepus_free(ctx, s->hoisted_def);
-  s->hoisted_def = NULL;
+  s->hoisted_def = nullptr;
   s->hoisted_def_count = 0;
   s->hoisted_def_size = 0;
 }
@@ -27245,8 +27780,8 @@ __exception int resolve_variables(LEPUSContext *ctx, JSFunctionDef *s) {
 
   cc.bc_buf = bc_buf = s->byte_code.buf;
   cc.bc_len = bc_len = s->byte_code.size;
-  js_dbuf_init(ctx, &bc_out);
-  HandleScope func_scope(ctx, &bc_out.buf, HANDLE_TYPE_HEAP_OBJ);
+  js_parse_dbuf_init(s, &bc_out);
+  HandleScope func_scope(ctx);
 
   /* first pass for runtime checks (must be done before the
      variables are created) */
@@ -27559,9 +28094,8 @@ __exception int resolve_variables(LEPUSContext *ctx, JSFunctionDef *s) {
   }
 
   /* set the new byte code */
-  if (!ctx->gc_enable) dbuf_free(&s->byte_code);
+  if (!ctx->gc_enable) js_parse_dbuf_free(&s->byte_code);
   s->byte_code = bc_out;
-  WriteBarrierNoStore(ctx, bc_out.buf);
   if (dbuf_error(&s->byte_code)) {
     LEPUS_ThrowOutOfMemory(ctx);
     return -1;
@@ -27576,7 +28110,7 @@ fail:
     pos_next = pos + len;
     dbuf_put(&bc_out, bc_buf + pos, len);
   }
-  if (!ctx->gc_enable) dbuf_free(&s->byte_code);
+  if (!ctx->gc_enable) js_parse_dbuf_free(&s->byte_code);
   s->byte_code = bc_out;
   return -1;
 }
@@ -27604,7 +28138,7 @@ QJS_STATIC void compute_pc2line_info(JSFunctionDef *s) {
     uint32_t last_pc = 0;
     int i;
 
-    js_dbuf_init(s->ctx, &s->pc2line);
+    js_parse_dbuf_init(s, &s->pc2line);
     for (i = 0; i < s->line_number_count; i++) {
       uint32_t pc = s->line_number_slots[i].pc;
       // <Primjs begin>
@@ -27637,16 +28171,16 @@ QJS_STATIC void compute_pc2line_info(JSFunctionDef *s) {
   }
 }
 
-QJS_STATIC RelocEntry *add_reloc(LEPUSContext *ctx, LabelSlot *ls,
+QJS_STATIC RelocEntry *add_reloc(JSFunctionDef *fd, LabelSlot *ls,
                                  uint32_t addr, int size) {
   RelocEntry *re;
   re = static_cast<RelocEntry *>(
-      lepus_malloc(ctx, sizeof(*re), ALLOC_TAG_RelocEntry));
-  if (!re) return NULL;
+      js_parse_mallocz(fd->ctx, fd, sizeof(*re), ALLOC_TAG_RelocEntry));
+  if (!re) return nullptr;
   re->addr = addr;
   re->size = size;
-  HeapObjStore(ctx, &re->next, ls->first_reloc);
-  HeapObjStore(ctx, &ls->first_reloc, re);
+  re->next = ls->first_reloc;
+  js_parse_ptr_store(&ls->first_reloc, re);
   return re;
 }
 
@@ -27901,24 +28435,22 @@ __exception int resolve_labels(LEPUSContext *ctx, JSFunctionDef *s) {
 
   cc.bc_buf = bc_buf = s->byte_code.buf;
   cc.bc_len = bc_len = s->byte_code.size;
-  js_dbuf_init(ctx, &bc_out);
-  HandleScope func_scope(ctx, &bc_out.buf, HANDLE_TYPE_HEAP_OBJ);
+  js_parse_dbuf_init(s, &bc_out);
 
 #if SHORT_OPCODES
   if (s->jump_size) {
-    s->jump_slots = static_cast<JumpSlot *>(lepus_mallocz(
-        s->ctx, sizeof(*s->jump_slots) * s->jump_size, ALLOC_TAG_WITHOUT_PTR));
-    if (s->jump_slots == NULL) return -1;
-    WriteBarrierNoStore(ctx, s->jump_slots);
+    s->jump_slots = static_cast<JumpSlot *>(
+        js_parse_mallocz(s->ctx, s, sizeof(*s->jump_slots) * s->jump_size,
+                         ALLOC_TAG_WITHOUT_PTR));
+    if (s->jump_slots == nullptr) return -1;
   }
 #endif
   /* XXX: Should skip this phase if not generating SHORT_OPCODES */
   if (s->line_number_size && !(s->js_mode & JS_MODE_STRIP)) {
-    s->line_number_slots = static_cast<LineNumberSlot *>(lepus_mallocz(
-        s->ctx, sizeof(*s->line_number_slots) * s->line_number_size,
+    s->line_number_slots = static_cast<LineNumberSlot *>(js_parse_mallocz(
+        s->ctx, s, sizeof(*s->line_number_slots) * s->line_number_size,
         ALLOC_TAG_WITHOUT_PTR));
-    if (s->line_number_slots == NULL) return -1;
-    WriteBarrierNoStore(ctx, (void *)s->line_number_slots);
+    if (s->line_number_slots == nullptr) return -1;
     s->line_number_last = s->line_num;
     s->line_number_last_pc = 0;
   }
@@ -28034,9 +28566,8 @@ __exception int resolve_labels(LEPUSContext *ctx, JSFunctionDef *s) {
               put_u8(bc_out.buf + re->addr, diff);
               break;
           }
-          if (!ctx->gc_enable) lepus_free(ctx, re);
         }
-        ls->first_reloc = NULL;
+        ls->first_reloc = nullptr;
       } break;
 
       case OP_caller_str:
@@ -28176,7 +28707,7 @@ __exception int resolve_labels(LEPUSContext *ctx, JSFunctionDef *s) {
             jp->op = OP_if_false8 + (op - OP_if_false);
             dbuf_putc(&bc_out, OP_if_false8 + (op - OP_if_false));
             dbuf_putc(&bc_out, 0);
-            if (!add_reloc(ctx, ls, bc_out.size - 1, 1)) goto fail;
+            if (!add_reloc(s, ls, bc_out.size - 1, 1)) goto fail;
             break;
           }
           if (diff < 32768 && op == OP_goto) {
@@ -28184,7 +28715,7 @@ __exception int resolve_labels(LEPUSContext *ctx, JSFunctionDef *s) {
             jp->op = OP_goto16;
             dbuf_putc(&bc_out, OP_goto16);
             dbuf_put_u16(&bc_out, 0);
-            if (!add_reloc(ctx, ls, bc_out.size - 2, 2)) goto fail;
+            if (!add_reloc(s, ls, bc_out.size - 2, 2)) goto fail;
             break;
           }
         } else {
@@ -28210,7 +28741,7 @@ __exception int resolve_labels(LEPUSContext *ctx, JSFunctionDef *s) {
         dbuf_put_u32(&bc_out, ls->addr - bc_out.size);
         if (ls->addr == -1) {
           /* unresolved yet: create a new relocation entry */
-          if (!add_reloc(ctx, ls, bc_out.size - 4, 4)) goto fail;
+          if (!add_reloc(s, ls, bc_out.size - 4, 4)) goto fail;
         }
         break;
       case OP_with_get_var:
@@ -28243,7 +28774,7 @@ __exception int resolve_labels(LEPUSContext *ctx, JSFunctionDef *s) {
         dbuf_put_u32(&bc_out, ls->addr - bc_out.size);
         if (ls->addr == -1) {
           /* unresolved yet: create a new relocation entry */
-          if (!add_reloc(ctx, ls, bc_out.size - 4, 4)) goto fail;
+          if (!add_reloc(s, ls, bc_out.size - 4, 4)) goto fail;
         }
         dbuf_putc(&bc_out, is_with);
       } break;
@@ -28817,21 +29348,17 @@ __exception int resolve_labels(LEPUSContext *ctx, JSFunctionDef *s) {
       }
     }
   }
-  if (!ctx->gc_enable) lepus_free(ctx, s->jump_slots);
-  s->jump_slots = NULL;
+  s->jump_slots = nullptr;
 #endif
-  if (!ctx->gc_enable) lepus_free(ctx, s->label_slots);
-  s->label_slots = NULL;
+  s->label_slots = nullptr;
   /* XXX: should delay until copying to runtime bytecode function */
   compute_pc2line_info(s);
   if (!ctx->gc_enable) {
-    lepus_free(ctx, s->line_number_slots);
-    dbuf_free(&s->byte_code);
+    js_parse_dbuf_free(&s->byte_code);
   }
-  s->line_number_slots = NULL;
+  s->line_number_slots = nullptr;
   /* set the new byte code */
   s->byte_code = bc_out;
-  WriteBarrierNoStore(ctx, bc_out.buf);
   s->use_short_opcodes = TRUE;
   if (dbuf_error(&s->byte_code)) {
     LEPUS_ThrowOutOfMemory(ctx);
@@ -28840,7 +29367,7 @@ __exception int resolve_labels(LEPUSContext *ctx, JSFunctionDef *s) {
   return 0;
 fail:
   /* XXX: not safe */
-  if (!ctx->gc_enable) dbuf_free(&bc_out);
+  if (!ctx->gc_enable) js_parse_dbuf_free(&bc_out);
   return -1;
 }
 
@@ -29073,6 +29600,9 @@ LEPUSValue js_create_function(LEPUSContext *ctx, JSFunctionDef *fd) {
   int function_size, byte_code_offset, cpool_offset;
   int closure_var_offset, vardefs_offset;
   bool is_gc = ctx->gc_enable;
+  JSParseZone *parse_zone = fd->parse_zone;
+  BOOL zone_allocated = parse_zone != nullptr;
+  BOOL owns_parse_zone = fd->owns_parse_zone;
   HandleScope func_scope(ctx);
 
   /* recompute scope linkage */
@@ -29189,8 +29719,10 @@ LEPUSValue js_create_function(LEPUSContext *ctx, JSFunctionDef *fd) {
   memcpy(b->byte_code_buf, fd->byte_code.buf, fd->byte_code.size);
 
   if (!is_gc) {
-    lepus_free(ctx, fd->byte_code.buf);
+    if (!zone_allocated) lepus_free(ctx, fd->byte_code.buf);
     fd->byte_code.buf = NULL;
+    fd->byte_code.size = 0;
+    fd->byte_code.allocated_size = 0;
   }
 
   b->func_name = fd->func_name;
@@ -29223,11 +29755,11 @@ LEPUSValue js_create_function(LEPUSContext *ctx, JSFunctionDef *fd) {
     b->var_count = fd->var_count;
     b->arg_count = fd->arg_count;
     b->defined_arg_count = fd->defined_arg_count;
-    if (!is_gc) {
+    if (!is_gc && !zone_allocated) {
       lepus_free(ctx, fd->args);
       lepus_free(ctx, fd->vars);
-      lepus_free(ctx, fd->vars_htab);
     }
+    if (!is_gc && !zone_allocated) lepus_free(ctx, fd->vars_htab);
   }
   b->cpool_count = fd->cpool_count;
   if (b->cpool_count) {
@@ -29240,7 +29772,7 @@ LEPUSValue js_create_function(LEPUSContext *ctx, JSFunctionDef *fd) {
       memcpy(b->cpool, fd->cpool, b->cpool_count * sizeof(*b->cpool));
     }
   }
-  if (!is_gc) {
+  if (!is_gc && !zone_allocated) {
     lepus_free(ctx, fd->cpool);
     fd->cpool = NULL;
   }
@@ -29257,7 +29789,7 @@ LEPUSValue js_create_function(LEPUSContext *ctx, JSFunctionDef *fd) {
   if (fd->js_mode & JS_MODE_STRIP) {
     if (!is_gc) {
       LEPUS_FreeAtom(ctx, fd->filename);
-      dbuf_free(&fd->pc2line);  // probably useless
+      js_parse_dbuf_free(&fd->pc2line);  // probably useless
       if (fd->caller_slots)
         free_caller_slot(ctx->rt, fd->caller_slots, fd->caller_count);
     }
@@ -29277,13 +29809,29 @@ LEPUSValue js_create_function(LEPUSContext *ctx, JSFunctionDef *fd) {
     b->debug.end_line_num = fd->end_line_num;
 #endif
 
-    HeapObjStore(
-        ctx, &b->debug.pc2line_buf,
-        static_cast<uint8_t *>(lepus_realloc(
-            ctx, fd->pc2line.buf, fd->pc2line.size, ALLOC_TAG_WITHOUT_PTR)));
-    if (ctx->gc_enable && !b->debug.pc2line_buf)
-      HeapObjStore(ctx, &b->debug.pc2line_buf, fd->pc2line.buf);
-    b->debug.pc2line_len = fd->pc2line.size;
+    if (zone_allocated) {
+      uint8_t *pc2line_buf = nullptr;
+      size_t pc2line_size = fd->pc2line.size;
+      if (fd->pc2line.size) {
+        pc2line_buf = static_cast<uint8_t *>(
+            lepus_malloc(ctx, fd->pc2line.size, ALLOC_TAG_WITHOUT_PTR));
+        if (!pc2line_buf) goto fail;
+        memcpy(pc2line_buf, fd->pc2line.buf, fd->pc2line.size);
+      }
+      HeapObjStore(ctx, &b->debug.pc2line_buf, pc2line_buf);
+      b->debug.pc2line_len = pc2line_size;
+      fd->pc2line.buf = nullptr;
+      fd->pc2line.size = 0;
+      fd->pc2line.allocated_size = 0;
+    } else {
+      HeapObjStore(
+          ctx, &b->debug.pc2line_buf,
+          static_cast<uint8_t *>(lepus_realloc(
+              ctx, fd->pc2line.buf, fd->pc2line.size, ALLOC_TAG_WITHOUT_PTR)));
+      if (ctx->gc_enable && !b->debug.pc2line_buf)
+        HeapObjStore(ctx, &b->debug.pc2line_buf, fd->pc2line.buf);
+      b->debug.pc2line_len = fd->pc2line.size;
+    }
 
     HeapObjStore(ctx, &b->debug.source, fd->source);
     fd->source = nullptr;
@@ -29308,7 +29856,8 @@ LEPUSValue js_create_function(LEPUSContext *ctx, JSFunctionDef *fd) {
     b->debug.file_name = ctx->rt->atom_array[b->debug.filename];
 #endif
   }
-  if (fd->scopes != fd->def_scope_array && !is_gc) lepus_free(ctx, fd->scopes);
+  if (fd->scopes != fd->def_scope_array && !is_gc && !zone_allocated)
+    lepus_free(ctx, fd->scopes);
 
   b->closure_var_count = fd->closure_var_count;
   if (b->closure_var_count) {
@@ -29316,7 +29865,7 @@ LEPUSValue js_create_function(LEPUSContext *ctx, JSFunctionDef *fd) {
     memcpy(b->closure_var, fd->closure_var,
            b->closure_var_count * sizeof(*b->closure_var));
   }
-  if (!is_gc) {
+  if (!is_gc && !zone_allocated) {
     lepus_free(ctx, fd->closure_var);
     fd->closure_var = NULL;
   }
@@ -29351,6 +29900,12 @@ LEPUSValue js_create_function(LEPUSContext *ctx, JSFunctionDef *fd) {
   }
 #endif
 
+  if (owns_parse_zone) {
+    if (is_gc)
+      js_parse_zone_release_function_def(ctx, fd);
+    else
+      js_parse_zone_free(ctx, parse_zone);
+  }
   if (!is_gc) lepus_free(ctx, fd);
 #ifdef TEST_BYTECODE_REWRITE
   return force_read_from_snapshot(ctx, b);
@@ -29358,7 +29913,10 @@ LEPUSValue js_create_function(LEPUSContext *ctx, JSFunctionDef *fd) {
   return LEPUS_MKPTR(LEPUS_TAG_FUNCTION_BYTECODE, b);
 #endif
 fail:
-  if (!is_gc) js_free_function_def(ctx, fd);
+  if (is_gc)
+    js_parse_zone_release_function_def(ctx, fd);
+  else
+    js_free_function_def(ctx, fd);
   return LEPUS_EXCEPTION;
 }
 #endif

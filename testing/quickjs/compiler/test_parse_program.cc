@@ -36,6 +36,18 @@ TEST(QjsCompiler, Parse) {
   LEPUS_FreeRuntime(rt);
 }
 
+TEST(QjsCompiler, ParserZoneAllocator) {
+  auto *rt = LEPUS_NewRuntime();
+  auto *ctx = LEPUS_NewContext(rt);
+
+  ASSERT_EQ(0, js_parse_zone_unit_test(ctx));
+  ASSERT_EQ(0, js_parse_zone_dynbuf_unit_test(ctx));
+  ASSERT_EQ(0, js_parse_zone_gc_unit_test(ctx));
+
+  LEPUS_FreeContext(ctx);
+  LEPUS_FreeRuntime(rt);
+}
+
 TEST(QjsCompiler, DebuggerStatementParse) {
   auto *rt = LEPUS_NewRuntime();
   auto *ctx = LEPUS_NewContext(rt);

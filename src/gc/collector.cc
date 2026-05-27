@@ -124,42 +124,49 @@ void Visitor::VisitJSFunctionDef(void *ptr, GCWorkStack &workStack) noexcept {
     workStack.push_back((address_t)fd1);
   }
 
-  DynBuf *dbuf;
-  if (fd->byte_code.buf) {
-    dbuf = &fd->byte_code;
-    workStack.push_back((address_t)dbuf->buf);
+  const uint8_t *byte_code_buf = fd->byte_code.buf;
+  int byte_code_size = fd->byte_code.size;
+  if (byte_code_buf) {
+    PushBytecodeAtoms(byte_code_buf, byte_code_size, fd->use_short_opcodes,
+                      workStack);
   }
   workStack.push_back((address_t)fd->caller_slots);
 
-  workStack.push_back((address_t)fd->jump_slots);
-
-  // must load 'label_slots' before scan to keep consistent(may change during
-  // con-mark)
-  workStack.push_back((address_t)fd->label_slots);
-
-  workStack.push_back((address_t)fd->line_number_slots);
-
-  // must load 'cpool' before scan to keep consistent(may change during
-  // con-mark)
-  workStack.push_back((address_t)fd->cpool);
-
-  workStack.push_back((address_t)(fd->vars));
-  workStack.push_back((address_t)(fd->vars_htab));
-  workStack.push_back((address_t)fd->args);
-
-  if (fd->hoisted_def) {
-    workStack.push_back((address_t)fd->hoisted_def);
+  LEPUSValue *cpool = fd->cpool;
+  int cpool_count = fd->cpool_count;
+  if (cpool) {
+    for (int i = 0; i < cpool_count; i++) {
+      PushObjLEPUSValue(cpool[i], workStack);
+    }
   }
-
-  if (fd->closure_var) {
-    workStack.push_back((address_t)fd->closure_var);
+  JSVarDef *vars = fd->vars;
+  int var_count = fd->var_count;
+  if (vars) {
+    for (int i = 0; i < var_count; i++) {
+      PushObjAtom(vars[i].var_name, workStack);
+    }
   }
-
-  if (fd->scopes != fd->def_scope_array) {
-    workStack.push_back((address_t)fd->scopes);
+  JSVarDef *args = fd->args;
+  int arg_count = fd->arg_count;
+  if (args) {
+    for (int i = 0; i < arg_count; i++) {
+      PushObjAtom(args[i].var_name, workStack);
+    }
   }
-
-  workStack.push_back((address_t)fd->pc2line.buf);
+  JSHoistedDef *hoisted_def = fd->hoisted_def;
+  int hoisted_def_count = fd->hoisted_def_count;
+  if (hoisted_def) {
+    for (int i = 0; i < hoisted_def_count; i++) {
+      PushObjAtom(hoisted_def[i].var_name, workStack);
+    }
+  }
+  LEPUSClosureVar *closure_var = fd->closure_var;
+  int closure_var_count = fd->closure_var_count;
+  if (closure_var) {
+    for (int i = 0; i < closure_var_count; i++) {
+      PushObjAtom(closure_var[i].var_name, workStack);
+    }
+  }
   workStack.push_back((address_t)fd->source);
 }
 

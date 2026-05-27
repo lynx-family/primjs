@@ -2292,6 +2292,20 @@ QJS_HIDE BOOL JS_AtomIsArrayIndex(LEPUSContext *ctx, uint32_t *pval,
 QJS_HIDE JSAtom js_get_atom_index(LEPUSRuntime *rt, JSAtomStruct *p);
 QJS_HIDE LEPUSModuleDef *js_new_module_def(LEPUSContext *ctx, JSAtom name);
 struct JSFunctionDef;
+typedef struct JSParseZone JSParseZone;
+#ifndef NO_QUICKJS_COMPILER
+QJS_HIDE JSParseZone *js_parse_zone_new(LEPUSContext *ctx);
+QJS_HIDE void js_parse_zone_free(LEPUSContext *ctx, JSParseZone *zone);
+QJS_HIDE void *js_parse_realloc2(LEPUSContext *ctx, JSFunctionDef *fd,
+                                 void *ptr, size_t old_size, size_t size,
+                                 size_t *pslack, int alloc_tag);
+QJS_HIDE void *js_parse_mallocz(LEPUSContext *ctx, JSFunctionDef *fd,
+                                size_t size, int alloc_tag);
+QJS_HIDE void js_parse_dbuf_init(JSFunctionDef *fd, DynBuf *s);
+QJS_HIDE void js_parse_dbuf_free(DynBuf *s);
+QJS_HIDE void js_parse_zone_release_function_def(LEPUSContext *ctx,
+                                                 JSFunctionDef *fd);
+#endif
 QJS_HIDE int resolve_labels(LEPUSContext *ctx, JSFunctionDef *s);
 QJS_HIDE int resolve_variables(LEPUSContext *ctx, JSFunctionDef *s);
 QJS_HIDE int new_label_fd(JSFunctionDef *fd, int label);
@@ -2568,6 +2582,11 @@ QJS_HIDE json_val *json_parse_value(JSParseState *s, size_t dat_len);
 QJS_HIDE void js_parse_init(LEPUSContext *ctx, JSParseState *s,
                             const char *input, size_t input_len,
                             const char *filename, int start_line_num = 0);
+#ifdef QJS_UNITTEST
+QJS_HIDE int js_parse_zone_unit_test(LEPUSContext *ctx);
+QJS_HIDE int js_parse_zone_dynbuf_unit_test(LEPUSContext *ctx);
+QJS_HIDE int js_parse_zone_gc_unit_test(LEPUSContext *ctx);
+#endif
 QJS_HIDE LEPUSValue JS_ParseJSONOPT(LEPUSContext *ctx, const char *buf,
                                     size_t buf_len, const char *filename);
 QJS_HIDE LEPUSObject *get_typed_array(LEPUSContext *ctx,
@@ -2752,6 +2771,8 @@ typedef struct LineNumberSlot {
 
 typedef struct JSFunctionDef {
   LEPUSContext *ctx;
+  JSParseZone *parse_zone;
+  bool owns_parse_zone;
   struct JSFunctionDef *parent;
   int parent_cpool_idx;   /* index in the constant pool of the parent
                              or -1 if none */
@@ -2788,6 +2809,7 @@ typedef struct JSFunctionDef {
 
   JSVarDef *vars;
   uint32_t *vars_htab; /* indexes into vars[] */
+  int vars_htab_size;  /* allocated size for vars_htab[] */
   int var_size;        /* allocated size for vars[] */
   int var_count;
   JSVarDef *args;

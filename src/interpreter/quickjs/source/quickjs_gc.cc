@@ -11262,13 +11262,28 @@ JSFunctionDef *js_new_function_def_GC(LEPUSContext *ctx, JSFunctionDef *parent,
                                       BOOL is_eval, BOOL is_func_expr,
                                       const char *filename, int line_num) {
   JSFunctionDef *fd;
+  JSParseZone *parse_zone;
+  BOOL owns_parse_zone;
 
+  if (parent) {
+    parse_zone = parent->parse_zone;
+    owns_parse_zone = FALSE;
+  } else {
+    parse_zone = js_parse_zone_new(ctx);
+    if (!parse_zone) return nullptr;
+    owns_parse_zone = TRUE;
+  }
   fd = static_cast<JSFunctionDef *>(
       lepus_mallocz(ctx, sizeof(*fd), ALLOC_TAG_JSFunctionDef));
-  if (!fd) return NULL;
+  if (!fd) {
+    if (owns_parse_zone) js_parse_zone_free(ctx, parse_zone);
+    return nullptr;
+  }
   HandleScope func_scope(ctx, fd, HANDLE_TYPE_DIR_HEAP_OBJ);
 
   fd->ctx = ctx;
+  fd->parse_zone = parse_zone;
+  fd->owns_parse_zone = owns_parse_zone;
   init_list_head(&fd->child_list);
 
   /* insert in parent list */
@@ -11284,7 +11299,7 @@ JSFunctionDef *js_new_function_def_GC(LEPUSContext *ctx, JSFunctionDef *parent,
 
   fd->is_eval = is_eval;
   fd->is_func_expr = is_func_expr;
-  js_dbuf_init(ctx, &fd->byte_code);
+  js_parse_dbuf_init(fd, &fd->byte_code);
   fd->last_opcode_pos = -1;
   fd->func_name = JS_ATOM_NULL;
   fd->var_object_idx = -1;
@@ -11311,7 +11326,7 @@ JSFunctionDef *js_new_function_def_GC(LEPUSContext *ctx, JSFunctionDef *parent,
   fd->filename = LEPUS_NewAtom(ctx, filename);
   fd->line_num = line_num;
 
-  js_dbuf_init(ctx, &fd->pc2line);
+  js_parse_dbuf_init(fd, &fd->pc2line);
   // fd->pc2line_last_line_num = line_num;
   // fd->pc2line_last_pc = 0;
   fd->last_opcode_line_num = line_num;
@@ -11434,7 +11449,6 @@ __exception int js_parse_function_decl2_GC(
   if (!fd) {
     return -1;
   }
-  func_scope.PushHandle(&fd->byte_code.buf, HANDLE_TYPE_HEAP_OBJ);
 #ifdef ENABLE_QUICKJS_DEBUGGER
   fd->column_num = compute_column(s, 0);
 #endif
@@ -11947,7 +11961,7 @@ static LEPUSValue __JS_EvalInternal_GC(LEPUSContext *ctx,
   LEPUSStackFrame *sf;
   JSVarRef **var_refs;
   LEPUSFunctionBytecode *b;
-  JSFunctionDef *fd;
+  JSFunctionDef *fd = nullptr;
   LEPUSModuleDef *m;
   LEPUSScriptSource *script = nullptr;
 
@@ -11987,14 +12001,13 @@ static LEPUSValue __JS_EvalInternal_GC(LEPUSContext *ctx,
     }
   }
   fd = js_new_function_def_GC(ctx, NULL, TRUE, FALSE, filename, 1);
+  if (!fd) goto fail1;
   func_scope.PushHandle(fd, HANDLE_TYPE_DIR_HEAP_OBJ);
-  func_scope.PushHandle(&fd->byte_code.buf, HANDLE_TYPE_HEAP_OBJ);
 
 #ifdef ENABLE_QUICKJS_DEBUGGER
   fd->column_num = 0;
 #endif
 
-  if (!fd) goto fail1;
   HeapObjStore(ctx, &s->cur_func, fd);
   fd->eval_type = eval_type;
   fd->has_this_binding = (eval_type != LEPUS_EVAL_TYPE_DIRECT);
@@ -12069,6 +12082,7 @@ static LEPUSValue __JS_EvalInternal_GC(LEPUSContext *ctx,
   return ret_val;
 fail1:
   /* XXX: should free all the unresolved dependencies */
+  js_parse_zone_release_function_def(ctx, fd);
   return LEPUS_EXCEPTION;
 }
 
