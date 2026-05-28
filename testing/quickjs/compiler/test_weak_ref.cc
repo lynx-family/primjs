@@ -156,4 +156,152 @@ TEST_F(WeakRefTest, WrongParamsTest) {
   }
 }
 
+class WeakRefResetTest : public ::testing::Test {
+ protected:
+  WeakRefResetTest() = default;
+  ~WeakRefResetTest() override = default;
+
+  void SetUp() override {
+    rt_ = LEPUS_NewRuntime();
+    ctx_ = LEPUS_NewContext(rt_);
+    lepus_std_add_helpers(ctx_, 0, NULL);
+  }
+
+  void TearDown() override {
+    lepus_std_free_handlers(rt_);
+    LEPUS_FreeContext(ctx_);
+    LEPUS_FreeRuntime(rt_);
+  }
+
+  LEPUSContext* ctx_;
+  LEPUSRuntime* rt_;
+};
+
+// Verify that reset_weak_ref correctly unlinks JSMapRecord from the
+// WeakMap's internal records list and that the WeakMap remains structurally
+// intact after key objects are freed via nested reference chains.
+//
+// NOTE on test coverage: The actual crash (double list_del on the same
+// JSMapRecord) requires map_delete_record to be called on a record whose
+// links are already NULL. Through pure JavaScript APIs this is unreachable
+// because reset_weak_ref's first pass removes the record from both the
+// hash table and records list before any callbacks fire. The real crash
+// scenario involves complex C++ level object lifetime chains or GC
+// finalizer ordering. The fix (mr->empty = TRUE) is validated by code
+// inspection; these tests verify structural integrity and catch related
+// regressions under ASAN/MSAN.
+TEST_F(WeakRefResetTest, RecordUnlinkedAfterKeyFreed) {
+  // Create a WeakMap with a key, verify internal record exists, then free
+  // the key and verify the record was properly removed from the map.
+  std::string src = R"(
+    var wm = new WeakMap();
+    var key = {x: 1};
+    wm.set(key, "value");
+  )";
+  LEPUSValue ret = LEPUS_Eval(ctx_, src.c_str(), src.length(), "test_unlink.js",
+                              LEPUS_EVAL_TYPE_GLOBAL);
+  ASSERT_FALSE(LEPUS_IsException(ret));
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  // Access internal JSMapState to verify record presence.
+  LEPUSValue global = LEPUS_GetGlobalObject(ctx_);
+  LEPUSValue wm_val = LEPUS_GetPropertyStr(ctx_, global, "wm");
+  LEPUSObject* wm_obj = LEPUS_VALUE_GET_OBJ(wm_val);
+  JSMapState* s = wm_obj->u.map_state;
+
+  ASSERT_NE(s, nullptr);
+  ASSERT_EQ(s->record_count, 1u);
+  ASSERT_FALSE(list_empty(&s->records));
+
+  // Free the key → triggers reset_weak_ref → first pass unlinks record.
+  src = "key = null;";
+  ret = LEPUS_Eval(ctx_, src.c_str(), src.length(), "test_unlink2.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  ASSERT_FALSE(LEPUS_IsException(ret));
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  // After reset_weak_ref: the record has been unlinked from s->records
+  // (via list_del in first pass) and freed (in second pass for RC mode).
+  // In GC mode, cleanup is deferred until a GC cycle runs.
+  if (!ctx_->rt->gc_enable) {
+    EXPECT_TRUE(list_empty(&s->records));
+  }
+
+  // Verify WeakMap still functions correctly with new entries.
+  src = R"(
+    var key2 = {y: 2};
+    wm.set(key2, "value2");
+    wm.get(key2);
+  )";
+  ret = LEPUS_Eval(ctx_, src.c_str(), src.length(), "test_unlink3.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  ASSERT_FALSE(LEPUS_IsException(ret));
+  const char* str = LEPUS_ToCString(ctx_, ret);
+  EXPECT_STREQ(str, "value2");
+  if (!ctx_->rt->gc_enable) {
+    LEPUS_FreeCString(ctx_, str);
+    LEPUS_FreeValue(ctx_, ret);
+    LEPUS_FreeValue(ctx_, wm_val);
+    LEPUS_FreeValue(ctx_, global);
+  }
+}
+
+// Test nested object freeing during reset_weak_ref: when a WeakMap value
+// holds the only reference to another object that is also a key in the
+// same WeakMap, freeing the first key triggers a chain of reset_weak_ref
+// calls. This exercises concurrent list modifications on the same
+// JSMapState and validates structural integrity under ASAN.
+TEST_F(WeakRefResetTest, NestedResetWeakRefOnSameMap) {
+  // key1's value in the WeakMap is key2 (the only strong ref to key2).
+  // Freeing key1 → reset_weak_ref(key1) second pass frees value (key2)
+  // → key2 refcount=0 → reset_weak_ref(key2) nested call on same map.
+  std::string src = R"(
+    var wm = new WeakMap();
+    (function() {
+      var key2 = {id: 2};
+      var key1 = {id: 1};
+      wm.set(key1, key2);  // key1's value = key2 (strong ref in map)
+      wm.set(key2, "leaf_value");
+      // Now: key1 and key2 are both keys in wm.
+      // key2 is ONLY reachable via wm's value for key1.
+      // Dropping key1 and key2 locals: key1 refcount=0 immediately,
+      // key2 refcount held by mr_key1->value until second pass frees it.
+    })();
+  )";
+  LEPUSValue ret = LEPUS_Eval(ctx_, src.c_str(), src.length(), "test_nested.js",
+                              LEPUS_EVAL_TYPE_GLOBAL);
+  ASSERT_FALSE(LEPUS_IsException(ret));
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  // Both keys freed (nested reset_weak_ref). WeakMap must be structurally
+  // intact with an empty records list.
+  // In GC mode, cleanup is deferred until a GC cycle runs.
+  LEPUSValue global = LEPUS_GetGlobalObject(ctx_);
+  LEPUSValue wm_val = LEPUS_GetPropertyStr(ctx_, global, "wm");
+  LEPUSObject* wm_obj = LEPUS_VALUE_GET_OBJ(wm_val);
+  JSMapState* s = wm_obj->u.map_state;
+
+  if (!ctx_->rt->gc_enable) {
+    EXPECT_TRUE(list_empty(&s->records));
+  }
+
+  // WeakMap must still accept new entries without corruption.
+  src = R"(
+    var k = {id: 3};
+    wm.set(k, "works");
+    wm.get(k);
+  )";
+  ret = LEPUS_Eval(ctx_, src.c_str(), src.length(), "test_nested2.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  ASSERT_FALSE(LEPUS_IsException(ret));
+  const char* str = LEPUS_ToCString(ctx_, ret);
+  EXPECT_STREQ(str, "works");
+  if (!ctx_->rt->gc_enable) {
+    LEPUS_FreeCString(ctx_, str);
+    LEPUS_FreeValue(ctx_, ret);
+    LEPUS_FreeValue(ctx_, wm_val);
+    LEPUS_FreeValue(ctx_, global);
+  }
+}
+
 }  // namespace weak_ref_test

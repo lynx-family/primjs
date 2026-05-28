@@ -29375,6 +29375,7 @@ QJS_STATIC void reset_weak_ref_gc(LEPUSRuntime *rt, LEPUSObject *p) {
         gc_list_del(rt, &mr->link, &mr->map->records,
                     offsetof(JSMapRecord, link));
         list_del(&mr->hash_link);
+        mr->empty = TRUE;
       } break;
       case WEAK_REF_KIND_WEAK_REF: {
         WeakRefData *weak_ref = wr->u.weak_ref;

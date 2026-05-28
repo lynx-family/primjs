@@ -44322,6 +44322,7 @@ QJS_STATIC void reset_weak_ref(LEPUSRuntime *rt, LEPUSObject *p) {
         assert(!mr->empty);
         list_del(&mr->link);
         list_del(&mr->hash_link);
+        mr->empty = TRUE;
       } break;
       case WEAK_REF_KIND_WEAK_REF: {
         WeakRefData *weak_ref = wr->u.weak_ref;
