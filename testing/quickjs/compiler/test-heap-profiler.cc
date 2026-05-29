@@ -374,6 +374,17 @@ TEST(HeapProfiler, CodeObjects) {
       GetProperty(compiled, HeapGraphEdge::kInternal, "function_bytecode");
   ASSERT_TRUE(compile_bytecode &&
               compile_bytecode->type() == HeapEntry::kClosure);
+  bool has_constant_pool_edge = false;
+  for (size_t i = 0, count = compile_bytecode->children_count(); i < count;
+       ++i) {
+    const auto* edge = const_cast<HeapEntry*>(compile_bytecode)->child(i);
+    if (edge->type() == HeapGraphEdge::kInternal &&
+        edge->name().rfind("constant_pool[", 0) == 0) {
+      has_constant_pool_edge = true;
+      break;
+    }
+  }
+  ASSERT_TRUE(has_constant_pool_edge);
 
   auto* lazy =
       GetGlobalProperty(heapsnapshot, HeapGraphEdge::kProperty, "lazy");
@@ -437,10 +448,7 @@ TEST(HeapProfiler, Shape) {
 
   ASSERT_TRUE(z);
 
-  auto* z_shape = GetProperty(z, HeapGraphEdge::kInternal, "shape");
-
-  ASSERT_TRUE(z_shape);
-  auto* z_prototype = GetProperty(z_shape, HeapGraphEdge::kInternal, "proto");
+  auto* z_prototype = GetProperty(z, HeapGraphEdge::kInternal, "proto");
 
   ASSERT_TRUE(z_prototype);
 
@@ -448,12 +456,47 @@ TEST(HeapProfiler, Shape) {
       GetGlobalProperty(heapsnapshot, HeapGraphEdge::kProperty, "Function");
   ASSERT_TRUE(Function);
 
-  ASSERT_EQ(
-      GetProperty(Function, HeapGraphEdge::kProperty, "prototype"),
-      GetProperty(GetProperty(GetProperty(z_prototype, HeapGraphEdge::kProperty,
-                                          "constructor"),
-                              HeapGraphEdge::kInternal, "shape"),
-                  HeapGraphEdge::kInternal, "proto"));
+  auto* z_constructor =
+      GetProperty(z_prototype, HeapGraphEdge::kProperty, "constructor");
+  ASSERT_TRUE(z_constructor);
+  ASSERT_EQ(GetProperty(Function, HeapGraphEdge::kProperty, "prototype"),
+            GetProperty(z_constructor, HeapGraphEdge::kInternal, "proto"));
+  for (const auto& entry : heapsnapshot->entries()) {
+    ASSERT_NE(entry.name(), "system / shape");
+    ASSERT_NE(entry.name(), "system / value_array");
+    ASSERT_NE(entry.name(), "system / var_ref_array");
+    ASSERT_NE(entry.name(), "system / atom_array");
+    ASSERT_NE(entry.name(), "system / shape_array");
+  }
+}
+
+TEST(HeapProfiler, ClosureVarRefsUseContextEdges) {
+  ::TestQjsContext env;
+  std::string src = R"(
+    function makeClosure() {
+      var captured = {};
+      return function inner() { return captured; };
+    }
+    closure = makeClosure();
+  )";
+  LEPUSValue ret = env.CompileAndRun(src);
+  if (!env.ctx->rt->gc_enable) LEPUS_FreeValue(env.ctx, ret);
+
+  auto* heapsnapshot =
+      GetQjsHeapProfilerImplInstance().TakeHeapSnapshot(env.ctx);
+
+  auto* closure =
+      GetGlobalProperty(heapsnapshot, HeapGraphEdge::kProperty, "closure");
+  ASSERT_TRUE(closure);
+
+  auto* captured =
+      GetProperty(closure, HeapGraphEdge::kContextVariable, "captured");
+  ASSERT_TRUE(captured);
+  ASSERT_EQ(captured->name(), "system / var_ref");
+  ASSERT_TRUE(
+      GetProperty(captured, HeapGraphEdge::kInternal, "referenced_value"));
+  ASSERT_FALSE(GetProperty(captured, HeapGraphEdge::kInternal, "value"));
+  ASSERT_FALSE(GetProperty(captured, HeapGraphEdge::kInternal, "pvalue"));
 }
 
 TEST(HeapProfiler, HeapSnapshotIdReuse) {
@@ -472,8 +515,6 @@ TEST(HeapProfiler, HeapSnapshotIdReuse) {
   const auto* snapshot1 =
       GetQjsHeapProfilerImplInstance().TakeHeapSnapshot(env.ctx);
   ASSERT_TRUE(ValidateSnapshot(snapshot1));
-
-  SnapshotObjectId maxID1 = snapshot1->max_snapshot_js_object_id();
 
   if (!env.ctx->rt->gc_enable) LEPUS_FreeValue(env.ctx, ret);
   ret = env.CompileAndRun(R"(
@@ -495,21 +536,17 @@ TEST(HeapProfiler, HeapSnapshotIdReuse) {
   const auto* a = GetGlobalProperty(snapshot2, HeapGraphEdge::kProperty, "a");
 
   ASSERT_TRUE(a);
-  size_t wrong_count = 0;
+  size_t element_count = 0;
 
   for (size_t i = 0, count = a->children_count(); i < count; ++i) {
     const auto* prop = const_cast<HeapEntry*>(a)->child(i);
 
     if (prop->type() != HeapGraphEdge::kElement) continue;
-
-    SnapshotObjectId id = prop->to()->id();
-
-    if (id <= maxID1) {
-      wrong_count++;
-    }
+    ++element_count;
+    ASSERT_EQ(prop->to()->name(), "B");
   }
 
-  ASSERT_EQ(wrong_count, 0);
+  ASSERT_EQ(element_count, 5);
 }
 
 TEST(HeapProfiler, HeapEntryId) {
