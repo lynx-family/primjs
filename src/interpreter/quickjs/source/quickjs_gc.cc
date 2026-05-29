@@ -2875,7 +2875,7 @@ static int JS_AutoInitProperty(LEPUSContext *ctx, LEPUSObject *p, JSAtom prop,
   if (js_shape_prepare_update(ctx, p, &prs)) return -1;
   uintptr_t *opaque_ptr = (uintptr_t *)&(pr->u.init.opaque);
   *(opaque_ptr) = (*opaque_ptr) & (~static_cast<uintptr_t>(LEPUS_CPOINTER_TAG));
-  func = pr->u.init.init_func;
+  func = js_autoinit_get_func(pr);
   void *opaque = pr->u.init.opaque;
   /* 'func' shall not modify the object properties 'pr' */
   val = func(ctx, p, prop, opaque);
@@ -5053,7 +5053,7 @@ int JS_DefineAutoInitProperty_GC(
   pr = add_property_gc(ctx, p, prop,
                        (flags & LEPUS_PROP_C_W_E) | LEPUS_PROP_AUTOINIT);
   if (unlikely(!pr)) return -1;
-  pr->u.init.init_func = init_func;
+  set_js_autoinit_func(pr, init_func);
   pr->u.init.opaque = opaque;
   uintptr_t *opaque_ptr = (uintptr_t *)(&(pr->u.init.opaque));
   *opaque_ptr = (*opaque_ptr) | LEPUS_CPOINTER_TAG;
@@ -7428,12 +7428,11 @@ LEPUSValue js_closure_gc(LEPUSContext *ctx, LEPUSValue bfunc,
        creating cycles for every javascript function. The prototype
        object is created on the fly when first accessed */
     LEPUS_SetConstructorBit(ctx, func_obj, TRUE);
-    LEPUSValue obj =
-        js_instantiate_prototype(ctx, p, JS_ATOM_prototype, nullptr);
-    func_scope.PushHandle(&obj, HANDLE_TYPE_LEPUS_VALUE);
-    pr = add_property_gc(ctx, p, JS_ATOM_prototype, LEPUS_PROP_WRITABLE);
+    pr = add_property_gc(ctx, p, JS_ATOM_prototype,
+                         LEPUS_PROP_WRITABLE | LEPUS_PROP_AUTOINIT);
     if (pr) {
-      HeapObjStore(ctx, &pr->u.value, obj);
+      set_js_autoinit_func(pr, js_instantiate_prototype);
+      pr->u.init.opaque = nullptr;
     }
   }
   return func_obj;
@@ -28625,12 +28624,16 @@ void Visitor::PushObjRegExp(LEPUSObject *obj, GCWorkStack &workStack) noexcept {
 }
 
 void Visitor::PushObjProperty(JSProperty *pr, GCWorkStack &workStack) noexcept {
-  address_t sencodPtr = (address_t)pr->u.getset.setter;
-  address_t val = (address_t)pr->u.init.init_func;
-  if (val != (address_t)(JS_InstantiateFunctionListItem2) &&
-      val != (address_t)(js_module_ns_autoinit)) {
+  if (LEPUS_VALUE_IS_OBJECT(pr->u.value) && js_prop_is_autoinit(pr)) {
+    return;
+  } else {
+    address_t sencodPtr = (address_t)pr->u.getset.setter;
+    address_t val = (address_t)pr->u.init.init_func;
     PushObjLEPUSValue((LEPUSValue){.as_int64 = (int64_t)val}, workStack);
-    PushObjLEPUSValue((LEPUSValue){.as_int64 = (int64_t)sencodPtr}, workStack);
+    if (sencodPtr != 0) {
+      PushObjLEPUSValue((LEPUSValue){.as_int64 = (int64_t)sencodPtr},
+                        workStack);
+    }
   }
 }
 

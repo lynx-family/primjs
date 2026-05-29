@@ -1209,6 +1209,9 @@ typedef struct JSGeneratorData {
   JSAsyncFunctionState func_state;
 } JSGeneratorData;
 
+typedef LEPUSValue JSAutoInitFunc(LEPUSContext *ctx, LEPUSObject *p,
+                                  JSAtom atom, void *opaque);
+
 typedef struct JSProperty {
   union {
     LEPUSValue value;      /* LEPUS_PROP_NORMAL */
@@ -1218,12 +1221,24 @@ typedef struct JSProperty {
     } getset;
     JSVarRef *var_ref; /* LEPUS_PROP_VARREF */
     struct {           /* LEPUS_PROP_AUTOINIT */
-      LEPUSValue (*init_func)(LEPUSContext *ctx, LEPUSObject *obj, JSAtom prop,
-                              void *opaque);
+      uintptr_t init_func;
       void *opaque;
     } init;
   } u;
 } JSProperty;
+
+inline JSAutoInitFunc *js_autoinit_get_func(JSProperty *pr) {
+  return (JSAutoInitFunc *)(pr->u.init.init_func & ~3);
+}
+
+inline void set_js_autoinit_func(JSProperty *pr, JSAutoInitFunc *func) {
+  pr->u.init.init_func = (uintptr_t)func | 1;
+}
+
+inline bool js_prop_is_autoinit(JSProperty *pr) {
+  auto init_val = pr->u.init.init_func;
+  return (init_val & 3) == 1;
+}
 
 #define JS_PROP_INITIAL_SIZE 2
 #define JS_PROP_INITIAL_HASH_SIZE 4 /* must be a power of two */
