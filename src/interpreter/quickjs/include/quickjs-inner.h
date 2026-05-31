@@ -2862,6 +2862,8 @@ typedef struct JSFunctionDef {
 #ifdef ENABLE_QUICKJS_DEBUGGER
   int64_t column_num;
   LEPUSScriptSource *script;
+  int debugger_cpool_idx;  /* cpool index for "debugger" string, -1 if none */
+  int statement_cpool_idx; /* cpool index for "statement" string, -1 if none */
 #endif
   DynBuf pc2line;
 

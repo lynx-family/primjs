@@ -22979,13 +22979,20 @@ QJS_STATIC void set_eval_ret_undefined(JSParseState *s) {
 
 #ifdef ENABLE_QUICKJS_DEBUGGER
 QJS_STATIC void js_gen_debugger_statement(JSParseState *s, LEPUSContext *ctx) {
-  LEPUSValue statement = LEPUS_NewString(ctx, "statement");
-  if (LEPUS_IsException(statement)) return;
-  if (emit_push_const(s, statement, 0) < 0) {
-    LEPUS_FreeValue(ctx, statement);
-    return;
+  JSFunctionDef *fd = s->cur_func;
+  int idx = fd->statement_cpool_idx;
+  if (idx < 0) {
+    LEPUSValue statement = LEPUS_NewString(ctx, "statement");
+    if (LEPUS_IsException(statement)) return;
+    idx = cpool_add(s, statement);
+    if (idx < 0) {
+      LEPUS_FreeValue(ctx, statement);
+      return;
+    }
+    fd->statement_cpool_idx = idx;
   }
-  LEPUS_FreeValue(ctx, statement);
+  emit_op(s, OP_push_const);
+  emit_u32(s, idx);
   emit_op(s, OP_drop);
 }
 #endif
@@ -23612,16 +23619,23 @@ QJS_STATIC __exception int js_parse_statement_or_decl(JSParseState *s,
     case TOK_DEBUGGER: {
       if (next_token(s)) goto fail;
 #ifdef ENABLE_QUICKJS_DEBUGGER
-      // generate opcode: op_push_const
-      LEPUSValue debugger;
-      debugger = LEPUS_NewString(ctx, "debugger");
-      if (LEPUS_IsException(debugger)) goto fail;
-      if (emit_push_const(s, debugger, 0) < 0) {
-        LEPUS_FreeValue(ctx, debugger);
-        goto fail;
+      {
+        JSFunctionDef *fd = s->cur_func;
+        int idx = fd->debugger_cpool_idx;
+        if (idx < 0) {
+          LEPUSValue debugger = LEPUS_NewString(ctx, "debugger");
+          if (LEPUS_IsException(debugger)) goto fail;
+          idx = cpool_add(s, debugger);
+          if (idx < 0) {
+            LEPUS_FreeValue(ctx, debugger);
+            goto fail;
+          }
+          fd->debugger_cpool_idx = idx;
+        }
+        emit_op(s, OP_push_const);
+        emit_u32(s, idx);
+        emit_op(s, OP_drop);
       }
-      LEPUS_FreeValue(ctx, debugger);
-      emit_op(s, OP_drop);
 #endif
       if (js_parse_expect_semi(s)) goto fail;
     } break;
@@ -25208,6 +25222,10 @@ QJS_STATIC JSFunctionDef *js_new_function_def(LEPUSContext *ctx,
 
   fd->filename = LEPUS_NewAtom(ctx, filename);
   fd->line_num = line_num;
+#ifdef ENABLE_QUICKJS_DEBUGGER
+  fd->debugger_cpool_idx = -1;
+  fd->statement_cpool_idx = -1;
+#endif
 
   js_dbuf_init(ctx, &fd->pc2line);
   // fd->pc2line_last_line_num = line_num;

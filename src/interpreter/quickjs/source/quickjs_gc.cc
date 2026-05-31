@@ -10547,12 +10547,18 @@ static void set_eval_ret_undefined(JSParseState *s) {
 
 #ifdef ENABLE_QUICKJS_DEBUGGER
 static void js_gen_debugger_statement(JSParseState *s, LEPUSContext *ctx) {
-  LEPUSValue statement = JS_NewString_GC(ctx, "statement");
-  HandleScope func_scope(s->ctx, &statement, HANDLE_TYPE_LEPUS_VALUE);
-  if (LEPUS_IsException(statement)) return;
-  if (emit_push_const(s, statement, 0) < 0) {
-    return;
+  JSFunctionDef *fd = s->cur_func;
+  int idx = fd->statement_cpool_idx;
+  if (idx < 0) {
+    LEPUSValue statement = JS_NewString_GC(ctx, "statement");
+    HandleScope func_scope(s->ctx, &statement, HANDLE_TYPE_LEPUS_VALUE);
+    if (LEPUS_IsException(statement)) return;
+    idx = cpool_add(s, statement);
+    if (idx < 0) return;  // GC will reclaim the string
+    fd->statement_cpool_idx = idx;
   }
+  emit_op(s, OP_push_const);
+  emit_u32(s, idx);
   emit_op(s, OP_drop);
 }
 #endif
@@ -11184,15 +11190,22 @@ static __exception int js_parse_statement_or_decl(JSParseState *s,
     case TOK_DEBUGGER: {
       if (next_token(s)) goto fail;
 #ifdef ENABLE_QUICKJS_DEBUGGER
-      // generate opcode: op_push_const
-      debugger = JS_NewString_GC(ctx, "debugger");
-      func_scope.PushHandle(&debugger, HANDLE_TYPE_LEPUS_VALUE);
-      if (LEPUS_IsException(debugger)) goto fail;
-      if (emit_push_const(s, debugger, 0) < 0) {
-        goto fail;
+      {
+        JSFunctionDef *fd = s->cur_func;
+        int idx = fd->debugger_cpool_idx;
+        if (idx < 0) {
+          debugger = JS_NewString_GC(ctx, "debugger");
+          func_scope.PushHandle(&debugger, HANDLE_TYPE_LEPUS_VALUE);
+          if (LEPUS_IsException(debugger)) goto fail;
+          idx = cpool_add(s, debugger);
+          if (idx < 0) goto fail;  // GC will reclaim the string
+          fd->debugger_cpool_idx = idx;
+          func_scope.ResetHandle(&debugger, HANDLE_TYPE_LEPUS_VALUE);
+        }
+        emit_op(s, OP_push_const);
+        emit_u32(s, idx);
+        emit_op(s, OP_drop);
       }
-      emit_op(s, OP_drop);
-      func_scope.ResetHandle(&debugger, HANDLE_TYPE_LEPUS_VALUE);
 #endif
       if (js_parse_expect_semi(s)) goto fail;
     } break;
@@ -11310,6 +11323,10 @@ JSFunctionDef *js_new_function_def_GC(LEPUSContext *ctx, JSFunctionDef *parent,
 
   fd->filename = LEPUS_NewAtom(ctx, filename);
   fd->line_num = line_num;
+#ifdef ENABLE_QUICKJS_DEBUGGER
+  fd->debugger_cpool_idx = -1;
+  fd->statement_cpool_idx = -1;
+#endif
 
   js_dbuf_init(ctx, &fd->pc2line);
   // fd->pc2line_last_line_num = line_num;
