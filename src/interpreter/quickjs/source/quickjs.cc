@@ -50,17 +50,19 @@ extern "C" {
 #include <memoryapi.h>
 #else
 #include <sys/time.h>
+#include <unistd.h>
 #endif
 #include <time.h>
 
 #include <atomic>
 #include <cstdint>
 #include <cstdlib>
+#include <unordered_set>
+#include <vector>
 #if defined(ANDROID) || defined(__ANDROID__) || defined(OS_IOS) || \
     defined(OS_HARMONY)
 #include <errno.h>
 #include <sys/syscall.h>
-#include <unistd.h>
 #endif
 
 #if defined(__APPLE__)
@@ -80,6 +82,7 @@ extern "C" {
 }
 #endif
 
+#include "gc/global-handles.h"
 #include "gc/trace-gc.h"
 #include "quickjs/include/bignum.h"
 #include "quickjs/include/quickjs-inner.h"
@@ -6080,12 +6083,149 @@ QJS_STATIC void compute_value_size(LEPUSValueConst val,
   }
 }
 
+#ifdef ENABLE_QUICKJS_DEBUGGER
+namespace {
+struct VMPssRange {
+  uintptr_t begin;
+  uintptr_t end;
+};
+
+size_t AlignSize(size_t size, size_t alignment) {
+  return (size + alignment - 1) / alignment * alignment;
+}
+
+template <typename T>
+size_t EstimateUnorderedSetUsage(const std::unordered_set<T> *set) {
+  if (set == nullptr) return 0;
+
+  size_t usage = sizeof(*set);
+  usage += set->bucket_count() * sizeof(void *);
+
+  // Estimate each hash node as next pointer + cached hash + stored value.
+  size_t node_size = sizeof(void *) + sizeof(size_t) +
+                     sizeof(typename std::unordered_set<T>::value_type);
+  node_size = AlignSize(node_size, alignof(void *));
+  usage += node_size * set->size();
+  return usage;
+}
+
+size_t GetResidentUsageForRanges(const std::vector<VMPssRange> &ranges) {
+#ifndef _WIN32
+  if (ranges.empty()) return 0;
+
+  long sys_page_size = sysconf(_SC_PAGESIZE);
+  if (sys_page_size <= 0) return 0;
+
+  const uintptr_t page_size = static_cast<uintptr_t>(sys_page_size);
+  size_t resident_usage = 0;
+  for (const auto &range : ranges) {
+    if (range.end <= range.begin) continue;
+
+    uintptr_t aligned_begin = range.begin / page_size * page_size;
+    uintptr_t aligned_end = (range.end + page_size - 1) / page_size * page_size;
+    if (aligned_end <= aligned_begin) continue;
+
+    size_t aligned_size = aligned_end - aligned_begin;
+    size_t page_count = aligned_size / page_size;
+#if defined(__APPLE__)
+    std::vector<char> residency(page_count);
+    if (mincore(reinterpret_cast<const void *>(aligned_begin), aligned_size,
+                residency.data()) != 0) {
+      continue;
+    }
+#else
+    std::vector<unsigned char> residency(page_count);
+    if (mincore(reinterpret_cast<void *>(aligned_begin), aligned_size,
+                residency.data()) != 0) {
+      continue;
+    }
+#endif
+
+    for (size_t i = 0; i < page_count; ++i) {
+      if ((residency[i] & 0x1) == 0) continue;
+      uintptr_t page_begin = aligned_begin + i * page_size;
+      uintptr_t page_end = page_begin + page_size;
+      uintptr_t overlap_begin =
+          range.begin > page_begin ? range.begin : page_begin;
+      uintptr_t overlap_end = range.end < page_end ? range.end : page_end;
+      resident_usage += overlap_end - overlap_begin;
+    }
+  }
+  return resident_usage;
+#else
+  (void)ranges;
+  return 0;
+#endif
+}
+}  // namespace
+#endif
+
 void LEPUS_ComputeMemoryUsage(LEPUSRuntime *rt, LEPUSMemoryUsage *s) {
   memset(s, 0, sizeof(*s));
+#ifdef ENABLE_QUICKJS_DEBUGGER
+  size_t common_base_size = 0;
+  {
+    if (rt->ptr_handles != nullptr) {
+      common_base_size += sizeof(PtrHandles);
+      if (rt->ptr_handles->GetHandles() != nullptr &&
+          rt->ptr_handles->GetHandleSize() > 0) {
+        common_base_size +=
+            sizeof(*rt->ptr_handles->GetHandles()) *
+            static_cast<size_t>(rt->ptr_handles->GetHandleSize());
+      }
+    }
+    if (rt->global_handles_ != nullptr) {
+      common_base_size += rt->global_handles_->TotalSize();
+    }
+    common_base_size += EstimateUnorderedSetUsage(rt->finalizerSet);
+    common_base_size += EstimateUnorderedSetUsage(rt->async_obj_recoder);
+
+    struct list_head *el;
+    list_for_each(el, &rt->context_list) {
+      LEPUSContext *ctx = list_entry(el, LEPUSContext, link);
+      common_base_size += EstimateUnorderedSetUsage(ctx->obj_finalizer_recoder);
+      common_base_size +=
+          EstimateUnorderedSetUsage(ctx->fr_data_finalizer_recoder);
+    }
+  }
+
   if (rt->gc_enable) {
     s->malloc_size = rt->ros_->GetAllocatedSize();
     s->malloc_limit = rt->ros_->GetHeapGrowthLimit();
-    s->memory_used_size = rt->ros_->GetAllocatedSize();
+
+    // base size only for gc mode.
+    size_t gc_base_size = sizeof(LEPUSRuntime);
+    if (rt->atom_hash != nullptr && rt->atom_hash_size > 0) {
+      gc_base_size += sizeof(*rt->atom_hash) * rt->atom_hash_size;
+    }
+    if (rt->atom_array != nullptr && rt->atom_size > 0) {
+      gc_base_size += sizeof(*rt->atom_array) * rt->atom_size;
+    }
+    if (rt->class_array != nullptr && rt->class_count > 0) {
+      gc_base_size += sizeof(*rt->class_array) * rt->class_count;
+    }
+
+    if (rt->ros_ != nullptr) {
+      gc_base_size += sizeof(ROS_GC::RosAllocImpl);
+      std::vector<VMPssRange> ranges;
+      auto &page_groups = rt->ros_->GetPageGroups();
+      auto &groups = page_groups.GetGroupArray();
+      for (size_t i = 0; i < page_groups.GetGroupsNum(); ++i) {
+        auto &group = groups[i];
+        if (!group.IsInitialized()) continue;
+
+        uintptr_t mmap_begin = static_cast<uintptr_t>(group.GetBegin()) -
+                               static_cast<uintptr_t>(ALLOCUTIL_PAGE_SIZE);
+        size_t mmap_size = group.GetMemMapedSize();
+        if (mmap_size == 0) continue;
+        ranges.push_back({mmap_begin, mmap_begin + mmap_size});
+      }
+      s->memory_used_size = GetResidentUsageForRanges(ranges);
+    }
+    if (s->memory_used_size == 0) {
+      s->memory_used_size = rt->ros_->GetAllocatedSize();
+    }
+    s->base_malloc_size = common_base_size + gc_base_size;
     return;
   }
   struct list_head *el, *el1;
@@ -6097,8 +6237,9 @@ void LEPUS_ComputeMemoryUsage(LEPUSRuntime *rt, LEPUSMemoryUsage *s) {
   s->malloc_limit = rt->malloc_state.malloc_limit;
 
   s->memory_used_count = 2; /* rt + rt->class_array */
-  s->memory_used_size =
-      sizeof(LEPUSRuntime) + sizeof(LEPUSValue) * rt->class_count;
+  s->memory_used_size = sizeof(LEPUSRuntime) +
+                        sizeof(LEPUSValue) * rt->class_count + common_base_size;
+  s->base_malloc_size = common_base_size;
 
   list_for_each(el, &rt->context_list) {
     LEPUSContext *ctx = list_entry(el, LEPUSContext, link);
@@ -6353,15 +6494,18 @@ void LEPUS_ComputeMemoryUsage(LEPUSRuntime *rt, LEPUSMemoryUsage *s) {
   s->memory_used_size += s->atom_size + s->str_size + s->obj_size +
                          s->prop_size + s->shape_size + s->lepus_func_size +
                          s->lepus_func_code_size + s->lepus_func_pc2line_size;
+#endif
 }
 
 void LEPUS_DumpMemoryUsage(FILE *fp, const LEPUSMemoryUsage *s,
                            LEPUSRuntime *rt) {
+#ifdef ENABLE_QUICKJS_DEBUGGER
   if (rt && rt->gc_enable) {
     fprintf(fp,
             "QuickJS memory usage -- \n  malloc_size: %lld\n  malloc_limit: "
-            "%lld\n  memory_used_size: %lld",
-            s->malloc_size, s->malloc_limit, s->memory_used_size);
+            "%lld\n  memory_used_size: %lld  base_malloc_size: %lld\n",
+            s->malloc_size, s->malloc_limit, s->memory_used_size,
+            s->base_malloc_size);
     return;
   }
   fprintf(fp,
@@ -6489,6 +6633,7 @@ void LEPUS_DumpMemoryUsage(FILE *fp, const LEPUSMemoryUsage *s,
     fprintf(fp, "%-20s %8" PRId64 " %8" PRId64 "\n", "binary objects",
             s->binary_object_count, s->binary_object_size);
   }
+#endif
 }
 
 #endif
@@ -45045,6 +45190,16 @@ size_t LEPUS_GetHeapSize(LEPUSRuntime *rt) {
   } else {
     return rt->malloc_state.malloc_size;
   }
+}
+
+void LEPUS_ReportGCInfo(LEPUSRuntime *rt) { JS_UpdateGCInfo(rt, 0, true); }
+
+void LEPUS_SetGCInfoThreshold(LEPUSRuntime *rt, size_t threshold_bytes) {
+  if (threshold_bytes < 64 * KB) {
+    threshold_bytes = 64 * KB;
+  }
+  rt->gc_info_threshold = threshold_bytes;
+  rt->gc_info_interval_size = 0;
 }
 
 QJS_STATIC int js_create_resolving_functions(LEPUSContext *ctx,

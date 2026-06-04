@@ -796,6 +796,12 @@ void LEPUS_SetClassProto(LEPUSContext *ctx, LEPUSClassID class_id,
 LEPUSValue LEPUS_GetClassProto(LEPUSContext *ctx, LEPUSClassID class_id);
 int LEPUS_MoveUnhandledRejectionToException(LEPUSContext *ctx);
 size_t LEPUS_GetHeapSize(LEPUSRuntime *rt);
+/* force to trigger memory usage report via callback registered by
+ * LEPUS_SetGCObserver */
+void LEPUS_ReportGCInfo(LEPUSRuntime *rt);
+/* set the threshold for gc info report in bytes and minimum value of 64kb */
+void LEPUS_SetGCInfoThreshold(LEPUSRuntime *rt, size_t gc_threshold_bytes);
+
 /* the following functions are used to select the intrinsic object to
    save memory */
 LEPUSContext *LEPUS_NewContextRaw(LEPUSRuntime *rt);
@@ -838,10 +844,19 @@ QJS_HIDE char *lepus_strdup(LEPUSContext *ctx, const char *str, int alloc_tag);
 QJS_HIDE char *lepus_strndup(LEPUSContext *ctx, const char *s, size_t n,
                              int alloc_tag);
 
-#if LYNX_SIMPLIFY
+/* memory usage support (only available with debugger) */
 typedef struct LEPUSMemoryUsage {
-  int64_t malloc_size, malloc_limit, memory_used_size;
+  int64_t malloc_size, malloc_limit;
   int64_t malloc_count;
+  int64_t memory_used_size;  // In GC mode, it represents the physical memory
+                             // footprint memory pages (the RSS footprint
+                             // obtained by using mincore on the mmap region).
+                             // In RC mode, it represents the memory footprint
+                             // obtained by accumulating objects, strings, etc.,
+                             // instead of using malloc_size.
+  int64_t base_malloc_size;  // Base malloc size besides malloc_size and you
+                             // could consider the total memory usage to be
+                             // malloc_size + base_malloc_size
   int64_t memory_used_count;
   int64_t atom_count, atom_size;
   int64_t str_count, str_size;
@@ -858,8 +873,6 @@ typedef struct LEPUSMemoryUsage {
 void LEPUS_ComputeMemoryUsage(LEPUSRuntime *rt, LEPUSMemoryUsage *s);
 void LEPUS_DumpMemoryUsage(FILE *fp, const LEPUSMemoryUsage *s,
                            LEPUSRuntime *rt);
-
-#endif
 
 /* atom support */
 JSAtom LEPUS_NewAtomLen(LEPUSContext *ctx, const char *str, size_t len);

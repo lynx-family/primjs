@@ -29686,12 +29686,12 @@ bool CheckTools::IsValidTid(int tid) {
   return false;
 }
 
-void JS_UpdateGCInfo(LEPUSRuntime *rt, size_t size, bool from_gc) {
+void JS_UpdateGCInfo(LEPUSRuntime *rt, size_t size, bool force) {
   if (rt == nullptr || rt->gc_info_threshold == 0) return;
   rt->gc_info_interval_size += size;
   if ((rt->gc_info_interval_size > rt->gc_info_threshold &&
        LEPUS_GetHeapSize(rt) > rt->gc_info_threshold) ||
-      from_gc) {
+      force) {
     GCObserver *observer = static_cast<GCObserver *>(rt->gc_observer);
     if (observer) {
       std::stringstream gc_info;

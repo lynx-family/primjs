@@ -60,6 +60,7 @@ class PtrHandles {
   HeapStruct *GetHandles() const { return handles; }
   void SetHeapObjIdx(int idx) { handle_idx = idx; }
   int GetHeapObjIdx() const { return handle_idx; }
+  int GetHandleSize() const { return handle_size; }
 
  private:
   int handle_idx;
