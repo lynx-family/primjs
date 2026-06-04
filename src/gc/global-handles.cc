@@ -394,6 +394,15 @@ void GlobalHandles::CollectAllRoots(GCWorkStack& workStack, int offset,
   }
 }
 
+void GlobalHandles::VisitRoots(visitor visit, void* data) {
+  if (handles_count() == 0 || !visit) return;
+  for (Node* node : *regular_nodes_) {
+    if (node->IsStrongRetainer()) {
+      visit(*node->location(), data);
+    }
+  }
+}
+
 void GlobalHandles::GlobalRootsFinalizer() {
   if (handles_count() == 0) return;
   if (!has_callbacks_) return;

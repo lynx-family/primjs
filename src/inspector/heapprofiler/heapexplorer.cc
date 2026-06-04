@@ -12,6 +12,8 @@
 #include <vector>
 
 #include "gc/collector.h"
+#include "gc/global-handles.h"
+#include "gc/qjsvaluevalue-space.h"
 #include "gc/trace-gc.h"
 #include "inspector/heapprofiler/gen.h"
 #include "inspector/heapprofiler/heapprofiler.h"
@@ -144,7 +146,56 @@ HeapEntry* QjsHeapExplorer::AddEntry(LEPUSContext* ctx, const HeapObjPtr& obj) {
                                   obj_id, sizeof(JSVarRef));
     } break;
     case HeapObjPtr ::kLEPUSModuleDef: {
-      // TODO: @zhangyuping
+      auto* m = static_cast<const LEPUSModuleDef*>(obj.ptr_);
+      std::string module_name = "system / module";
+      if (m && m->module_name != JS_ATOM_NULL) {
+        if (auto* str = LEPUS_AtomToCString(ctx, m->module_name)) {
+          module_name = str;
+          if (!ctx->gc_enable) LEPUS_FreeCString(ctx, str);
+        }
+      }
+      entry = snapshot_->AddEntry(HeapEntry::kNative, module_name, obj_id,
+                                  sizeof(LEPUSModuleDef));
+    } break;
+    case HeapObjPtr::kJSArrayBuffer: {
+      entry = snapshot_->AddEntry(HeapEntry::kNative, "system / array_buffer",
+                                  obj_id, sizeof(JSArrayBuffer));
+    } break;
+    case HeapObjPtr::kJSTypedArray: {
+      entry = snapshot_->AddEntry(HeapEntry::kNative, "system / typed_array",
+                                  obj_id, sizeof(JSTypedArray));
+    } break;
+    case HeapObjPtr::kJSMapState: {
+      entry = snapshot_->AddEntry(HeapEntry::kNative, "system / map_state",
+                                  obj_id, sizeof(JSMapState));
+    } break;
+    case HeapObjPtr::kJSMapRecord: {
+      entry = snapshot_->AddEntry(HeapEntry::kNative, "system / map_record",
+                                  obj_id, sizeof(JSMapRecord));
+    } break;
+    case HeapObjPtr::kJSPromiseFunctionData: {
+      entry = snapshot_->AddEntry(HeapEntry::kNative,
+                                  "system / promise_function_data", obj_id,
+                                  sizeof(JSPromiseFunctionData));
+    } break;
+    case HeapObjPtr::kFinalizationRegistryData: {
+      entry = snapshot_->AddEntry(HeapEntry::kNative,
+                                  "system / finalization_registry_data", obj_id,
+                                  sizeof(FinalizationRegistryData));
+    } break;
+    case HeapObjPtr::kFinalizationRegistryEntry: {
+      entry = snapshot_->AddEntry(HeapEntry::kNative,
+                                  "system / finalization_registry_entry",
+                                  obj_id, sizeof(FinalizationRegistryEntry));
+    } break;
+    case HeapObjPtr::kWeakRefData: {
+      entry = snapshot_->AddEntry(HeapEntry::kNative, "system / weak_ref_data",
+                                  obj_id, sizeof(WeakRefData));
+    } break;
+    case HeapObjPtr::kWeakRefRecord: {
+      entry =
+          snapshot_->AddEntry(HeapEntry::kNative, "system / weak_ref_record",
+                              obj_id, sizeof(WeakRefRecord));
     } break;
     case HeapObjPtr ::kLEPUSFunctionBytecode: {
       auto* b = static_cast<const LEPUSFunctionBytecode*>(obj.ptr_);
@@ -185,6 +236,42 @@ HeapEntry* QjsHeapExplorer::AddEntry(LEPUSContext* ctx, const HeapObjPtr& obj) {
                                     name.size() ? name : "Object", obj_id,
                                     sizeof(LEPUSObject));
       }
+    } break;
+    case HeapObjPtr ::kJSValueArray: {
+      entry = snapshot_->AddEntry(HeapEntry::kNative, "system / value_array",
+                                  obj_id, obj.size_);
+    } break;
+    case HeapObjPtr::kJSPropertyArray: {
+      entry = snapshot_->AddEntry(HeapEntry::kNative, "system / property_array",
+                                  obj_id, obj.size_);
+    } break;
+    case HeapObjPtr::kJSReqModuleEntryArray: {
+      entry = snapshot_->AddEntry(
+          HeapEntry::kNative, "system / req_module_entries", obj_id, obj.size_);
+    } break;
+    case HeapObjPtr::kJSExportEntryArray: {
+      entry = snapshot_->AddEntry(HeapEntry::kNative, "system / export_entries",
+                                  obj_id, obj.size_);
+    } break;
+    case HeapObjPtr::kJSImportEntryArray: {
+      entry = snapshot_->AddEntry(HeapEntry::kNative, "system / import_entries",
+                                  obj_id, obj.size_);
+    } break;
+    case HeapObjPtr::kJSResolveEntryArray: {
+      entry = snapshot_->AddEntry(
+          HeapEntry::kNative, "system / resolve_entries", obj_id, obj.size_);
+    } break;
+    case HeapObjPtr::kVarRef2Array: {
+      entry = snapshot_->AddEntry(HeapEntry::kNative, "system / var_ref_array",
+                                  obj_id, sizeof(JSVarRef*) * obj.size_);
+    } break;
+    case HeapObjPtr::kAtom2Array: {
+      entry = snapshot_->AddEntry(HeapEntry::kNative, "system / atom_array",
+                                  obj_id, sizeof(JSAtomStruct*) * obj.size_);
+    } break;
+    case HeapObjPtr::kShape2Array: {
+      entry = snapshot_->AddEntry(HeapEntry::kNative, "system / shape_array",
+                                  obj_id, sizeof(JSShape*) * obj.size_);
     } break;
     case HeapObjPtr ::kContext: {
       entry = snapshot_->AddEntry(HeapEntry::kNative, "system / jscontext",
@@ -240,6 +327,16 @@ void QjsHeapExplorer::SetPropertyReference(LEPUSContext* ctx, HeapEntry* entry,
   return;
 }
 
+void QjsHeapExplorer::SetAndExtractValue(LEPUSContext* ctx, HeapEntry* parent,
+                                         const std::string& name,
+                                         const LEPUSValue& value,
+                                         HeapGraphEdge::Type type) {
+  auto* child = GetEntry(ctx, value);
+  if (!child) return;
+  parent->SetNamedReference(type, name, child);
+  ExtractValueReference(ctx, child, value);
+}
+
 void QjsHeapExplorer::ExtractHandleObjReference(LEPUSContext* ctx,
                                                 HeapEntry* entry,
                                                 const HeapObjPtr& obj) {
@@ -267,10 +364,14 @@ void QjsHeapExplorer::ExtractHandleObjReference(LEPUSContext* ctx,
       return ExtractFunctionBytecodeReference(
           ctx, entry, static_cast<const LEPUSFunctionBytecode*>(obj.ptr_));
     }
+    case HeapObjPtr::kLEPUSModuleDef: {
+      return ExtractModuleReference(
+          ctx, entry, static_cast<const LEPUSModuleDef*>(obj.ptr_));
+    }
     case HeapObjPtr::kJSValueArray: {
       return ExtractValueArrayReference(
           ctx, entry, static_cast<const LEPUSValue*>(obj.ptr_),
-          sizeof(obj.ptr_) / sizeof(LEPUSValue));
+          obj.size_ / sizeof(LEPUSValue));
     }
     default:
       break;
@@ -292,6 +393,22 @@ void QjsHeapExplorer::ExtractValueReference(LEPUSContext* ctx, HeapEntry* entry,
           ctx, entry,
           static_cast<const LEPUSFunctionBytecode*>(
               LEPUS_VALUE_GET_PTR(value)));
+    case LEPUS_TAG_MODULE:
+      return ExtractModuleReference(
+          ctx, entry,
+          static_cast<const LEPUSModuleDef*>(LEPUS_VALUE_GET_PTR(value)));
+    case LEPUS_TAG_ASYNC_FUNCTION: {
+      auto* async_data =
+          static_cast<const JSAsyncFunctionData*>(LEPUS_VALUE_GET_PTR(value));
+      if (async_data->is_active) {
+        ExtractAsyncFunctionStateReference(ctx, entry, &async_data->func_state);
+      }
+      SetAndExtractValue(ctx, entry, "resolving_func",
+                         async_data->resolving_funcs[0]);
+      SetAndExtractValue(ctx, entry, "resolving_func",
+                         async_data->resolving_funcs[1]);
+      return;
+    }
     case LEPUS_TAG_OBJECT:
       return ExtractObjectReference(
           ctx, entry,
@@ -316,6 +433,132 @@ void QjsHeapExplorer::ExtractShapeReference(LEPUSContext* ctx, HeapEntry* entry,
     }
   }
   return;
+}
+
+void QjsHeapExplorer::ExtractModuleReference(LEPUSContext* ctx,
+                                             HeapEntry* entry,
+                                             const LEPUSModuleDef* m) {
+  if (HasBeExtracted(m)) return;
+  InsertExtractedObj(m);
+
+  if (m->req_module_entries) {
+    for (int i = 0; i < m->req_module_entries_count; ++i) {
+      const auto* req = &m->req_module_entries[i];
+      if (req->module) {
+        auto* module_entry = GetEntry(ctx, HeapObjPtr{req->module});
+        SetInternalReference(entry, "req_module.module", module_entry);
+        if (module_entry) {
+          ExtractModuleReference(ctx, module_entry, req->module);
+        }
+      }
+    }
+  }
+
+  if (m->export_entries) {
+    for (int i = 0; i < m->export_entries_count; ++i) {
+      const auto* export_entry = &m->export_entries[i];
+      if (export_entry->export_type == JS_EXPORT_TYPE_LOCAL &&
+          export_entry->u.local.var_ref) {
+        auto* var_ref_entry = GetEntry(
+            ctx, LEPUS_MKPTR(LEPUS_TAG_VAR_REF, export_entry->u.local.var_ref));
+        SetInternalReference(entry, "export.var_ref", var_ref_entry);
+        if (var_ref_entry) {
+          ExtractVarrefReference(ctx, var_ref_entry,
+                                 export_entry->u.local.var_ref);
+        }
+      }
+    }
+  }
+
+  SetAndExtractValue(ctx, entry, "module_ns", m->module_ns);
+  SetAndExtractValue(ctx, entry, "func_obj", m->func_obj);
+  SetAndExtractValue(ctx, entry, "eval_exception", m->eval_exception);
+}
+
+void QjsHeapExplorer::ExtractNapiHandleScopeReference(LEPUSContext* ctx,
+                                                      HeapEntry* entry) {
+  auto* cur_scope = ctx->napi_scope;
+  while (cur_scope) {
+    auto* cur_handle = cur_scope->GetHandle();
+    while (cur_handle) {
+      SetAndExtractValue(ctx, entry, "napi_handle", cur_handle->value);
+      cur_handle = cur_handle->prev;
+    }
+    cur_scope = cur_scope->GetPrevScope();
+  }
+}
+
+void QjsHeapExplorer::ExtractDebuggerInfoReference(LEPUSContext* ctx,
+                                                   HeapEntry* entry,
+                                                   LEPUSDebuggerInfo* info) {
+#ifdef ENABLE_QUICKJS_DEBUGGER
+  if (!info) return;
+  auto* info_entry = GetEntry(ctx, HeapObjPtr{info, HeapObjPtr::kWithoutPtr,
+                                              sizeof(LEPUSDebuggerInfo)});
+  SetInternalReference(entry, "debugger_info", info_entry);
+  if (!info_entry) return;
+
+  SetAndExtractValue(ctx, info_entry, "debugger_name", info->debugger_name);
+  if (info->source_code) {
+    SetInternalReference(info_entry, "source_code",
+                         GetEntry(ctx, HeapObjPtr{info->source_code}));
+  }
+  struct list_head* el;
+  list_for_each(el, &info->script_list) {
+    auto* script = list_entry(el, LEPUSScriptSource, link);
+    if (script->url) {
+      SetInternalReference(info_entry, "script.url",
+                           GetEntry(ctx, HeapObjPtr{script->url}));
+    }
+    if (script->source) {
+      SetInternalReference(info_entry, "script.source",
+                           GetEntry(ctx, HeapObjPtr{script->source}));
+    }
+    if (script->hash) {
+      SetInternalReference(info_entry, "script.hash",
+                           GetEntry(ctx, HeapObjPtr{script->hash}));
+    }
+    if (script->source_map_url) {
+      SetInternalReference(info_entry, "script.source_map_url",
+                           GetEntry(ctx, HeapObjPtr{script->source_map_url}));
+    }
+  }
+
+  SetAndExtractValue(ctx, info_entry, "pause_state.get_properties_array",
+                     info->pause_state.get_properties_array);
+  SetAndExtractValue(ctx, info_entry, "running_state.get_properties_array",
+                     info->running_state.get_properties_array);
+  SetAndExtractValue(ctx, info_entry, "object_group_registry",
+                     info->object_group_registry);
+  SetAndExtractValue(ctx, info_entry, "console.messages",
+                     info->console.messages);
+#define DebuggerExtractStringPool(name, str)                 \
+  SetAndExtractValue(ctx, info_entry, "literal_pool." #name, \
+                     info->literal_pool.name);
+  QJSDebuggerStringPool(DebuggerExtractStringPool)
+#undef DebuggerExtractStringPool
+
+      SetAndExtractValue(ctx, info_entry, "debugger_obj.response",
+                         info->debugger_obj.response);
+  SetAndExtractValue(ctx, info_entry, "debugger_obj.notification",
+                     info->debugger_obj.notification);
+  SetAndExtractValue(ctx, info_entry, "debugger_obj.breakpoint",
+                     info->debugger_obj.breakpoint);
+  SetAndExtractValue(ctx, info_entry, "debugger_obj.bp_location",
+                     info->debugger_obj.bp_location);
+  SetAndExtractValue(ctx, info_entry, "debugger_obj.result",
+                     info->debugger_obj.result);
+  SetAndExtractValue(ctx, info_entry, "debugger_obj.preview_prop",
+                     info->debugger_obj.preview_prop);
+  for (auto& [pc, value] : info->break_bytecode_map) {
+    SetAndExtractValue(ctx, info_entry, "break_bytecode", value);
+  }
+  if (info->pause_on_next_statement_reason) {
+    SetInternalReference(
+        info_entry, "pause_on_next_statement_reason",
+        GetEntry(ctx, HeapObjPtr{info->pause_on_next_statement_reason}));
+  }
+#endif
 }
 
 void QjsHeapExplorer::ExtractObjectReference(LEPUSContext* ctx,
@@ -361,6 +604,11 @@ void QjsHeapExplorer::ExtractObjectReference(LEPUSContext* ctx,
         ExtractValueReference(ctx, pr_entry, pr.u.value);
       }
     }
+  }
+  if (p->first_weak_ref) {
+    auto* weak_ref_entry = GetEntry(ctx, HeapObjPtr{p->first_weak_ref});
+    SetInternalReference(entry, "first_weak_ref", weak_ref_entry);
+    ExtractWeakRefRecordReference(ctx, weak_ref_entry, p->first_weak_ref);
   }
 
   switch (p->class_id) {
@@ -422,7 +670,361 @@ void QjsHeapExplorer::ExtractObjectReference(LEPUSContext* ctx,
       }
     } break;
     default:
-      // @zhangyuping: TODO.
+      ExtractClassSpecificReference(ctx, entry, p);
+      break;
+  }
+  return;
+}
+
+// Mirrors GC's PushObjLEPUSStackFrame (quickjs_gc.cc:28566).
+void QjsHeapExplorer::ExtractStackFrameReference(LEPUSContext* ctx,
+                                                 HeapEntry* entry,
+                                                 const LEPUSStackFrame* sf) {
+  if (sf->arg_buf) {
+    for (int i = 0; i < sf->arg_count; ++i) {
+      SetAndExtractValue(ctx, entry, "arg", sf->arg_buf[i]);
+    }
+  }
+  if (sf->var_buf) {
+    LEPUSValue* cur_sp = sf->cur_sp ? sf->cur_sp : sf->sp;
+    if (cur_sp) {
+      for (LEPUSValue* sp = sf->var_buf; sp < cur_sp; ++sp) {
+        SetAndExtractValue(ctx, entry, "var", *sp);
+      }
+    }
+  }
+  SetAndExtractValue(ctx, entry, "cur_func", sf->cur_func);
+  if (sf->var_refs) {
+    int array_size = get_obj_size(sf->var_refs) / sizeof(JSVarRef*);
+    for (int i = 0; i < array_size; ++i) {
+      if (sf->var_refs[i]) {
+        auto* var_entry =
+            GetEntry(ctx, LEPUS_MKPTR(LEPUS_TAG_VAR_REF, sf->var_refs[i]));
+        SetInternalReference(entry, "var_ref", var_entry);
+        ExtractVarrefReference(ctx, var_entry, sf->var_refs[i]);
+      }
+    }
+  }
+#ifdef ENABLE_QUICKJS_DEBUGGER
+  SetAndExtractValue(ctx, entry, "this", sf->pthis);
+#endif
+}
+
+// Mirrors GC's PushObjLEPUSAsyncFunctionState (quickjs_gc.cc:28552).
+void QjsHeapExplorer::ExtractAsyncFunctionStateReference(
+    LEPUSContext* ctx, HeapEntry* entry, const JSAsyncFunctionState* s) {
+  if (!s->on_stack) {
+    ExtractStackFrameReference(ctx, entry, &s->frame);
+  }
+  SetAndExtractValue(ctx, entry, "this_val", s->this_val);
+}
+
+// Mirrors GC's VisitJSMapState / VisitJSMapRecord (quickjs_gc.cc:28847/28861).
+void QjsHeapExplorer::ExtractMapReference(LEPUSContext* ctx, HeapEntry* entry,
+                                          const JSMapState* s) {
+  auto* head = &s->records;
+  struct list_head* el;
+  for (el = head->next; el && el != head; el = el->next) {
+    auto* mr = list_entry(el, JSMapRecord, link);
+    auto* record_entry = GetEntry(ctx, HeapObjPtr{mr});
+    SetInternalReference(entry, "record", record_entry);
+    ExtractMapRecordReference(ctx, record_entry, mr, s->is_weak);
+  }
+}
+
+void QjsHeapExplorer::ExtractMapRecordReference(LEPUSContext* ctx,
+                                                HeapEntry* entry,
+                                                const JSMapRecord* mr,
+                                                bool weak_key) {
+  if (!mr || mr->empty || HasBeExtracted(mr)) return;
+  InsertExtractedObj(mr);
+  if (!weak_key) {
+    SetAndExtractValue(ctx, entry, "key", mr->key);
+  } else {
+    auto* key_entry = GetEntry(ctx, mr->key);
+    if (key_entry) {
+      entry->SetNamedReference(HeapGraphEdge::kWeak, "key", key_entry);
+    }
+  }
+  SetAndExtractValue(ctx, entry, "value", mr->value);
+}
+
+// Mirrors GC's VisitJSPromiseData / VisitJSPromiseReactionData
+// (quickjs_gc.cc:28924/28940).
+void QjsHeapExplorer::ExtractPromiseReference(LEPUSContext* ctx,
+                                              HeapEntry* entry,
+                                              const JSPromiseData* s) {
+  for (int i = 0; i < 2; ++i) {
+    auto* head = &s->promise_reactions[i];
+    struct list_head* el;
+    for (el = head->next; el && el != head; el = el->next) {
+      auto* rd = list_entry(el, JSPromiseReactionData, link);
+      SetAndExtractValue(ctx, entry, "resolving_func", rd->resolving_funcs[0]);
+      SetAndExtractValue(ctx, entry, "resolving_func", rd->resolving_funcs[1]);
+      SetAndExtractValue(ctx, entry, "handler", rd->handler);
+    }
+  }
+  SetAndExtractValue(ctx, entry, "promise_result", s->promise_result);
+}
+
+void QjsHeapExplorer::ExtractFinalizationRegistryEntryReference(
+    LEPUSContext* ctx, HeapEntry* entry, const FinalizationRegistryEntry* fin) {
+  if (!fin || HasBeExtracted(fin)) return;
+  InsertExtractedObj(fin);
+  if (fin->data) {
+    auto* data_entry = GetEntry(ctx, HeapObjPtr{fin->data});
+    SetInternalReference(entry, "data", data_entry);
+  }
+  auto* target_entry = GetEntry(ctx, fin->target);
+  if (target_entry) {
+    entry->SetNamedReference(HeapGraphEdge::kWeak, "target", target_entry);
+  }
+  SetAndExtractValue(ctx, entry, "held_value", fin->held_value);
+  auto* token_entry = GetEntry(ctx, fin->token);
+  if (token_entry) {
+    entry->SetNamedReference(HeapGraphEdge::kWeak, "token", token_entry);
+  }
+}
+
+void QjsHeapExplorer::ExtractFinalizationRegistryReference(
+    LEPUSContext* ctx, HeapEntry* entry, const FinalizationRegistryData* frd) {
+  if (!frd || HasBeExtracted(frd)) return;
+  InsertExtractedObj(frd);
+  SetAndExtractValue(ctx, entry, "cleanup_callback", frd->cbs);
+  auto* head = &frd->entries;
+  struct list_head* el;
+  for (el = head->next; el && el != head; el = el->next) {
+    auto* fin = list_entry(el, FinalizationRegistryEntry, link);
+    auto* fin_entry = GetEntry(ctx, HeapObjPtr{fin});
+    SetInternalReference(entry, "entry", fin_entry);
+    ExtractFinalizationRegistryEntryReference(ctx, fin_entry, fin);
+  }
+}
+
+void QjsHeapExplorer::ExtractWeakRefRecordReference(LEPUSContext* ctx,
+                                                    HeapEntry* entry,
+                                                    const WeakRefRecord* wr) {
+  if (!wr || HasBeExtracted(wr)) return;
+  InsertExtractedObj(wr);
+  switch (wr->kind) {
+    case WEAK_REF_KIND_WEAK_MAP: {
+      auto* record = wr->u.map_record;
+      if (record) {
+        auto* record_entry = GetEntry(ctx, HeapObjPtr{record});
+        SetInternalReference(entry, "map_record", record_entry);
+        ExtractMapRecordReference(ctx, record_entry, record, true);
+      }
+    } break;
+    case WEAK_REF_KIND_FINALIZATION_REGISTRY: {
+      auto* fin = wr->u.fin_node;
+      if (fin) {
+        auto* fin_entry = GetEntry(ctx, HeapObjPtr{fin});
+        SetInternalReference(entry, "finalization_entry", fin_entry);
+        ExtractFinalizationRegistryEntryReference(ctx, fin_entry, fin);
+      }
+    } break;
+    case WEAK_REF_KIND_WEAK_REF: {
+      auto* weak_ref = wr->u.weak_ref;
+      if (weak_ref) {
+        auto* weak_ref_entry = GetEntry(ctx, HeapObjPtr{weak_ref});
+        SetInternalReference(entry, "weak_ref_data", weak_ref_entry);
+        auto* target_entry = GetEntry(ctx, weak_ref->target);
+        if (target_entry) {
+          weak_ref_entry->SetNamedReference(HeapGraphEdge::kWeak, "target",
+                                            target_entry);
+        }
+      }
+    } break;
+  }
+  if (wr->next_weak_ref) {
+    auto* next_entry = GetEntry(ctx, HeapObjPtr{wr->next_weak_ref});
+    SetInternalReference(entry, "next_weak_ref", next_entry);
+    ExtractWeakRefRecordReference(ctx, next_entry, wr->next_weak_ref);
+  }
+}
+
+// Mirrors GC's VisitLEPUSObject class switch (quickjs_gc.cc:28680) plus the
+// dedicated VisitXxx finalizer visitors, covering the object kinds not handled
+// inline in ExtractObjectReference.
+void QjsHeapExplorer::ExtractClassSpecificReference(LEPUSContext* ctx,
+                                                    HeapEntry* entry,
+                                                    const LEPUSObject* p) {
+  switch (p->class_id) {
+    case JS_CLASS_BOUND_FUNCTION: {
+      auto* bf = p->u.bound_function;
+      if (!bf) break;
+      SetAndExtractValue(ctx, entry, "func_obj", bf->func_obj);
+      SetAndExtractValue(ctx, entry, "this_val", bf->this_val);
+      for (int i = 0; i < bf->argc; ++i) {
+        SetAndExtractValue(ctx, entry, "bound_arg", bf->argv[i]);
+      }
+    } break;
+    case JS_CLASS_C_FUNCTION_DATA: {
+      auto* s = p->u.c_function_data_record;
+      if (!s) break;
+      for (int i = 0; i < s->data_len; ++i) {
+        SetAndExtractValue(ctx, entry, "data", s->data[i]);
+      }
+    } break;
+    case JS_CLASS_FOR_IN_ITERATOR: {
+      auto* it = p->u.for_in_iterator;
+      if (it) SetAndExtractValue(ctx, entry, "obj", it->obj);
+    } break;
+    case JS_CLASS_ARRAY_BUFFER:
+    case JS_CLASS_SHARED_ARRAY_BUFFER: {
+      auto* abuf = p->u.array_buffer;
+      if (abuf && abuf->from_js_heap && abuf->data) {
+        auto* data_entry =
+            GetEntry(ctx, HeapObjPtr{abuf->data, HeapObjPtr::kWithoutPtr,
+                                     static_cast<size_t>(abuf->byte_length)});
+        SetInternalReference(entry, "data", data_entry);
+      }
+    } break;
+    case JS_CLASS_UINT8C_ARRAY:
+    case JS_CLASS_INT8_ARRAY:
+    case JS_CLASS_UINT8_ARRAY:
+    case JS_CLASS_INT16_ARRAY:
+    case JS_CLASS_UINT16_ARRAY:
+    case JS_CLASS_INT32_ARRAY:
+    case JS_CLASS_UINT32_ARRAY:
+    case JS_CLASS_BIG_INT64_ARRAY:
+    case JS_CLASS_BIG_UINT64_ARRAY:
+    case JS_CLASS_FLOAT32_ARRAY:
+    case JS_CLASS_FLOAT64_ARRAY:
+    case JS_CLASS_DATAVIEW: {
+      auto* ta = p->u.typed_array;
+      if (ta && ta->buffer) {
+        SetAndExtractValue(ctx, entry, "buffer",
+                           LEPUS_MKPTR(LEPUS_TAG_OBJECT, ta->buffer));
+      }
+    } break;
+    case JS_CLASS_MAP:
+    case JS_CLASS_SET:
+    case JS_CLASS_WEAKMAP:
+    case JS_CLASS_WEAKSET: {
+      if (p->u.map_state) ExtractMapReference(ctx, entry, p->u.map_state);
+    } break;
+    case JS_CLASS_MAP_ITERATOR:
+    case JS_CLASS_SET_ITERATOR: {
+      auto* it = static_cast<const JSMapIteratorData*>(
+          static_cast<const void*>(p->u.map_iterator_data));
+      if (!it) break;
+      SetAndExtractValue(ctx, entry, "obj", it->obj);
+      if (it->cur_record) {
+        auto* record_entry = GetEntry(ctx, HeapObjPtr{it->cur_record});
+        SetInternalReference(entry, "cur_record", record_entry);
+        ExtractMapRecordReference(
+            ctx, record_entry, it->cur_record,
+            it->cur_record->map && it->cur_record->map->is_weak);
+      }
+    } break;
+    case JS_CLASS_ARRAY_ITERATOR:
+    case JS_CLASS_STRING_ITERATOR: {
+      auto* it = static_cast<const JSArrayIteratorData*>(
+          static_cast<const void*>(p->u.array_iterator_data));
+      if (it) SetAndExtractValue(ctx, entry, "obj", it->obj);
+    } break;
+    case JS_CLASS_REGEXP_STRING_ITERATOR: {
+      auto* it = static_cast<const JSRegExpStringIteratorData*>(
+          static_cast<const void*>(p->u.regexp_string_iterator_data));
+      if (!it) break;
+      SetAndExtractValue(ctx, entry, "iterating_regexp", it->iterating_regexp);
+      SetAndExtractValue(ctx, entry, "iterated_string", it->iterated_string);
+    } break;
+    case JS_CLASS_GENERATOR: {
+      auto* s = p->u.generator_data;
+      if (s && s->state != JS_GENERATOR_STATE_COMPLETED) {
+        ExtractAsyncFunctionStateReference(ctx, entry, &s->func_state);
+      }
+    } break;
+    case JS_CLASS_PROXY: {
+      auto* s = p->u.proxy_data;
+      if (!s) break;
+      SetAndExtractValue(ctx, entry, "target", s->target);
+      SetAndExtractValue(ctx, entry, "handler", s->handler);
+      SetAndExtractValue(ctx, entry, "proto", s->proto);
+    } break;
+    case JS_CLASS_PROMISE: {
+      if (p->u.promise_data) {
+        ExtractPromiseReference(ctx, entry, p->u.promise_data);
+      }
+    } break;
+    case JS_CLASS_PROMISE_RESOLVE_FUNCTION:
+    case JS_CLASS_PROMISE_REJECT_FUNCTION: {
+      auto* s = p->u.promise_function_data;
+      if (!s) break;
+      SetAndExtractValue(ctx, entry, "promise", s->promise);
+    } break;
+    case JS_CLASS_ASYNC_FUNCTION_RESOLVE:
+    case JS_CLASS_ASYNC_FUNCTION_REJECT: {
+      auto* s = p->u.async_function_data;
+      if (!s) break;
+      if (s->is_active) {
+        ExtractAsyncFunctionStateReference(ctx, entry, &s->func_state);
+      }
+      SetAndExtractValue(ctx, entry, "resolving_func", s->resolving_funcs[0]);
+      SetAndExtractValue(ctx, entry, "resolving_func", s->resolving_funcs[1]);
+    } break;
+    case JS_CLASS_ASYNC_FROM_SYNC_ITERATOR: {
+      auto* s = static_cast<const JSAsyncFromSyncIteratorData*>(
+          static_cast<const void*>(p->u.async_from_sync_iterator_data));
+      if (!s) break;
+      SetAndExtractValue(ctx, entry, "sync_iter", s->sync_iter);
+      SetAndExtractValue(ctx, entry, "next_method", s->next_method);
+    } break;
+    case JS_CLASS_ASYNC_GENERATOR: {
+      auto* s = static_cast<const JSAsyncGeneratorData*>(
+          static_cast<const void*>(p->u.async_generator_data));
+      if (!s) break;
+      auto* head = &s->queue;
+      struct list_head* el;
+      for (el = head->next; el && el != head; el = el->next) {
+        auto* req = list_entry(el, JSAsyncGeneratorRequest, link);
+        SetAndExtractValue(ctx, entry, "result", req->result);
+        SetAndExtractValue(ctx, entry, "promise", req->promise);
+        SetAndExtractValue(ctx, entry, "resolving_func",
+                           req->resolving_funcs[0]);
+        SetAndExtractValue(ctx, entry, "resolving_func",
+                           req->resolving_funcs[1]);
+      }
+      if (s->state != JS_ASYNC_GENERATOR_STATE_COMPLETED) {
+        ExtractAsyncFunctionStateReference(ctx, entry, &s->func_state);
+      }
+    } break;
+    case JS_CLASS_NUMBER:
+    case JS_CLASS_STRING:
+    case JS_CLASS_BOOLEAN:
+    case JS_CLASS_SYMBOL:
+    case JS_CLASS_DATE:
+    case JS_CLASS_BIG_INT: {
+      SetAndExtractValue(ctx, entry, "value", p->u.object_data);
+    } break;
+    case JS_CLASS_REGEXP: {
+      const auto* re = &p->u.regexp;
+      auto* pattern_entry = GetEntry(ctx, HeapObjPtr{re->pattern});
+      SetInternalReference(entry, "pattern", pattern_entry);
+      auto* bytecode_entry = GetEntry(ctx, HeapObjPtr{re->bytecode});
+      SetInternalReference(entry, "bytecode", bytecode_entry);
+    } break;
+    case JS_CLASS_WeakRef: {
+      auto* weak_ref = p->u.weak_ref_data;
+      if (!weak_ref) break;
+      auto* weak_ref_entry = GetEntry(ctx, HeapObjPtr{weak_ref});
+      SetInternalReference(entry, "weak_ref_data", weak_ref_entry);
+      auto* target_entry = GetEntry(ctx, weak_ref->target);
+      if (target_entry) {
+        weak_ref_entry->SetNamedReference(HeapGraphEdge::kWeak, "target",
+                                          target_entry);
+      }
+    } break;
+    case JS_CLASS_FinalizationRegistry: {
+      auto* frd = p->u.fin_reg_data;
+      if (!frd) break;
+      auto* frd_entry = GetEntry(ctx, HeapObjPtr{frd});
+      SetInternalReference(entry, "registry_data", frd_entry);
+      ExtractFinalizationRegistryReference(ctx, frd_entry, frd);
+    } break;
+    default:
       break;
   }
   return;
@@ -431,8 +1033,9 @@ void QjsHeapExplorer::ExtractObjectReference(LEPUSContext* ctx,
 void QjsHeapExplorer::ExtractVarrefReference(LEPUSContext* ctx,
                                              HeapEntry* entry,
                                              const JSVarRef* ref) {
-  if (HasBeExtracted(entry)) return;
-  InsertExtractedObj(entry);
+  if (!ref) return;
+  if (HasBeExtracted(ref)) return;
+  InsertExtractedObj(ref);
   if (!LEPUS_IsUndefined(ref->value)) {
     auto* value_entry = GetEntry(ctx, ref->value);
     if (value_entry) {
@@ -526,6 +1129,15 @@ void QjsHeapExplorer::ExtractContextReference(LEPUSContext* ctx,
     OPERATOR_CONTEXT_MEMBER(SetInternalAndExtractReference)
 #undef SetInternalAndExtractReference
   }
+  if (ctx->loaded_modules.next && ctx->loaded_modules.prev) {
+    struct list_head *el, *el1;
+    list_for_each_safe(el, el1, &ctx->loaded_modules) {
+      auto* module = list_entry(el, LEPUSModuleDef, link);
+      auto* module_entry = GetEntry(ctx, HeapObjPtr{module});
+      SetInternalReference(ctx_entry, "loaded_module", module_entry);
+      ExtractModuleReference(ctx, module_entry, module);
+    }
+  }
   {
     constexpr const char* native_error_name[] = {
         "eval_error_proto",      "range_error_proto",
@@ -542,16 +1154,47 @@ void QjsHeapExplorer::ExtractContextReference(LEPUSContext* ctx,
     }
   }
   {
-    for (size_t i = 0; i < ctx->rt->class_count; ++i) {
-      auto* class_proto_entry = GetEntry(ctx, ctx->class_proto[i]);
-      if (class_proto_entry) {
-        SetInternalReference(ctx_entry,
-                             "class_proto[" + std::to_string(i) + "]",
-                             class_proto_entry);
-        ExtractValueReference(ctx, class_proto_entry, ctx->class_proto[i]);
+    for (int i = 0; i < ctx->rt->class_count; ++i) {
+      auto* proto_entry = GetEntry(ctx, ctx->class_proto[i]);
+      if (!proto_entry) continue;
+
+      std::string edge_name = "class_proto";
+      if (ctx->rt->class_array && ctx->rt->class_array[i].class_name) {
+        if (auto* class_name =
+                LEPUS_AtomToCString(ctx, ctx->rt->class_array[i].class_name)) {
+          edge_name += ":";
+          edge_name += class_name;
+          if (!ctx->gc_enable) LEPUS_FreeCString(ctx, class_name);
+        } else {
+          edge_name += "[" + std::to_string(i) + "]";
+        }
+      } else {
+        edge_name += "[" + std::to_string(i) + "]";
+      }
+      SetInternalReference(ctx_entry, edge_name, proto_entry);
+      ExtractValueReference(ctx, proto_entry, ctx->class_proto[i]);
+    }
+  }
+  {
+    if (auto* array_shape = ctx->array_shape) {
+      auto* arr_shape_entry = GetEntry(ctx, HeapObjPtr{array_shape});
+      SetInternalReference(ctx_entry, "array_shape", arr_shape_entry);
+      ExtractShapeReference(ctx, arr_shape_entry, array_shape);
+    }
+  }
+  for (size_t i = 0; i < kFunctionShapeSize; ++i) {
+    if (auto* function_shape = ctx->function_shape[i]) {
+      auto* function_shape_entry = GetEntry(ctx, HeapObjPtr{function_shape});
+      SetInternalReference(ctx_entry,
+                           "function_shape[" + std::to_string(i) + "]",
+                           function_shape_entry);
+      if (function_shape_entry) {
+        ExtractShapeReference(ctx, function_shape_entry, function_shape);
       }
     }
   }
+  ExtractNapiHandleScopeReference(ctx, ctx_entry);
+  ExtractDebuggerInfoReference(ctx, ctx_entry, ctx->debugger_info);
   {
     // lynx_target_sdk_version
     if (ctx->lynx_target_sdk_version) {
@@ -561,6 +1204,12 @@ void QjsHeapExplorer::ExtractContextReference(LEPUSContext* ctx,
                                    "lynx_target_sdk_version", version_entry);
     }
   }
+  if (ctx->fg_ctx) {
+    auto* fg_ctx_entry =
+        GetEntry(ctx, HeapObjPtr{ctx->fg_ctx, HeapObjPtr::kWithoutPtr,
+                                 sizeof(FinalizationRegistryContext)});
+    SetInternalReference(ctx_entry, "fg_ctx", fg_ctx_entry);
+  }
   return;
 }
 
@@ -569,15 +1218,63 @@ void QjsHeapExplorer::ExtractRuntimeReference(LEPUSContext* ctx,
                                               LEPUSRuntime* rt) {
   if (HasBeExtracted(rt)) return;
   InsertExtractedObj(rt);
+  ExtractRuntimeRootReference(ctx, entry, rt);
   if (rt->rt_info) {
     auto* info_entry = GetEntry(ctx, HeapObjPtr{rt->rt_info});
     SetInternalReference(entry, "rt_info", info_entry);
+  }
+  if (rt->atom_array) {
+    auto* atom_array_entry =
+        GetEntry(ctx, HeapObjPtr{rt->atom_array, (size_t)rt->atom_size});
+    SetInternalReference(entry, "atom_array", atom_array_entry);
+    if (atom_array_entry) {
+      for (size_t i = 1; i < rt->atom_size; ++i) {
+        auto* p = rt->atom_array[i];
+        if (p && !atom_is_free(p)) {
+          auto* atom_entry = GetEntry(ctx, HeapObjPtr{p});
+          SetElementReference(atom_array_entry, i, atom_entry);
+        }
+      }
+    }
   }
   {
     auto* except_entry = GetEntry(ctx, rt->current_exception);
     if (except_entry) {
       SetInternalReference(entry, "current_exception", except_entry);
+      ExtractValueReference(ctx, except_entry, rt->current_exception);
     }
+  }
+
+  if (rt->shape_hash) {
+    auto* shape_array_entry =
+        GetEntry(ctx, HeapObjPtr{rt->shape_hash, (size_t)rt->shape_hash_size});
+    SetInternalReference(entry, "shape_array", shape_array_entry);
+    if (shape_array_entry) {
+      for (size_t i = 0; i < rt->shape_hash_size; ++i) {
+        if (rt->shape_hash[i]) {
+          auto* sh_entry = GetEntry(ctx, HeapObjPtr{rt->shape_hash[i]});
+          SetElementReference(shape_array_entry, i, sh_entry);
+          ExtractShapeReference(ctx, sh_entry, rt->shape_hash[i]);
+        }
+      }
+    }
+  }
+
+  if (rt->boilerplateArg0) {
+    SetAndExtractValue(ctx, entry, "boilerplateArg0",
+                       LEPUS_MKPTR(LEPUS_TAG_OBJECT, rt->boilerplateArg0));
+  }
+  if (rt->boilerplateArg1) {
+    SetAndExtractValue(ctx, entry, "boilerplateArg1",
+                       LEPUS_MKPTR(LEPUS_TAG_OBJECT, rt->boilerplateArg1));
+  }
+  if (rt->boilerplateArg2) {
+    SetAndExtractValue(ctx, entry, "boilerplateArg2",
+                       LEPUS_MKPTR(LEPUS_TAG_OBJECT, rt->boilerplateArg2));
+  }
+  if (rt->boilerplateArg3) {
+    SetAndExtractValue(ctx, entry, "boilerplateArg3",
+                       LEPUS_MKPTR(LEPUS_TAG_OBJECT, rt->boilerplateArg3));
   }
 
   if (rt->obj_list.next && rt->obj_list.prev && !list_empty(&rt->obj_list)) {
@@ -597,6 +1294,44 @@ void QjsHeapExplorer::ExtractRuntimeReference(LEPUSContext* ctx,
   }
 
   return;
+}
+
+void QjsHeapExplorer::ExtractJobListReference(LEPUSContext* ctx,
+                                              HeapEntry* entry,
+                                              LEPUSRuntime* rt) {
+  if (!rt->job_list.next || !rt->job_list.prev) return;
+  list_head *el, *el1;
+  list_for_each_safe(el, el1, &rt->job_list) {
+    auto* job = list_entry(el, JSJobEntry, link);
+    if (job->ctx) {
+      auto* job_ctx_entry = GetEntry(job->ctx, HeapObjPtr{job->ctx});
+      SetInternalReference(entry, "job.context", job_ctx_entry);
+    }
+    for (int i = 0; i < job->argc; ++i) {
+      SetAndExtractValue(ctx, entry, "job.argv", job->argv[i]);
+    }
+  }
+}
+
+void QjsHeapExplorer::ExtractUnhandledRejectionReference(LEPUSContext* ctx,
+                                                         HeapEntry* entry,
+                                                         LEPUSRuntime* rt) {
+  if (!rt->unhandled_rejections.next || !rt->unhandled_rejections.prev) return;
+  list_head *el, *el1;
+  list_for_each_safe(el, el1, &rt->unhandled_rejections) {
+    auto* rejection = list_entry(el, JSUnhandledRejectionEntry, link);
+    SetAndExtractValue(ctx, entry, "unhandled_rejection.error",
+                       rejection->error);
+    SetAndExtractValue(ctx, entry, "unhandled_rejection.promise",
+                       rejection->promise);
+  }
+}
+
+void QjsHeapExplorer::ExtractRuntimeRootReference(LEPUSContext* ctx,
+                                                  HeapEntry* entry,
+                                                  LEPUSRuntime* rt) {
+  ExtractJobListReference(ctx, entry, rt);
+  ExtractUnhandledRejectionReference(ctx, entry, rt);
 }
 
 void QjsHeapExplorer::SetRootToGcRootReference() {
@@ -722,15 +1457,14 @@ void QjsHeapExplorer::ExtractGcRootHandleReference() {
         auto& value_buffer = *reinterpret_cast<ValueBuffer*>(heap_obj.ptr);
         for (size_t i = 0; i < value_buffer.len; ++i) {
           auto* value_entry = GetEntry(ctx, value_buffer.arr[i]);
-          SetElementReference(entry, i, value_entry);
+          if (!value_entry) continue;
+          entry->SetNamedAutoIndexReference(HeapGraphEdge::kInternal,
+                                            value_entry);
           ExtractValueReference(ctx, value_entry, value_buffer.arr[i]);
         }
       } break;
-      case HANDLE_TYPE_CSTRING: {
-        const auto* str = *reinterpret_cast<const char**>(heap_obj.ptr);
-        auto* str_entry = GetEntry(ctx, HeapObjPtr{str});
-        entry->SetNamedAutoIndexReference(HeapGraphEdge::kInternal, str_entry);
-      } break;
+      case HANDLE_TYPE_CSTRING:
+        break;
       case HANDLE_TYPE_UNDEFINED:
       default:
         break;
@@ -739,7 +1473,35 @@ void QjsHeapExplorer::ExtractGcRootHandleReference() {
   return;
 }
 
-void QjsHeapExplorer::ExtractGcRootGlobalHandleReference() { return; }
+void QjsHeapExplorer::VisitGlobalHandleRoot(LEPUSValue value, void* data) {
+  auto* visitor_data = static_cast<RootVisitorData*>(data);
+  auto* explorer = visitor_data->explorer;
+  auto* value_entry = explorer->GetEntry(visitor_data->ctx, value);
+  if (!value_entry) return;
+  visitor_data->entry->SetNamedAutoIndexReference(HeapGraphEdge::kInternal,
+                                                  value_entry);
+  explorer->ExtractValueReference(visitor_data->ctx, value_entry, value);
+}
+
+void QjsHeapExplorer::ExtractGcRootGlobalHandleReference() {
+  auto* ctx = context_;
+  if (!ctx->gc_enable) return;
+  auto* entry = snapshot_->gc_subroot(Root::kGlobalHandles);
+  if (ctx->rt->global_handles_) {
+    RootVisitorData visitor_data{this, ctx, entry};
+    ctx->rt->global_handles_->VisitRoots(VisitGlobalHandleRoot, &visitor_data);
+  }
+  auto* allocator = ctx->rt->qjsvaluevalue_allocator;
+  if (!allocator) return;
+  allocator->IterateStrongRoots([this, ctx, entry](LEPUSValue* val) {
+    auto* value_entry = GetEntry(ctx, *val);
+    if (value_entry) {
+      entry->SetNamedAutoIndexReference(HeapGraphEdge::kInternal, value_entry);
+      ExtractValueReference(ctx, value_entry, *val);
+    }
+  });
+  return;
+}
 
 void QjsHeapExplorer::ExtractGcRootRuntimeReference() {
   auto* ctx = context_;
@@ -782,11 +1544,11 @@ void QjsHeapExplorer::IterateAndExtractReference(
   for (size_t i = 0; i < static_cast<size_t>(Root::kNumberOfRoots); ++i) {
     SetGcRootReference(static_cast<Root>(i));
   }
-
+  ExtractGcRootRuntimeReference();
   ExtractGcRootContextReference();
   ExtractGcRootStackReference();
   ExtractGcRootHandleReference();
-  ExtractGcRootRuntimeReference();
+  ExtractGcRootGlobalHandleReference();
 #ifdef ENABLE_COMPATIBLE_MM
   if (context_->gc_enable) {
     context_->rt->collector_->ResetForbidGC();

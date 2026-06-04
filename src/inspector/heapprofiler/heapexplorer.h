@@ -21,6 +21,7 @@ struct JSString;
 struct JSAsyncFunctionData;
 struct JSShape;
 struct JSVarRef;
+struct WeakRefRecord;
 
 namespace quickjs {
 namespace heapprofiler {
@@ -124,10 +125,49 @@ class QjsHeapExplorer : public HeapEntriesAllocator {
                                   size_t);
   void ExtractLepusRefReference(LEPUSContext*, HeapEntry*,
                                 const LEPUSLepusRef*);
+  void ExtractModuleReference(LEPUSContext*, HeapEntry*, const LEPUSModuleDef*);
+  void ExtractNapiHandleScopeReference(LEPUSContext*, HeapEntry*);
+  void ExtractDebuggerInfoReference(LEPUSContext*, HeapEntry*,
+                                    LEPUSDebuggerInfo*);
 
   void ExtractValueReference(LEPUSContext*, HeapEntry*, const LEPUSValue&);
   void ExtractHandleObjReference(LEPUSContext*, HeapEntry*, const HeapObjPtr&);
   HeapObjPtr GetHandleObj(void* ptr);
+
+  // class-specific object reference extraction, mirrors GC's VisitXxx.
+  void ExtractClassSpecificReference(LEPUSContext*, HeapEntry*,
+                                     const LEPUSObject*);
+  void ExtractMapReference(LEPUSContext*, HeapEntry*, const JSMapState*);
+  void ExtractMapRecordReference(LEPUSContext*, HeapEntry*, const JSMapRecord*,
+                                 bool weak_key);
+  void ExtractPromiseReference(LEPUSContext*, HeapEntry*, const JSPromiseData*);
+  void ExtractFinalizationRegistryReference(LEPUSContext*, HeapEntry*,
+                                            const FinalizationRegistryData*);
+  void ExtractFinalizationRegistryEntryReference(
+      LEPUSContext*, HeapEntry*, const FinalizationRegistryEntry*);
+  void ExtractWeakRefRecordReference(LEPUSContext*, HeapEntry*,
+                                     const WeakRefRecord*);
+  void ExtractAsyncFunctionStateReference(LEPUSContext*, HeapEntry*,
+                                          const JSAsyncFunctionState*);
+  void ExtractStackFrameReference(LEPUSContext*, HeapEntry*,
+                                  const LEPUSStackFrame*);
+  void ExtractRuntimeRootReference(LEPUSContext*, HeapEntry*, LEPUSRuntime*);
+  void ExtractJobListReference(LEPUSContext*, HeapEntry*, LEPUSRuntime*);
+  void ExtractUnhandledRejectionReference(LEPUSContext*, HeapEntry*,
+                                          LEPUSRuntime*);
+
+  struct RootVisitorData {
+    QjsHeapExplorer* explorer;
+    LEPUSContext* ctx;
+    HeapEntry* entry;
+  };
+  static void VisitGlobalHandleRoot(LEPUSValue, void*);
+
+  // create a child node for `value`, add a named edge from `parent`, and
+  // recurse into the child. No-op if `value` has no heap entry.
+  void SetAndExtractValue(LEPUSContext*, HeapEntry* parent,
+                          const std::string& name, const LEPUSValue& value,
+                          HeapGraphEdge::Type = HeapGraphEdge::kInternal);
 
   bool HasBeExtracted(const HeapPtr& ptr) {
     return has_extractedobj_.find(ptr) != has_extractedobj_.end();

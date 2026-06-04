@@ -211,3 +211,13 @@ void QJSValueValueSpace::CollectAllRoots(GCWorkStack& workStack) {
     }
   }
 }
+
+void QJSValueValueSpace::IterateStrongRoots(
+    const std::function<void(LEPUSValue*)>& cb) {
+  for (Element* node : *regular_nodes_) {
+    if (node->IsStrongRetainer()) {
+      LEPUSValue* val = (LEPUSValue*)((uint8_t*)(node->location()) + 8);
+      cb(val);
+    }
+  }
+}

@@ -1209,6 +1209,58 @@ typedef struct JSGeneratorData {
   JSAsyncFunctionState func_state;
 } JSGeneratorData;
 
+struct JSMapRecord;
+
+typedef struct JSArrayIteratorData {
+  LEPUSValue obj;
+  JSIteratorKindEnum kind;
+  uint32_t idx;
+} JSArrayIteratorData;
+
+typedef struct JSMapIteratorData {
+  LEPUSValue obj;
+  JSIteratorKindEnum kind;
+  JSMapRecord *cur_record;
+} JSMapIteratorData;
+
+typedef struct JSRegExpStringIteratorData {
+  LEPUSValue iterating_regexp;
+  LEPUSValue iterated_string;
+  BOOL global;
+  BOOL unicode;
+  BOOL done;
+} JSRegExpStringIteratorData;
+
+typedef struct JSAsyncFromSyncIteratorData {
+  LEPUSValue sync_iter;
+  LEPUSValue next_method;
+} JSAsyncFromSyncIteratorData;
+
+typedef enum JSAsyncGeneratorStateEnum {
+  JS_ASYNC_GENERATOR_STATE_SUSPENDED_START,
+  JS_ASYNC_GENERATOR_STATE_SUSPENDED_YIELD,
+  JS_ASYNC_GENERATOR_STATE_SUSPENDED_YIELD_STAR,
+  JS_ASYNC_GENERATOR_STATE_EXECUTING,
+  JS_ASYNC_GENERATOR_STATE_AWAITING_RETURN,
+  JS_ASYNC_GENERATOR_STATE_COMPLETED,
+} JSAsyncGeneratorStateEnum;
+
+typedef struct JSAsyncGeneratorRequest {
+  struct list_head link;
+  int completion_type; /* GEN_MAGIC_x */
+  LEPUSValue result;
+  LEPUSValue promise;
+  LEPUSValue resolving_funcs[2];
+} JSAsyncGeneratorRequest;
+
+typedef struct JSAsyncGeneratorData {
+  LEPUSObject *generator; /* back pointer to the object (const) */
+  JSAsyncGeneratorStateEnum state;
+  JSAsyncFunctionState func_state;
+  struct list_head queue; /* list of JSAsyncGeneratorRequest.link */
+  bool is_completed;
+} JSAsyncGeneratorData;
+
 typedef struct JSProperty {
   union {
     LEPUSValue value;      /* LEPUS_PROP_NORMAL */

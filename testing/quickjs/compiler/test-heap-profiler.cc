@@ -9,6 +9,7 @@
 #include "gc/trace-gc.h"
 #include "gtest/gtest.h"
 #include "inspector/heapprofiler/heapprofiler.h"
+#include "inspector/interface.h"
 #include "quickjs/include/quickjs-inner.h"
 
 extern void take_heap_snapshot_test(LEPUSContext* ctx);
@@ -225,7 +226,56 @@ static const HeapEntry* GetGlobalProperty(const HeapSnapshot* snapshot,
   return GetProperty(GetGlobalVarObject(snapshot), type, name);
 }
 
+static const HeapEntry* GetFirstGcSubrootChild(const HeapSnapshot* snapshot,
+                                               Root root) {
+  auto* subroot = snapshot->gc_subroot(root);
+  if (!subroot || !subroot->children_count()) return nullptr;
+  return subroot->child(0)->to();
+}
+
+static const HeapEntry* FindReachableEntryByName(const HeapEntry* root,
+                                                 const char* name) {
+  std::unordered_set<const HeapEntry*> visited;
+  std::list<const HeapEntry*> queue;
+
+  queue.push_back(root);
+  visited.insert(root);
+
+  while (!queue.empty()) {
+    const auto* entry = queue.front();
+    queue.pop_front();
+
+    if (!strcmp(name, GetName(entry))) return entry;
+
+    for (size_t i = 0, count = entry->children_count(); i < count; ++i) {
+      const auto* child = const_cast<HeapEntry*>(entry)->child(i)->to();
+      if (visited.insert(child).second) {
+        queue.push_back(child);
+      }
+    }
+  }
+
+  return nullptr;
+}
+
 #pragma clang diagnostic pop
+
+static LEPUSValue HeapProfilerNoopJob(LEPUSContext*, int, LEPUSValueConst*) {
+  return LEPUS_UNDEFINED;
+}
+
+#ifdef ENABLE_QUICKJS_DEBUGGER
+class ScopedQjsDebugger {
+ public:
+  explicit ScopedQjsDebugger(LEPUSContext* ctx) : ctx_(ctx) {
+    QJSDebuggerInitialize(ctx_);
+  }
+  ~ScopedQjsDebugger() { QJSDebuggerFree(ctx_); }
+
+ private:
+  LEPUSContext* ctx_ = nullptr;
+};
+#endif
 
 TEST(QjsHeapProfiler, HeapSnapshot) {
   ::TestQjsContext env;
@@ -428,6 +478,155 @@ TEST(HeapProfiler, HeapNumber) {
   ASSERT_TRUE(b == nullptr);
 }
 
+TEST(HeapProfiler, TracingGcContextRoots) {
+  ::TestQjsContext env;
+  if (!env.ctx->rt->gc_enable) GTEST_SKIP();
+
+#ifdef ENABLE_QUICKJS_DEBUGGER
+  ScopedQjsDebugger debugger(env.ctx);
+#endif
+
+  auto* snapshot = GetQjsHeapProfilerImplInstance().TakeHeapSnapshot(env.ctx);
+
+  ASSERT_TRUE(ValidateSnapshot(snapshot));
+
+  auto* context = GetFirstGcSubrootChild(snapshot, Root::kContextList);
+  ASSERT_TRUE(context);
+
+  ASSERT_TRUE(GetProperty(context, HeapGraphEdge::kInternal, "global_obj"));
+  ASSERT_TRUE(GetProperty(context, HeapGraphEdge::kInternal, "global_var_obj"));
+  ASSERT_TRUE(GetProperty(context, HeapGraphEdge::kInternal, "eval_obj"));
+  ASSERT_TRUE(GetProperty(context, HeapGraphEdge::kInternal, "function_proto"));
+  ASSERT_TRUE(GetProperty(context, HeapGraphEdge::kInternal, "function_ctor"));
+  ASSERT_TRUE(GetProperty(context, HeapGraphEdge::kInternal, "regexp_ctor"));
+  ASSERT_TRUE(GetProperty(context, HeapGraphEdge::kInternal, "promise_ctor"));
+  ASSERT_TRUE(GetProperty(context, HeapGraphEdge::kInternal, "iterator_proto"));
+  ASSERT_TRUE(
+      GetProperty(context, HeapGraphEdge::kInternal, "async_iterator_proto"));
+  ASSERT_TRUE(
+      GetProperty(context, HeapGraphEdge::kInternal, "array_proto_values"));
+  ASSERT_FALSE(GetProperty(context, HeapGraphEdge::kInternal, "class_proto"));
+  ASSERT_TRUE(
+      GetProperty(context, HeapGraphEdge::kInternal, "class_proto:Object"));
+  ASSERT_TRUE(
+      GetProperty(context, HeapGraphEdge::kInternal, "class_proto:Array"));
+#ifdef ENABLE_QUICKJS_DEBUGGER
+  ASSERT_TRUE(GetProperty(context, HeapGraphEdge::kInternal, "debugger_info"));
+#endif
+}
+
+TEST(HeapProfiler, TracingGcRuntimeContainerNodes) {
+  ::TestQjsContext env;
+  if (!env.ctx->rt->gc_enable) GTEST_SKIP();
+
+  auto* snapshot = GetQjsHeapProfilerImplInstance().TakeHeapSnapshot(env.ctx);
+
+  ASSERT_TRUE(ValidateSnapshot(snapshot));
+
+  auto* context = GetFirstGcSubrootChild(snapshot, Root::kContextList);
+  ASSERT_TRUE(context);
+
+  auto* runtime = GetProperty(context, HeapGraphEdge::kInternal, "runtime");
+  ASSERT_TRUE(runtime);
+
+  auto* atom_array =
+      GetProperty(runtime, HeapGraphEdge::kInternal, "atom_array");
+  ASSERT_TRUE(atom_array);
+  ASSERT_EQ(HeapEntry::kNative, atom_array->type());
+  ASSERT_STREQ("system / atom_array", GetName(atom_array));
+
+  auto* shape_array =
+      GetProperty(runtime, HeapGraphEdge::kInternal, "shape_array");
+  ASSERT_TRUE(shape_array);
+  ASSERT_EQ(HeapEntry::kNative, shape_array->type());
+  ASSERT_STREQ("system / shape_array", GetName(shape_array));
+}
+
+TEST(HeapProfiler, TracingGcTakeSnapshotPreservesConsoleMessages) {
+  ::TestQjsContext env;
+  if (!env.ctx->rt->gc_enable) GTEST_SKIP();
+
+#ifdef ENABLE_QUICKJS_DEBUGGER
+  ScopedQjsDebugger debugger(env.ctx);
+#else
+  GTEST_SKIP();
+#endif
+
+  auto* info = env.ctx->debugger_info;
+  ASSERT_TRUE(info);
+
+  LEPUSValue ret = env.CompileAndRun(R"(
+    console.log({ label: 'console-message-root' });
+  )");
+  ASSERT_FALSE(LEPUS_IsException(ret));
+  ASSERT_FALSE(LEPUS_IsNull(info->console.messages));
+  ASSERT_FALSE(LEPUS_IsUndefined(info->console.messages));
+  ASSERT_GT(info->console.length, 0);
+
+  void* messages_ptr = LEPUS_VALUE_GET_PTR(info->console.messages);
+  int32_t messages_length = info->console.length;
+
+  auto* snapshot = GetQjsHeapProfilerImplInstance().TakeHeapSnapshot(env.ctx);
+
+  ASSERT_TRUE(ValidateSnapshot(snapshot));
+  ASSERT_FALSE(LEPUS_IsUndefined(info->console.messages));
+  ASSERT_EQ(messages_ptr, LEPUS_VALUE_GET_PTR(info->console.messages));
+  ASSERT_EQ(messages_length, info->console.length);
+}
+
+TEST(HeapProfiler, TracingGcGlobalHandlesRoot) {
+  ::TestQjsContext env;
+  if (!env.ctx->rt->gc_enable) GTEST_SKIP();
+
+  LEPUSValue obj = env.CompileAndRun(R"(
+    (function() {
+      function GlobalHandleTarget() {
+        this.payload = { label: 'global-handle' };
+      }
+      return new GlobalHandleTarget();
+    })()
+  )");
+  ASSERT_TRUE(LEPUS_VALUE_IS_OBJECT(obj));
+
+  LEPUSValue* handle = GlobalizeReference(env.rt, obj, false);
+  ASSERT_NE(handle, nullptr);
+
+  auto* snapshot = GetQjsHeapProfilerImplInstance().TakeHeapSnapshot(env.ctx);
+
+  ASSERT_TRUE(ValidateSnapshot(snapshot));
+  ASSERT_TRUE(FindReachableEntryByName(
+      snapshot->gc_subroot(Root::kGlobalHandles), "GlobalHandleTarget"));
+
+  DisposeGlobal(env.rt, handle);
+}
+
+TEST(HeapProfiler, TracingGcJobListRoot) {
+  ::TestQjsContext env;
+  if (!env.ctx->rt->gc_enable) GTEST_SKIP();
+
+  LEPUSValue obj = env.CompileAndRun(R"(
+    (function() {
+      function JobListTarget() {
+        this.payload = { label: 'job-list' };
+      }
+      return new JobListTarget();
+    })()
+  )");
+  ASSERT_TRUE(LEPUS_VALUE_IS_OBJECT(obj));
+
+  LEPUSValueConst argv[] = {obj};
+  ASSERT_EQ(0, LEPUS_EnqueueJob(env.ctx, HeapProfilerNoopJob, 1, argv));
+
+  auto* snapshot = GetQjsHeapProfilerImplInstance().TakeHeapSnapshot(env.ctx);
+
+  ASSERT_TRUE(ValidateSnapshot(snapshot));
+  ASSERT_TRUE(FindReachableEntryByName(snapshot->gc_root(), "JobListTarget"));
+
+  LEPUSContext* job_ctx = nullptr;
+  while (LEPUS_ExecutePendingJob(env.rt, &job_ctx) > 0) {
+  }
+}
+
 TEST(HeapProfiler, TakeSnapshotTest) {
   ::TestQjsContext env;
   take_heap_snapshot_test(env.ctx);
@@ -465,8 +664,6 @@ TEST(HeapProfiler, Shape) {
     ASSERT_NE(entry.name(), "system / shape");
     ASSERT_NE(entry.name(), "system / value_array");
     ASSERT_NE(entry.name(), "system / var_ref_array");
-    ASSERT_NE(entry.name(), "system / atom_array");
-    ASSERT_NE(entry.name(), "system / shape_array");
   }
 }
 

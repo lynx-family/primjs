@@ -8239,33 +8239,6 @@ static LEPUSValue js_async_function_call(LEPUSContext *ctx,
 
 /* AsyncGenerator */
 
-typedef enum JSAsyncGeneratorStateEnum {
-  JS_ASYNC_GENERATOR_STATE_SUSPENDED_START,
-  JS_ASYNC_GENERATOR_STATE_SUSPENDED_YIELD,
-  JS_ASYNC_GENERATOR_STATE_SUSPENDED_YIELD_STAR,
-  JS_ASYNC_GENERATOR_STATE_EXECUTING,
-  JS_ASYNC_GENERATOR_STATE_AWAITING_RETURN,
-  JS_ASYNC_GENERATOR_STATE_COMPLETED,
-} JSAsyncGeneratorStateEnum;
-
-typedef struct JSAsyncGeneratorRequest {
-  struct list_head link;
-  /* completion */
-  int completion_type; /* GEN_MAGIC_x */
-  LEPUSValue result;
-  /* promise capability */
-  LEPUSValue promise;
-  LEPUSValue resolving_funcs[2];
-} JSAsyncGeneratorRequest;
-
-typedef struct JSAsyncGeneratorData {
-  LEPUSObject *generator; /* back pointer to the object (const) */
-  JSAsyncGeneratorStateEnum state;
-  JSAsyncFunctionState func_state;
-  struct list_head queue; /* list of JSAsyncGeneratorRequest.link */
-  bool is_completed;
-} JSAsyncGeneratorData;
-
 static LEPUSValue js_async_generator_resolve_function(
     LEPUSContext *ctx, LEPUSValueConst this_obj, int argc,
     LEPUSValueConst *argv, int magic, LEPUSValue *func_data);
@@ -15780,12 +15753,6 @@ fail:
   return LEPUS_EXCEPTION;
 }
 
-typedef struct JSArrayIteratorData {
-  LEPUSValue obj;
-  JSIteratorKindEnum kind;
-  uint32_t idx;
-} JSArrayIteratorData;
-
 static LEPUSValue js_create_array(LEPUSContext *ctx, int len,
                                   LEPUSValueConst *tab) {
   LEPUSValue obj;
@@ -18904,14 +18871,6 @@ exception:
   return LEPUS_EXCEPTION;
 }
 
-typedef struct JSRegExpStringIteratorData {
-  LEPUSValue iterating_regexp;
-  LEPUSValue iterated_string;
-  BOOL global;
-  BOOL unicode;
-  BOOL done;
-} JSRegExpStringIteratorData;
-
 static LEPUSValue js_regexp_string_iterator_next(LEPUSContext *ctx,
                                                  LEPUSValueConst this_val,
                                                  int argc,
@@ -21705,12 +21664,6 @@ static LEPUSValue js_map_forEach(LEPUSContext *ctx, LEPUSValueConst this_val,
 
 /* Map Iterator */
 
-typedef struct JSMapIteratorData {
-  LEPUSValue obj;
-  JSIteratorKindEnum kind;
-  JSMapRecord *cur_record;
-} JSMapIteratorData;
-
 static LEPUSValue js_create_map_iterator(LEPUSContext *ctx,
                                          LEPUSValueConst this_val, int argc,
                                          LEPUSValueConst *argv, int magic) {
@@ -23166,11 +23119,6 @@ static const LEPUSCFunctionListEntry js_async_iterator_proto_funcs[] = {
 };
 
 /* AsyncFromSyncIteratorPrototype */
-
-typedef struct JSAsyncFromSyncIteratorData {
-  LEPUSValue sync_iter;
-  LEPUSValue next_method;
-} JSAsyncFromSyncIteratorData;
 
 static LEPUSValue js_async_from_sync_iterator_next(LEPUSContext *ctx,
                                                    LEPUSValueConst this_val,

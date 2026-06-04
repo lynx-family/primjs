@@ -9,7 +9,10 @@
 #ifndef SRC_GC_QJSVALUEVALUE_SPACE_H_
 #define SRC_GC_QJSVALUEVALUE_SPACE_H_
 
+#include <functional>
+
 #include "gc/persistent-handle.h"
+
 class QJSValueValueSpace final {
  public:
   QJSValueValueSpace(const QJSValueValueSpace&) = delete;
@@ -24,6 +27,8 @@ class QJSValueValueSpace final {
   ~QJSValueValueSpace();
   void* Create();
   void CollectAllRoots(GCWorkStack& workStack);
+  // Iterate persistent strong LEPUSValue roots for heap snapshots.
+  void IterateStrongRoots(const std::function<void(LEPUSValue*)>& cb);
   LEPUSRuntime* runtime() const { return runtime_; }
 
  private:
