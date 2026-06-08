@@ -601,51 +601,6 @@ bool JS_GetGCPauseSuppressionMode_GC(LEPUSRuntime *rt) {
   return rt->ros_->GetGCPauseSuppressionMode();
 }
 
-/* default memory allocation functions with memory limitation */
-QJS_STATIC inline size_t js_def_malloc_usable_size(void *ptr) {
-#if defined(__APPLE__)
-  return malloc_size(ptr);
-#elif defined(_WIN32)
-  return _msize(ptr);
-#elif defined(EMSCRIPTEN)
-  return 0;
-#elif defined(__linux__)
-  return malloc_usable_size(ptr);
-#else
-  /* change this to `return 0;` if
-   * compilation fails */
-  return malloc_usable_size(ptr);
-#endif
-}
-
-static void *js_def_malloc(JSMallocState *s, size_t size, int alloc_tag) {
-  void *ptr;
-
-  /* Do not allocate zero bytes: behavior is platform dependent */
-  assert(size != 0);
-
-  if (unlikely(s->malloc_size + size > s->malloc_limit)) return NULL;
-
-  ptr = malloc(size);
-  if (!ptr) return NULL;
-
-  s->malloc_count++;
-  s->malloc_size += js_def_malloc_usable_size(ptr) + MALLOC_OVERHEAD;
-  return ptr;
-}
-
-#define JS_OBJECT_IS_ARRAY_BUFFER(obj)       \
-  (obj->class_id == JS_CLASS_ARRAY_BUFFER || \
-   obj->class_id == JS_CLASS_SHARED_ARRAY_BUFFER)
-
-static void js_def_free(JSMallocState *s, void *ptr) {
-  if (!ptr) return;
-
-  s->malloc_count--;
-  s->malloc_size -= js_def_malloc_usable_size(ptr) + MALLOC_OVERHEAD;
-  free(ptr);
-}
-
 static void lepus_def_gcfree(JSMallocState *s, void *ptr) { abort(); }
 
 size_t allocate_usable_size(void *mem) {

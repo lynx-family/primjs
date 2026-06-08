@@ -1151,19 +1151,21 @@ fail:
 }
 
 /* default memory allocation functions with memory limitation */
-QJS_STATIC inline size_t js_def_malloc_usable_size(void *ptr) {
-#if defined(__APPLE__)
+QJS_STATIC inline size_t js_def_malloc_usable_size(const void *ptr) {
+#if defined(__APPLE__) || defined(OS_IOS)
   return malloc_size(ptr);
 #elif defined(_WIN32)
-  return _msize(ptr);
-#elif defined(EMSCRIPTEN)
-  return 0;
-#elif defined(__linux__)
+  return _msize(const_cast<void *>(ptr));
+#elif defined(ANDROID) || defined(__ANDROID__)
+#if defined(__ANDROID_API__) && __ANDROID_API__ >= 17
   return malloc_usable_size(ptr);
 #else
-  /* change this to `return 0;` if
-   * compilation fails */
-  return malloc_usable_size(ptr);
+  return 0;
+#endif
+#elif defined(__linux__)
+  return malloc_usable_size(const_cast<void *>(ptr));
+#else
+  return 0;
 #endif
 }
 
@@ -1222,19 +1224,7 @@ static const LEPUSMallocFunctions def_malloc_funcs = {
     js_def_malloc,
     js_def_free,
     js_def_realloc,
-#if defined(__APPLE__)
-    malloc_size,
-#elif defined(_WIN32)
-    (size_t(*)(const void *))_msize,
-#elif defined(EMSCRIPTEN)
-    NULL,
-#elif defined(__linux__)
-    (size_t(*)(const void *))malloc_usable_size,
-#else
-    /* change this to `NULL,` if compilation
-       fails */
-    malloc_usable_size,
-#endif
+    js_def_malloc_usable_size,
 };
 
 LEPUSRuntime *LEPUS_NewRuntime() {
