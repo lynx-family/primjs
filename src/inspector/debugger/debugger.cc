@@ -1352,7 +1352,7 @@ QJS_HIDE void JS_AddIntrinsicConsole(LEPUSContext *ctx) {
   LEPUSValue global = ctx->global_obj;
   LEPUSValue console = LEPUS_NewObject(ctx);
   HandleScope func_scope{ctx, &console, HANDLE_TYPE_LEPUS_VALUE};
-  DebuggerSetPropertyStr(ctx, global, "console", console);
+  LEPUS_SetPropertyStr(ctx, global, "console", console);
   LEPUSValue cfunc = LEPUS_UNDEFINED;
   func_scope.PushHandle(&cfunc, HANDLE_TYPE_LEPUS_VALUE);
 #define RegisterConsole(name, type)                                          \

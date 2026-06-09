@@ -38572,6 +38572,28 @@ static const LEPUSCFunctionListEntry js_math_obj[] = {
                      LEPUS_PROP_WRITABLE | LEPUS_PROP_CONFIGURABLE),
 };
 
+// Default empty console with no-op methods
+static LEPUSValue js_console_noop(LEPUSContext *ctx, LEPUSValueConst this_val,
+                                  int argc, LEPUSValueConst *argv) {
+  return LEPUS_UNDEFINED;
+}
+
+static const LEPUSCFunctionListEntry js_default_console_funcs[] = {
+    LEPUS_CFUNC_DEF("log", 0, js_console_noop),
+    LEPUS_CFUNC_DEF("info", 0, js_console_noop),
+    LEPUS_CFUNC_DEF("debug", 0, js_console_noop),
+    LEPUS_CFUNC_DEF("error", 0, js_console_noop),
+    LEPUS_CFUNC_DEF("warn", 0, js_console_noop),
+};
+
+void JS_AddDefaultConsole(LEPUSContext *ctx) {
+  LEPUSValue console = LEPUS_NewObject(ctx);
+  HandleScope func_scope{ctx, &console, HANDLE_TYPE_LEPUS_VALUE};
+  LEPUS_SetPropertyFunctionList(ctx, console, js_default_console_funcs,
+                                countof(js_default_console_funcs));
+  LEPUS_SetPropertyStr(ctx, ctx->global_obj, "console", console);
+}
+
 /* Date */
 
 #if 0
@@ -48153,6 +48175,7 @@ void LEPUS_AddIntrinsicBaseObjects(LEPUSContext *ctx) {
                                LEPUS_DupValue(ctx, ctx->global_obj),
                                LEPUS_PROP_CONFIGURABLE | LEPUS_PROP_WRITABLE);
   JS_AddIntrinsicBigInt(ctx);
+  JS_AddDefaultConsole(ctx);
   return;
 }
 

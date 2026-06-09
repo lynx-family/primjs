@@ -3352,4 +3352,6 @@ inline const LEPUSCFunctionListEntry js_native_error_proto_funcs[] = {
 #undef DEF
 };
 
+void JS_AddDefaultConsole(LEPUSContext *ctx);
+
 #endif  // SRC_INTERPRETER_QUICKJS_INCLUDE_QUICKJS_INNER_H_

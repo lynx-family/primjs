@@ -24755,6 +24755,7 @@ void JS_AddIntrinsicBaseObjects_GC(LEPUSContext *ctx) {
   func_scope.PushHandle(&cfunc, HANDLE_TYPE_LEPUS_VALUE);
   LEPUS_SetPropertyStr(ctx, ctx->global_obj, "lepusng_gc", cfunc);
   JS_AddIntrinsicBigInt(ctx);
+  JS_AddDefaultConsole(ctx);
 }
 
 static LEPUSValue js_array_buffer_constructor3(
