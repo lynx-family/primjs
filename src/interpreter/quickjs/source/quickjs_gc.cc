@@ -21466,6 +21466,13 @@ static bool try_delete_weak_ref(LEPUSRuntime *rt, LEPUSObject *p, void *ptr) {
   return false;
 }
 
+static bool IsValidJSMapRecordLink(ROS_GC::RosAllocImpl *ros,
+                                   const struct list_head *link) {
+  return link != nullptr &&
+         ros->GetPageGroups().HasAddress(reinterpret_cast<address_t>(link) -
+                                         offsetof(JSMapRecord, link));
+}
+
 static void map_delete_record(LEPUSRuntime *rt, JSMapState *s,
                               JSMapRecord *mr) {
   if (mr->empty) return;
@@ -28641,25 +28648,7 @@ void Visitor::VisitLEPUSObject(void *ptr, GCWorkStack &workStack) noexcept {
   }
   // first_weak_ref
   if (unlikely(obj->first_weak_ref)) {
-    for (WeakRefRecord *wr = obj->first_weak_ref; wr != nullptr;
-         wr = wr->next_weak_ref) {
-      switch (wr->kind) {
-        case WEAK_REF_KIND_WEAK_MAP:
-          workStack.push_back((address_t)wr->u.map_record);
-          PushObjLEPUSValue(wr->u.map_record->value, workStack);
-          break;
-        case WEAK_REF_KIND_FINALIZATION_REGISTRY: {
-          FinalizationRegistryEntry *fin_node = wr->u.fin_node;
-          workStack.push_back((address_t)fin_node);
-          PushObjLEPUSValue(fin_node->held_value, workStack);
-          PushObjLEPUSValue(fin_node->token, workStack);
-          break;
-        }
-        default:
-          break;
-      }
-      workStack.push_back((address_t)wr);
-    }
+    workStack.push_back((address_t)obj->first_weak_ref);
   }
   // finalizer
   switch (obj->class_id) {
@@ -29447,15 +29436,29 @@ void Finalizer::JSTypedArrayFinalizer(void *ptr) noexcept {
 }
 void Finalizer::JSMapStateFinalizer(void *ptr) noexcept {
   JSMapState *s = static_cast<JSMapState *>(ptr);
-  struct list_head *el, *el1;
-  JSMapRecord *mr;
-  list_for_each_safe(el, el1, &s->records) {
-    mr = list_entry(el, JSMapRecord, link);
+  auto *ros = rt_->collector_->GetRosAllocator();
+  struct list_head *el = s->records.next;
+  while (el != &s->records) {
+    if (!IsValidJSMapRecordLink(ros, el)) {
+      break;
+    }
+
+    struct list_head *next = el->next;
+    JSMapRecord *mr = list_entry(el, JSMapRecord, link);
     if (!mr->empty) {
       if (s->is_weak && LEPUS_VALUE_IS_OBJECT(mr->key)) {
-        try_delete_weak_ref(rt_, LEPUS_VALUE_GET_OBJ(mr->key), mr);
+        LEPUSObject *key_obj = LEPUS_VALUE_GET_OBJ(mr->key);
+        if (ros->GetPageGroups().HasAddress(
+                reinterpret_cast<address_t>(key_obj))) {
+          try_delete_weak_ref(rt_, key_obj, mr);
+        }
       }
     }
+
+    if (next != &s->records && !IsValidJSMapRecordLink(ros, next)) {
+      break;
+    }
+    el = next;
   }
 }
 void Finalizer::JSMapIteratorDataFinalizer(void *ptr) noexcept {
