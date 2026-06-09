@@ -29428,11 +29428,25 @@ void Finalizer::JSModuleDefFinalizer(void *ptr) noexcept {
 void Finalizer::FinalizationRegistryDataFinalizer(void *ptr) noexcept {
   auto *frd = reinterpret_cast<FinalizationRegistryData *>(ptr);
   if (!frd) return;
-  list_head *el;
-  list_for_each(el, &frd->entries) {
+  auto *ros = rt_->collector_->GetRosAllocator();
+  list_head *el = frd->entries.next;
+  while (el != &frd->entries) {
+    if (el == nullptr || !ros->GetPageGroups().HasAddress(
+                             reinterpret_cast<address_t>(el) -
+                             offsetof(FinalizationRegistryEntry, link))) {
+      break;
+    }
+    struct list_head *next = el->next;
     FinalizationRegistryEntry *fin_node =
         list_entry(el, FinalizationRegistryEntry, link);
-    delete_weak_ref(rt_, LEPUS_VALUE_GET_OBJ(fin_node->target), fin_node);
+    if (LEPUS_VALUE_IS_OBJECT(fin_node->target)) {
+      LEPUSObject *target_obj = LEPUS_VALUE_GET_OBJ(fin_node->target);
+      if (ros->GetPageGroups().HasAddress(
+              reinterpret_cast<address_t>(target_obj))) {
+        try_delete_weak_ref(rt_, target_obj, fin_node);
+      }
+    }
+    el = next;
   }
 }
 
@@ -29440,7 +29454,12 @@ void Finalizer::WeakRefDataFinalizer(void *ptr) noexcept {
   auto *wrd = reinterpret_cast<WeakRefData *>(ptr);
   LEPUSValue target = wrd->target;
   if (LEPUS_VALUE_IS_OBJECT(target)) {
-    delete_weak_ref(rt_, LEPUS_VALUE_GET_OBJ(target), wrd);
+    auto *ros = rt_->collector_->GetRosAllocator();
+    LEPUSObject *target_obj = LEPUS_VALUE_GET_OBJ(target);
+    if (ros->GetPageGroups().HasAddress(
+            reinterpret_cast<address_t>(target_obj))) {
+      try_delete_weak_ref(rt_, target_obj, wrd);
+    }
   }
   return;
 }
