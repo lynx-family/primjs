@@ -209,10 +209,6 @@ QJS_HIDE void SetDebuggerStepStatement(LEPUSDebuggerInfo *info,
 
 QJS_HIDE const uint8_t *FindBreakpointBytecode(LEPUSContext *ctx,
                                                LEPUSBreakpoint *bp);
-QJS_HIDE LEPUSValue js_symbol_toString(LEPUSContext *, LEPUSValue, int32_t,
-                                       LEPUSValue *);
-QJS_HIDE LEPUSValue js_symbol_toString_GC(LEPUSContext *, LEPUSValue, int32_t,
-                                          LEPUSValue *);
 QJS_HIDE void DebuggerParseScript(LEPUSContext *ctx, const char *input,
                                   size_t input_len, struct JSFunctionDef *fd,
                                   const char *filename, int32_t end_line_num,

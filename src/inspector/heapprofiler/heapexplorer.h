@@ -127,8 +127,9 @@ class QjsHeapExplorer : public HeapEntriesAllocator {
                                 const LEPUSLepusRef*);
   void ExtractModuleReference(LEPUSContext*, HeapEntry*, const LEPUSModuleDef*);
   void ExtractNapiHandleScopeReference(LEPUSContext*, HeapEntry*);
-  void ExtractDebuggerInfoReference(LEPUSContext*, HeapEntry*,
-                                    LEPUSDebuggerInfo*);
+  void ExtractDebuggerInfoFromContext(LEPUSContext*, HeapEntry*);
+  void ExtractStackFrameDebuggerThis(LEPUSContext*, HeapEntry*,
+                                     const LEPUSStackFrame*);
 
   void ExtractValueReference(LEPUSContext*, HeapEntry*, const LEPUSValue&);
   void ExtractHandleObjReference(LEPUSContext*, HeapEntry*, const HeapObjPtr&);
@@ -184,6 +185,11 @@ class QjsHeapExplorer : public HeapEntriesAllocator {
   HeapObjectIdMaps* object_id_maps_ = nullptr;
 
   std::unordered_set<HeapPtr> has_extractedobj_;
+
+#ifdef ENABLE_QUICKJS_DEBUGGER
+  void ExtractDebuggerInfoReference(LEPUSContext*, HeapEntry*,
+                                    LEPUSDebuggerInfo*);
+#endif
 };
 
 }  // namespace heapprofiler

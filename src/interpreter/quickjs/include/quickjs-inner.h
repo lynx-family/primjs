@@ -2763,6 +2763,10 @@ QJS_HIDE LEPUSValue __attribute__((format(printf, 3, 4)))
 __JS_ThrowTypeErrorAtom(LEPUSContext *ctx, JSAtom atom, const char *fmt, ...);
 QJS_HIDE LEPUSValue JS_ThrowTypeErrorPrivateNotFound(LEPUSContext *ctx,
                                                      JSAtom atom);
+QJS_HIDE LEPUSValue js_symbol_toString(LEPUSContext *, LEPUSValue, int32_t,
+                                       LEPUSValue *);
+QJS_HIDE LEPUSValue js_symbol_toString_GC(LEPUSContext *, LEPUSValue, int32_t,
+                                          LEPUSValue *);
 typedef struct BlockEnv {
   struct BlockEnv *prev;
   JSAtom label_name; /* JS_ATOM_NULL if none */
@@ -3167,8 +3171,11 @@ class TraceManager {
 
 #define JS_OBJECT_IS_OUTER(obj) (obj->class_id >= JS_CLASS_INIT_COUNT)
 
-#ifdef ENABLE_QUICKJS_DEBUGGER
+#if ENABLE_QUICKJS_DEBUGGER
 #define TRACE_EVENT(name) auto tracer = TraceManager{name};
+#else
+#define TRACE_EVENT(name)
+#endif /* ENABLE_QUICKJS_DEBUGGER */
 
 #ifdef ENABLE_COMPATIBLE_MM
 #define DEBUGGER_COMPATIBLE_CALL_RET(ctx, name, args...) \
@@ -3176,11 +3183,6 @@ class TraceManager {
 #else
 #define DEBUGGER_COMPATIBLE_CALL_RET(ctx, name, args...) (name(args))
 #endif /* ENABLE_COMPATIBLE_MM */
-
-#else
-#define TRACE_EVENT(name)
-#define DEBUGGER_COMPATIBLE_CALL_RET
-#endif /* ENABLE_QUICKJS_DEBUGGER */
 
 int64_t date_now();
 

@@ -1704,6 +1704,9 @@ void LEPUS_ReportExternalSize(LEPUSRuntime *rt, int64_t total_size,
 
 void LEPUS_SetGCObserver(LEPUSRuntime *rt, void *opaque);
 void *LEPUS_GetGCObserver(LEPUSRuntime *rt);
+// Returned pointer should be released with js_profile_free_heap_snapshot().
+const char *js_profile_take_heap_snapshot(LEPUSContext *ctx);
+void js_profile_free_heap_snapshot(const char *snapshot);
 // <Primjs end>
 
 #undef lepus_unlikely

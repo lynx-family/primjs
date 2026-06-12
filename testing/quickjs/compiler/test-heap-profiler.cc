@@ -13,6 +13,8 @@
 #include "quickjs/include/quickjs-inner.h"
 
 extern void take_heap_snapshot_test(LEPUSContext* ctx);
+extern const char* js_profile_take_heap_snapshot(LEPUSContext* ctx);
+extern void js_profile_free_heap_snapshot(const char* snapshot);
 namespace {
 class TestQjsContext {
  public:
@@ -630,6 +632,31 @@ TEST(HeapProfiler, TracingGcJobListRoot) {
 TEST(HeapProfiler, TakeSnapshotTest) {
   ::TestQjsContext env;
   take_heap_snapshot_test(env.ctx);
+}
+
+TEST(HeapProfiler, TakeHeapSnapshotReturnsMallocedCString) {
+  ::TestQjsContext env;
+  LEPUSValue ret = env.CompileAndRun(R"(
+    const heapSnapshotTarget = {foo: "bar"};
+  )");
+  if (!env.ctx->rt->gc_enable) LEPUS_FreeValue(env.ctx, ret);
+
+  const char* snapshot = js_profile_take_heap_snapshot(env.ctx);
+  ASSERT_NE(nullptr, snapshot);
+
+  std::string snapshot_json(snapshot);
+  js_profile_free_heap_snapshot(snapshot);
+
+  ASSERT_GT(snapshot_json.size(), 0);
+  LEPUSValue parsed = LEPUS_ParseJSON(env.ctx, snapshot_json.c_str(),
+                                      snapshot_json.size(), "heap-snapshot");
+  HandleScope func_scope{env.ctx, &parsed, HANDLE_TYPE_LEPUS_VALUE};
+  ASSERT_TRUE(LEPUS_IsObject(parsed));
+
+  JSAtom snapshot_prop = LEPUS_NewAtom(env.ctx, "snapshot");
+  ASSERT_TRUE(LEPUS_HasProperty(env.ctx, parsed, snapshot_prop));
+  if (!env.ctx->rt->gc_enable) LEPUS_FreeAtom(env.ctx, snapshot_prop);
+  if (!env.ctx->rt->gc_enable) LEPUS_FreeValue(env.ctx, parsed);
 }
 
 TEST(HeapProfiler, Shape) {

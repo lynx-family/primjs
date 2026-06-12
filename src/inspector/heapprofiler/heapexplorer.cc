@@ -488,79 +488,6 @@ void QjsHeapExplorer::ExtractNapiHandleScopeReference(LEPUSContext* ctx,
   }
 }
 
-void QjsHeapExplorer::ExtractDebuggerInfoReference(LEPUSContext* ctx,
-                                                   HeapEntry* entry,
-                                                   LEPUSDebuggerInfo* info) {
-#ifdef ENABLE_QUICKJS_DEBUGGER
-  if (!info) return;
-  auto* info_entry = GetEntry(ctx, HeapObjPtr{info, HeapObjPtr::kWithoutPtr,
-                                              sizeof(LEPUSDebuggerInfo)});
-  SetInternalReference(entry, "debugger_info", info_entry);
-  if (!info_entry) return;
-
-  SetAndExtractValue(ctx, info_entry, "debugger_name", info->debugger_name);
-  if (info->source_code) {
-    SetInternalReference(info_entry, "source_code",
-                         GetEntry(ctx, HeapObjPtr{info->source_code}));
-  }
-  struct list_head* el;
-  list_for_each(el, &info->script_list) {
-    auto* script = list_entry(el, LEPUSScriptSource, link);
-    if (script->url) {
-      SetInternalReference(info_entry, "script.url",
-                           GetEntry(ctx, HeapObjPtr{script->url}));
-    }
-    if (script->source) {
-      SetInternalReference(info_entry, "script.source",
-                           GetEntry(ctx, HeapObjPtr{script->source}));
-    }
-    if (script->hash) {
-      SetInternalReference(info_entry, "script.hash",
-                           GetEntry(ctx, HeapObjPtr{script->hash}));
-    }
-    if (script->source_map_url) {
-      SetInternalReference(info_entry, "script.source_map_url",
-                           GetEntry(ctx, HeapObjPtr{script->source_map_url}));
-    }
-  }
-
-  SetAndExtractValue(ctx, info_entry, "pause_state.get_properties_array",
-                     info->pause_state.get_properties_array);
-  SetAndExtractValue(ctx, info_entry, "running_state.get_properties_array",
-                     info->running_state.get_properties_array);
-  SetAndExtractValue(ctx, info_entry, "object_group_registry",
-                     info->object_group_registry);
-  SetAndExtractValue(ctx, info_entry, "console.messages",
-                     info->console.messages);
-#define DebuggerExtractStringPool(name, str)                 \
-  SetAndExtractValue(ctx, info_entry, "literal_pool." #name, \
-                     info->literal_pool.name);
-  QJSDebuggerStringPool(DebuggerExtractStringPool)
-#undef DebuggerExtractStringPool
-
-      SetAndExtractValue(ctx, info_entry, "debugger_obj.response",
-                         info->debugger_obj.response);
-  SetAndExtractValue(ctx, info_entry, "debugger_obj.notification",
-                     info->debugger_obj.notification);
-  SetAndExtractValue(ctx, info_entry, "debugger_obj.breakpoint",
-                     info->debugger_obj.breakpoint);
-  SetAndExtractValue(ctx, info_entry, "debugger_obj.bp_location",
-                     info->debugger_obj.bp_location);
-  SetAndExtractValue(ctx, info_entry, "debugger_obj.result",
-                     info->debugger_obj.result);
-  SetAndExtractValue(ctx, info_entry, "debugger_obj.preview_prop",
-                     info->debugger_obj.preview_prop);
-  for (auto& [pc, value] : info->break_bytecode_map) {
-    SetAndExtractValue(ctx, info_entry, "break_bytecode", value);
-  }
-  if (info->pause_on_next_statement_reason) {
-    SetInternalReference(
-        info_entry, "pause_on_next_statement_reason",
-        GetEntry(ctx, HeapObjPtr{info->pause_on_next_statement_reason}));
-  }
-#endif
-}
-
 void QjsHeapExplorer::ExtractObjectReference(LEPUSContext* ctx,
                                              HeapEntry* entry,
                                              const LEPUSObject* p) {
@@ -705,9 +632,7 @@ void QjsHeapExplorer::ExtractStackFrameReference(LEPUSContext* ctx,
       }
     }
   }
-#ifdef ENABLE_QUICKJS_DEBUGGER
-  SetAndExtractValue(ctx, entry, "this", sf->pthis);
-#endif
+  ExtractStackFrameDebuggerThis(ctx, entry, sf);
 }
 
 // Mirrors GC's PushObjLEPUSAsyncFunctionState (quickjs_gc.cc:28552).
@@ -1194,7 +1119,7 @@ void QjsHeapExplorer::ExtractContextReference(LEPUSContext* ctx,
     }
   }
   ExtractNapiHandleScopeReference(ctx, ctx_entry);
-  ExtractDebuggerInfoReference(ctx, ctx_entry, ctx->debugger_info);
+  ExtractDebuggerInfoFromContext(ctx, ctx_entry);
   {
     // lynx_target_sdk_version
     if (ctx->lynx_target_sdk_version) {
@@ -1248,8 +1173,8 @@ void QjsHeapExplorer::ExtractRuntimeReference(LEPUSContext* ctx,
   if (rt->shape_hash) {
     auto* shape_array_entry =
         GetEntry(ctx, HeapObjPtr{rt->shape_hash, (size_t)rt->shape_hash_size});
-    SetInternalReference(entry, "shape_array", shape_array_entry);
     if (shape_array_entry) {
+      SetInternalReference(entry, "shape_array", shape_array_entry);
       for (size_t i = 0; i < rt->shape_hash_size; ++i) {
         if (rt->shape_hash[i]) {
           auto* sh_entry = GetEntry(ctx, HeapObjPtr{rt->shape_hash[i]});
@@ -1556,5 +1481,101 @@ void QjsHeapExplorer::IterateAndExtractReference(
 #endif
   return;
 }
+}  // namespace heapprofiler
+}  // namespace quickjs
+
+namespace quickjs {
+namespace heapprofiler {
+
+#ifdef ENABLE_QUICKJS_DEBUGGER
+void QjsHeapExplorer::ExtractDebuggerInfoFromContext(LEPUSContext* ctx,
+                                                     HeapEntry* entry) {
+  ExtractDebuggerInfoReference(ctx, entry, ctx->debugger_info);
+}
+
+void QjsHeapExplorer::ExtractStackFrameDebuggerThis(LEPUSContext* ctx,
+                                                    HeapEntry* entry,
+                                                    const LEPUSStackFrame* sf) {
+  SetAndExtractValue(ctx, entry, "this", sf->pthis);
+}
+
+void QjsHeapExplorer::ExtractDebuggerInfoReference(LEPUSContext* ctx,
+                                                   HeapEntry* entry,
+                                                   LEPUSDebuggerInfo* info) {
+  if (!info) return;
+  auto* info_entry = GetEntry(ctx, HeapObjPtr{info, HeapObjPtr::kWithoutPtr,
+                                              sizeof(LEPUSDebuggerInfo)});
+  SetInternalReference(entry, "debugger_info", info_entry);
+  if (!info_entry) return;
+
+  SetAndExtractValue(ctx, info_entry, "debugger_name", info->debugger_name);
+  if (info->source_code) {
+    SetInternalReference(info_entry, "source_code",
+                         GetEntry(ctx, HeapObjPtr{info->source_code}));
+  }
+  struct list_head* el;
+  list_for_each(el, &info->script_list) {
+    auto* script = list_entry(el, LEPUSScriptSource, link);
+    if (script->url) {
+      SetInternalReference(info_entry, "script.url",
+                           GetEntry(ctx, HeapObjPtr{script->url}));
+    }
+    if (script->source) {
+      SetInternalReference(info_entry, "script.source",
+                           GetEntry(ctx, HeapObjPtr{script->source}));
+    }
+    if (script->hash) {
+      SetInternalReference(info_entry, "script.hash",
+                           GetEntry(ctx, HeapObjPtr{script->hash}));
+    }
+    if (script->source_map_url) {
+      SetInternalReference(info_entry, "script.source_map_url",
+                           GetEntry(ctx, HeapObjPtr{script->source_map_url}));
+    }
+  }
+
+  SetAndExtractValue(ctx, info_entry, "pause_state.get_properties_array",
+                     info->pause_state.get_properties_array);
+  SetAndExtractValue(ctx, info_entry, "running_state.get_properties_array",
+                     info->running_state.get_properties_array);
+  SetAndExtractValue(ctx, info_entry, "object_group_registry",
+                     info->object_group_registry);
+  SetAndExtractValue(ctx, info_entry, "console.messages",
+                     info->console.messages);
+#define DebuggerExtractStringPool(name, str)                 \
+  SetAndExtractValue(ctx, info_entry, "literal_pool." #name, \
+                     info->literal_pool.name);
+  QJSDebuggerStringPool(DebuggerExtractStringPool)
+#undef DebuggerExtractStringPool
+
+      SetAndExtractValue(ctx, info_entry, "debugger_obj.response",
+                         info->debugger_obj.response);
+  SetAndExtractValue(ctx, info_entry, "debugger_obj.notification",
+                     info->debugger_obj.notification);
+  SetAndExtractValue(ctx, info_entry, "debugger_obj.breakpoint",
+                     info->debugger_obj.breakpoint);
+  SetAndExtractValue(ctx, info_entry, "debugger_obj.bp_location",
+                     info->debugger_obj.bp_location);
+  SetAndExtractValue(ctx, info_entry, "debugger_obj.result",
+                     info->debugger_obj.result);
+  SetAndExtractValue(ctx, info_entry, "debugger_obj.preview_prop",
+                     info->debugger_obj.preview_prop);
+  for (auto& [pc, value] : info->break_bytecode_map) {
+    SetAndExtractValue(ctx, info_entry, "break_bytecode", value);
+  }
+  if (info->pause_on_next_statement_reason) {
+    SetInternalReference(
+        info_entry, "pause_on_next_statement_reason",
+        GetEntry(ctx, HeapObjPtr{info->pause_on_next_statement_reason}));
+  }
+}
+#else
+void QjsHeapExplorer::ExtractDebuggerInfoFromContext(LEPUSContext* /*ctx*/,
+                                                     HeapEntry* /*entry*/) {}
+void QjsHeapExplorer::ExtractStackFrameDebuggerThis(
+    LEPUSContext* /*ctx*/, HeapEntry* /*entry*/,
+    const LEPUSStackFrame* /*sf*/) {}
+#endif  // ENABLE_QUICKJS_DEBUGGER
+
 }  // namespace heapprofiler
 }  // namespace quickjs

@@ -15,7 +15,6 @@
 #include <unordered_map>
 #include <vector>
 
-#include "inspector/debugger/debugger.h"
 #include "inspector/heapprofiler/gen.h"
 #include "inspector/heapprofiler/serialize.h"
 #include "quickjs/include/quickjs-inner.h"
@@ -65,27 +64,10 @@ class Fronted {
 
   // send reponse
   virtual void SendReponse(LEPUSValue message) = 0;
+  virtual ~Fronted() {}
 };
 
 // Fronted interface
-class DevtoolFronted : public quickjs::heapprofiler::Fronted {
- public:
-  explicit DevtoolFronted(LEPUSContext* ctx) : context_(ctx) {}
-  virtual ~DevtoolFronted() = default;
-
-  // send notification
-  void AddHeapSnapshotChunk(const std::string& chunk) override;
-  void ReportHeapSnapshotProgress(uint32_t done, uint32_t total,
-                                  bool finished) override;
-
-  // send reponse
-
-  void SendReponse(LEPUSValue message) override;
-
- private:
-  LEPUSContext* context_;
-};
-
 class HeapSnapshotOutputStream : public quickjs::heapprofiler::OutputStream {
  public:
   explicit HeapSnapshotOutputStream(const std::shared_ptr<Fronted>& fronted)
@@ -140,6 +122,33 @@ QjsHeapProfilerImpl& GetQjsHeapProfilerImplInstance();
 }  // namespace heapprofiler
 }  // namespace quickjs
 
+#ifdef ENABLE_QUICKJS_DEBUGGER
+#include "inspector/debugger/debugger.h"
+
+namespace quickjs {
+namespace heapprofiler {
+
+class DevtoolFronted : public quickjs::heapprofiler::Fronted {
+ public:
+  explicit DevtoolFronted(LEPUSContext* ctx) : context_(ctx) {}
+  virtual ~DevtoolFronted() = default;
+
+  // send notification
+  void AddHeapSnapshotChunk(const std::string& chunk) override;
+  void ReportHeapSnapshotProgress(uint32_t done, uint32_t total,
+                                  bool finished) override;
+
+  // send reponse
+  void SendReponse(LEPUSValue message) override;
+
+ private:
+  LEPUSContext* context_;
+};
+
+}  // namespace heapprofiler
+}  // namespace quickjs
+
 void HandleHeapProfilerProtocols(DebuggerParams*);
-void js_profile_take_heap_snapshot(LEPUSContext*);
+#endif  // ENABLE_QUICKJS_DEBUGGER
+
 #endif  // SRC_INSPECTOR_HEAPPROFILER_HEAPPROFILER_H_

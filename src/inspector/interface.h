@@ -31,6 +31,7 @@
 
 #ifndef SRC_INSPECTOR_INTERFACE_H_
 #define SRC_INSPECTOR_INTERFACE_H_
+
 #ifdef __cplusplus
 extern "C" {
 #endif

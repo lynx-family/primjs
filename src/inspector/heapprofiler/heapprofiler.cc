@@ -10,12 +10,18 @@
 #include "inspector/heapprofiler/heapprofiler.h"
 
 #include <algorithm>
+#include <cstdlib>
+#include <cstring>
 #include <ostream>
+#include <sstream>
 
-#include "inspector/debugger_inner.h"
+#if defined(OS_ANDROID)
+#include <unistd.h>
+#endif
+
 #include "inspector/heapprofiler/gen.h"
 #include "inspector/heapprofiler/serialize.h"
-#include "inspector/protocols.h"
+#include "inspector/interface.h"
 
 namespace quickjs {
 namespace heapprofiler {
@@ -112,6 +118,59 @@ HeapSnapshot* QjsHeapProfilerImpl::TakeHeapSnapshot(LEPUSContext* ctx) {
   return profiler->TakeSnapshot(ctx, nullptr);
 }
 
+}  // namespace heapprofiler
+}  // namespace quickjs
+
+class PrintFronted : public quickjs::heapprofiler::Fronted {
+ public:
+  // send notification
+  void AddHeapSnapshotChunk(const std::string& chunk) override {
+    snapshot_.append(chunk);
+  }
+
+  void ReportHeapSnapshotProgress(uint32_t done, uint32_t total,
+                                  bool finished) override {}
+  // send reponse
+  void SendReponse(LEPUSValue message) override {}
+
+  const std::string& Content() const { return snapshot_; }
+
+ private:
+  std::string snapshot_;
+};
+
+extern "C" const char* js_profile_take_heap_snapshot(LEPUSContext* ctx) {
+  if (ctx == nullptr) {
+    return nullptr;
+  }
+
+  auto outstream = std::make_shared<PrintFronted>();
+
+  quickjs::heapprofiler::GetQjsHeapProfilerImplInstance().TakeHeapSnapshot(
+      ctx, outstream);
+
+  const auto& snapshot = outstream->Content();
+  auto* result = static_cast<char*>(std::malloc(snapshot.size() + 1));
+  if (result == nullptr) {
+    return nullptr;
+  }
+
+  std::memcpy(result, snapshot.data(), snapshot.size());
+  result[snapshot.size()] = '\0';
+  return result;
+}
+
+extern "C" void js_profile_free_heap_snapshot(const char* snapshot) {
+  std::free(const_cast<char*>(snapshot));
+}
+
+#ifdef ENABLE_QUICKJS_DEBUGGER
+#include "inspector/debugger_inner.h"
+#include "inspector/protocols.h"
+
+namespace quickjs {
+namespace heapprofiler {
+
 void DevtoolFronted::AddHeapSnapshotChunk(const std::string& chunk) {
   if (context_ == nullptr) return;
 
@@ -140,50 +199,20 @@ void DevtoolFronted::SendReponse(LEPUSValue message) {
   SendResponse(context_, message, nullobj);
 }
 
-class PrintFronted : public Fronted {
- public:
-  // send notification
-  void AddHeapSnapshotChunk(const std::string& chunk) override {
-    stream << chunk;
-  }
-
-  void ReportHeapSnapshotProgress(uint32_t done, uint32_t total,
-                                  bool finished) override{};
-  // send reponse
-  void SendReponse(LEPUSValue message) override{};
-
-  const std::stringstream& GetStream() { return stream; }
-
-  virtual ~PrintFronted() { stream.clear(); }
-
- private:
-  std::stringstream stream;
-};
-
 }  // namespace heapprofiler
 }  // namespace quickjs
-
-void js_profile_take_heap_snapshot(LEPUSContext* ctx) {
-  auto outstream = std::make_shared<quickjs::heapprofiler::PrintFronted>();
-
-  quickjs::heapprofiler::GetQjsHeapProfilerImplInstance().TakeHeapSnapshot(
-      ctx, outstream);
-
-  quickjs::heapprofiler::js_heap_dump_file(outstream->GetStream().str(),
-                                           "heapsnapshot");
-  return;
-}
 
 void HandleHeapProfilerProtocols(DebuggerParams* param) {
   quickjs::heapprofiler::GetQjsHeapProfilerImplInstance().TakeHeapSnapshot(
       param->ctx, param->message,
       std::make_shared<quickjs::heapprofiler::DevtoolFronted>(param->ctx));
 }
+#endif  // ENABLE_QUICKJS_DEBUGGER
 
-// for unittest
 #ifdef HEAPPROFILER_UNITTEST
+
 void take_heap_snapshot_test(LEPUSContext* ctx) {
-  auto outstream = std::make_shared<quickjs::heapprofiler::PrintFronted>();
+  auto outstream = std::make_shared<PrintFronted>();
 
   quickjs::heapprofiler::GetQjsHeapProfilerImplInstance().TakeHeapSnapshot(
       ctx, outstream);

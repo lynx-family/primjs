@@ -18,6 +18,8 @@ message(STATUS "Building in ${CMAKE_BUILD_TYPE} mode")
 message(("${CMAKE_CURRENT_SOURCE_DIR}"))
 
 option(ENABLE_QUICKJS_DEBUGGER "Enable quickjs debugger" OFF)
+option(ENABLE_HEAPPROFILER
+       "Enable heap profiler only (subset of quickjs debugger)" OFF)
 option(ENABLE_LEPUSNG "Enable LepusNG" OFF)
 option(ENABLE_LITE "Enable quickjs static library" OFF)
 option(ENABLE_PRIMJS_SNAPSHOT "Enable primjs snapshot" OFF)
@@ -172,8 +174,18 @@ set(quickjs_sources
     ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/quickjs-libc.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/quickjs.cc)
 
+set(heapprofiler_sources
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/heapprofiler/edge.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/heapprofiler/entry.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/heapprofiler/gen.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/heapprofiler/heapexplorer.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/heapprofiler/heapprofiler.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/heapprofiler/serialize.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/heapprofiler/snapshot.cc)
+
 if(${ENABLE_QUICKJS_DEBUGGER})
   add_definitions(-DENABLE_QUICKJS_DEBUGGER)
+  add_definitions(-DENABLE_HEAPPROFILER)
   set(qucikjs_debugger_sources
       ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/cpuprofiler/cpu_profiler.cc
       ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/cpuprofiler/profile_generator.cc
@@ -185,16 +197,13 @@ if(${ENABLE_QUICKJS_DEBUGGER})
       ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/debugger/debugger_properties.cc
       ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/debugger/debugger_queue.cc
       ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/debugger/debugger.cc
-      ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/heapprofiler/edge.cc
-      ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/heapprofiler/entry.cc
-      ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/heapprofiler/gen.cc
-      ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/heapprofiler/heapexplorer.cc
-      ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/heapprofiler/heapprofiler.cc
-      ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/heapprofiler/serialize.cc
-      ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/heapprofiler/snapshot.cc
+      ${heapprofiler_sources}
       ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/runtime/runtime.cc
       ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/protocols.cc
       ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/string_tools.cc)
+elseif(${ENABLE_HEAPPROFILER})
+  set(qucikjs_debugger_sources ${heapprofiler_sources})
+  add_definitions(-DENABLE_HEAPPROFILER)
 endif()
 
 set(napi_sources
