@@ -6000,24 +6000,24 @@ static BOOL JS_IsLiveObject(LEPUSRuntime *rt, LEPUSValueConst obj) {
   return !p->free_mark;
 }
 
+#ifdef ENABLE_QUICKJS_DEBUGGER
+namespace {
 /* Compute memory used by various object types */
 /* XXX: poor man's approach to handling multiply referenced objects */
 typedef struct JSMemoryUsage_helper {
-  double memory_used_count;
-  double str_count;
-  double str_size;
-  double lepus_func_count;
-  double lepus_func_size;
-  double lepus_func_code_size;
-  double lepus_func_pc2line_count;
-  double lepus_func_pc2line_size;
+  double memory_used_count{0.f};
+  double str_count{0.f};
+  double str_size{0.f};
+  double lepus_func_count{0.f};
+  double lepus_func_size{0.f};
+  double lepus_func_code_size{0.f};
+  double lepus_func_pc2line_count{0.f};
+  double lepus_func_pc2line_size{0.f};
 } JSMemoryUsage_helper;
 
-#if LYNX_SIMPLIFY
-QJS_STATIC void compute_value_size(LEPUSValueConst val,
-                                   JSMemoryUsage_helper *hp);
+void compute_value_size(LEPUSValueConst val, JSMemoryUsage_helper *hp);
 
-QJS_STATIC void compute_jsstring_size(JSString *str, JSMemoryUsage_helper *hp) {
+void compute_jsstring_size(JSString *str, JSMemoryUsage_helper *hp) {
   if (!str->atom_type) { /* atoms are handled separately */
     double s_ref_count = str->header.ref_count;
     hp->str_count += 1 / s_ref_count;
@@ -6027,8 +6027,7 @@ QJS_STATIC void compute_jsstring_size(JSString *str, JSMemoryUsage_helper *hp) {
   }
 }
 
-QJS_STATIC void compute_bytecode_size(LEPUSFunctionBytecode *b,
-                                      JSMemoryUsage_helper *hp) {
+void compute_bytecode_size(LEPUSFunctionBytecode *b, JSMemoryUsage_helper *hp) {
   int memory_used_count, lepus_func_size, i;
   double ref_count = b->header.ref_count;
 
@@ -6067,8 +6066,7 @@ QJS_STATIC void compute_bytecode_size(LEPUSFunctionBytecode *b,
   hp->memory_used_count += memory_used_count / ref_count;
 }
 
-QJS_STATIC void compute_value_size(LEPUSValueConst val,
-                                   JSMemoryUsage_helper *hp) {
+void compute_value_size(LEPUSValueConst val, JSMemoryUsage_helper *hp) {
   switch (LEPUS_VALUE_GET_TAG(val)) {
     case LEPUS_TAG_STRING:
       compute_jsstring_size(LEPUS_VALUE_GET_STRING(val), hp);
@@ -6083,8 +6081,6 @@ QJS_STATIC void compute_value_size(LEPUSValueConst val,
   }
 }
 
-#ifdef ENABLE_QUICKJS_DEBUGGER
-namespace {
 struct VMPssRange {
   uintptr_t begin;
   uintptr_t end;
@@ -6230,7 +6226,7 @@ void LEPUS_ComputeMemoryUsage(LEPUSRuntime *rt, LEPUSMemoryUsage *s) {
   }
   struct list_head *el, *el1;
   int i;
-  JSMemoryUsage_helper mem = {0}, *hp = &mem;
+  JSMemoryUsage_helper mem, *hp = &mem;
 
   s->malloc_count = rt->malloc_state.malloc_count;
   s->malloc_size = rt->malloc_state.malloc_size;
@@ -6502,8 +6498,9 @@ void LEPUS_DumpMemoryUsage(FILE *fp, const LEPUSMemoryUsage *s,
 #ifdef ENABLE_QUICKJS_DEBUGGER
   if (rt && rt->gc_enable) {
     fprintf(fp,
-            "QuickJS memory usage -- \n  malloc_size: %lld\n  malloc_limit: "
-            "%lld\n  memory_used_size: %lld  base_malloc_size: %lld\n",
+            "QuickJS memory usage -- \n  malloc_size: %" PRId64
+            "\n  malloc_limit: %" PRId64 "\n  memory_used_size: %" PRId64
+            "  base_malloc_size: %" PRId64 "\n",
             s->malloc_size, s->malloc_limit, s->memory_used_size,
             s->base_malloc_size);
     return;
@@ -6526,13 +6523,13 @@ void LEPUS_DumpMemoryUsage(FILE *fp, const LEPUSMemoryUsage *s,
     };
     int i, usage_size_ok = 0;
     for (i = 0; i < countof(object_types); i++) {
-      unsigned int size = object_types[i].size;
+      size_t size = object_types[i].size;
       void *p = lepus_malloc_rt(rt, size);
       if (p) {
-        unsigned int size1 = lepus_malloc_usable_size_rt(rt, p);
+        size_t size1 = lepus_malloc_usable_size_rt(rt, p);
         if (size1 >= size) {
           usage_size_ok = 1;
-          fprintf(fp, "  %3u + %-2u  %s\n", size, size1 - size,
+          fprintf(fp, "  %3zu + %-2zu  %s\n", size, size1 - size,
                   object_types[i].name);
         }
         lepus_free_rt(rt, p);
@@ -6635,8 +6632,6 @@ void LEPUS_DumpMemoryUsage(FILE *fp, const LEPUSMemoryUsage *s,
   }
 #endif
 }
-
-#endif
 
 LEPUSValue LEPUS_GetGlobalObject(LEPUSContext *ctx) {
   CallGCFunc(JS_GetGlobalObject_GC, ctx);
