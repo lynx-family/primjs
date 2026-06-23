@@ -37,9 +37,7 @@ Your native addon can include the headers from this package and call the `_weak`
 
 ```cpp
 #include "node_api.h" // From this package, with weak symbols
-#if defined(USE_WEAK_SUFFIX_NAPI)
 #include "weak_napi_defines.h" // This header file defines macros for all weak symbols and must be included before using weak symbols/definitions
-#endif
 
 // Example native addon function
 napi_value MyNativeFunction(napi_env env, napi_callback_info info) {
@@ -49,28 +47,26 @@ napi_value MyNativeFunction(napi_env env, napi_callback_info info) {
   return world;
 }
 
-#if defined(USE_WEAK_SUFFIX_NAPI)
 #include "weak_napi_undefs.h" // This header file undefines all weak symbols and must be included at the end of the file
-#endif
 ```
 
 At runtime, the host application must call `inject_weak_node_api_host()` to provide the real implementation before any addons are loaded.
 
 ## Compile-time macro control
 
-- By default, if `USE_WEAK_SUFFIX_NAPI` is **not** defined, the headers provided by this package do not rename any Node-API symbols and all `napi_*` APIs keep their original symbol names.
-- When the `USE_WEAK_SUFFIX_NAPI` macro is defined at compile time, the renaming macros in `weak_napi_defines.h` / `weak_napi_undefs.h` become active and map all `napi_*` symbols to implementations with the `_weak` suffix (weak suffix symbol remapping).
-- `USE_WEAK_SUFFIX_NAPI` acts as a compile-time gate: only when this macro is defined will the weak suffix symbol remapping scheme be applied.
+- By default, if `USE_WEAK_SUFFIX_NAPI` is **not** defined, generated headers define it as `1` and weak suffix symbol remapping is enabled.
+- When `USE_WEAK_SUFFIX_NAPI` is `1`, the renaming macros in `weak_napi_defines.h` / `weak_napi_undefs.h` map all `napi_*` symbols to implementations with the `_weak` suffix.
+- Define `USE_WEAK_SUFFIX_NAPI=0` only when building a legacy non-renamed variant that must keep the original Node-API symbol names.
 
-### How to enable (examples)
+### How to opt out (examples)
 
-- When invoking the compiler directly, add `-DUSE_WEAK_SUFFIX_NAPI` to your compile flags.
-- In CMake, you can enable it via `add_compile_definitions(USE_WEAK_SUFFIX_NAPI)` or `target_compile_definitions(my_target PRIVATE USE_WEAK_SUFFIX_NAPI)`.
+- When invoking the compiler directly, add `-DUSE_WEAK_SUFFIX_NAPI=0` to your compile flags.
+- In CMake, you can opt out via `add_compile_definitions(USE_WEAK_SUFFIX_NAPI=0)` or `target_compile_definitions(my_target PRIVATE USE_WEAK_SUFFIX_NAPI=0)`.
 
 ### Scope and recommendations
 
-- Files under the `headers/` and `generated/` directories that are produced by `prepare-headers` and shipped with this package already contain conditional includes of `weak_napi_defines.h` / `weak_napi_undefs.h` guarded by `USE_WEAK_SUFFIX_NAPI`. As long as this macro is defined in your compile command, weak suffix symbol remapping will be enabled for those headers/sources.
-- For translation units you author yourself (for example additional `.c` / `.cc` / `.cpp` files) that directly include this package's `node_api.h`, it is recommended to use the same `#if defined(USE_WEAK_SUFFIX_NAPI)` wrapping pattern as in the example above so that their behavior matches.
+- Files under the `headers/` and `generated/` directories that are produced by `prepare-headers` and shipped with this package contain weak symbol macro includes guarded by the value of `USE_WEAK_SUFFIX_NAPI`.
+- For translation units you author yourself (for example additional `.c` / `.cc` / `.cpp` files) that directly include this package's `node_api.h`, include `weak_napi_defines.h` before using Node-API symbols and `weak_napi_undefs.h` after those declarations/definitions so their behavior matches the generated headers.
 
 ### Coexistence with other N-API Implementations
 

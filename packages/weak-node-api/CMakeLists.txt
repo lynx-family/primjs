@@ -97,12 +97,18 @@ set_property(TARGET ${PROJECT_NAME} PROPERTY POSITION_INDEPENDENT_CODE ON)
 # C++20 is needed to use designated initializers
 target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_20)
 
-# Weak suffix symbol compile-time gate: allow opting into renaming via
-# USE_WEAK_SUFFIX_NAPI when building this library.
-option(USE_WEAK_SUFFIX_NAPI "Enable weak suffix symbol remapping when building weak-node-api" OFF)
-if (USE_WEAK_SUFFIX_NAPI)
-  target_compile_definitions(${PROJECT_NAME} PUBLIC USE_WEAK_SUFFIX_NAPI)
+# Weak suffix symbol compile-time gate. Headers default to weak suffix
+# remapping; pass USE_WEAK_SUFFIX_NAPI=0 only for the legacy non-renamed
+# variant.
+option(USE_WEAK_SUFFIX_NAPI "Enable weak suffix symbol remapping when building weak-node-api" ON)
+if(USE_WEAK_SUFFIX_NAPI)
+  set(WEAK_NODE_API_USE_WEAK_SUFFIX_NAPI_VALUE 1)
+else()
+  set(WEAK_NODE_API_USE_WEAK_SUFFIX_NAPI_VALUE 0)
 endif()
+target_compile_definitions(${PROJECT_NAME} PUBLIC
+  USE_WEAK_SUFFIX_NAPI=${WEAK_NODE_API_USE_WEAK_SUFFIX_NAPI_VALUE}
+)
 
 # Node-API version selection
 target_compile_definitions(${PROJECT_NAME} PRIVATE NAPI_VERSION=8)

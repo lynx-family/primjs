@@ -8,8 +8,8 @@ ROOT_DIR=$(cd "$(dirname "$0")/../.." && pwd)
 cd "$ROOT_DIR"
 
 # This script builds macOS dylibs for both the default and weak_suffix variants
-# in a single invocation. Variant selection is handled via CMake options
-# (USE_WEAK_SUFFIX_NAPI) per build;
+# in a single invocation. Headers enable weak suffix remapping by default, so
+# the default variant explicitly opts out with USE_WEAK_SUFFIX_NAPI=OFF.
 
 echo "[cmake] Preparing headers..."
 echo "[cmake] Installing dependencies..."
@@ -26,8 +26,8 @@ BASE_CMAKE_ARGS="-DCMAKE_OSX_DEPLOYMENT_TARGET=10.13"
 for VARIANT in default weak_suffix; do
   if [[ "$VARIANT" == "default" ]]; then
     PREBUILT_BASE_DIR="prebuilt/macos"
-    CMAKE_EXTRA_ARGS="$BASE_CMAKE_ARGS"
-    echo "[cmake] ===== Building macOS default variant (no weak suffix) ====="
+    CMAKE_EXTRA_ARGS="$BASE_CMAKE_ARGS -DUSE_WEAK_SUFFIX_NAPI=OFF"
+    echo "[cmake] ===== Building macOS default variant (USE_WEAK_SUFFIX_NAPI=OFF) ====="
   else
     PREBUILT_BASE_DIR="prebuilt/macos/weak_suffix"
     CMAKE_EXTRA_ARGS="$BASE_CMAKE_ARGS -DUSE_WEAK_SUFFIX_NAPI=ON"

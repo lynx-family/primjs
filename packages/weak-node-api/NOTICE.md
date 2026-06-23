@@ -28,7 +28,7 @@ It incorporates and derives from upstream open-source projects as noted below. W
 - Generated headers and sources
   - The `generated/` directory may contain files derived from the upstream React Native Node API generator as packaged in the `weak-node-api` npm release noted above. Top-of-file comments in those files indicate the upstream origin and direct readers to this NOTICE.
   - We perform limited post-processing to insert weak symbol macro includes (`weak_napi_defines.h` / `weak_napi_undefs.h`) and adjust include paths.
-  - As of this branch, these weak symbol macro includes are only effective when the `USE_WEAK_SUFFIX_NAPI` compile-time macro is defined.
+  - As of this branch, generated headers define `USE_WEAK_SUFFIX_NAPI` to `1` by default. Consumers can explicitly compile with `USE_WEAK_SUFFIX_NAPI=0` to keep original Node-API symbol names.
 
 - Symbol renaming (weak macros)
   - To avoid linkage and symbol conflicts, we introduce symbol renaming via macro wrappers. The files `defs_header/weak_napi_defines.h` and `defs_header/weak_napi_undefs.h` implement the weak symbol macro scheme used across the merged headers and generated sources.

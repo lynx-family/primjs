@@ -15,7 +15,7 @@ Lynx integrates Node-API based native add-ons into runtimes. To reduce friction 
 - A symbol renaming scheme via weak macro wrappers,
 - GN and CMake build integration for downstream consumption,
 - Optional prebuilt binaries for macOS (dynamic library) and Windows (dynamic library).
-- The weak symbol renaming scheme is gated by the `USE_WEAK_SUFFIX_NAPI` macro so that consumers can opt into it per translation unit.
+- The weak symbol renaming scheme is controlled by the `USE_WEAK_SUFFIX_NAPI` macro. It defaults to `1` in generated headers so weak suffix remapping is the normal behavior; consumers can opt out with `USE_WEAK_SUFFIX_NAPI=0`.
 
 ## Usage Overview
 

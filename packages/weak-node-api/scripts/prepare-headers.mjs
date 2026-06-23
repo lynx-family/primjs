@@ -338,9 +338,8 @@ function processFile(filePath) {
     "",
   ].join("\n");
 
-  // Enable weak symbol remapping when USE_WEAK_SUFFIX_NAPI is defined, or
-  // by default on Harmony where the adapter is always expected to export weak
-  // suffixed symbols.
+  // Enable weak symbol remapping by default. Consumers that need the original
+  // Node-API names can explicitly compile with USE_WEAK_SUFFIX_NAPI=0.
   const useRelativeWeakMacroHeaders =
     isInGenerated &&
     (base === "weak_node_api.cpp" ||
@@ -348,12 +347,15 @@ function processFile(filePath) {
       base === "NodeApiHost.hpp");
   const weakMacroHeaderPrefix = useRelativeWeakMacroHeaders ? "../headers/" : "";
   const defineLines = [
-    "#if defined(USE_WEAK_SUFFIX_NAPI) || defined(OS_HARMONY)",
+    "#ifndef USE_WEAK_SUFFIX_NAPI",
+    "#define USE_WEAK_SUFFIX_NAPI 1",
+    "#endif",
+    "#if USE_WEAK_SUFFIX_NAPI || defined(OS_HARMONY)",
     `#include "${weakMacroHeaderPrefix}weak_napi_defines.h"`,
     "#endif",
   ];
   const undefLines = [
-    "#if defined(USE_WEAK_SUFFIX_NAPI) || defined(OS_HARMONY)",
+    "#if USE_WEAK_SUFFIX_NAPI || defined(OS_HARMONY)",
     `#include "${weakMacroHeaderPrefix}weak_napi_undefs.h"`,
     "#endif",
   ];

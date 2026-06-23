@@ -50,8 +50,8 @@ if (-not (Get-Command npm -ErrorAction SilentlyContinue)) {
 }
 
 # This script builds both the default and weak_suffix variants of the
-# WeakNodeAPI DLL in a single run. Variant selection is handled via CMake
-# (passing -DUSE_WEAK_SUFFIX_NAPI=ON for the weak build);
+# WeakNodeAPI DLL in a single run. Headers enable weak suffix remapping by
+# default, so the default variant explicitly passes USE_WEAK_SUFFIX_NAPI=OFF.
 
 # Run header preparation step from OSS root.
 Write-Info "Running 'npm run prepare:headers'..."
@@ -125,7 +125,7 @@ foreach ($variant in $variants) {
   if ($useWeakSuffix) {
     Write-Info "===== Building Windows weak_suffix variant (USE_WEAK_SUFFIX_NAPI=ON) ====="
   } else {
-    Write-Info "===== Building Windows default variant (no weak suffix) ====="
+    Write-Info "===== Building Windows default variant (USE_WEAK_SUFFIX_NAPI=OFF) ====="
   }
 
   $configureArgs = @(
@@ -134,9 +134,8 @@ foreach ($variant in $variants) {
     '-G', $generator,
     '-A', 'x64'
   )
-  if ($useWeakSuffix) {
-    $configureArgs += '-DUSE_WEAK_SUFFIX_NAPI=ON'
-  }
+  $useWeakSuffixCMakeValue = if ($useWeakSuffix) { 'ON' } else { 'OFF' }
+  $configureArgs += "-DUSE_WEAK_SUFFIX_NAPI=$useWeakSuffixCMakeValue"
 
   Write-Info "Configuring CMake project for generator '$generator' (x64, variant=$name)..."
   Push-Location $rootDir

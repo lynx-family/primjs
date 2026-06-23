@@ -2,9 +2,9 @@
 // Licensed under the Apache License Version 2.0 that can be found in the
 // LICENSE file in the root directory of this source tree.
 
-// Note: It is recommended to include this header under a guard such as
-// `#if defined(USE_WEAK_SUFFIX_NAPI)` so that weak suffix symbol remapping is
-// enabled only when explicitly requested.
+// Note: It is recommended to include this header under a value guard such as
+// `#if USE_WEAK_SUFFIX_NAPI` so that weak suffix symbol remapping can be
+// disabled explicitly with USE_WEAK_SUFFIX_NAPI=0.
 
 // Helper to construct weak symbol names
 #define WEAK_NAPI_SYMBOL(name) name##_weak
