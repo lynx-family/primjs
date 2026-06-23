@@ -111,6 +111,39 @@ def CheckUnitTestsBuild(options):
     subprocess.check_call(build_primjs_snapshot_qjs_debug_unittest, shell=True)
     subprocess.check_call(build_primjs_snapshot_napi_unittest, shell=True)
     subprocess.check_call(build_primjs_heap_unittest, shell=True)
+
+    # Build with bytecode optimization enabled
+    gn_bytecode_opt_build_args = """
+        enable_unittests = true
+        is_asan = true
+        use_lepusng = true
+        use_lepusng_bytecode_opt = true
+        enable_coverage = true
+        use_rtti = true
+        is_debug = true
+        enable_quickjs_debugger = true
+        {}
+        {}
+  """.format(
+        TARGET_CPU, TARGET_OS
+    )
+
+    gn_bytecode_opt_gen_cmd = """ gn gen out/Default_bytecode_opt --args='%s' """ % (
+        gn_bytecode_opt_build_args
+    )
+
+    gn_bytecode_opt_clean_cmd = "gn clean out/Default_bytecode_opt"
+    build_bytecode_opt_qjs_cmd = "ninja -C out/Default_bytecode_opt qjs"
+    build_bytecode_opt_test262 = "ninja -C out/Default_bytecode_opt run_test262"
+    build_bytecode_opt_quickjs_unittest = (
+        "ninja -C out/Default_bytecode_opt quickjs_unittest"
+    )
+
+    subprocess.check_call(gn_bytecode_opt_gen_cmd, shell=True)
+    subprocess.check_call(gn_bytecode_opt_clean_cmd, shell=True)
+    subprocess.check_call(build_bytecode_opt_qjs_cmd, shell=True)
+    subprocess.check_call(build_bytecode_opt_test262, shell=True)
+    subprocess.check_call(build_bytecode_opt_quickjs_unittest, shell=True)
     sys.exit(0)
 
 

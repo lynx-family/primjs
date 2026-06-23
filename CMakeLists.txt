@@ -21,6 +21,7 @@ option(ENABLE_QUICKJS_DEBUGGER "Enable quickjs debugger" OFF)
 option(ENABLE_HEAPPROFILER
        "Enable heap profiler only (subset of quickjs debugger)" OFF)
 option(ENABLE_LEPUSNG "Enable LepusNG" OFF)
+option(ENABLE_LEPUSNG_BYTECODE_OPT "Enable LepusNG bytecode optimization" OFF)
 option(ENABLE_LITE "Enable quickjs static library" OFF)
 option(ENABLE_PRIMJS_SNAPSHOT "Enable primjs snapshot" OFF)
 option(ENABLE_COMPATIBLE_MM "Enable compatible memory" OFF)
@@ -86,6 +87,17 @@ endif()
 
 if(${ENABLE_LEPUSNG})
   add_definitions(-DENABLE_LEPUSNG)
+endif()
+
+if(${ENABLE_LEPUSNG_BYTECODE_OPT})
+  if(NOT ${ENABLE_LEPUSNG})
+    message(WARNING "ENABLE_LEPUSNG_BYTECODE_OPT requires ENABLE_LEPUSNG, forcing OFF")
+    set(ENABLE_LEPUSNG_BYTECODE_OPT OFF)
+  endif()
+endif()
+
+if(${ENABLE_LEPUSNG_BYTECODE_OPT})
+  add_definitions(-DENABLE_LEPUSNG_BYTECODE_OPT)
 endif()
 
 if(${DISABLE_NANBOX})
@@ -172,7 +184,8 @@ set(quickjs_sources
     ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/quickjs_gc.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/quickjs_version.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/quickjs-libc.cc
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/quickjs.cc)
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/quickjs.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/quickjs-opt-bytecode.cc)
 
 set(heapprofiler_sources
     ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/heapprofiler/edge.cc
@@ -418,11 +431,16 @@ if(WIN32)
 endif()
 
 if(ENABLE_UNITTESTS)
+  # qjs and run-test262 link the pre-built quickjs static library rather than
+  # re-compiling all quickjs sources, avoiding duplicate compilation and
+  # reducing incremental build time.
   set(qjs_sources ${CMAKE_CURRENT_SOURCE_DIR}/testing/quickjs/compiler/qjs.cc)
   set(test262_sources
       ${CMAKE_CURRENT_SOURCE_DIR}/testing/quickjs/run-test262.cc)
-  add_executable(run-test262 ${test262_sources} ${quickjs_sources})
-  add_executable(qjs ${qjs_sources} ${quickjs_sources})
+  add_executable(run-test262 ${test262_sources})
+  target_link_libraries(run-test262 quickjs)
+  add_executable(qjs ${qjs_sources})
+  target_link_libraries(qjs quickjs)
   set_target_properties(qjs run-test262 PROPERTIES RUNTIME_OUTPUT_DIRECTORY
                                                    ${CMAKE_BINARY_DIR})
 endif()

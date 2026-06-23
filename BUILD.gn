@@ -30,6 +30,10 @@ config("quickjs_public_config") {
     defines += [ "ENABLE_LEPUSNG" ]
   }
 
+  if (use_lepusng_bytecode_opt) {
+    defines += [ "ENABLE_LEPUSNG_BYTECODE_OPT" ]
+  }
+
   if (force_gc) {
     defines += [ "FORCE_GC_AT_MALLOC" ]
   }

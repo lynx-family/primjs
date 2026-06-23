@@ -14,5 +14,6 @@ primjs_source_set("quickjs") {
     "source/quickjs.cc",
     "source/quickjs_gc.cc",
     "source/quickjs_version.cc",
+    "source/quickjs-opt-bytecode.cc",
   ]
 }

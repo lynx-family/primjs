@@ -9,7 +9,7 @@ import os
 import subprocess
 import sys
 
-test_case = ["", "_snapshot"]
+test_case = ["", "_snapshot", "_bytecode_opt"]
 
 
 def CheckUnitTestRun():
@@ -24,12 +24,19 @@ def CheckUnitTestRun():
         print("{}: Check quickjs test cases...".format(info))
         binary_dir = "./out/Default{}/".format(case)
         os.environ["LLVM_PROFILE_FILE"] = binary_dir + "qjs.profraw"
-        unittest_cases = [
-            "qjs_debug_test",
-            "quickjs_unittest",
-            "napi_unittest",
-            "heap_unittest",
-        ]
+
+        # bytecode_opt only runs quickjs_unittest and test262
+        if case == "_bytecode_opt":
+            unittest_cases = [
+                "quickjs_unittest",
+            ]
+        else:
+            unittest_cases = [
+                "qjs_debug_test",
+                "quickjs_unittest",
+                "napi_unittest",
+                "heap_unittest",
+            ]
         for unittest in unittest_cases:
             print("{}: Check %s cases...".format(info) % unittest)
             os.environ["LLVM_PROFILE_FILE"] = (
@@ -45,14 +52,15 @@ def CheckUnitTestRun():
                 check=True,
             )
 
-        # run js test using qjs
-        output = subprocess.run(
-            ["python3", "tools/ci/run_quickjs_unittests.py", "-b", binary_dir],
-            text=True,
-            stdout=sys.stdout,
-            stderr=sys.stderr,
-            check=True,
-        )
+        # run js test using qjs (skip for bytecode_opt)
+        if case != "_bytecode_opt":
+            output = subprocess.run(
+                ["python3", "tools/ci/run_quickjs_unittests.py", "-b", binary_dir],
+                text=True,
+                stdout=sys.stdout,
+                stderr=sys.stderr,
+                check=True,
+            )
         # run test262
         output = subprocess.run(
             [
@@ -67,7 +75,7 @@ def CheckUnitTestRun():
             stderr= sys.stderr,
             check=True,
         )
-        print("Congratulations! All %s are passed.\n" % unittest)
+        print("Congratulations! All %s tests are passed.\n" % info)
 
 
 def main():

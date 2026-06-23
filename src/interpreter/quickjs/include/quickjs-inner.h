@@ -3366,4 +3366,169 @@ inline const LEPUSCFunctionListEntry js_native_error_proto_funcs[] = {
 
 void JS_AddDefaultConsole(LEPUSContext *ctx);
 
+/* ========================================================================
+ * QuickJS peephole optimization common structures & helpers
+ * Used by base peephole optimizations always, not exported.
+ * ======================================================================== */
+
+/* Code pattern matching context for peephole optimizations */
+typedef struct CodeContext {
+  const uint8_t *bc_buf; /* code buffer */
+  int bc_len;            /* length of the code buffer */
+  int pos;               /* position past the matched code pattern */
+  int64_t line_num;      /* last visited OP_line_num parameter or -1 */
+  int op;
+  int idx;
+  int label;
+  int val;
+  JSAtom atom;
+} CodeContext;
+
+/* Pattern matching opcode combinator macros */
+#define M2(op1, op2) ((op1) | ((op2) << 8))
+#define M3(op1, op2, op3) ((op1) | ((op2) << 8) | ((op3) << 16))
+#define M4(op1, op2, op3, op4) \
+  ((op1) | ((op2) << 8) | ((op3) << 16) | ((op4) << 24))
+
+/* Check if bytecode sequence starting at pos matches the given pattern */
+BOOL code_match(CodeContext *s, int pos, ...);
+
+/* Match "dup put_x(n) [drop [get_x(n)]]" pattern.
+ * Returns final opcode (OP_set_x/OP_put_x) or -1 if no match.
+ * On match: updates *pos_next, *line_num; cc->idx has variable index.
+ * *line2 is set if a delayed line number update is needed. */
+int match_dup_put_pattern(CodeContext *cc, int pos_next_in, int *pos_next_out,
+                          int64_t *line_num, int64_t *line2);
+
+/* Jump shrink: shrink goto32 to goto16/goto8 (baseline logic, always available)
+ */
+void opt_jump_shrink(LEPUSContext *ctx, JSFunctionDef *s, DynBuf *bc_out,
+                     bool iterative);
+
+/* ========================================================================
+ * LepusNG bytecode optimization internal structures & helpers
+ * Only used internally when LepusNG optimization is enabled, not exported.
+ * ======================================================================== */
+#ifdef ENABLE_LEPUSNG_BYTECODE_OPT
+
+/* Forward declarations for optimization context types - full definitions in
+ * quickjs-opt-bytecode.h */
+struct SLURecord;
+typedef struct BytecodeOptCtx BytecodeOptCtx;
+
+/* Optimization helper functions (defined in quickjs.cc, called from
+ * quickjs-opt-bytecode.cc) */
+void add_pc2line_info(JSFunctionDef *s, uint32_t pc, int64_t line_num);
+void put_short_code(DynBuf *bc_out, int op, int idx);
+void push_short_int(DynBuf *bc_out, int32_t v);
+int skip_dead_code(JSFunctionDef *s, const uint8_t *bc_buf, int bc_len, int pos,
+                   int64_t *out_line_num);
+int find_jump_target(JSFunctionDef *s, int label, int *out_op,
+                     int64_t *out_line);
+
+/* Peephole optimization helpers used in resolve_labels() main loop (defined in
+ * quickjs-opt-bytecode.cc) */
+BOOL goto_inline_push_return(LEPUSContext *ctx, JSFunctionDef *s,
+                             uint32_t label, const uint8_t *bc_buf, int bc_len,
+                             DynBuf *bc_out, int *out_pos_next,
+                             int64_t *out_line_num, int pos_next,
+                             int64_t line_num, uint8_t *loc_initialized,
+                             uint8_t *var_ref_initialized);
+BOOL try_esbuild_nullish_opt(JSFunctionDef *s, DynBuf *bc_out, CodeContext *cc,
+                             int start_pos, uint8_t *loc_initialized,
+                             int base_op, int base_idx, int *out_end_pos,
+                             int *out_label, int64_t *out_line_num);
+BOOL fold_dup_const_strict_eq_branch(CodeContext *cc, int pos_next,
+                                     int const_op, JSFunctionDef *s,
+                                     DynBuf *bc_out, int64_t line_num,
+                                     int *out_pos_next, int64_t *out_line_num,
+                                     int *out_branch_label);
+BOOL try_downgrade_put_loc_check(CodeContext *cc, int pos_next, int idx,
+                                 JSFunctionDef *s, DynBuf *bc_out,
+                                 int64_t line_num, uint8_t *loc_initialized,
+                                 BytecodeOptCtx *opt_ctx,
+                                 BOOL before_first_backward_label,
+                                 BOOL mark_perm_init, int *out_pos_next,
+                                 int64_t *out_line_num);
+BOOL try_fold_unary_on_int_const(CodeContext *cc, int pos_next, int unary_op,
+                                 int32_t val, JSFunctionDef *s, DynBuf *bc_out,
+                                 int64_t line_num, int *out_pos_next,
+                                 int64_t *out_line_num);
+int scan_drop_chain_before_return_undef(const uint8_t *bc_buf, int bc_len,
+                                        int start_pos);
+void record_slu_position(LEPUSContext *ctx, BytecodeOptCtx *opt_ctx,
+                         int bc_out_pos, int var_idx);
+BOOL try_dup_put_check_drop(CodeContext *cc, int pos_next, JSFunctionDef *s,
+                            DynBuf *bc_out, int64_t line_num,
+                            uint8_t *loc_initialized,
+                            uint8_t *var_ref_initialized,
+                            BytecodeOptCtx *opt_ctx,
+                            BOOL before_first_backward_label, int *out_pos_next,
+                            int64_t *out_line_num);
+BOOL try_fold_undefined_goto_return(CodeContext *cc, int pos_next,
+                                    JSFunctionDef *s, DynBuf *bc_out,
+                                    const uint8_t *bc_buf, int bc_len,
+                                    int64_t line_num, uint8_t *loc_initialized,
+                                    uint8_t *var_ref_initialized,
+                                    int *out_pos_next, int64_t *out_line_num);
+BOOL try_const_strict_neq_standalone(CodeContext *cc, int pos_next, int is_op,
+                                     JSFunctionDef *s, DynBuf *bc_out,
+                                     int64_t line_num, int *out_op,
+                                     int *out_label, int *out_pos_next,
+                                     int64_t *out_line_num,
+                                     BOOL *out_has_label);
+BOOL try_lnot_branch_invert(CodeContext *cc, int pos_next, int *out_op,
+                            int *out_label, int *out_pos_next,
+                            int64_t *out_line_num);
+BOOL try_consume_lnot_cascade(CodeContext *cc, int start_pos,
+                              int initial_truthy, int *out_final_val,
+                              int *out_skip_bytes, int64_t *out_line_num);
+BOOL fold_const_truthy(CodeContext *cc, int pos_next, int initial_truthy,
+                       JSFunctionDef *s, DynBuf *bc_out, int64_t line_num,
+                       int *out_pos_next, int64_t *out_line_num,
+                       int *out_branch_label);
+BOOL try_eliminate_slu_dead(CodeContext *cc, int pos_next, int idx,
+                            JSFunctionDef *s, const uint8_t *bc_buf,
+                            int bc_len);
+int try_fold_lnot_on_const(CodeContext *cc, int pos_next, int32_t const_val,
+                           JSFunctionDef *s, DynBuf *bc_out, int cf_pos2,
+                           int *cf_emit_start, int *out_cf_pos1,
+                           int *out_cf_pos2, int64_t line_num, int32_t *out_val,
+                           int *out_pos_next, int64_t *out_line_num);
+BOOL try_dup_put_var_drop(CodeContext *cc, int pos_next, JSFunctionDef *s,
+                          DynBuf *bc_out, int64_t line_num, int *out_pos_next,
+                          int64_t *out_line_num);
+int try_downgrade_get_loc_check(CodeContext *cc, int pos_next, int idx,
+                                JSFunctionDef *s, DynBuf *bc_out,
+                                uint8_t *loc_initialized, int64_t line_num,
+                                int *out_pos_next, int64_t *out_line_num);
+BOOL try_downgrade_put_var_ref_check(CodeContext *cc, int pos_next, int idx,
+                                     JSFunctionDef *s, DynBuf *bc_out,
+                                     uint8_t *var_ref_initialized,
+                                     int64_t line_num, int *out_pos_next,
+                                     int64_t *out_line_num);
+BOOL try_downgrade_get_var_ref_check(CodeContext *cc, int pos_next, int idx,
+                                     JSFunctionDef *s, DynBuf *bc_out,
+                                     uint8_t *var_ref_initialized,
+                                     int64_t line_num, int *out_pos_next,
+                                     int64_t *out_line_num);
+int try_fold_put_check_peephole(CodeContext *cc, int pos_next, int idx,
+                                JSFunctionDef *s, DynBuf *bc_out,
+                                int64_t line_num, int *out_pos_next,
+                                int64_t *out_line_num);
+int try_handle_put_loc_check(CodeContext *cc, int op, int pos_next, int idx,
+                             JSFunctionDef *s, DynBuf *bc_out,
+                             uint8_t *loc_initialized, BytecodeOptCtx *opt_ctx,
+                             BOOL before_first_backward_label, int64_t line_num,
+                             int *out_pos_next, int64_t *out_line_num);
+BOOL try_eliminate_slu(CodeContext *cc, int pos_next, int idx, JSFunctionDef *s,
+                       const uint8_t *bc_buf, int bc_len,
+                       BytecodeOptCtx *opt_ctx);
+
+/* Mark a local variable as initialized (defined in quickjs-opt-bytecode.cc) */
+void mark_loc_written(uint8_t *loc_initialized, BytecodeOptCtx *opt_ctx,
+                      BOOL before_first_backward_label, int idx, int var_count);
+
+#endif /* ENABLE_LEPUSNG_BYTECODE_OPT */
+
 #endif  // SRC_INTERPRETER_QUICKJS_INCLUDE_QUICKJS_INNER_H_

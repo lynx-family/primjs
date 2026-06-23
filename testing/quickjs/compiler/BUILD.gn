@@ -49,6 +49,13 @@ unittest_set("quickjs_testset") {
     "test_varinfo_outside.cc",
     "test_weak_ref.cc",
   ]
+
+  if (use_lepusng_bytecode_opt) {
+    sources += [
+      "test_bytecode_opt_stress.cc",
+      "test_bytecode_opt_unit.cc",
+    ]
+  }
   cflags = [ "-Wno-c99-designator" ]
   data_deps = [ ":quickjs_test_cases_copy" ]
 }
