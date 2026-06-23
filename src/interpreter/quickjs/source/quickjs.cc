@@ -51739,6 +51739,17 @@ void *LEPUS_GetGCObserver(LEPUSRuntime *rt) {
 #endif
 }
 
+#if !defined(ENABLE_HEAPPROFILER) && !defined(ENABLE_QUICKJS_DEBUGGER)
+extern "C" const char *js_profile_take_heap_snapshot(LEPUSContext *ctx) {
+  (void)ctx;
+  return nullptr;
+}
+
+extern "C" void js_profile_free_heap_snapshot(const char *snapshot) {
+  (void)snapshot;
+}
+#endif
+
 pid_t get_tid() {
   pid_t tid = 0;
 #if defined(ANDROID) || defined(__ANDROID__) || defined(OS_HARMONY)

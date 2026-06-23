@@ -161,6 +161,9 @@ extern "C" const char* js_profile_take_heap_snapshot(LEPUSContext* ctx) {
 }
 
 extern "C" void js_profile_free_heap_snapshot(const char* snapshot) {
+  if (snapshot == nullptr) {
+    return;
+  }
   std::free(const_cast<char*>(snapshot));
 }
 
