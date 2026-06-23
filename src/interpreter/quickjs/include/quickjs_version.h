@@ -9,6 +9,7 @@
 #include <stdio.h>
 #define FEATURE_LEPUSNG_DEBUGINFO_OUTSIDE "2.5"
 #define PRIMJS_ADD_VERSION_CODE "2.14"
+#define PRIMJS_STRIP_VARINFO_VERSION "4.1"
 
 typedef struct Version {
   int major, minor, revision, build;

@@ -45,7 +45,7 @@ void QJSDebuggerFree(LEPUSContext *ctx);
 // process protocol message sent here when then paused
 void ProcessPausedMessages(LEPUSContext *ctx, const char *message);
 
-// call this funciton for each pc, do inspector check
+// call this function for each pc, do inspector check
 void DoInspectorCheck(LEPUSContext *ctx);
 
 // send consoleAPICalled notification
@@ -142,6 +142,24 @@ void SetFunctionDebugSource(LEPUSContext *ctx, LEPUSFunctionBytecode *b,
                             const char *source, int32_t source_len);
 
 void SetFunctionScript(LEPUSFunctionBytecode *b, LEPUSScriptSource *script);
+
+// for varinfo outside: get/set vardefs
+uint32_t GetFunctionVarDefCount(LEPUSFunctionBytecode *b);
+// Returns the variable name at the given index, or nullptr if vardefs is
+// null or idx is out of range.
+// In RC mode (!ctx->gc_enable), the caller must free the returned string
+// with LEPUS_FreeCString(ctx, name).
+// In GC mode, the string is managed by the garbage collector and must NOT
+// be manually freed.
+const char *GetFunctionVarDefName(LEPUSContext *ctx, LEPUSFunctionBytecode *b,
+                                  uint32_t idx);
+int32_t GetFunctionVarDefScopeLevel(LEPUSFunctionBytecode *b, uint32_t idx);
+int32_t GetFunctionVarDefScopeNext(LEPUSFunctionBytecode *b, uint32_t idx);
+uint8_t GetFunctionVarDefFlags(LEPUSFunctionBytecode *b, uint32_t idx);
+void SetFunctionVarDefs(LEPUSContext *ctx, LEPUSFunctionBytecode *b,
+                        const char **var_names, const int32_t *scope_levels,
+                        const int32_t *scope_next_info, const uint8_t *flags,
+                        uint32_t count);
 
 int64_t GetFunctionDebugColumnNum(LEPUSContext *ctx,
                                   struct LEPUSFunctionBytecode *b);

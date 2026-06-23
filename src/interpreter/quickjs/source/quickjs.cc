@@ -1434,6 +1434,12 @@ void LEPUS_SetRuntimeInfo(LEPUSRuntime *rt, const char *s) {
   }
 }
 
+void LEPUS_SetOptLepusNGPackageSize(LEPUSRuntime *rt, int enable) {
+  if (rt) {
+    rt->opt_lepusng_package_size = enable ? true : false;
+  }
+}
+
 void LEPUS_FreeRuntime(LEPUSRuntime *rt) {
   CallGCFunc(JS_FreeRuntime_GC, rt);
   struct list_head *el, *el1;
@@ -1893,8 +1899,10 @@ LEPUSContext *LEPUS_NewContextRaw(LEPUSRuntime *rt) {
   // <Primjs begin>
   ctx->next_function_id = 1;   // for lepusNG sourcemap, need to start from 1
   ctx->debuginfo_outside = 2;  // 2: uninitialize, 1: true, 0: false
+  ctx->varinfo_outside = 0;
   ctx->lynx_target_sdk_version = nullptr;
   ctx->is_lepusng = rt->is_lepusng;
+  ctx->opt_lepusng_package_size = rt->opt_lepusng_package_size;
 #ifdef QJS_UNITTEST
   ctx->debugger_need_polling = true;
 #else
@@ -26925,6 +26933,9 @@ __exception int add_closure_variables(LEPUSContext *ctx, JSFunctionDef *s,
       ctx, sizeof(s->closure_var[0]) * count, ALLOC_TAG_WITHOUT_PTR));
   if (!s->closure_var) return -1;
   WriteBarrierNoStore(ctx, (void *)s->closure_var);
+  /* When vardefs have been stripped (varinfo-outside), skip all
+     vardefs-dependent loops and only add closure_var entries. */
+  if (!b->vardefs) goto add_closure_vars;
   /* Add lexical variables in scope at the point of evaluation */
   if (scope_idx == DEBUG_SCOPE_INDEX) {
     for (i = 0; i < b->var_count; i++) {
@@ -26977,6 +26988,7 @@ __exception int add_closure_variables(LEPUSContext *ctx, JSFunctionDef *s,
       }
     }
   }
+add_closure_vars:
   for (i = 0; i < b->closure_var_count; i++) {
     LEPUSClosureVar *cv0 = &b->closure_var[i];
     LEPUSClosureVar *cv = &s->closure_var[s->closure_var_count++];
@@ -29453,6 +29465,7 @@ LEPUSValue js_create_function(LEPUSContext *ctx, JSFunctionDef *fd) {
   b->super_call_allowed = fd->super_call_allowed;
   b->super_allowed = fd->super_allowed;
   b->arguments_allowed = fd->arguments_allowed;
+  b->has_eval_call = fd->has_eval_call;
 
 #if defined(DUMP_BYTECODE) && (DUMP_BYTECODE & 1)
   if (!(fd->js_mode & JS_MODE_STRIP)) {
@@ -29501,6 +29514,9 @@ QJS_STATIC void free_function_bytecode(LEPUSRuntime *rt,
   if (b->vardefs) {
     for (i = 0; i < b->arg_count + b->var_count; i++) {
       LEPUS_FreeAtomRT(rt, b->vardefs[i].var_name);
+    }
+    if (b->vardefs_ext) {
+      lepus_free_rt(rt, b->vardefs);
     }
   }
   if (b->cpool) {
@@ -30457,7 +30473,7 @@ QJS_STATIC LEPUSValue __JS_EvalInternal(LEPUSContext *ctx,
     if (debugger_eval) {
       // use DEBUG_SCOPE_INDEX to add all lexical variables to debug eval
       // closure.
-      int32_t idx = b->var_count ? DEBUG_SCOPE_INDEX : -1;
+      int32_t idx = (b->var_count && b->vardefs) ? DEBUG_SCOPE_INDEX : -1;
       if (add_closure_variables(ctx, fd, b, idx)) goto fail;
     } else {
       if (add_closure_variables(ctx, fd, b, scope_idx)) goto fail;
@@ -31050,6 +31066,24 @@ fail:
   return -1;
 }
 
+/* Determine whether vardefs should be stripped from serialized bytecode.
+   Conditions:
+   - lepusng mode only (standard QJS path unchanged)
+   - function must not contain eval() (eval needs vardefs at runtime)
+   - debuginfo_outside enabled and target SDK version >=
+   PRIMJS_STRIP_VARINFO_VERSION When called without `b` (e.g. from
+   JS_WriteObjectAtoms for the header flag), only the context-level conditions
+   are checked; per-function eval exemption is skipped since the header flag
+   indicates global strip capability. */
+static bool JS_ShouldStripVarInfo(LEPUSContext *ctx,
+                                  LEPUSFunctionBytecode *b = nullptr) {
+  if (!ctx->is_lepusng) return false;
+  if (b && b->has_eval_call) return false;
+  return ctx->debuginfo_outside == 1 && ctx->lynx_target_sdk_version &&
+         IsHigherOrEqual(ctx->lynx_target_sdk_version,
+                         PRIMJS_STRIP_VARINFO_VERSION);
+}
+
 static int JS_WriteFunction(BCWriterState *s, LEPUSValueConst obj) {
   uint8_t debuginfo_outside = s->ctx->debuginfo_outside;
   LEPUSFunctionBytecode *b =
@@ -31082,7 +31116,7 @@ static int JS_WriteFunction(BCWriterState *s, LEPUSValueConst obj) {
   bc_put_leb128(s, b->closure_var_count);
   bc_put_leb128(s, b->cpool_count);
   bc_put_leb128(s, b->byte_code_len);
-  if (b->vardefs) {
+  if (b->vardefs && !JS_ShouldStripVarInfo(s->ctx, b)) {
     bc_put_leb128(s, b->arg_count + b->var_count);
     for (i = 0; i < b->arg_count + b->var_count; i++) {
       JSVarDef *vd = &b->vardefs[i];
@@ -31391,6 +31425,9 @@ QJS_STATIC int JS_WriteObjectAtoms(BCWriterState *s) {
     primjs_version = LEPUS_GetPrimjsVersion();
     if (s->ctx->debuginfo_outside) {
       primjs_version |= NEW_DEBUGINFO_FLAG;
+    }
+    if (JS_ShouldStripVarInfo(s->ctx)) {
+      primjs_version |= STRIP_VARINFO_FLAG;
     }
     bc_put_u64(s, primjs_version);
   }
@@ -32526,6 +32563,9 @@ QJS_STATIC int JS_ReadObjectAtoms(BCReaderState *s) {
       s->ctx->binary_version = v64;
       if (v64 & NEW_DEBUGINFO_FLAG) {
         s->ctx->debuginfo_outside = 1;
+      }
+      if (v64 & STRIP_VARINFO_FLAG) {
+        s->ctx->varinfo_outside = 1;
       }
     } else {
       LEPUS_ThrowSyntaxError(s->ctx, "invalid version (%d expected=%d)", v8,

@@ -204,6 +204,9 @@ void Visitor::VisitLEPUSFunctionBytecode(void *ptr,
   PushBytecodeAtoms(b->byte_code_buf, b->byte_code_len, TRUE, workStack);
   int i;
   if (b->vardefs) {
+    if (b->vardefs_ext) {
+      workStack.push_back((address_t)b->vardefs);
+    }
     for (i = 0; i < b->arg_count + b->var_count; i++) {
       workStack.push_back(
           (address_t)GetAtomObj(b->vardefs[i].var_name, workStack));

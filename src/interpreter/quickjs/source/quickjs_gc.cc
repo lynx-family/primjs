@@ -867,8 +867,10 @@ LEPUSContext *JS_NewContextRaw_GC(LEPUSRuntime *rt) {
   // <Primjs begin>
   ctx->next_function_id = 1;   // for lepusNG sourcemap, need to start from 1
   ctx->debuginfo_outside = 2;  // 2: uninitialize, 1: true, 0: false
+  ctx->varinfo_outside = 0;
   ctx->lynx_target_sdk_version = nullptr;
   ctx->is_lepusng = rt->is_lepusng;
+  ctx->opt_lepusng_package_size = rt->opt_lepusng_package_size;
 #ifdef QJS_UNITTEST
   ctx->debugger_need_polling = true;
 #else

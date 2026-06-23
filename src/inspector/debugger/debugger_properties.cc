@@ -1791,6 +1791,7 @@ QJS_HIDE LEPUSValue GetLocalVariables(LEPUSContext* ctx, int32_t stack_index) {
     if (!f || !lepus_class_has_bytecode(f->class_id)) goto done;
     struct LEPUSFunctionBytecode* b = f->u.func.function_bytecode;
 
+    if (!b->vardefs) goto done;
     for (uint32_t i = 0; i < b->arg_count + b->var_count; i++) {
       LEPUSValue var_val;
       if (i < b->arg_count)

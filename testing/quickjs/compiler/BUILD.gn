@@ -46,6 +46,7 @@ unittest_set("quickjs_testset") {
     "test_parse_program.cc",
     "test_primjs_version.cc",
     "test_promise_rejection.cc",
+    "test_varinfo_outside.cc",
     "test_weak_ref.cc",
   ]
   cflags = [ "-Wno-c99-designator" ]

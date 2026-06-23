@@ -444,6 +444,7 @@ struct LEPUSRuntime {
   PtrHandles *ptr_handles;
   bool gc_enable;
   bool is_lepusng;
+  bool opt_lepusng_package_size;
   void *user_opaque;
   JSMallocState malloc_state;
   ROS_GC::RosAllocImpl *ros_;
@@ -780,6 +781,11 @@ struct LEPUSContext {
   uint32_t next_function_id;  // for lepusng debugger encode.
   uint8_t
       debuginfo_outside;  // for lepusng debugger encode to avoid break change.
+  uint8_t varinfo_outside;  // Set to 1 when reading bytecode with
+                            // STRIP_VARINFO_FLAG. Signals to the host that
+                            // vardefs have been stripped and must be injected
+                            // externally via SetFunctionVarDefs before debugger
+                            // variable inspection can work.
   char *lynx_target_sdk_version;
   BOOL debugger_mode;
   BOOL debugger_parse_script;  // for shared context debugger
@@ -791,6 +797,7 @@ struct LEPUSContext {
   NAPIHandleScope *napi_scope;
   bool gc_enable;
   bool is_lepusng;
+  bool opt_lepusng_package_size;
   bool object_ctx_check;
   uint64_t binary_version;
   struct FinalizationRegistryContext *fg_ctx = nullptr;
@@ -954,7 +961,12 @@ typedef struct LEPUSFunctionBytecode {
   uint8_t arguments_allowed : 1;
   uint8_t has_debug : 1;
   uint8_t read_only_bytecode : 1;
-  /* XXX: 4 bits available */
+  uint8_t has_eval_call : 1;
+  uint8_t vardefs_ext : 1; /* vardefs is a separate heap allocation injected via
+                             SetFunctionVarDefs after varinfo-outside stripping,
+                             rather than inline in the bytecode block; must be
+                             freed individually in free_function_bytecode */
+  /* XXX: 2 bits available */
   uint8_t *byte_code_buf; /* (self pointer) */
   int byte_code_len;
   JSAtom func_name;
@@ -3108,6 +3120,7 @@ typedef struct FinalizerOpaque {
 #define BC_NEW_PREFIX 0x8
 #define VERSION_PLACEHOLDER 0xCAB00000
 #define NEW_DEBUGINFO_FLAG 0x100000000
+#define STRIP_VARINFO_FLAG 0x200000000
 
 bool JS_IsNewVersion(LEPUSContext *ctx);
 bool JS_CheckBytecodeVersion(uint64_t v64);

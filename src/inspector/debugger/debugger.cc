@@ -269,6 +269,64 @@ void SetFunctionScript(LEPUSFunctionBytecode *b, LEPUSScriptSource *script) {
   LEPUS_HeapObjStoreNoCtx(&b->script, script);
 }
 
+// varinfo outside: getters
+uint32_t GetFunctionVarDefCount(LEPUSFunctionBytecode *b) {
+  if (!b->vardefs) return 0;
+  return b->arg_count + b->var_count;
+}
+
+const char *GetFunctionVarDefName(LEPUSContext *ctx, LEPUSFunctionBytecode *b,
+                                  uint32_t idx) {
+  if (!b->vardefs || idx >= b->arg_count + b->var_count) return nullptr;
+  return LEPUS_AtomToCString(ctx, b->vardefs[idx].var_name);
+}
+
+int32_t GetFunctionVarDefScopeLevel(LEPUSFunctionBytecode *b, uint32_t idx) {
+  if (!b->vardefs || idx >= b->arg_count + b->var_count) return -1;
+  return b->vardefs[idx].scope_level;
+}
+
+int32_t GetFunctionVarDefScopeNext(LEPUSFunctionBytecode *b, uint32_t idx) {
+  if (!b->vardefs || idx >= b->arg_count + b->var_count) return -1;
+  return b->vardefs[idx].scope_next;
+}
+
+uint8_t GetFunctionVarDefFlags(LEPUSFunctionBytecode *b, uint32_t idx) {
+  if (!b->vardefs || idx >= b->arg_count + b->var_count) return 0;
+  JSVarDef *vd = &b->vardefs[idx];
+  return (vd->var_kind & 0x0F) | ((vd->is_const & 1) << 4) |
+         ((vd->is_lexical & 1) << 5) | ((vd->is_captured & 1) << 6);
+}
+
+void SetFunctionVarDefs(LEPUSContext *ctx, LEPUSFunctionBytecode *b,
+                        const char **var_names, const int32_t *scope_levels,
+                        const int32_t *scope_nexts, const uint8_t *flags,
+                        uint32_t count) {
+  if (b->vardefs) return;  // already has vardefs, no-op
+  if (!var_names || count == 0 || count != b->arg_count + b->var_count) return;
+
+  JSVarDef *vardefs = static_cast<JSVarDef *>(
+      // JSVarDef contains only JSAtom (ref-counted integer) and scalar fields,
+      // no GC-traced pointer fields, so ALLOC_TAG_WITHOUT_PTR is correct.
+      lepus_mallocz(ctx, count * sizeof(JSVarDef), ALLOC_TAG_WITHOUT_PTR));
+  if (!vardefs) return;
+
+  for (uint32_t i = 0; i < count; i++) {
+    vardefs[i].var_name =
+        var_names[i] ? LEPUS_NewAtom(ctx, var_names[i]) : JS_ATOM_NULL;
+    vardefs[i].scope_level = scope_levels ? scope_levels[i] : 0;
+    vardefs[i].scope_next = scope_nexts ? scope_nexts[i] : -1;
+    if (flags) {
+      vardefs[i].var_kind = flags[i] & 0x0F;
+      vardefs[i].is_const = (flags[i] >> 4) & 1;
+      vardefs[i].is_lexical = (flags[i] >> 5) & 1;
+      vardefs[i].is_captured = (flags[i] >> 6) & 1;
+    }
+  }
+  LEPUS_HeapObjStore(ctx, &b->vardefs, (void *)vardefs);
+  b->vardefs_ext = 1;
+}
+
 int64_t *GetFunctionLineNums(LEPUSContext *ctx, const LEPUSFunctionBytecode *b,
                              size_t *size) {
 #ifdef ENABLE_QUICKJS_DEBUGGER
