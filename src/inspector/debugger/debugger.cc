@@ -730,13 +730,16 @@ QJS_HIDE void DebuggerParseScript(LEPUSContext *ctx, const char *input,
 
   if (script) {
     fd->source_len = input_len;
-    if (ctx->gc_enable || err) {
-      // fd->source free in js_free_function_def
-      LEPUS_HeapObjStore(
-          ctx, &fd->source,
-          js_strmalloc_gc(ctx, script->source, strlen(script->source)));
+    if (script->source) {
+      if (ctx->gc_enable || err) {
+        // fd->source free in js_free_function_def
+        LEPUS_HeapObjStore(ctx, &fd->source,
+                           js_strmalloc_gc(ctx, script->source, input_len));
+      } else {
+        fd->source = script->source;
+      }
     } else {
-      fd->source = script->source;
+      fd->source = nullptr;
     }
     LEPUS_HeapObjStore(ctx, &fd->script, script);
     int32_t view_id = GetViewID(filename);
