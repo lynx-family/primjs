@@ -11,7 +11,7 @@ It incorporates and derives from upstream open-source projects as noted below. W
   - Published npm package: weak-node-api (https://www.npmjs.com/package/weak-node-api)
   - License: MIT (see https://github.com/callstackincubator/react-native-node-api/blob/main/LICENSE.md)
   - Upstream npm version in this package: weak-node-api@0.1.1 (tracked via devDependency in package.json)
-  - Usage: We copy selected headers and generated sources from the `weak-node-api` npm package. Our package publishes the generated sources and additional build integration.
+  - Usage: We copy selected headers and generated sources from the `weak-node-api` npm package. Our package publishes the derived headers/sources and additional scaffolding/build integration.
 
 - Node-Addon-API (node-addon-api)
   - Repository: https://github.com/node-addon-api/node-addon-api
@@ -32,18 +32,16 @@ It incorporates and derives from upstream open-source projects as noted below. W
 
 - Symbol renaming (weak macros)
   - To avoid linkage and symbol conflicts, we introduce symbol renaming via macro wrappers. The files `defs_header/weak_napi_defines.h` and `defs_header/weak_napi_undefs.h` implement the weak symbol macro scheme used across the merged headers and generated sources.
+  - Note: these macro headers are copied into `headers/` during the `prepare:headers` pipeline so that consumers only need to include from `headers/`.
 
 ## Build System Additions and Packaging
 - Binary distribution and layout
-  - This package may include prebuilt artifacts under `prebuilt/` where applicable, along with source and build integration files for GN and CMake. Refer to README.md for usage details.
+  - This package does not ship prebuilt binaries. Android/HarmonyOS consumers fetch `libnapi_adapter.so` from remote artifacts when needed; iOS/macOS use static integration. Windows support is coming soon.
+  - A header-only CMake config (`weak-node-api-config.cmake`) is provided for include path propagation, and scaffolding templates are provided for generating addon projects.
 
-## Dual-License Note on defs_header/*
+## License Note on Macro Headers
 
-- The macro headers under `defs_header/` currently carry Apache-2.0 license headers and are retained as-is. We explicitly acknowledge and preserve those file-level headers.
-- Dual-license situation:
-  - Package-level license: Apache-2.0 (see LICENSE).
-  - File-level exception: Files under `defs_header/` are licensed under Apache-2.0 per their header. In case of conflict, the file-level license governs those specific files.
-  - Downstream guidance: Consumers should treat the package as Apache-2.0 except for the `defs_header/*` files, which carry Apache-2.0. Redistribution must retain the respective original file headers and this NOTICE.
+- The macro headers under `defs_header/` and the copied versions under `headers/` carry Apache-2.0 license headers and are retained as-is. Redistribution must retain the original file headers and this NOTICE.
 
 ## Additional Notes
 

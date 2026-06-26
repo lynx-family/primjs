@@ -1,0 +1,18 @@
+{
+  "android": {
+    "packageUrl": "https://repo1.maven.org/maven2/org/lynxsdk/lynx/primjs/3.9.0-alpha.1/primjs-3.9.0-alpha.1.aar",
+    "libraryPath": "jni/arm64-v8a/libnapi_adapter.so"
+  },
+  "harmony": {
+    "packageUrl": "https://ohpm.openharmony.cn/ohpm/@lynx/primjs/-/primjs-3.9.0-alpha.3.har",
+    "libraryPaths": [
+      "package/libs/arm64-v8a/libnapi_adapter.so",
+      "libs/arm64-v8a/libnapi_adapter.so"
+    ]
+  },
+  "win": {
+    "packageUrl": "",
+    "dllPath": "lib/lynx.dll",
+    "importLibraryPath": "lib/lynx.dll.lib"
+  }
+}

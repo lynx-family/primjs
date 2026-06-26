@@ -13,18 +13,14 @@ Lynx integrates Node-API based native add-ons into runtimes. To reduce friction 
 
 - A ready-to-publish set of derived headers and sources (from upstream generator outputs),
 - A symbol renaming scheme via weak macro wrappers,
-- GN and CMake build integration for downstream consumption,
-- Optional prebuilt binaries for macOS (dynamic library) and Windows (dynamic library).
+- CMake integration for downstream consumption (header-only config and addon scaffolding templates).
 - The weak symbol renaming scheme is gated by the `USE_WEAK_SUFFIX_NAPI` macro so that consumers can opt into it per translation unit.
 
 ## Usage Overview
 
 - Source-based integration:
-  - Use `CMakeLists.txt` to reference `generated/*` sources and `headers/*` headers in your native project.
-
-- Prebuilt consumption:
-  - On macOS, consume the published dylib and headers to avoid local compilation.
-  - On Windows, link against the published dynamic library and use the provided headers.
+  - Use `weak-node-api-config.cmake` to get include paths (header-only interface target).
+  - Use the provided scaffolding templates to generate an addon project that links the platform library from cloud artifacts when needed (Android/HarmonyOS). Windows support is coming soon.
 
 ## Attribution & License
 

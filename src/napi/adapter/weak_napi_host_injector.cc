@@ -29,16 +29,16 @@ extern "C" void PrimJSInstallWeakNodeApiRawPtrHostProvider(
 const PrimJSNodeApiRawPtrHost* GetInjectedWeakNapiRawPtrHost() {
   if (gWeakNodeApiRawPtrHostProvider == nullptr) {
     fprintf(stderr,
-            "weak-node-api iOS bridge provider is not installed before "
+            "weak-node-api Apple bridge provider is not installed before "
             "SetupWeakNodeApiEnv\n");
     abort();
   }
   return reinterpret_cast<const PrimJSNodeApiRawPtrHost*>(
       gWeakNodeApiRawPtrHostProvider());
 }
-#endif
+#else
+extern "C" const void* PrimJSGetWeakNodeApiRawPtrHost(void);
 
-#if !defined(__APPLE__)
 extern "C" void SetupWeakNodeApiEnv(void) __attribute__((constructor));
 #endif
 

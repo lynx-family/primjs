@@ -258,25 +258,157 @@ function injectWeakCpp(base, isInGenerated, newLines) {
     return;
   }
 
+  let weakHeaderIncludeIndex = -1;
+  for (let i = 0; i < newLines.length; i++) {
+    if (newLines[i].includes('#include "weak_node_api.hpp"')) {
+      weakHeaderIncludeIndex = i;
+      break;
+    }
+  }
+  if (weakHeaderIncludeIndex !== -1 && !newLines.join("\n").includes("#include <vector>")) {
+    newLines.splice(
+      weakHeaderIncludeIndex + 1,
+      0,
+      "",
+      "#include <cstring>",
+      "#include <mutex>",
+      "#include <vector>",
+    );
+  }
+
   const joined = newLines.join("\n");
-  if (joined.includes("napi_find_module_weak(")) {
-    return;
+  if (!joined.includes("pending_modules()")) {
+    const hostInjectIndex = newLines.findIndex((line) =>
+      line.includes("void inject_weak_node_api_host(const NodeApiHost &host)"),
+    );
+    if (hostInjectIndex !== -1) {
+      newLines.splice(
+        hostInjectIndex,
+        1,
+        "",
+        "namespace {",
+        "",
+        "std::mutex& pending_module_mutex() {",
+        "  static std::mutex* mutex = new std::mutex();",
+        "  return *mutex;",
+        "}",
+        "",
+        "std::vector<napi_module>& pending_modules() {",
+        "  static std::vector<napi_module>* modules = new std::vector<napi_module>();",
+        "  return *modules;",
+        "}",
+        "",
+        "void flush_pending_modules_to_host() {",
+        "  if (g_host.napi_module_register == nullptr) {",
+        "    return;",
+        "  }",
+        "",
+        "  std::vector<napi_module> modules;",
+        "  {",
+        "    std::lock_guard<std::mutex> lock(pending_module_mutex());",
+        "    modules.swap(pending_modules());",
+        "  }",
+        "",
+        "  for (auto& module : modules) {",
+        "    g_host.napi_module_register(&module);",
+        "  }",
+        "}",
+        "",
+        "void register_module(napi_module* mod) {",
+        "  if (mod == nullptr) {",
+        "    return;",
+        "  }",
+        "",
+        "  if (g_host.napi_module_register != nullptr) {",
+        "    g_host.napi_module_register(mod);",
+        "    return;",
+        "  }",
+        "",
+        "  std::lock_guard<std::mutex> lock(pending_module_mutex());",
+        "  pending_modules().push_back(*mod);",
+        "}",
+        "",
+        "bool find_pending_module(const char* name, napi_module* out) {",
+        "  if (name == nullptr || out == nullptr) {",
+        "    return false;",
+        "  }",
+        "",
+        "  std::lock_guard<std::mutex> lock(pending_module_mutex());",
+        "  for (auto it = pending_modules().rbegin(); it != pending_modules().rend();",
+        "       ++it) {",
+        "    if (it->nm_modname != nullptr && std::strcmp(name, it->nm_modname) == 0) {",
+        "      *out = *it;",
+        "      return true;",
+        "    }",
+        "  }",
+        "  return false;",
+        "}",
+        "",
+        "}  // namespace",
+        "",
+        "void inject_weak_node_api_host(const NodeApiHost &host) {",
+        "  g_host = host;",
+        "  flush_pending_modules_to_host();",
+        "};",
+      );
+    }
+  }
+
+  const moduleRegisterStart = newLines.findIndex((line) =>
+    line.includes('extern "C" void napi_module_register(napi_module *arg0)'),
+  );
+  if (moduleRegisterStart !== -1) {
+    let moduleRegisterEnd = -1;
+    for (let i = moduleRegisterStart; i < newLines.length; i++) {
+      if (newLines[i].trim() === "};") {
+        moduleRegisterEnd = i;
+        break;
+      }
+    }
+    if (moduleRegisterEnd !== -1) {
+      newLines.splice(
+        moduleRegisterStart,
+        moduleRegisterEnd - moduleRegisterStart + 1,
+        'extern "C" void napi_module_register(napi_module *arg0) {',
+        "  register_module(arg0);",
+        "};",
+      );
+    }
   }
 
   const wrapperLines = [
     "",
     'extern "C" bool',
     "napi_find_module_weak(const char* name, napi_module* out) {",
-    "  if (g_host.napi_find_module_weak == nullptr) {",
-    "    fprintf(stderr, \"Node-API function 'napi_find_module_weak' called \"",
-    "                    \"before it was injected!\\n\");",
-    "    abort();",
+    "  if (g_host.napi_find_module_weak != nullptr &&",
+    "      g_host.napi_find_module_weak(name, out)) {",
+    "    return true;",
     "  }",
-    "  return g_host.napi_find_module_weak(name, out);",
+    "  return find_pending_module(name, out);",
     "};",
   ];
 
-  newLines.push(...wrapperLines);
+  const findModuleStart = newLines.findIndex((line) =>
+    line.includes("napi_find_module_weak(const char* name, napi_module* out)"),
+  );
+  if (findModuleStart === -1) {
+    newLines.push(...wrapperLines);
+  } else {
+    let findModuleEnd = -1;
+    for (let i = findModuleStart; i < newLines.length; i++) {
+      if (newLines[i].trim() === "};") {
+        findModuleEnd = i;
+        break;
+      }
+    }
+    if (findModuleEnd !== -1) {
+      let externLine = findModuleStart;
+      if (newLines[findModuleStart - 1]?.trim() === 'extern "C" bool') {
+        externLine = findModuleStart - 1;
+      }
+      newLines.splice(externLine, findModuleEnd - externLine + 1, ...wrapperLines.slice(1));
+    }
+  }
 }
 
 function processFile(filePath) {

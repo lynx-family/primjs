@@ -1,166 +1,255 @@
 # @lynx-js/weak-node-api
 
-A distribution package that provides a "weak-linked" Node-API implementation with symbol renaming, headers, and pre-built binaries. It is designed to be safely integrated into complex applications where multiple Node-API providers might coexist (e.g., in a host that also embeds Node.js).
+## Overview
 
-This package is derived from the upstream `weak-node-api` project by Callstack, which itself is part of the `react-native-node-api` effort.
+- Lynx-friendly weak Node-API headers plus a scaffolding CLI for building N-API addons with CMake
+- Targets Android, iOS, HarmonyOS, and macOS. Windows support is coming soon.
+- User-facing package consumption requires Node.js 18+
+- iOS is also published as an independent CocoaPods package named `LynxWeakNodeAPI`, which ships the generated weak-node-api sources separately from PrimJS
+- See Agent.md for AI-oriented guidance and conventions
 
-## Overview & Working Principle
+## User Guide
 
-On certain platforms like Android, the dynamic linker enforces strict symbol resolution. A native module must have its dependencies explicitly declared to access their symbols at runtime. This poses a challenge for Node-API addons that need to link against a host-provided implementation (like Hermes or a custom runtime) without creating a hard compile-time dependency.
-
-`weak-node-api` solves this by providing:
-
-1.  **A Weak-linked Interface**: It exposes the full Node-API function set but without any implementation. Instead, each function call is routed through a global function table (a `struct` of function pointers).
-2.  **Runtime Injection**: The application host, which holds the *actual* Node-API implementation, is responsible for "injecting" its function table into this package at runtime. This populates the function pointers.
-3.  **Symbol Renaming**: All `napi_*` functions and types are renamed with a `_weak` suffix (e.g., `napi_create_object` becomes `napi_create_object_weak`). This prevents symbol collisions if another standard Node-API implementation (like Node.js) is also present in the same process space. This is the primary modification introduced by this project compared to the upstream `weak-node-api` project.
-
-This design allows native addons to link against a stable, intermediary interface without needing to know the details of the host's runtime environment.
-
-## Installation and Usage
-
-### Installation
+### Create a project
 
 ```bash
-npm install @lynx-js/weak-node-api
+# Use npm to fetch the package on-the-fly and run its bin
+npm exec -y --package=@lynx-js/weak-node-api -- create-weak-node-api
+# Or with npx
+npx -y -p @lynx-js/weak-node-api create-weak-node-api
 ```
 
-The package is available on NPM: [https://www.npmjs.com/package/@lynx-js/weak-node-api](https://www.npmjs.com/package/@lynx-js/weak-node-api)
+Alternative: local project flow (no initializer)
 
-### Node.js version
+```bash
+mkdir my-addon && cd my-addon
+npm init -y
+npm i -D @lynx-js/weak-node-api@^0.1.0
+# Now the local bin is available via node_modules/.bin
+npm exec create-weak-node-api
+# Or add a script and run it:
+npm pkg set scripts.scaffold=\"create-weak-node-api\"
+npm run scaffold
+```
 
-- **Consumers**: No `engines.node` restriction is published. Install/use the package with the Node.js version required by your own environment and tooling.
-- **Maintainers**: Node.js >= 22 is required if you need to run the helper scripts that regenerate headers/sources (they rely on the upstream `weak-node-api` devDependency).
+Follow the prompt for the project name. A cross-platform CMake project will be created with:
+- CMakeLists.txt
+- a sample addon source file
+- dependency fetch scripts (Android/HarmonyOS)
 
-### Basic Usage
+### Develop and build
 
-Your native addon can include the headers from this package and call the `_weak` suffixed functions.
+```bash
+cd your-project
+npm install
+cmake -S . -B build
+cmake --build build --config Release
+```
+
+The generic CMake command above builds the current host platform only. For example, running it on macOS produces the macOS static library. To build Android, iOS, or HarmonyOS, configure a separate build directory with the platform-specific CMake toolchain/generator shown below.
+
+### Typical workflow
+
+1) Scaffold a project
+
+```bash
+npm exec -y --package=@lynx-js/weak-node-api -- create-weak-node-api
+```
+
+2) Generate the cross-platform project
+
+You will get a project with:
+- CMakeLists.txt
+- src/addon.cc (your N-API business logic)
+- scripts/fetch-libs.mjs (downloads platform libraries for Android/HarmonyOS)
+- scripts/package-apple.mjs (packages Apple outputs into an xcframework and podspec)
+- a unified `dist/` output layout configured by the scaffold CMake template:
+  - Android: `dist/android/<abi>/lib<project>.so`
+  - HarmonyOS: `dist/harmony/<abi>/lib<project>.so`
+  - iOS: `dist/ios/iphoneos/lib<project>.a` or `dist/ios/iphonesimulator/lib<project>.a`
+  - macOS: `dist/macos/macosx/lib<project>.a`
+  - Apple packaging: `dist/apple/<project>.xcframework` and `dist/apple/<project>.podspec` after `npm run package:apple`
+
+3) Implement your addon logic
+
+Edit src/addon.cc. If you enable USE_WEAK_SUFFIX_NAPI, follow the per-translation-unit include convention:
+- Include weak_napi_defines.h after the last include
+- Include weak_napi_undefs.h at the end of the file
+
+The scaffolded sample is written against the `node-addon-api` C++ wrapper and uses a unified registration model: once the addon binary is loaded it auto-registers itself, and it also exports the standard Node-API C entry points (`napi_register_module_v1` / `node_api_module_get_api_version_v1`) so a host may still locate it with `dlsym`/`GetProcAddress`.
+
+4) Build with CMake
+
+```bash
+npm install
+cmake -S . -B build
+cmake --build build --config Release
+```
+
+The command above builds the current host platform only. Use a separate build directory and the corresponding CMake toolchain/generator for each target platform you want to build.
+
+Android (NDK):
+
+```bash
+cmake -S . -B build-android-arm64 \
+  -DCMAKE_TOOLCHAIN_FILE=$ANDROID_NDK/build/cmake/android.toolchain.cmake \
+  -DANDROID_ABI=arm64-v8a \
+  -DANDROID_PLATFORM=android-21 \
+  -DCMAKE_BUILD_TYPE=Release
+cmake --build build-android-arm64
+```
+
+HarmonyOS (OHOS SDK/NDK):
+
+```bash
+cmake -S . -B build-ohos-arm64 \
+  -DCMAKE_TOOLCHAIN_FILE=$OHOS_NDK/build/cmake/ohos.toolchain.cmake \
+  -DCMAKE_BUILD_TYPE=Release
+cmake --build build-ohos-arm64
+```
+
+iOS device (Xcode):
+
+```bash
+cmake -S . -B build-ios-device \
+  -G Xcode \
+  -DCMAKE_SYSTEM_NAME=iOS \
+  -DCMAKE_OSX_SYSROOT=iphoneos \
+  -DCMAKE_OSX_ARCHITECTURES=arm64
+cmake --build build-ios-device --config Release
+```
+
+iOS simulator (Xcode):
+
+```bash
+cmake -S . -B build-ios-sim \
+  -G Xcode \
+  -DCMAKE_SYSTEM_NAME=iOS \
+  -DCMAKE_OSX_SYSROOT=iphonesimulator \
+  -DCMAKE_OSX_ARCHITECTURES=arm64
+cmake --build build-ios-sim --config Release
+```
+
+macOS:
+
+```bash
+cmake -S . -B build-macos \
+  -DCMAKE_OSX_ARCHITECTURES=arm64 \
+  -DCMAKE_BUILD_TYPE=Release
+cmake --build build-macos --config Release
+```
+
+The scaffold is configured to emit platform-appropriate addon artifacts into `dist/`.
+On Android/HarmonyOS the artifact is `lib<project>.so`; on iOS/macOS it is `lib<project>.a`. Windows support is coming soon.
+
+Registration is unified across static and dynamic loading styles. "Static" means the addon is linked into the host process, usually as an Apple static library, and auto-registers when the image is loaded. "Dynamic" means the host loads a shared addon and may find the exported Node-API entry point with `dlsym`/`GetProcAddress`. The scaffold emits both paths from the same registration block, so platform code does not need separate registration macros.
+
+5) Platform specifics
+
+- Android: CMake triggers scripts/fetch-libs.mjs to download the AAR and extract vendor/android/libnapi_adapter.so, then links it.
+- HarmonyOS: CMake triggers scripts/fetch-libs.mjs to download the HAR and extract vendor/harmony/libnapi_adapter.so, then links it. USE_WEAK_SUFFIX_NAPI is enabled by default.
+- Windows: coming soon.
+- iOS/macOS: Apple platforms emit static libraries; dynamic platforms emit loadable libraries. The addon registration code is unified across platforms: it auto-registers when loaded and also exports the standard dynamic C entry points. For Apple static integration, include `addon_use.h` from exactly one host `.cc`/`.mm` file so `NAPI_USE` retains the auto-registration symbol before `requireNodeAddon` is called. macOS enables USE_WEAK_SUFFIX_NAPI by default.
+
+6) Package Apple artifacts for direct integration
+
+```bash
+npm run package:apple
+```
+
+This command consumes the already-built Apple static libraries under `dist/ios/...` and `dist/macos/...`, then writes:
+- `dist/apple/<project>.xcframework`
+- `dist/apple/<project>.podspec`
+- `dist/apple/include/addon_use.h`
+
+The generated podspec is ready for local CocoaPods integration:
+
+```ruby
+pod 'your-project', :path => '../path/to/dist/apple'
+```
+
+If you later publish the Apple package remotely, replace the generated podspec's `s.source = { :path => "." }` with your hosted zip URL and checksum.
+
+For Apple static integration, link the generated static-library xcframework into the host app and include the generated use header from exactly one host `.cc`/`.mm` file. The header expands to `NAPI_USE(<addon_symbol>)`, creating an explicit `used` reference to the addon's auto-registration symbol so Xcode's release/dead-strip link does not remove it. Keep the generated registration block in `src/addon.cc` and the generated `addon_use.h` intact; do not use `-force_load` for this path.
 
 ```cpp
-#include "node_api.h" // From this package, with weak symbols
-#if defined(USE_WEAK_SUFFIX_NAPI)
-#include "weak_napi_defines.h" // This header file defines macros for all weak symbols and must be included before using weak symbols/definitions
-#endif
+#include "addon_use.h"
 
-// Example native addon function
-napi_value MyNativeFunction(napi_env env, napi_callback_info info) {
-  napi_value world;
-  napi_status status = napi_create_string_utf8(env, "world", NAPI_AUTO_LENGTH, &world);
-  // Note: napi_create_string_utf8 is a macro that resolves to napi_create_string_utf8_weak
-  return world;
-}
-
-#if defined(USE_WEAK_SUFFIX_NAPI)
-#include "weak_napi_undefs.h" // This header file undefines all weak symbols and must be included at the end of the file
-#endif
+requireNodeAddon("your-project");
 ```
 
-At runtime, the host application must call `inject_weak_node_api_host()` to provide the real implementation before any addons are loaded.
+### Platform linking strategy
 
-## Compile-time macro control
+- Android: downloads the AAR and extracts jni/arm64-v8a/libnapi_adapter.so, then links it
+- HarmonyOS: downloads the HAR and extracts libs/arm64-v8a/libnapi_adapter.so, then links it; USE_WEAK_SUFFIX_NAPI is enabled by default
+- Windows: coming soon.
+- iOS/macOS: emits a static library and `addon_use.h`; include the use header from exactly one host `.cc`/`.mm` file so `NAPI_USE` retains the addon's auto-registration symbol
 
-- By default, if `USE_WEAK_SUFFIX_NAPI` is **not** defined, the headers provided by this package do not rename any Node-API symbols and all `napi_*` APIs keep their original symbol names.
-- When the `USE_WEAK_SUFFIX_NAPI` macro is defined at compile time, the renaming macros in `weak_napi_defines.h` / `weak_napi_undefs.h` become active and map all `napi_*` symbols to implementations with the `_weak` suffix (weak suffix symbol remapping).
-- `USE_WEAK_SUFFIX_NAPI` acts as a compile-time gate: only when this macro is defined will the weak suffix symbol remapping scheme be applied.
+### Symbol renaming (avoid conflicts with other N-API providers)
 
-### How to enable (examples)
+- Controlled by the compile-time macro USE_WEAK_SUFFIX_NAPI
+- Enabled by default on HarmonyOS and macOS; optional on other platforms
+- In your translation units:
+  - include weak_napi_defines.h after the last include
+  - include weak_napi_undefs.h at the end of the file
 
-- When invoking the compiler directly, add `-DUSE_WEAK_SUFFIX_NAPI` to your compile flags.
-- In CMake, you can enable it via `add_compile_definitions(USE_WEAK_SUFFIX_NAPI)` or `target_compile_definitions(my_target PRIVATE USE_WEAK_SUFFIX_NAPI)`.
+### Packaging handoff
 
-### Scope and recommendations
+The scaffold does not publish platform packages for you. Instead, it writes organized build artifacts to `dist/` so you can package them using your own release flow:
+- Android: turn `dist/android/.../*.so` into an AAR
+- HarmonyOS: turn `dist/harmony/.../*.so` into a HAR
+- Windows: support is coming soon; no Windows artifact is generated by the current scaffold.
+- iOS/macOS: run `npm run package:apple` to produce a static-library xcframework plus podspec for direct integration or later publishing
 
-- Files under the `headers/` and `generated/` directories that are produced by `prepare-headers` and shipped with this package already contain conditional includes of `weak_napi_defines.h` / `weak_napi_undefs.h` guarded by `USE_WEAK_SUFFIX_NAPI`. As long as this macro is defined in your compile command, weak suffix symbol remapping will be enabled for those headers/sources.
-- For translation units you author yourself (for example additional `.c` / `.cc` / `.cpp` files) that directly include this package's `node_api.h`, it is recommended to use the same `#if defined(USE_WEAK_SUFFIX_NAPI)` wrapping pattern as in the example above so that their behavior matches.
+## Maintainer Guide
 
-### Coexistence with other N-API Implementations
+### Local development
 
-Because all symbols are renamed, your addon can be safely loaded into environments that have another Node-API provider. The weak symbols from this package will not conflict with the standard symbols. This is the primary motivation for this package.
+- Node.js requirement: 22+ (see .nvmrc)
+- headers/ and generated/ are produced by npm run prepare:headers and are not committed to the repository
+- Scaffolding entry: scripts/create.mjs
+- Templates: templates/
 
-## Directory Structure
-
-After installation via npm, the package contains the following key directories and files:
-
--   `headers/`: Public C/C++ headers for consumption. This includes the renamed `node_api.h` and the C++ wrapper `node-addon-api`.
--   `generated/`: Upstream-generated source files (`weak_node_api.cpp`, `NodeApiHost.hpp`).
--   `prebuilt/`: Pre-compiled binaries for supported platforms and architectures.
--   `prebuilt/macos/debug/libweak-node-api.dylib` and `prebuilt/macos/release/libweak-node-api.dylib`: macOS universal shared libraries (arm64 + x86_64).
--   `licenses/`: Directory containing the full license texts of all third-party dependencies.
-    -   `licenses/weak-node-api.MIT`
-    -   `licenses/node-addon-api.MIT`
-    -   `licenses/node-api-headers.MIT`
--   `weak-node-api-config.cmake`: A CMake configuration file to help downstream projects find and link against this package.
--   `LICENSE`: The main license for this package (Apache-2.0).
--   `NOTICE`: Copyright and attribution notice for The Lynx Authors.
--   `THIRD-PARTY-NOTICES.md`: Detailed notices for all bundled third-party software.
-
-## License and Compliance
-
-This package is licensed under the **Apache License 2.0**.
-
-It incorporates code from the following upstream projects, which are licensed under the **MIT License**:
-
-1.  **weak-node-api**: From `callstackincubator/react-native-node-api`.
-2.  **node-addon-api**: From `nodejs/node-addon-api`.
-3.  **Node-API C headers (node-api-headers)**: From `nodejs/node-api-headers`.
-
-We adhere to the following compliance standards:
--   The full text of the Apache-2.0 license is in the `LICENSE` file.
--   A `NOTICE` file is included with the copyright statement for The Lynx Authors.
--   `THIRD-PARTY-NOTICES.md` provides detailed attribution for all included third-party software.
--   The `licenses/` directory contains the full license texts for all MIT-licensed components.
-
-Even when distributing only the binary artifacts, you must retain and distribute the `LICENSE`, `NOTICE`, and `THIRD-PARTY-NOTICES.md` files, along with the `licenses/` directory.
-
-
-## Windows Build
-
-On Windows you can use Visual Studio 2022 (MSVC) and CMake to build the `WeakNodeAPI.dll` dynamic library and its import library `WeakNodeAPI.lib`.
-
-### Toolchain Requirements
-
-- **Visual Studio 2022**: Install the "Desktop development with C++" workload.
-- **CMake**: Version >= 3.24, and make sure `cmake.exe` is available on the `PATH`.
-- **Node.js**: Version >= 22, required to run the helper scripts used during development/build.
-- **Architecture**: Only x64 is supported.
-
-### Local Build
-
-From the `oss/` directory you can trigger the Windows build via npm scripts. The script will build both Debug and Release configurations and package the results into the `prebuilt/` layout.
+### Refresh headers / generated code
 
 ```bash
-# From the oss/ directory
-# This calls tools/cmake/build_windows_msvc.ps1 via the npm script
-npm run build:release:win
+npm install
+npm run prepare:headers
 ```
 
-### Artifacts and Paths
+### Release checklist
 
-After a successful build, you should find the following artifacts under `prebuilt/`. In addition to the DLL, prebuilt packaging always includes `WeakNodeAPI.exp` for both Debug and Release, and includes `WeakNodeAPI.pdb` for Debug builds. The import library `WeakNodeAPI.lib` is packaged when available but is not required.
+- Update the version in package.json
+- The publish flow updates templates/skeleton/package.json automatically so scaffolded projects depend on the package name and version being released
+- Run npm run bootstrap locally to validate generated outputs and scaffolding behavior
+- The GitHub release workflows for Android/HarmonyOS/iOS run npm install and npm run prepare:headers before packaging/publishing
 
--   **Default layout**:
-    -   `prebuilt/win/x64/Debug/WeakNodeAPI.dll`
-    -   `prebuilt/win/x64/Debug/WeakNodeAPI.exp`
-    -   `prebuilt/win/x64/Debug/WeakNodeAPI.pdb`
-    -   `prebuilt/win/x64/Debug/WeakNodeAPI.lib` (optional)
-    -   `prebuilt/win/x64/Release/WeakNodeAPI.dll`
-    -   `prebuilt/win/x64/Release/WeakNodeAPI.exp`
-    -   `prebuilt/win/x64/Release/WeakNodeAPI.lib` (optional)
--   **`weak_suffix` layout**:
-    -   `prebuilt/win/weak_suffix/x64/Debug/WeakNodeAPI.dll`
-    -   `prebuilt/win/weak_suffix/x64/Debug/WeakNodeAPI.exp`
-    -   `prebuilt/win/weak_suffix/x64/Debug/WeakNodeAPI.pdb`
-    -   `prebuilt/win/weak_suffix/x64/Debug/WeakNodeAPI.lib` (optional)
-    -   `prebuilt/win/weak_suffix/x64/Release/WeakNodeAPI.dll`
-    -   `prebuilt/win/weak_suffix/x64/Release/WeakNodeAPI.exp`
-    -   `prebuilt/win/weak_suffix/x64/Release/WeakNodeAPI.lib` (optional)
+### Validate the scaffolder
 
-### Troubleshooting
+```bash
+node scripts/create.mjs
+```
 
-- **CMake configuration fails**:
-  - Ensure Visual Studio 2022 with the C++ desktop workload is fully installed.
-  - Verify that `cmake.exe` is on the `PATH` and that the version meets the minimum requirement.
-- **"npm" or "node" command not found**:
-  - Ensure Node.js is installed and its installation directory is added to the `PATH`.
-- **Build errors**:
-  - First verify that `npm run prepare:headers` completes successfully.
-  - Check that the C++ toolchain is intact and not blocked by antivirus or security software.
+### Publishing and npm create
+
+If you want an `npm create` initializer UX, you can publish an optional initializer package:
+- @lynx-js/weak-node-api: headers + templates + create script
+- @lynx-js/create-weak-node-api (optional): npm create initializer that depends on and forwards to @lynx-js/weak-node-api
+
+This repository does not ship an initializer package by default, so the recommended entry points are:
+- npm exec -y --package=@lynx-js/weak-node-api -- create-weak-node-api
+- npx -y -p @lynx-js/weak-node-api create-weak-node-api
+
+## Directory layout
+
+- headers/: Node-API C/C++ headers for consumers
+- generated/: generated weak bridge sources/headers
+- shim/: helper headers
+- scripts/: package scripts (prepare-headers, scaffolder)
+- templates/: scaffolding templates
+- Agent.md: AI-friendly guide and conventions
+
+## Compliance
+
+- Licensed under Apache-2.0
+- Third-party licenses are documented in THIRD-PARTY-NOTICES.md and licenses/

@@ -1,3 +1,9 @@
+## 0.1.0 - 2026-06-16
+- **Scaffolding CLI**: Adds a `create-weak-node-api` scaffolder for generating Lynx-friendly N-API addon projects using CMake.
+- **Multi-platform Outputs**: Scaffolded projects now support selecting multiple target platforms and write organized artifacts to `dist/`, with Android/HarmonyOS producing `.so` files and Apple platforms producing static libraries.
+- **No Prebuilt Binaries**: This package no longer ships prebuilt macOS binaries. Android/HarmonyOS consumers fetch `libnapi_adapter.so` from remote artifacts when needed; iOS/macOS use static integration.
+- **Header-only CMake Config**: `weak-node-api-config.cmake` now provides a header-only interface target for includes.
+
 ## 0.0.9 - 2026-05-08
 - **Compatibility**: Also use relative paths for `weak_napi_defines.h` and `weak_napi_undefs.h` in generated `NodeApiHost.hpp`, keeping all generated source-facing files independent of the `headers` include directory.
 
@@ -10,14 +16,15 @@
 ## 0.0.6 - 2026-04-16
 - **Compatibility**: Remove the published `engines.node` restriction so consumers are not blocked by npm engine checks.
 - **Release Policy**: Continue to require Node.js 22+ only for maintainer workflows that run helper scripts such as `prepare:headers`.
+- **iOS Distribution**: Add an independent CocoaPods package (`LynxWeakNodeAPI`) published from a GitHub release zip so generated weak-node-api sources do not need to be committed and can be consumed separately from PrimJS.
 
 ## 0.0.5 - 2026-04-16
 - **Compatibility**: Relax consumer Node.js requirement to >= 18 (publish-time `engines.node`).
 - **Dev Dependency**: Track the upstream `weak-node-api@0.1.1` as a devDependency to avoid imposing its Node.js requirements on consumers.
 - **Docs**: Clarify consumer vs maintainer Node.js version requirements.
 
-## 0.1.0 - 2026-04-07
-- **Breaking Change**: Update module lookup APIs to use caller-provided output storage to avoid cross-DLL allocation/free issues on Windows.
+## 0.0.4 - 2026-04-07
+- **Breaking Change**: Update module lookup APIs to use caller-provided output storage to avoid cross-binary allocation/free issues.
   - `napi_find_module_primjs`: changed from returning a heap-allocated `napi_module_spec_compl*` to `bool napi_find_module_primjs(const char* name, napi_module* out)`.
   - `napi_find_module_weak`: changed to `bool napi_find_module_weak(const char* name, napi_module* out)` and forwards to the injected host implementation.
 
@@ -26,7 +33,7 @@
 
 ## 0.0.2 - 2026-02-26
 - **Unified N-API Integration**: Merges source files from upstream `weak-node-api@0.1.1` and `node-addon-api@7.1.0` packages. This integration provides symbol suffix renaming capabilities (appending `_weak` suffix) and includes a comprehensive set of source files in the `headers/` and `generated/` directories for seamless downstream usage.
-- **Prebuilt Binaries**: Provides prebuilt binary libraries for macOS (x86 & arm64) and Windows (x64) platforms.
+- **Prebuilt Binaries**: Provided prebuilt macOS binaries at the time.
 
 ## 0.0.1 - 2026-02-06
 
