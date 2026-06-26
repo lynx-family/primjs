@@ -75,6 +75,15 @@ static_assert(sizeof(char16_t) == sizeof(wchar_t),
 ////////////////////////////////////////////////////////////////////////////////
 namespace Napi {
 
+// To put the C++ wrapper into a custom namespace, define this macro to a valid
+// identifier consistently for all translation units and consumers:
+//   -DPRIMJS_NAPI_CPP_CUSTOM_NAMESPACE=YourNamespace
+#ifdef PRIMJS_NAPI_CPP_CUSTOM_NAMESPACE
+namespace PRIMJS_NAPI_CPP_CUSTOM_NAMESPACE {}
+using namespace PRIMJS_NAPI_CPP_CUSTOM_NAMESPACE;
+namespace PRIMJS_NAPI_CPP_CUSTOM_NAMESPACE {
+#endif
+
 // Forward declarations
 template <class T>
 class Maybe;
@@ -2493,6 +2502,9 @@ String String::From(napi_env env, const T& value) {
   return Helper::From(env, value);
 }
 
+#ifdef PRIMJS_NAPI_CPP_CUSTOM_NAMESPACE
+}  // namespace PRIMJS_NAPI_CPP_CUSTOM_NAMESPACE
+#endif
 }  // namespace Napi
 
 // Register an add-on based on an initializer function.

@@ -28,6 +28,15 @@
 
 namespace Napi {
 
+// To put the C++ wrapper into a custom namespace, define this macro to a valid
+// identifier consistently for all translation units and consumers:
+//   -DPRIMJS_NAPI_CPP_CUSTOM_NAMESPACE=YourNamespace
+#ifdef PRIMJS_NAPI_CPP_CUSTOM_NAMESPACE
+namespace PRIMJS_NAPI_CPP_CUSTOM_NAMESPACE {}
+using namespace PRIMJS_NAPI_CPP_CUSTOM_NAMESPACE;
+namespace PRIMJS_NAPI_CPP_CUSTOM_NAMESPACE {
+#endif
+
 static NAPI_NO_RETURN void Fatal(const char* message) { ::abort(); }
 
 static void CheckStatus(napi_env env, napi_status status, const char* message) {
@@ -1470,4 +1479,7 @@ uint32_t VersionManagement::GetNapiVersion(Env env) {
   CheckStatus(env, status, "failed to call napi_get_version");
   return result;
 }
+#ifdef PRIMJS_NAPI_CPP_CUSTOM_NAMESPACE
+}  // namespace PRIMJS_NAPI_CPP_CUSTOM_NAMESPACE
+#endif
 }  // namespace Napi
