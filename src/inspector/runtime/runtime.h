@@ -33,17 +33,11 @@
 #ifndef SRC_INSPECTOR_RUNTIME_RUNTIME_H_
 #define SRC_INSPECTOR_RUNTIME_RUNTIME_H_
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-#include "quickjs/include/quickjs.h"
-#ifdef __cplusplus
-}
-#endif
-
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "quickjs/include/quickjs.h"
 
 typedef struct DebuggerParams DebuggerParams;
 // handle runtime.enable protocol

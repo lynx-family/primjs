@@ -5,13 +5,8 @@
 #ifndef SRC_GC_TRACE_GC_H_
 #define SRC_GC_TRACE_GC_H_
 #include <string>
-#ifdef __cplusplus
-extern "C" {
-#endif
+
 #include "quickjs/include/quickjs.h"
-#ifdef __cplusplus
-}
-#endif
 
 size_t allocate_usable_size(void *mem);
 void set_heap_obj_len(void *ptr, int len);

@@ -16,14 +16,8 @@
 #include <utility>
 #include <vector>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-#include "quickjs/include/quickjs.h"
-#ifdef __cplusplus
-}
-#endif
 #include "inspector/cpuprofiler/profile_tree.h"
+#include "quickjs/include/quickjs.h"
 
 namespace primjs {
 namespace CpuProfiler {

@@ -4,15 +4,7 @@
 
 #include <cstring>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include "quickjs/include/quickjs.h"
-
-#ifdef __cplusplus
-}
-#endif
 
 static bool IsASCII(char c) { return !(c & ~0x7F); }
 

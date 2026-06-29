@@ -9,14 +9,8 @@
 #ifndef SRC_INSPECTOR_CPUPROFILER_TRACING_CPU_PROFILER_H_
 #define SRC_INSPECTOR_CPUPROFILER_TRACING_CPU_PROFILER_H_
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-#include "quickjs/include/quickjs.h"
-#ifdef __cplusplus
-}
-#endif
 #include "inspector/cpuprofiler/cpu_profiler.h"
+#include "quickjs/include/quickjs.h"
 
 typedef struct DebuggerParams DebuggerParams;
 // ref:

@@ -8,10 +8,8 @@
 
 #ifndef SRC_GC_PERSISTENT_HANDLE_H_
 #define SRC_GC_PERSISTENT_HANDLE_H_
-extern "C" {
-#include "quickjs/include/quickjs.h"
-}
 #include "gc/global-handles.h"
+#include "quickjs/include/quickjs.h"
 
 const int kApiSystemPointerSize = sizeof(void*);
 static const int kNodeClassIdOffset = 1 * kApiSystemPointerSize;

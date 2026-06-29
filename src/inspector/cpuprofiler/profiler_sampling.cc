@@ -18,14 +18,7 @@
 #include "inspector/debugger/debugger.h"
 #include "inspector/interface.h"
 #include "quickjs/include/quickjs-inner.h"
-
-#ifdef __cplusplus
-extern "C" {
-#endif
 #include "quickjs/include/quickjs.h"
-#ifdef __cplusplus
-}
-#endif
 
 #if defined(ANDROID) || defined(__ANDROID__)
 #include <android/log.h>

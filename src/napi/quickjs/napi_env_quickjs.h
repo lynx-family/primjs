@@ -10,15 +10,8 @@
 #ifndef SRC_NAPI_QUICKJS_NAPI_ENV_QUICKJS_H_
 #define SRC_NAPI_QUICKJS_NAPI_ENV_QUICKJS_H_
 
-#ifdef __cplusplus
-extern "C" {
-#endif  // __cplusplus
-#include "quickjs/include/quickjs.h"
-#ifdef __cplusplus
-}
-#endif  // __cplusplus
-
 #include "js_native_api.h"
+#include "quickjs/include/quickjs.h"
 #ifdef USE_PRIMJS_NAPI
 #include "primjs_napi_defines.h"
 #endif

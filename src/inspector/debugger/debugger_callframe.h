@@ -32,15 +32,8 @@
 #ifndef SRC_INSPECTOR_DEBUGGER_DEBUGGER_CALLFRAME_H_
 #define SRC_INSPECTOR_DEBUGGER_DEBUGGER_CALLFRAME_H_
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-#include "quickjs/include/quickjs.h"
-#ifdef __cplusplus
-}
-#endif
-
 #include "inspector/debugger/debugger.h"
+#include "quickjs/include/quickjs.h"
 
 /**
  * @brief call this function to handle "Debugger.evalueateOnCallFrame"

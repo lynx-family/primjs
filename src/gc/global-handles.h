@@ -12,6 +12,7 @@
 #include "gc/gc_work_stack.h"
 #include "gc/persistent-handle.h"
 #include "gc/sizes.h"
+#include "quickjs/include/quickjs.h"
 
 typedef uintptr_t Addr;
 typedef void (*visitor)(LEPUSValue, void*);

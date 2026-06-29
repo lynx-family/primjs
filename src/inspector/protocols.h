@@ -32,19 +32,11 @@
 #ifndef SRC_INSPECTOR_PROTOCOLS_H_
 #define SRC_INSPECTOR_PROTOCOLS_H_
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-#include "quickjs/include/quickjs.h"
-
-#ifdef __cplusplus
-}
-#endif
-
 #include <cstring>
 #include <string>
 #include <unordered_map>
+
+#include "quickjs/include/quickjs.h"
 typedef struct DebuggerParams DebuggerParams;
 
 typedef enum ProtocolType {

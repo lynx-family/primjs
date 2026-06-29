@@ -16,16 +16,10 @@
 #include <string>
 #include <thread>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-#include "quickjs/include/quickjs.h"
-#ifdef __cplusplus
-}
-#endif
 #include "inspector/cpuprofiler/profile_generator.h"
 #include "inspector/cpuprofiler/profiler_sampling.h"
 #include "quickjs/include/quickjs-inner.h"
+#include "quickjs/include/quickjs.h"
 
 namespace primjs {
 namespace CpuProfiler {

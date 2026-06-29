@@ -46,9 +46,8 @@
 #include <vector>
 
 #include "quickjs/include/list.h"
-extern "C" {
 #include "quickjs/include/quickjs.h"
-}
+
 #define DEBUGGER_MAX_SCOPE_LEVEL 23
 extern const char kConsoleDerivedObjectsProp[];
 extern const char kConsoleObjectIdPrefix[];

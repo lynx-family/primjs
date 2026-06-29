@@ -32,16 +32,6 @@
 #ifndef SRC_INSPECTOR_DEBUGGER_DEBUGGER_H_
 #define SRC_INSPECTOR_DEBUGGER_DEBUGGER_H_
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-#include "quickjs/include/quickjs.h"
-
-#ifdef __cplusplus
-}
-#endif
-
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -51,6 +41,7 @@ extern "C" {
 
 #include "inspector/debugger_inner.h"
 #include "quickjs/include/quickjs-inner.h"
+#include "quickjs/include/quickjs.h"
 
 // debugger step mode: step over, step in, step out and continue
 enum DebuggerStepMode {

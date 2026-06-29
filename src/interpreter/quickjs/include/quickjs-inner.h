@@ -36,19 +36,16 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-
 #include "quickjs/include/cutils.h"
 #include "quickjs/include/list.h"
-#include "quickjs/include/quickjs.h"
-
 #ifdef __cplusplus
 }
 #endif
-
 #include "gc/allocator.h"
 #include "gc/collector_ms.h"
 #include "quickjs/include/dtoa.h"
 #include "quickjs/include/primjs_monitor.h"
+#include "quickjs/include/quickjs.h"
 
 #ifndef _WIN32
 #include <sys/mman.h>
