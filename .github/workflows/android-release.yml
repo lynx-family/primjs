@@ -20,20 +20,24 @@ jobs:
     timeout-minutes: 60
     outputs:
       version: ${{ steps.get_version.outputs.VERSION }}
+      release_mode: ${{ steps.get_version.outputs.RELEASE_MODE }}
     steps:
       - name: Get Version
         id: get_version
         run: |-
           if [ ${{ github.event_name }} == 'workflow_dispatch' ]; then
             version=${{ github.event.inputs.tag }}
+            release_mode="manual"
           else
             version=$(echo ${{ github.ref }} | awk -F "/" '{print $3}')
+            release_mode="tag_release"
           fi
           if [[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ || \
                 $version =~ ^[0-9]+\.[0-9]+\.[0-9]+-rc\.[0-9]+$ || \
                 $version =~ ^[0-9]+\.[0-9]+\.[0-9]+-alpha\.[0-9]+$ ]]; then
             echo "Version is valid"
             echo "VERSION=$version" >> $GITHUB_OUTPUT;
+            echo "RELEASE_MODE=$release_mode" >> $GITHUB_OUTPUT;
           else
             echo "Version is invalid"
             exit 1
@@ -78,6 +82,7 @@ jobs:
         npm run prepare:headers
 
     - name: Build artifact
+      if: ${{ needs.get-version.outputs.release_mode == 'tag_release' }}
       run: |-
         pushd Android
         chmod +x ./gradlew
@@ -95,7 +100,19 @@ jobs:
         popd
       id: build_artifact
 
+    - name: Build snapshot artifact
+      if: ${{ needs.get-version.outputs.release_mode == 'manual' }}
+      env:
+        CENTRAL_TOKEN_USERNAME: ${{ secrets.MAVEN_CENTRAL_TOKEN_USERNAME }}
+        CENTRAL_TOKEN_PASSWORD: ${{ secrets.MAVEN_CENTRAL_TOKEN_PASSWORD }}
+      run: |-
+        pushd Android
+        chmod +x ./gradlew
+        ./gradlew assembleAllModulesRelease
+        ./gradlew publishAllModules -Pversion=${{ needs.get-version.outputs.version }}-SNAPSHOT \
+
     - name: Publish artifact to maven
+      if: ${{ needs.get-version.outputs.release_mode == 'tag_release' }}
       uses: lynx-infra/maven-publish-action@2a55bab5273ffd84ebbb600e783286fc6251c239
       with:
         portal_api_token: ${{ secrets.PORTAL_API_TOKEN }}

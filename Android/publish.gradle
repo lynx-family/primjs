@@ -16,6 +16,8 @@ buildscript {
 }
 import org.json.simple.JSONArray
 
+def baseVersion = findProperty("version")
+
 def getAARPath(buildPath) {
     FileTree fileTree = project.fileTree(dir: buildPath, includes: ['**/*.aar'])
     if (fileTree.files) {
@@ -23,6 +25,18 @@ def getAARPath(buildPath) {
     } else {
         throw new GradleException("No aar found in the path $buildPath.")
     }
+}
+
+def isSnapshotVersion = { String version ->
+    version != null && version.endsWith("-SNAPSHOT")
+}
+
+def getCentralTokenUsername = {
+    findProperty("centralTokenUsername") ?: System.getenv("CENTRAL_TOKEN_USERNAME")
+}
+
+def getCentralTokenPassword = {
+    findProperty("centralTokenPassword") ?: System.getenv("CENTRAL_TOKEN_PASSWORD")
 }
 
 afterEvaluate {
@@ -61,22 +75,39 @@ afterEvaluate {
                             def signingKeyId = findProperty("signing.keyId")
                             def signingPassword = findProperty("signing.password")
                             def signingSecretKey = findProperty("signing.secretKey")
-                            useInMemoryPgpKeys(signingKeyId, signingSecretKey, signingPassword)
-                            sign publishing.publications.release
+                            if (signingKeyId != null && signingKeyId != "") {
+                                useInMemoryPgpKeys(signingKeyId, signingSecretKey, signingPassword)
+                                sign publishing.publications.release
+                            }
                         }
                     }
                 }
             }
             repositories {
                 maven {
-                    url = "$project.buildDir/release"
+                    if (isSnapshotVersion(baseVersion)) {
+                        url = uri("https://central.sonatype.com/repository/maven-snapshots/")
+                        credentials {
+                            username = getCentralTokenUsername()
+                            password = getCentralTokenPassword()
+                        }
+                    } else {
+                        url = "$project.buildDir/release"
+                    }
                 }
             }
         }
     }
     tasks.withType(PublishToMavenRepository) { task ->
         task.doFirst {
-            repository.url = "$project.buildDir/release/${publication.version}"
+            if (isSnapshotVersion(publication.version.toString())) {
+                if (!repository.credentials.username || !repository.credentials.password) {
+                    throw new GradleException("Snapshot publishing requires centralTokenUsername/centralTokenPassword or CENTRAL_TOKEN_USERNAME/CENTRAL_TOKEN_PASSWORD")
+                }
+                repository.url = uri("https://central.sonatype.com/repository/maven-snapshots/")
+            } else {
+                repository.url = "$project.buildDir/release/${publication.version}"
+            }
         }
     }
 }
