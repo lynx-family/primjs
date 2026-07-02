@@ -1,0 +1,74 @@
+Android/publish.gradle
+  s_eaafff47afb906::t_a8b3068f60d4af 40-41
+  s_6086c17ed67674::t_9e8358177a8c29 81
+  h_7a1e47632c7d77 19,30-39,79-80,88-96,103-108,110
+.github/workflows/android-release.yml
+  s_81d7215515f89c::t_add2c1af205879 108-111
+  s_a80c255bb4c35c::t_c5d3604f2ac14d 30
+  s_90ceb31294abd7::t_fbbcd328b9f0b6 23
+  h_7a1e47632c7d77 33,85,104-107,112,115
+  s_ec64fac4c1863f::t_317133b287e5f0 40
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.5.2",
+  "base_commit_sha": "f9e995547304c30c46ed1b8d47f28398ad28bc13",
+  "prompts": {},
+  "humans": {
+    "h_7a1e47632c7d77": {
+      "author": "gaohanqing <gaohanqing@bytedance.com>"
+    }
+  },
+  "sessions": {
+    "s_6086c17ed67674": {
+      "agent_id": {
+        "tool": "trae-cue",
+        "id": "ai_tab-icr-9959ad6e-1286-4a3e-8cdc-e3b916b61494",
+        "model": "default"
+      },
+      "human_author": null
+    },
+    "s_81d7215515f89c": {
+      "agent_id": {
+        "tool": "trae-cue",
+        "id": "ai_tab-icr-ab5bc79d-2bd8-4f42-a43f-395c46f0ffba",
+        "model": "default"
+      },
+      "human_author": "gaohanqing <gaohanqing@bytedance.com>"
+    },
+    "s_90ceb31294abd7": {
+      "agent_id": {
+        "tool": "trae-cue",
+        "id": "ai_tab-icr-22be519d-fa26-4a60-bc9d-f5c1a3778df5",
+        "model": "default"
+      },
+      "human_author": "gaohanqing <gaohanqing@bytedance.com>"
+    },
+    "s_a80c255bb4c35c": {
+      "agent_id": {
+        "tool": "trae-cue",
+        "id": "ai_tab-icr-e164a94f-b098-44d7-9917-057361e7a4da",
+        "model": "default"
+      },
+      "human_author": "gaohanqing <gaohanqing@bytedance.com>"
+    },
+    "s_eaafff47afb906": {
+      "agent_id": {
+        "tool": "trae",
+        "id": "6a44cccdc2d0de288444b259",
+        "model": "gpt-5.2__dev"
+      },
+      "human_author": null
+    },
+    "s_ec64fac4c1863f": {
+      "agent_id": {
+        "tool": "trae-cue",
+        "id": "ai_tab-icr-551ac2b6-7507-4fe7-867b-06dad5c809b8",
+        "model": "default"
+      },
+      "human_author": "gaohanqing <gaohanqing@bytedance.com>"
+    }
+  },
+  "attestation_metadata": {},
+  "remote_transcripts": {}
+}
