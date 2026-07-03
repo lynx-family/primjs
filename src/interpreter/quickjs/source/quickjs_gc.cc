@@ -21408,21 +21408,6 @@ static void delete_weak_ref(LEPUSRuntime *rt, LEPUSObject *p, void *ptr) {
   WriteBarrierNoStore(rt, wr->next_weak_ref);
 }
 
-static bool try_delete_weak_ref(LEPUSRuntime *rt, LEPUSObject *p, void *ptr) {
-  if (!p) return false;
-  WeakRefRecord **pwr = &p->first_weak_ref;
-  while (*pwr != nullptr) {
-    WeakRefRecord *wr = *pwr;
-    if (wr->u.ptr == ptr) {
-      *pwr = wr->next_weak_ref;
-      WriteBarrierNoStore(rt, wr->next_weak_ref);
-      return true;
-    }
-    pwr = &wr->next_weak_ref;
-  }
-  return false;
-}
-
 static void map_delete_record(LEPUSRuntime *rt, JSMapState *s,
                               JSMapRecord *mr) {
   if (mr->empty) return;
@@ -28599,25 +28584,7 @@ void Visitor::VisitLEPUSObject(void *ptr, GCWorkStack &workStack) noexcept {
   }
   // first_weak_ref
   if (unlikely(obj->first_weak_ref)) {
-    for (WeakRefRecord *wr = obj->first_weak_ref; wr != nullptr;
-         wr = wr->next_weak_ref) {
-      switch (wr->kind) {
-        case WEAK_REF_KIND_WEAK_MAP:
-          workStack.push_back((address_t)wr->u.map_record);
-          PushObjLEPUSValue(wr->u.map_record->value, workStack);
-          break;
-        case WEAK_REF_KIND_FINALIZATION_REGISTRY: {
-          FinalizationRegistryEntry *fin_node = wr->u.fin_node;
-          workStack.push_back((address_t)fin_node);
-          PushObjLEPUSValue(fin_node->held_value, workStack);
-          PushObjLEPUSValue(fin_node->token, workStack);
-          break;
-        }
-        default:
-          break;
-      }
-      workStack.push_back((address_t)wr);
-    }
+    workStack.push_back((address_t)obj->first_weak_ref);
   }
   // finalizer
   switch (obj->class_id) {
@@ -29405,14 +29372,12 @@ void Finalizer::JSTypedArrayFinalizer(void *ptr) noexcept {
 }
 void Finalizer::JSMapStateFinalizer(void *ptr) noexcept {
   JSMapState *s = static_cast<JSMapState *>(ptr);
-  struct list_head *el, *el1;
+  struct list_head *el;
   JSMapRecord *mr;
-  list_for_each_safe(el, el1, &s->records) {
+  list_for_each(el, &s->records) {
     mr = list_entry(el, JSMapRecord, link);
     if (!mr->empty) {
-      if (s->is_weak && LEPUS_VALUE_IS_OBJECT(mr->key)) {
-        try_delete_weak_ref(rt_, LEPUS_VALUE_GET_OBJ(mr->key), mr);
-      }
+      if (s->is_weak) delete_weak_ref(rt_, LEPUS_VALUE_GET_OBJ(mr->key), mr);
     }
   }
 }
