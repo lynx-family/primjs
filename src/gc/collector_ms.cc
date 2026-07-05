@@ -532,30 +532,20 @@ void MarkSweepCollector::DoOnlyFinalizer() {
     finalizer->DoFinalizer2(val);
   }
   rt->finalizerSet->clear();
-}
 
-void MarkSweepCollector::DoCtxFinalizer(LEPUSContext *ctx) {
-  auto pool = GetThreadPool();
-  if (pool) pool->WaitFinish(true);
-
-  // Call finalizers for objects in obj_finalizer_recoder before deleting
-  if (ctx->obj_finalizer_recoder) {
-    auto &set = *ctx->obj_finalizer_recoder;
+  if (rt->obj_finalizer_recoder) {
+    auto &set = *rt->obj_finalizer_recoder;
     for (auto it = set.begin(); it != set.end(); ++it) {
-      finalizer->JSObjectOnlyFinalizer(*it);
+      LEPUSObject *obj = *it;
+      if (JS_OBJECT_IS_OUTER(obj)) {
+        finalizer->JSObjectOnlyFinalizer(obj);
+      }
     }
-    delete ctx->obj_finalizer_recoder;
-    ctx->obj_finalizer_recoder = nullptr;
+    rt->obj_finalizer_recoder->clear();
   }
 
-  // Call finalizers for fr_data_finalizer_recoder before deleting
-  if (ctx->fr_data_finalizer_recoder) {
-    auto &fr_set = *ctx->fr_data_finalizer_recoder;
-    for (auto it = fr_set.begin(); it != fr_set.end(); ++it) {
-      finalizer->FinalizationRegistryDataFinalizer(*it);
-    }
-    delete ctx->fr_data_finalizer_recoder;
-    ctx->fr_data_finalizer_recoder = nullptr;
+  if (rt->fr_data_finalizer_recoder) {
+    rt->fr_data_finalizer_recoder->clear();
   }
 }
 
@@ -783,29 +773,25 @@ void MarkSweepCollector::DoOuterObjFinalizer() {
   SCOPED_LOGGER(__func__);
   TRACE_EVENT("PRIMJS_DoOuterObjFinalizer");
 
-#define FINALIZER_HANDLER(set, func)                          \
-  auto &set = *ctx->set;                                      \
-  for (auto it = set.begin(); it != set.end();) {             \
-    auto val = *it;                                           \
-    if (!ros->IsObjectMarked((address_t)(val)-kHeaderSize)) { \
-      it = set.erase(it);                                     \
-      finalizer->func(val);                                   \
-    } else {                                                  \
-      it++;                                                   \
-    }                                                         \
+#define FINALIZER_HANDLER(recorder, func)                       \
+  if (rt->recorder) {                                           \
+    auto &set = *rt->recorder;                                  \
+    for (auto it = set.begin(); it != set.end();) {             \
+      auto val = *it;                                           \
+      if (!ros->IsObjectMarked((address_t)(val)-kHeaderSize)) { \
+        it = set.erase(it);                                     \
+        finalizer->func(val);                                   \
+      } else {                                                  \
+        it++;                                                   \
+      }                                                         \
+    }                                                           \
   }
 
-  // run outer_obj's finalizer in js thread
-  struct list_head *el, *el1;
-  list_for_each_safe(el, el1, &ros->GetRuntime()->context_list) {
-    LEPUSContext *ctx = list_entry(el, LEPUSContext, link);
-    FINALIZER_HANDLER(obj_finalizer_recoder, JSObjectFinalizer)
-
-    if (ctx->fr_data_finalizer_recoder) {
-      FINALIZER_HANDLER(fr_data_finalizer_recoder,
-                        FinalizationRegistryDataFinalizer)
-    }
-  }
+  auto rt = ros->GetRuntime();
+  FINALIZER_HANDLER(obj_finalizer_recoder, JSObjectFinalizer)
+  FINALIZER_HANDLER(fr_data_finalizer_recoder,
+                    FinalizationRegistryDataFinalizer)
+#undef FINALIZER_HANDLER
 }
 
 void MarkSweepCollector::ParallelSweepPhase() {

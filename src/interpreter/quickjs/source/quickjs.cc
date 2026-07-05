@@ -6183,14 +6183,9 @@ void LEPUS_ComputeMemoryUsage(LEPUSRuntime *rt, LEPUSMemoryUsage *s) {
     }
     common_base_size += EstimateUnorderedSetUsage(rt->finalizerSet);
     common_base_size += EstimateUnorderedSetUsage(rt->async_obj_recoder);
-
-    struct list_head *el;
-    list_for_each(el, &rt->context_list) {
-      LEPUSContext *ctx = list_entry(el, LEPUSContext, link);
-      common_base_size += EstimateUnorderedSetUsage(ctx->obj_finalizer_recoder);
-      common_base_size +=
-          EstimateUnorderedSetUsage(ctx->fr_data_finalizer_recoder);
-    }
+    common_base_size += EstimateUnorderedSetUsage(rt->obj_finalizer_recoder);
+    common_base_size +=
+        EstimateUnorderedSetUsage(rt->fr_data_finalizer_recoder);
   }
 
   if (rt->gc_enable) {
@@ -51657,8 +51652,8 @@ void insert_weakref_record(LEPUSContext *ctx, LEPUSObject *p,
                            struct WeakRefRecord *record) {
   HeapObjStore(ctx, &record->next_weak_ref, p->first_weak_ref);
   HeapObjStore(ctx, &p->first_weak_ref, record);
-  if (ctx->obj_finalizer_recoder) {
-    ctx->obj_finalizer_recoder->insert(p);
+  if (ctx->rt->obj_finalizer_recoder) {
+    ctx->rt->obj_finalizer_recoder->insert(p);
   }
   return;
 }
