@@ -486,12 +486,29 @@ bool concurrent_disabled() {
 #endif
 }
 
+constexpr int LEPUSNG_GC_INITIAL_HEAP_MASK =
+    LEPUSNG_GC_INITIAL_HEAP_BIT0 | LEPUSNG_GC_INITIAL_HEAP_BIT1;
+
+static size_t GetRosGCInitialHeapPageGroups() {
+  switch (settingsFlag & LEPUSNG_GC_INITIAL_HEAP_MASK) {
+    case LEPUSNG_GC_INITIAL_HEAP_BIT0:
+      return 24;
+    case LEPUSNG_GC_INITIAL_HEAP_BIT1:
+      return 32;
+    case LEPUSNG_GC_INITIAL_HEAP_MASK:
+      return 40;
+    default:
+      return 16;
+  }
+}
+
 void InitRosGC(LEPUSRuntime *rt) {
   rt->ros_ = new ROS_GC::RosAllocImpl(rt, !concurrent_disabled());
   rt->collector_ = new ROS_GC::MarkSweepCollector(rt->ros_);
   rt->ros_->SetCollector(rt->collector_);
-  ROS_GC::VMHeapParam param = {16 * ROS_GC::kRosDefaultPageGroupSize,
-                               static_cast<size_t>(8192) * MB};
+  ROS_GC::VMHeapParam param = {
+      GetRosGCInitialHeapPageGroups() * ROS_GC::kRosDefaultPageGroupSize,
+      static_cast<size_t>(8192) * MB};
   rt->ros_->Init(param);
 }
 
