@@ -6067,6 +6067,29 @@ QJS_STATIC void compute_value_size(LEPUSValueConst val,
 
 void LEPUS_ComputeMemoryUsage(LEPUSRuntime *rt, LEPUSMemoryUsage *s) {
   memset(s, 0, sizeof(*s));
+#ifdef ENABLE_QUICKJS_DEBUGGER
+  size_t common_base_size = 0;
+  {
+    if (rt->ptr_handles != nullptr) {
+      common_base_size += sizeof(PtrHandles);
+      if (rt->ptr_handles->GetHandles() != nullptr &&
+          rt->ptr_handles->GetHandleSize() > 0) {
+        common_base_size +=
+            sizeof(*rt->ptr_handles->GetHandles()) *
+            static_cast<size_t>(rt->ptr_handles->GetHandleSize());
+      }
+    }
+    if (rt->global_handles_ != nullptr) {
+      common_base_size += rt->global_handles_->TotalSize();
+    }
+    common_base_size += EstimateUnorderedSetUsage(rt->finalizerSet);
+    common_base_size += EstimateUnorderedSetUsage(rt->async_obj_recoder);
+    common_base_size += EstimateUnorderedSetUsage(rt->obj_finalizer_recoder);
+    common_base_size +=
+        EstimateUnorderedSetUsage(rt->fr_data_finalizer_recoder);
+  }
+
+
   if (rt->gc_enable) {
     s->malloc_size = rt->ros_->GetAllocatedSize();
     s->malloc_limit = rt->ros_->GetHeapGrowthLimit();
@@ -51462,8 +51485,8 @@ void insert_weakref_record(LEPUSContext *ctx, LEPUSObject *p,
                            struct WeakRefRecord *record) {
   HeapObjStore(ctx, &record->next_weak_ref, p->first_weak_ref);
   HeapObjStore(ctx, &p->first_weak_ref, record);
-  if (ctx->obj_finalizer_recoder) {
-    ctx->obj_finalizer_recoder->insert(p);
+  if (ctx->rt->obj_finalizer_recoder) {
+    ctx->rt->obj_finalizer_recoder->insert(p);
   }
   return;
 }

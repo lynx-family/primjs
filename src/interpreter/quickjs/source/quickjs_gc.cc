@@ -533,6 +533,9 @@ LEPUSRuntime *JS_NewRuntime2_GC(const LEPUSMallocFunctions *mf, void *opaque,
   rt->qjsvaluevalue_allocator = new QJSValueValueSpace(rt);
   rt->finalizerSet = new std::unordered_set<void *>();
   rt->async_obj_recoder = new std::unordered_set<void *>();
+  rt->obj_finalizer_recoder = new std::unordered_set<LEPUSObject *>();
+  rt->fr_data_finalizer_recoder =
+      new std::unordered_set<FinalizationRegistryData *>();
 
   init_list_head(&rt->context_list);
 #ifdef DUMP_LEAKS
@@ -799,6 +802,14 @@ void JS_FreeRuntime_GC(LEPUSRuntime *rt) {
       delete rt->async_obj_recoder;
       rt->async_obj_recoder = nullptr;
     }
+    if (rt->obj_finalizer_recoder) {
+      delete rt->obj_finalizer_recoder;
+      rt->obj_finalizer_recoder = nullptr;
+    }
+    if (rt->fr_data_finalizer_recoder) {
+      delete rt->fr_data_finalizer_recoder;
+      rt->fr_data_finalizer_recoder = nullptr;
+    }
     system_free(rt);
   }
 }
@@ -842,6 +853,14 @@ void JS_FreeRuntimeForEffect(LEPUSRuntime *rt) {
     if (rt->async_obj_recoder) {
       delete rt->async_obj_recoder;
       rt->async_obj_recoder = nullptr;
+    }
+    if (rt->obj_finalizer_recoder) {
+      delete rt->obj_finalizer_recoder;
+      rt->obj_finalizer_recoder = nullptr;
+    }
+    if (rt->fr_data_finalizer_recoder) {
+      delete rt->fr_data_finalizer_recoder;
+      rt->fr_data_finalizer_recoder = nullptr;
     }
   }
 }
@@ -889,7 +908,6 @@ LEPUSContext *JS_NewContextRaw_GC(LEPUSRuntime *rt) {
 
   ctx = static_cast<LEPUSContext *>(system_mallocz(sizeof(LEPUSContext)));
   if (!ctx) return NULL;
-  ctx->obj_finalizer_recoder = new std::unordered_set<LEPUSObject *>();
   ctx->gc_enable = rt->gc_enable;
   ctx->ptr_handles = rt->ptr_handles;
   ctx->class_proto = static_cast<LEPUSValue *>(
@@ -987,10 +1005,6 @@ void JS_FreeContext_GC(LEPUSContext *ctx) {
   if (ctx->napi_scope) {
     delete ctx->napi_scope;
     ctx->napi_scope = nullptr;
-  }
-
-  if (ctx->rt->collector_) {
-    ctx->rt->collector_->DoCtxFinalizer(ctx);
   }
 
   if (ctx->object_ctx_check && ctx->check_tools) {
@@ -2194,8 +2208,10 @@ QJS_HIDE LEPUSValue JS_NewObjectFromShape_GC(LEPUSContext *ctx, JSShape *sh,
       p->u.func.home_object = NULL;
       goto set_exotic;
     default:
-      if (unlikely(class_id >= JS_CLASS_INIT_COUNT))
-        ctx->obj_finalizer_recoder->insert(p);
+      if (unlikely(class_id >= JS_CLASS_INIT_COUNT) &&
+          ctx->rt->obj_finalizer_recoder) {
+        ctx->rt->obj_finalizer_recoder->insert(p);
+      }
     set_exotic:
       if (ctx->rt->class_array[class_id].exotic) {
         p->is_exotic = 1;
@@ -22104,10 +22120,9 @@ static LEPUSValue js_finalizationRegistry_constructor_gc(
   if (!frd) {
     return LEPUS_EXCEPTION;
   }
-  if (unlikely(!ctx->fr_data_finalizer_recoder))
-    ctx->fr_data_finalizer_recoder =
-        new std::unordered_set<FinalizationRegistryData *>();
-  ctx->fr_data_finalizer_recoder->insert(frd);
+  if (ctx->rt->fr_data_finalizer_recoder) {
+    ctx->rt->fr_data_finalizer_recoder->insert(frd);
+  }
   frd->fg_ctx = ctx->fg_ctx;
   init_list_head(&frd->entries);
   HeapObjStore(ctx, &frd->cbs, executor);

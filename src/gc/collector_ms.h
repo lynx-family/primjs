@@ -55,7 +55,6 @@ class MarkSweepCollector {
                          bool forceParallel = false);
   void RunFinalCollection();
   void DoOnlyFinalizer();
-  void DoCtxFinalizer(LEPUSContext *ctx);
   void OnlyUpdateHeapSize(size_t alloc_size);
 
   bool EnureConcurrentIsCompleted();

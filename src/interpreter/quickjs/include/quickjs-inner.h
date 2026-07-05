@@ -346,6 +346,7 @@ void *lepus_def_allocate(ROS_GC::RosAllocImpl *, size_t size, int alloc_tag);
 void *lepus_def_reallocate(ROS_GC::RosAllocImpl *ros, void *ptr, size_t size,
                            int alloc_tag);
 
+struct FinalizationRegistryData;
 struct JSVarRef;
 struct LEPUSRuntime {
   LEPUSMallocFunctions mf;
@@ -463,6 +464,8 @@ struct LEPUSRuntime {
                          int alloc_tag);
   std::unordered_set<void *> *finalizerSet;
   std::unordered_set<void *> *async_obj_recoder;
+  std::unordered_set<LEPUSObject *> *obj_finalizer_recoder;
+  std::unordered_set<FinalizationRegistryData *> *fr_data_finalizer_recoder;
   size_t gc_info_threshold;
   size_t gc_info_interval_size;
 };
@@ -795,8 +798,6 @@ struct LEPUSContext {
   uint64_t binary_version;
   struct FinalizationRegistryContext *fg_ctx = nullptr;
   bool con_mark_state = false;
-  std::unordered_set<LEPUSObject *> *obj_finalizer_recoder;
-  std::unordered_set<FinalizationRegistryData *> *fr_data_finalizer_recoder;
   CheckTools *check_tools;
 };
 
