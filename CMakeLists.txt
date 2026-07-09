@@ -19,8 +19,9 @@ message(("${CMAKE_CURRENT_SOURCE_DIR}"))
 
 option(ENABLE_QUICKJS_DEBUGGER "Enable quickjs debugger" OFF)
 option(ENABLE_HEAPPROFILER
-       "Enable heap profiler only (subset of quickjs debugger)" OFF)
+  "Enable heap profiler only (subset of quickjs debugger)" OFF)
 option(ENABLE_LEPUSNG "Enable LepusNG" OFF)
+option(ENABLE_LEPUSNG_BYTECODE_OPT "Enable LepusNG bytecode optimization" OFF)
 option(ENABLE_LITE "Enable quickjs static library" OFF)
 option(ENABLE_PRIMJS_SNAPSHOT "Enable primjs snapshot" OFF)
 option(ENABLE_COMPATIBLE_MM "Enable compatible memory" OFF)
@@ -35,17 +36,17 @@ option(ENABLE_BUILD_AAR "Enable build aar" OFF)
 option(ENABLE_VIRTUAL_STACK "Enable use virtual sp" OFF)
 
 set(CMAKE_COMMON_FLAGS
-    "${CMAKE_COMMON_FLAGS} -Os -fPIC -ffunction-sections -fdata-sections \
+  "${CMAKE_COMMON_FLAGS} -Os -fPIC -ffunction-sections -fdata-sections \
     -fno-short-enums -fno-strict-aliasing -Wall -Wextra -Wno-unused-parameter \
     -Wno-unused-function -faddrsig -Wno-c99-designator -Wno-unknown-warning-option \
     -Wno-sign-compare -Wno-unused-but-set-variable")
 
 if(ENABLE_ASAN)
   set(CMAKE_COMMON_FLAGS
-      "${CMAKE_COMMON_FLAGS} -fno-omit-frame-pointer -fsanitize=address")
+    "${CMAKE_COMMON_FLAGS} -fno-omit-frame-pointer -fsanitize=address")
 else()
   set(CMAKE_COMMON_FLAGS
-      "${CMAKE_COMMON_FLAGS} -fomit-frame-pointer -fno-sanitize=safe-stack")
+    "${CMAKE_COMMON_FLAGS} -fomit-frame-pointer -fno-sanitize=safe-stack")
 endif()
 
 set(CMAKE_C_FLAGS ${CMAKE_COMMON_FLAGS} ${CMAKE_C_FLAGS})
@@ -54,19 +55,19 @@ set(CMAKE_CXX_FLAGS "${CMAKE_COMMON_FLAGS} ${CMAKE_CXX_FLAGS} -std=c++17")
 if(CMAKE_SYSTEM_NAME STREQUAL "Android")
   if(${ANDROID_ABI} MATCHES "arm64-v8a" OR ${ANDROID_ABI} MATCHES "x86_64")
     set(CMAKE_SHARED_LINKER_FLAGS
-        "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-Bsymbolic -Wl,--warn-shared-textrel \
+      "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-Bsymbolic -Wl,--warn-shared-textrel \
         -Wl,--exclude-libs,ALL,--gc-sections -Wl,--build-id=sha1 -O2 -flto \
         -Wl,--icf=all -Wl,-z,max-page-size=16384 -Wl,-z,common-page-size=16384 \
         -Wl,-Map=output.map")
   else()
     set(CMAKE_SHARED_LINKER_FLAGS
-        "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-Bsymbolic -Wl,--warn-shared-textrel \
+      "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-Bsymbolic -Wl,--warn-shared-textrel \
         -Wl,--exclude-libs,ALL,--gc-sections -Wl,--build-id=sha1 -O2 -flto \
         -Wl,--icf=all -Wl,-Map=output.map")
   endif()
 else()
   set(CMAKE_SHARED_LINKER_FLAGS
-      "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-Bsymbolic -Wl,--warn-shared-textrel \
+    "${CMAKE_SHARED_LINKER_FLAGS} -Wl,-Bsymbolic -Wl,--warn-shared-textrel \
       -Wl,--exclude-libs,ALL,--gc-sections -Wl,--build-id=sha1 -O2 -flto \
       -Wl,--icf=all -Wl,-Map=output.map")
 endif()
@@ -88,6 +89,17 @@ if(${ENABLE_LEPUSNG})
   add_definitions(-DENABLE_LEPUSNG)
 endif()
 
+if(${ENABLE_LEPUSNG_BYTECODE_OPT})
+  if(NOT ${ENABLE_LEPUSNG})
+    message(WARNING "ENABLE_LEPUSNG_BYTECODE_OPT requires ENABLE_LEPUSNG, forcing OFF")
+    set(ENABLE_LEPUSNG_BYTECODE_OPT OFF)
+  endif()
+endif()
+
+if(${ENABLE_LEPUSNG_BYTECODE_OPT})
+  add_definitions(-DENABLE_LEPUSNG_BYTECODE_OPT)
+endif()
+
 if(${DISABLE_NANBOX})
   add_definitions(-DDISABLE_NANBOX=1)
 else()
@@ -100,27 +112,28 @@ if(ENABLE_PRIMJS_HARMONY)
   add_definitions(-DUSE_PRIMJS_NAPI)
   add_definitions(-DGNU_SUPPORT=1)
 else()
-if(CMAKE_SYSTEM_NAME STREQUAL "Android")
-  set(PLATFORM_ABI ${ANDROID_ABI})
-  add_definitions(-DOS_ANDROID=1)
+  if(CMAKE_SYSTEM_NAME STREQUAL "Android")
+    set(PLATFORM_ABI ${ANDROID_ABI})
+    add_definitions(-DOS_ANDROID=1)
+  endif()
 endif()
-endif()
-
 
 # primjs snapshot version
-if(${ENABLE_COMPATIBLE_MM} AND (${PLATFORM_ABI} MATCHES "arm64"))
+if(${ENABLE_COMPATIBLE_MM} AND(${PLATFORM_ABI} MATCHES "arm64"))
   add_definitions(-DENABLE_PRIMJS_SNAPSHOT)
   add_definitions(-DENABLE_COMPATIBLE_MM)
-  if (ENABLE_TT_ANDROID_MODE MATCHES ${REGEX_TRUE})
+
+  if(ENABLE_TT_ANDROID_MODE MATCHES ${REGEX_TRUE})
     add_definitions(-DENABLE_TT_ANDROID_MODE)
   endif()
+
   if(${ENABLE_QUICKJS_DEBUGGER})
     set(primjs_embedded_sources
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/primjs/android/embedded-inspector.S
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/primjs/android/embedded-inspector.S
     )
   else()
     set(primjs_embedded_sources
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/primjs/android/embedded.S)
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/primjs/android/embedded.S)
   endif()
 endif()
 
@@ -147,76 +160,77 @@ if(WIN32)
 endif()
 
 set(quickjs_sources
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/basic/log/logging.cc
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/gc/collector.cc
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/gc/global-handles.cc
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/gc/qjsvaluevalue-space.cc
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/gc/collector.cc
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/bignum.cc
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/gc/collector_ms.cc
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/gc/mem_map.cc
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/gc/logger.cc
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/gc/thread_pool.cc
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/gc/mrt_bitmap.cc
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/gc/page_group.cc
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/gc/page_map.cc
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/gc/ros_allocator.cc
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/gc/space.cc
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/gc/gc_tracer.cc
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/gc/gc_marking.cc
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/cutils.cc
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/dtoa.cc
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/libregexp.cc
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/libunicode.cc
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/primjs_monitor.cc
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/quickjs_gc.cc
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/quickjs_version.cc
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/quickjs-libc.cc
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/quickjs.cc)
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/basic/log/logging.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/gc/collector.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/gc/global-handles.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/gc/qjsvaluevalue-space.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/gc/collector.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/bignum.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/gc/collector_ms.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/gc/mem_map.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/gc/logger.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/gc/thread_pool.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/gc/mrt_bitmap.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/gc/page_group.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/gc/page_map.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/gc/ros_allocator.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/gc/space.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/gc/gc_tracer.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/gc/gc_marking.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/cutils.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/dtoa.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/libregexp.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/libunicode.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/primjs_monitor.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/quickjs_gc.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/quickjs_version.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/quickjs-libc.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/quickjs.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/quickjs-opt-bytecode.cc)
 
 set(heapprofiler_sources
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/heapprofiler/edge.cc
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/heapprofiler/entry.cc
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/heapprofiler/gen.cc
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/heapprofiler/heapexplorer.cc
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/heapprofiler/heapprofiler.cc
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/heapprofiler/serialize.cc
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/heapprofiler/snapshot.cc)
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/heapprofiler/edge.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/heapprofiler/entry.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/heapprofiler/gen.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/heapprofiler/heapexplorer.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/heapprofiler/heapprofiler.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/heapprofiler/serialize.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/heapprofiler/snapshot.cc)
 
 if(${ENABLE_QUICKJS_DEBUGGER})
   add_definitions(-DENABLE_QUICKJS_DEBUGGER)
   add_definitions(-DENABLE_HEAPPROFILER)
   set(qucikjs_debugger_sources
-      ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/cpuprofiler/cpu_profiler.cc
-      ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/cpuprofiler/profile_generator.cc
-      ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/cpuprofiler/profile_tree.cc
-      ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/cpuprofiler/profiler_sampling.cc
-      ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/cpuprofiler/tracing_cpu_profiler.cc
-      ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/debugger/debugger_breakpoint.cc
-      ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/debugger/debugger_callframe.cc
-      ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/debugger/debugger_properties.cc
-      ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/debugger/debugger_queue.cc
-      ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/debugger/debugger.cc
-      ${heapprofiler_sources}
-      ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/runtime/runtime.cc
-      ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/protocols.cc
-      ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/string_tools.cc)
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/cpuprofiler/cpu_profiler.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/cpuprofiler/profile_generator.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/cpuprofiler/profile_tree.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/cpuprofiler/profiler_sampling.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/cpuprofiler/tracing_cpu_profiler.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/debugger/debugger_breakpoint.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/debugger/debugger_callframe.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/debugger/debugger_properties.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/debugger/debugger_queue.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/debugger/debugger.cc
+    ${heapprofiler_sources}
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/runtime/runtime.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/protocols.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/string_tools.cc)
 elseif(${ENABLE_HEAPPROFILER})
   set(qucikjs_debugger_sources ${heapprofiler_sources})
   add_definitions(-DENABLE_HEAPPROFILER)
 endif()
 
 set(napi_sources
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/env/napi_env.cc
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/env/napi_runtime.cc
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/quickjs/js_native_api_QuickJS.cc
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/napi_module.cc
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/napi.cc)
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/env/napi_env.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/env/napi_runtime.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/quickjs/js_native_api_QuickJS.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/napi_module.cc
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/napi.cc)
 
 if(ENABLE_PRIMJS_HARMONY)
-set(primjs_harmony_napi_source
+  set(primjs_harmony_napi_source
     ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/harmony/js_native_api_harmony.cc)
-set(napi_sources ${napi_sources} ${primjs_harmony_napi_source})
+  set(napi_sources ${napi_sources} ${primjs_harmony_napi_source})
 endif()
 
 if(${ENABLE_CODECACHE})
@@ -227,24 +241,24 @@ if(${ENABLE_CODECACHE})
   endif()
 
   set(napi_sources ${napi_sources}
-                   ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/common/code_cache.cc)
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/common/code_cache.cc)
 endif()
 
 set(napi_v8_sources ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/v8/js_native_api_v8.cc)
 
 set(WEAK_NODE_API_GENERATED_CPP
-    ${CMAKE_CURRENT_SOURCE_DIR}/packages/weak-node-api/generated/weak_node_api.cpp)
+  ${CMAKE_CURRENT_SOURCE_DIR}/packages/weak-node-api/generated/weak_node_api.cpp)
 set(napi_adapter_sources
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/adapter/js_native_api_adapter.cc)
+  ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/adapter/js_native_api_adapter.cc)
 
 if(EXISTS ${WEAK_NODE_API_GENERATED_CPP})
   list(APPEND napi_adapter_sources
-       ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/adapter/weak_napi_host_generator.cc
-       ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/adapter/weak_napi_host_injector.cc
-       ${WEAK_NODE_API_GENERATED_CPP})
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/adapter/weak_napi_host_generator.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/adapter/weak_napi_host_injector.cc
+    ${WEAK_NODE_API_GENERATED_CPP})
 else()
   message(STATUS
-          "weak-node-api generated sources not found, skip weak-node-api adapter integration")
+    "weak-node-api generated sources not found, skip weak-node-api adapter integration")
 endif()
 
 include_directories(
@@ -265,9 +279,10 @@ if(EXISTS ${WEAK_NODE_API_GENERATED_CPP})
     ${CMAKE_CURRENT_SOURCE_DIR}/packages/weak-node-api/defs_header)
 endif()
 
-if (ENABLE_PRIMJS_HARMONY)
+if(ENABLE_PRIMJS_HARMONY)
   get_filename_component(PARENT_PARENT_DIR ${CMAKE_SOURCE_DIR}/../.. ABSOLUTE)
   get_filename_component(PARENT_PARENT_DIR_NAME ${PARENT_PARENT_DIR} NAME)
+
   if(PARENT_PARENT_DIR_NAME STREQUAL "primjs")
     set(PRIMJS_ROOT_DIR ${CMAKE_SOURCE_DIR}/../..)
   else()
@@ -280,48 +295,49 @@ endif()
 set(JS_V8_HEADERS ${PRIMJS_ROOT_DIR}/third_party/v8/include)
 
 set(quickjs_sources ${quickjs_sources} ${qucikjs_debugger_sources}
-                    ${primjs_embedded_sources})
+  ${primjs_embedded_sources})
 
-if(NOT (${CMAKE_CURRENT_SOURCE_DIR} STREQUAL ${CMAKE_SOURCE_DIR}))
+if(NOT(${CMAKE_CURRENT_SOURCE_DIR} STREQUAL ${CMAKE_SOURCE_DIR}))
   set(napi_sources
-      ${napi_sources}
-      PARENT_SCOPE)
+    ${napi_sources}
+    PARENT_SCOPE)
   set(quickjs_sources
-      ${quickjs_sources}
-      PARENT_SCOPE)
+    ${quickjs_sources}
+    PARENT_SCOPE)
   set(napi_v8_sources
-      ${napi_v8_sources}
-      PARENT_SCOPE)
+    ${napi_v8_sources}
+    PARENT_SCOPE)
   set(napi_adapter_sources
-      ${napi_adapter_sources}
-      PARENT_SCOPE)
+    ${napi_adapter_sources}
+    PARENT_SCOPE)
 endif()
 
 set_source_files_properties(
   ${napi_sources} ${napi_v8_sources} ${napi_adapter_sources}
   PROPERTIES
-    COMPILE_FLAGS
-    "${CMAKE_CXX_FLAGS} -fvisibility=hidden -fvisibility-inlines-hidden")
+  COMPILE_FLAGS
+  "${CMAKE_CXX_FLAGS} -fvisibility=hidden -fvisibility-inlines-hidden")
 add_library(quickjs STATIC ${quickjs_sources})
 add_library(napi_static STATIC ${napi_sources})
 
 set_target_properties(
   quickjs PROPERTIES ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR} OUTPUT_NAME
-                                                                  "quick")
+  "quick")
 set_target_properties(
   napi_static PROPERTIES ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}
-                         OUTPUT_NAME "napi")
+  OUTPUT_NAME "napi")
 
 if(ENABLE_BUILD_AAR)
   set(quickjs_sources
-      ${quickjs_sources}
-      "${CMAKE_CURRENT_SOURCE_DIR}/src/basic/log/primjs_logging.cc")
+    ${quickjs_sources}
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/basic/log/primjs_logging.cc")
 
   add_library(quick SHARED ${quickjs_sources})
   add_library(napi SHARED ${napi_sources})
   add_library(napi_v8 SHARED ${napi_v8_sources})
   add_library(napi_adapter SHARED ${napi_adapter_sources})
-  if (ENABLE_PRIMJS_HARMONY)
+
+  if(ENABLE_PRIMJS_HARMONY)
     find_library(log_lib "hilog_ndk.z")
     find_library(libm m)
     set(JS_V8_LIBRARY ${CMAKE_SOURCE_DIR}/../../../v8so/harmony/libs/${OHOS_ARCH}/libv8_libfull.so)
@@ -332,9 +348,11 @@ if(ENABLE_BUILD_AAR)
 
   target_link_libraries(quick ${log_lib})
   target_link_libraries(napi quick ${log_lib})
-  if (ENABLE_PRIMJS_HARMONY)
+
+  if(ENABLE_PRIMJS_HARMONY)
     target_link_libraries(napi ${libm} libace_napi.z.so libjsvm.so)
   endif()
+
   target_include_directories(napi_v8 PRIVATE ${JS_V8_HEADERS})
   target_link_libraries(napi_v8 PUBLIC ${JS_V8_LIBRARY})
   target_link_libraries(napi_adapter napi)
@@ -344,37 +362,37 @@ if(WIN32)
   if(${LINK_RUNTIME_TYPE} STREQUAL "MT")
     message("MT")
     add_compile_options($<$<OR:$<CONFIG:Release>,$<CONFIG:Relwithdebinfo>>:/MT>
-                        $<$<CONFIG:Debug>:/MTd>)
+      $<$<CONFIG:Debug>:/MTd>)
     add_compile_definitions($<$<CONFIG:Debug>:_ITERATOR_DEBUG_LEVEL=2>)
   else()
     message("MD")
     add_compile_options($<$<OR:$<CONFIG:Release>,$<CONFIG:Relwithdebinfo>>:/MD>
-                        $<$<CONFIG:Debug>:/MDd>)
+      $<$<CONFIG:Debug>:/MDd>)
   endif()
 
   target_compile_options(
     quickjs
     PUBLIC /utf-8
-           /Gy # separate functions for linker
-           /FC # use full pathnames in diagnostics
-           /MP # Build with Multiple Processes
-           /EHsc
-           -Wno-unused-command-line-argument
-           -Wno-c99-designator
-           -Wno-implicit-function-declaration
-           -Wno-unknown-argument
+    /Gy # separate functions for linker
+    /FC # use full pathnames in diagnostics
+    /MP # Build with Multiple Processes
+    /EHsc
+    -Wno-unused-command-line-argument
+    -Wno-c99-designator
+    -Wno-implicit-function-declaration
+    -Wno-unknown-argument
     PRIVATE)
 
   target_compile_definitions(
     quickjs
     PUBLIC UNICODE
-           _UNICODE
-           OS_WIN
-           WIN32_LEAN_AND_MEAN
-           _CRT_SECURE_NO_WARNINGS
-           NOMINMAX
-           _WINSOCK_DEPRECATED_NO_WARNINGS
-           CONFIG_VERSION="2019-09-10")
+    _UNICODE
+    OS_WIN
+    WIN32_LEAN_AND_MEAN
+    _CRT_SECURE_NO_WARNINGS
+    NOMINMAX
+    _WINSOCK_DEPRECATED_NO_WARNINGS
+    CONFIG_VERSION="2019-09-10")
 
   target_link_options(
     quickjs
@@ -387,26 +405,26 @@ if(WIN32)
   target_compile_options(
     napi_static
     PUBLIC /utf-8
-           /Gy # separate functions for linker
-           /FC # use full pathnames in diagnostics
-           /MP # Build with Multiple Processes
-           /EHsc
-           -Wno-unused-command-line-argument
-           -Wno-c99-designator
-           -Wno-implicit-function-declaration
-           -Wno-unknown-argument
+    /Gy # separate functions for linker
+    /FC # use full pathnames in diagnostics
+    /MP # Build with Multiple Processes
+    /EHsc
+    -Wno-unused-command-line-argument
+    -Wno-c99-designator
+    -Wno-implicit-function-declaration
+    -Wno-unknown-argument
     PRIVATE)
 
   target_compile_definitions(
     napi_static
     PUBLIC UNICODE
-           _UNICODE
-           OS_WIN
-           WIN32_LEAN_AND_MEAN
-           _CRT_SECURE_NO_WARNINGS
-           NOMINMAX
-           _WINSOCK_DEPRECATED_NO_WARNINGS
-           CONFIG_VERSION="2019-09-10")
+    _UNICODE
+    OS_WIN
+    WIN32_LEAN_AND_MEAN
+    _CRT_SECURE_NO_WARNINGS
+    NOMINMAX
+    _WINSOCK_DEPRECATED_NO_WARNINGS
+    CONFIG_VERSION="2019-09-10")
 
   target_link_options(
     napi_static
@@ -418,11 +436,16 @@ if(WIN32)
 endif()
 
 if(ENABLE_UNITTESTS)
+  # qjs and run-test262 link the pre-built quickjs static library rather than
+  # re-compiling all quickjs sources, avoiding duplicate compilation and
+  # reducing incremental build time.
   set(qjs_sources ${CMAKE_CURRENT_SOURCE_DIR}/testing/quickjs/compiler/qjs.cc)
   set(test262_sources
-      ${CMAKE_CURRENT_SOURCE_DIR}/testing/quickjs/run-test262.cc)
-  add_executable(run-test262 ${test262_sources} ${quickjs_sources})
-  add_executable(qjs ${qjs_sources} ${quickjs_sources})
+    ${CMAKE_CURRENT_SOURCE_DIR}/testing/quickjs/run-test262.cc)
+  add_executable(run-test262 ${test262_sources})
+  target_link_libraries(run-test262 quickjs)
+  add_executable(qjs ${qjs_sources})
+  target_link_libraries(qjs quickjs)
   set_target_properties(qjs run-test262 PROPERTIES RUNTIME_OUTPUT_DIRECTORY
-                                                   ${CMAKE_BINARY_DIR})
+    ${CMAKE_BINARY_DIR})
 endif()
