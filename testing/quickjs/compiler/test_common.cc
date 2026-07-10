@@ -1557,4 +1557,154 @@ TEST_F(CommonQjsTest, FindNameInfoNPE) {
                         LEPUS_EVAL_TYPE_GLOBAL);
   if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, ret);
 }
+
+TEST_F(CommonQjsTest, GeneratorYieldStarReentryNext) {
+  std::string src = R"(
+    var gen;
+    var caught = false;
+    var delegate = {
+      [Symbol.iterator]() { return this; },
+      next() {
+        try { gen.next(); }
+        catch (e) { if (e instanceof TypeError) caught = true; }
+        return { value: 1, done: true };
+      }
+    };
+    function* g() { return yield* delegate; }
+    gen = g();
+    var result = gen.next();
+    if (!caught) throw new Error("reentry via next() should throw TypeError");
+    if (result.value !== 1) throw new Error("value mismatch: " + result.value);
+    if (result.done !== true) throw new Error("done mismatch");
+  )";
+  RegisterAssert(ctx_);
+  auto ret = LEPUS_Eval(ctx_, src.c_str(), src.size(), "test.js",
+                        LEPUS_EVAL_TYPE_GLOBAL);
+  if (LEPUS_IsException(ret)) {
+    std::string err = js_get_exception_string(ctx_);
+    FAIL() << err;
+  }
+  if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, ret);
+}
+
+TEST_F(CommonQjsTest, GeneratorYieldStarReentryReturn) {
+  std::string src = R"(
+    var gen;
+    var caught = false;
+    var delegate = {
+      [Symbol.iterator]() { return this; },
+      next() { return { value: 10, done: false }; },
+      return(v) {
+        try { gen.return("inner"); }
+        catch (e) { if (e instanceof TypeError) caught = true; }
+        return { value: v, done: true };
+      }
+    };
+    function* g() { yield* delegate; }
+    gen = g();
+    gen.next();
+    var result = gen.return("outer");
+    if (!caught) throw new Error("reentry via return() should throw TypeError");
+    if (result.value !== "outer") throw new Error("value mismatch: " + result.value);
+    if (result.done !== true) throw new Error("done mismatch");
+  )";
+  RegisterAssert(ctx_);
+  auto ret = LEPUS_Eval(ctx_, src.c_str(), src.size(), "test.js",
+                        LEPUS_EVAL_TYPE_GLOBAL);
+  if (LEPUS_IsException(ret)) {
+    std::string err = js_get_exception_string(ctx_);
+    FAIL() << err;
+  }
+  if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, ret);
+}
+
+TEST_F(CommonQjsTest, GeneratorYieldStarReentryThrow) {
+  std::string src = R"(
+    var gen;
+    var caught = false;
+    var delegate = {
+      [Symbol.iterator]() { return this; },
+      next() { return { value: 20, done: false }; },
+      throw(e) {
+        try { gen.throw(new Error("inner")); }
+        catch (err) { if (err instanceof TypeError) caught = true; }
+        return { value: 30, done: true };
+      }
+    };
+    function* g() { return yield* delegate; }
+    gen = g();
+    gen.next();
+    var result = gen.throw(new Error("outer"));
+    if (!caught) throw new Error("reentry via throw() should throw TypeError");
+    if (result.value !== 30) throw new Error("value mismatch: " + result.value);
+    if (result.done !== true) throw new Error("done mismatch");
+  )";
+  RegisterAssert(ctx_);
+  auto ret = LEPUS_Eval(ctx_, src.c_str(), src.size(), "test.js",
+                        LEPUS_EVAL_TYPE_GLOBAL);
+  if (LEPUS_IsException(ret)) {
+    std::string err = js_get_exception_string(ctx_);
+    FAIL() << err;
+  }
+  if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, ret);
+}
+
+TEST_F(CommonQjsTest, GeneratorYieldStarReentryDoneGetter) {
+  std::string src = R"(
+    var gen;
+    var caught = false;
+    var callCount = 0;
+    var delegate = {
+      [Symbol.iterator]() { return this; },
+      next() {
+        callCount++;
+        if (callCount === 1) {
+          return {
+            get done() {
+              try { gen.next(); }
+              catch (e) { if (e instanceof TypeError) caught = true; }
+              return false;
+            },
+            value: 42
+          };
+        }
+        return { value: 99, done: true };
+      }
+    };
+    function* g() { yield* delegate; }
+    gen = g();
+    gen.next();
+    if (!caught) throw new Error("reentry via done getter should throw TypeError");
+  )";
+  RegisterAssert(ctx_);
+  auto ret = LEPUS_Eval(ctx_, src.c_str(), src.size(), "test.js",
+                        LEPUS_EVAL_TYPE_GLOBAL);
+  if (LEPUS_IsException(ret)) {
+    std::string err = js_get_exception_string(ctx_);
+    FAIL() << err;
+  }
+  if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, ret);
+}
+
+TEST_F(CommonQjsTest, GeneratorYieldStarNormalOperation) {
+  std::string src = R"(
+    function* inner() { yield 1; yield 2; return 3; }
+    function* outer() { var r = yield* inner(); return r; }
+    var g = outer();
+    var a = g.next();
+    if (a.value !== 1 || a.done !== false) throw new Error("first yield failed");
+    var b = g.next();
+    if (b.value !== 2 || b.done !== false) throw new Error("second yield failed");
+    var c = g.next();
+    if (c.value !== 3 || c.done !== true) throw new Error("return value failed");
+  )";
+  auto ret = LEPUS_Eval(ctx_, src.c_str(), src.size(), "test.js",
+                        LEPUS_EVAL_TYPE_GLOBAL);
+  if (LEPUS_IsException(ret)) {
+    std::string err = js_get_exception_string(ctx_);
+    FAIL() << err;
+  }
+  if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, ret);
+}
+
 }  // namespace common_qjs_test

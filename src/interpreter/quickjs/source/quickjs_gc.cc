@@ -7951,6 +7951,8 @@ redo:
       LEPUSValue method = LEPUS_UNDEFINED, iter_obj;
       HandleScope block_scope(ctx, &method, HANDLE_TYPE_LEPUS_VALUE);
       iter_obj = sf->cur_sp[-2];
+      // Set state to EXECUTING to prevent reentrant calls (spec compliance).
+      s->state = JS_GENERATOR_STATE_EXECUTING;
       if (magic == GEN_MAGIC_NEXT) {
         method = sf->cur_sp[-1];
       } else {
@@ -7992,6 +7994,7 @@ redo:
           ret = value;
           goto iter_done;
         } else {
+          s->state = JS_GENERATOR_STATE_SUSPENDED_YIELD_STAR;
           *pdone = 2;
         }
       } else {
@@ -8001,6 +8004,7 @@ redo:
           sf->cur_sp--;
           goto exec_arg;
         } else {
+          s->state = JS_GENERATOR_STATE_SUSPENDED_YIELD_STAR;
           *pdone = FALSE;
         }
       }
