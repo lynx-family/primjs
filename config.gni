@@ -22,6 +22,9 @@ declare_args() {
   use_lepusng = true
   just_lepusng = true
 
+  # Enable LepusNG bytecode optimization
+  use_lepusng_bytecode_opt = false
+
   # Open support of bignum
   # Conflict with lepusng!
   use_bignum = false

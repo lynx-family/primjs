@@ -86,6 +86,7 @@ extern "C" {
 #include "gc/trace-gc.h"
 #include "quickjs/include/bignum.h"
 #include "quickjs/include/quickjs-inner.h"
+#include "quickjs/include/quickjs-opt-bytecode.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -1437,6 +1438,11 @@ void LEPUS_SetRuntimeInfo(LEPUSRuntime *rt, const char *s) {
 void LEPUS_SetOptLepusNGPackageSize(LEPUSRuntime *rt, int enable) {
   if (rt) {
     rt->opt_lepusng_package_size = enable ? true : false;
+    struct list_head *el;
+    list_for_each(el, &rt->context_list) {
+      LEPUSContext *ctx = list_entry(el, LEPUSContext, link);
+      ctx->opt_lepusng_package_size = rt->opt_lepusng_package_size;
+    }
   }
 }
 
@@ -26622,6 +26628,10 @@ QJS_STATIC int resolve_scope_private_field1(LEPUSContext *ctx, BOOL *pis_ref,
     if (idx >= 0) {
       var_kind = fd->vars[idx].var_kind;
       if (is_ref) {
+#ifdef ENABLE_LEPUSNG_BYTECODE_OPT
+        if (OPTIMIZE && ctx->is_lepusng && ctx->opt_lepusng_package_size)
+          lepusng_mark_local_captured(fd, idx);
+#endif
         idx = get_closure_var(ctx, s, fd, FALSE, idx, var_name, TRUE, TRUE,
                               JS_VAR_NORMAL);
         if (idx < 0) return -1;
@@ -27003,26 +27013,8 @@ add_closure_vars:
   return 0;
 }
 
-typedef struct CodeContext {
-  const uint8_t *bc_buf; /* code buffer */
-  int bc_len;            /* length of the code buffer */
-  int pos;               /* position past the matched code pattern */
-  // <Primjs begin>
-  int64_t line_num; /* last visited OP_line_num parameter or -1 */
-  // <Primjs end>
-  int op;
-  int idx;
-  int label;
-  int val;
-  JSAtom atom;
-} CodeContext;
-
-#define M2(op1, op2) ((op1) | ((op2) << 8))
-#define M3(op1, op2, op3) ((op1) | ((op2) << 8) | ((op3) << 16))
-#define M4(op1, op2, op3, op4) \
-  ((op1) | ((op2) << 8) | ((op3) << 16) | ((op4) << 24))
-
-QJS_STATIC BOOL code_match(CodeContext *s, int pos, ...) {
+/* Check if bytecode sequence starting at pos matches the given pattern */
+BOOL code_match(CodeContext *s, int pos, ...) {
   const uint8_t *tab = s->bc_buf;
   // <Primjs begin>
   int op, len, op1, pos_next;
@@ -27285,9 +27277,8 @@ QJS_STATIC void instantiate_hoisted_definitions(LEPUSContext *ctx,
   s->hoisted_def_size = 0;
 }
 
-QJS_STATIC int skip_dead_code(
-    JSFunctionDef *s, const uint8_t *bc_buf, int bc_len, int pos,
-    /* Primjs begin */ int64_t *linep /*Primjs end*/) {
+int skip_dead_code(JSFunctionDef *s, const uint8_t *bc_buf, int bc_len, int pos,
+                   /* Primjs begin */ int64_t *linep /*Primjs end*/) {
   int op, len, label;
 
   for (; pos < bc_len; pos += len) {
@@ -27715,9 +27706,8 @@ fail:
 }
 
 /* the pc2line table gives a line number for each PC value */
-QJS_STATIC void add_pc2line_info(
-    JSFunctionDef *s, uint32_t pc,
-    /* <Primjs begin> */ int64_t line_num /* <Primjs end>*/) {
+void add_pc2line_info(JSFunctionDef *s, uint32_t pc,
+                      /* <Primjs begin> */ int64_t line_num /* <Primjs end>*/) {
   if (s->line_number_slots != NULL &&
       s->line_number_count < s->line_number_size &&
       pc >= s->line_number_last_pc && line_num != s->line_number_last) {
@@ -27810,9 +27800,8 @@ QJS_STATIC BOOL code_has_label(CodeContext *s, int pos, int label) {
 /* return the target label, following the OP_goto jumps
    the first opcode at destination is stored in *pop
  */
-QJS_STATIC int find_jump_target(
-    JSFunctionDef *s, int label, int *pop,
-    /* <Primjs begin> */ int64_t *pline /* <Primjs end>*/) {
+int find_jump_target(JSFunctionDef *s, int label, int *pop,
+                     /* <Primjs begin> */ int64_t *pline /* <Primjs end>*/) {
   int i, pos, op;
 
   update_label(s, label, -1);
@@ -27850,7 +27839,111 @@ done:
   return label;
 }
 
-QJS_STATIC void push_short_int(DynBuf *bc_out, int val) {
+/* Match "dup put_x(n) [drop [get_x(n)]]" pattern for peephole optimization.
+ * Returns: final opcode (OP_set_loc/OP_put_loc/etc.) or -1 if no match.
+ * On match: *pos_next_out and *line_num are updated, cc->idx has var index. */
+int match_dup_put_pattern(CodeContext *cc, int pos_next_in, int *pos_next_out,
+                          int64_t *line_num, int64_t *line2) {
+  *line2 = -1;
+  if (!code_match(cc, pos_next_in, M3(OP_put_loc, OP_put_arg, OP_put_var_ref),
+                  -1, -1))
+    return -1;
+  if (cc->line_num >= 0) *line_num = cc->line_num;
+  int op1 = cc->op + 1; /* put_x -> set_x */
+  *pos_next_out = cc->pos;
+  if (code_match(cc, cc->pos, OP_drop, -1)) {
+    if (cc->line_num >= 0) *line_num = cc->line_num;
+    op1 -= 1; /* set_x drop -> put_x */
+    *pos_next_out = cc->pos;
+    if (code_match(cc, cc->pos, op1 - 1, cc->idx, -1)) {
+      *line2 = cc->line_num; /* delay line number update */
+      op1 += 1;              /* put_x(n) get_x(n) -> set_x(n) */
+      *pos_next_out = cc->pos;
+    }
+  }
+  return op1;
+}
+
+void opt_jump_shrink(LEPUSContext *ctx, JSFunctionDef *s, DynBuf *bc_out,
+                     bool iterative) {
+#if SHORT_OPCODES
+  int patch_offsets;
+  do {
+    patch_offsets = 0;
+    for (int i = 0; i < s->jump_count; i++) {
+      JumpSlot *jp = &s->jump_slots[i];
+      int pos, diff, delta;
+
+      if (jp->size == 0) continue;
+      delta = 3;
+      switch (jp->op) {
+        case OP_goto16:
+          delta = 1;
+          /* fall thru */
+        case OP_if_false:
+        case OP_if_true:
+        case OP_goto:
+          pos = jp->pos;
+          diff = s->label_slots[jp->label].addr - pos;
+          if (diff >= -128 && diff <= 127 + delta) {
+            jp->size = 1;
+            if (jp->op == OP_goto16) {
+              bc_out->buf[pos - 1] = jp->op = OP_goto8;
+            } else {
+              bc_out->buf[pos - 1] = jp->op =
+                  OP_if_false8 + (jp->op - OP_if_false);
+            }
+            goto shrink;
+          } else if (diff == (int16_t)diff && jp->op == OP_goto) {
+            jp->size = 2;
+            delta = 2;
+            bc_out->buf[pos - 1] = jp->op = OP_goto16;
+          shrink:
+            memmove(bc_out->buf + pos + jp->size,
+                    bc_out->buf + pos + jp->size + delta,
+                    bc_out->size - pos - jp->size - delta);
+            bc_out->size -= delta;
+            patch_offsets++;
+            for (int j = 0; j < s->label_count; j++) {
+              if (s->label_slots[j].addr > pos) s->label_slots[j].addr -= delta;
+            }
+            for (int j = i + 1; j < s->jump_count; j++) {
+              if (s->jump_slots[j].pos > pos) s->jump_slots[j].pos -= delta;
+            }
+            for (int j = 0; j < s->line_number_count; j++) {
+              if (s->line_number_slots[j].pc > pos)
+                s->line_number_slots[j].pc -= delta;
+            }
+            for (int j = 0; j < s->caller_count; j++) {
+              if (s->caller_slots[j].pc > pos) s->caller_slots[j].pc -= delta;
+            }
+            continue;
+          }
+          break;
+      }
+    }
+    if (patch_offsets) {
+      for (int j = 0; j < s->jump_count; j++) {
+        JumpSlot *jp1 = &s->jump_slots[j];
+        int diff1 = s->label_slots[jp1->label].addr - jp1->pos;
+        switch (jp1->size) {
+          case 1:
+            put_u8(bc_out->buf + jp1->pos, diff1);
+            break;
+          case 2:
+            put_u16(bc_out->buf + jp1->pos, diff1);
+            break;
+          case 4:
+            put_u32(bc_out->buf + jp1->pos, diff1);
+            break;
+        }
+      }
+    }
+  } while (iterative && patch_offsets);
+#endif
+}
+
+void push_short_int(DynBuf *bc_out, int val) {
 #if SHORT_OPCODES
   if (val >= -1 && val <= 7) {
     dbuf_putc(bc_out, OP_push_0 + val);
@@ -27871,7 +27964,7 @@ QJS_STATIC void push_short_int(DynBuf *bc_out, int val) {
   dbuf_put_u32(bc_out, val);
 }
 
-QJS_STATIC void put_short_code(DynBuf *bc_out, int op, int idx) {
+void put_short_code(DynBuf *bc_out, int op, int idx) {
 #if SHORT_OPCODES
   if (idx < 4) {
     switch (op) {
@@ -28024,6 +28117,13 @@ __exception int resolve_labels(LEPUSContext *ctx, JSFunctionDef *s) {
 
   label_slots = s->label_slots;
 
+#ifdef ENABLE_LEPUSNG_BYTECODE_OPT
+  const BOOL lepusng_bytecode_opt =
+      ctx->is_lepusng && ctx->opt_lepusng_package_size;
+#else
+  constexpr BOOL lepusng_bytecode_opt = FALSE;
+#endif
+
   line_num = s->line_num;
 
   s->resolve_caller_count = 0;
@@ -28076,13 +28176,32 @@ __exception int resolve_labels(LEPUSContext *ctx, JSFunctionDef *s) {
   }
   /* initialize the 'this' variable if needed. In a derived class
      constructor, this is initially uninitialized. */
+#ifdef ENABLE_LEPUSNG_BYTECODE_OPT
+  BytecodeOptCtx opt_ctx = {};
+  opt_ctx.ctx = ctx;
+  int preamble_skip_pos = -1; /* position in bc_buf to skip (get_loc already
+                                 folded into set_loc in the preamble) */
+  int preamble_slu_pos =
+      -1; /* bc_out position of preamble SLU (derived ctor) */
+  int preamble_slu_var = -1;
+#endif
   if (s->this_var_idx >= 0) {
     if (s->is_derived_class_constructor) {
       dbuf_putc(&bc_out, OP_set_loc_uninitialized);
       dbuf_put_u16(&bc_out, s->this_var_idx);
+#ifdef ENABLE_LEPUSNG_BYTECODE_OPT
+      preamble_slu_pos = bc_out.size - 3;
+      preamble_slu_var = s->this_var_idx;
+#endif
     } else {
       dbuf_putc(&bc_out, OP_push_this);
-      put_short_code(&bc_out, OP_put_loc, s->this_var_idx);
+#ifdef ENABLE_LEPUSNG_BYTECODE_OPT
+      if (LEPUSNG_OPT_ENABLED()) {
+        preamble_skip_pos =
+            opt_preamble_emit_this(ctx, s, &bc_out, bc_buf, bc_len);
+      } else
+#endif
+        put_short_code(&bc_out, OP_put_loc, s->this_var_idx);
     }
   }
   /* initialize the 'arguments' variable if needed */
@@ -28117,11 +28236,69 @@ __exception int resolve_labels(LEPUSContext *ctx, JSFunctionDef *s) {
     put_short_code(&bc_out, OP_put_loc, s->arg_var_object_idx);
   }
 
+  /* Initialize optimization context and run all pre-passes */
+#ifdef ENABLE_LEPUSNG_BYTECODE_OPT
+  BOOL opt_enabled = lepusng_opt_resolve_labels_init(&opt_ctx, ctx, s, bc_buf,
+                                                     bc_len, &bc_out);
+  if (opt_enabled && preamble_slu_pos >= 0)
+    lepusng_opt_on_emit_slu(&opt_ctx, preamble_slu_pos, preamble_slu_var);
+  if (opt_enabled && preamble_skip_pos == -1) {
+    preamble_skip_pos = opt_ctx.preamble_skip_pos;
+  }
+#endif
+
   for (pos = 0; pos < bc_len; pos = pos_next) {
     int val;
     op = bc_buf[pos];
     len = opcode_info[op].size;
     pos_next = pos + len;
+#ifdef ENABLE_LEPUSNG_BYTECODE_OPT
+    int cf_emit_start = bc_out.size; /* for constant fold tracking */
+    /* Skip get_loc already folded into preamble set_loc */
+    if (pos == preamble_skip_pos) {
+      preamble_skip_pos = -1;
+      continue;
+    }
+    if (LEPUSNG_OPT_ENABLED()) {
+      int out_op = op, out_label = 0, out_val = 0;
+      BOOL out_has_val = FALSE;
+      LepusOptResult opt_rv = lepusng_opt_dispatch_opcode(
+          ctx, s, &cc, bc_buf, bc_len, &bc_out, label_slots, pos, &pos_next, op,
+          &line_num, &opt_ctx, &cf_emit_start, &opt_ctx.const_fold_pos1,
+          &opt_ctx.const_fold_pos2, &opt_ctx.const_fold_val1,
+          &opt_ctx.const_fold_val2, &opt_ctx.const_fold_is_bool1,
+          &opt_ctx.const_fold_is_bool2, &opt_ctx.loc_initialized,
+          &opt_ctx.var_ref_initialized, &opt_ctx.before_first_backward_label,
+          &out_op, &out_label, &out_val, &out_has_val);
+      if (opt_rv == LEPUS_OPT_BREAK) {
+        lepusng_opt_after_emit(&opt_ctx, &bc_out, cf_emit_start);
+        continue;
+      }
+      if (opt_rv == LEPUS_OPT_NO_CHANGE) {
+        add_pc2line_info(s, bc_out.size, line_num);
+        dbuf_put(&bc_out, bc_buf + pos, len);
+        lepusng_opt_after_emit(&opt_ctx, &bc_out, cf_emit_start);
+        continue;
+      }
+      /* Handle modified op from optimizations (e.g. lnot branch inversion) */
+      if (out_op != op) {
+        op = out_op;
+        label = out_label;
+        /* pos_next already set by the optimizer (pos_next_ref);
+           do NOT reset it — the optimizer may have consumed extra instructions
+           beyond the original opcode (e.g., fold_const_truthy consumes
+           if_false/if_true). */
+        if (op == OP_goto || op == OP_if_true || op == OP_if_false)
+          goto has_label;
+        /* Non-label op (e.g. OP_undefined): fall through to main switch */
+      }
+      if (out_has_val) {
+        val = out_val;
+        goto has_constant_test;
+      }
+    }
+#endif
+
     switch (op) {
       case OP_close_var_object: {
         if (s->var_object_idx >= 0) {
@@ -28170,6 +28347,9 @@ __exception int resolve_labels(LEPUSContext *ctx, JSFunctionDef *s) {
           if (!ctx->gc_enable) lepus_free(ctx, re);
         }
         ls->first_reloc = NULL;
+#ifdef ENABLE_LEPUSNG_BYTECODE_OPT
+        lepusng_opt_on_label(&opt_ctx, label, ls);
+#endif
       } break;
 
       case OP_caller_str:
@@ -28208,6 +28388,10 @@ __exception int resolve_labels(LEPUSContext *ctx, JSFunctionDef *s) {
       case OP_throw:
       case OP_throw_var:
         pos_next = skip_dead_code(s, bc_buf, bc_len, pos_next, &line_num);
+        /* After return/throw, fall-through is dead — handled by opt hook */
+#ifdef ENABLE_LEPUSNG_BYTECODE_OPT
+        lepusng_opt_on_return_throw(&opt_ctx);
+#endif
         goto no_change;
 
       case OP_goto:
@@ -28232,28 +28416,27 @@ __exception int resolve_labels(LEPUSContext *ctx, JSFunctionDef *s) {
             add_pc2line_info(s, bc_out.size, line_num);
             dbuf_putc(&bc_out, op1);
             pos_next = skip_dead_code(s, bc_buf, bc_len, pos_next, &line_num);
+            /* Redirected goto to return/throw: fall-through is dead */
+#ifdef ENABLE_LEPUSNG_BYTECODE_OPT
+            lepusng_opt_on_goto_redirected(&opt_ctx);
+#endif
             break;
           }
-          /* XXX: should duplicate single instructions followed by goto or
-           * return */
-          /* For example, can match one of these followed by return:
-             push_i32 / push_const / push_atom_value / get_var /
-             undefined / null / push_false / push_true / get_ref_value /
-             get_loc / get_arg / get_var_ref
-           */
+          /* Inline single side-effect-free push + return at goto target.
+             Eliminates a runtime branch when target is: <push> return */
+#ifdef ENABLE_LEPUSNG_BYTECODE_OPT
+          if (lepusng_bytecode_opt &&
+              lepusng_opt_try_goto_inline_push_return(
+                  &opt_ctx, label, bc_buf, bc_len, &bc_out, &pos_next,
+                  &line_num, pos_next, line_num)) {
+            break;
+          }
+#endif
         }
         goto has_label;
 
       case OP_gosub:
         label = get_u32(bc_buf + pos + 1);
-        if (0 && OPTIMIZE) {
-          label = find_jump_target(s, label, &op1, NULL);
-          if (op1 == OP_ret) {
-            update_label(s, label, -1);
-            /* empty finally clause: remove gosub */
-            break;
-          }
-        }
         goto has_label;
 
       case OP_catch:
@@ -28294,6 +28477,9 @@ __exception int resolve_labels(LEPUSContext *ctx, JSFunctionDef *s) {
         }
         assert(label >= 0 && label < s->label_count);
         ls = &label_slots[label];
+#ifdef ENABLE_LEPUSNG_BYTECODE_OPT
+        lepusng_opt_on_branch(&opt_ctx, op, label, ls);
+#endif
 #if SHORT_OPCODES
         jp = &s->jump_slots[s->jump_count++];
         jp->op = op;
@@ -28587,7 +28773,11 @@ __exception int resolve_labels(LEPUSContext *ctx, JSFunctionDef *s) {
           }
 #endif
         }
-        goto no_change;
+        /* Emit OP_undefined (also handles get_var("undefined") → OP_undefined)
+         */
+        add_pc2line_info(s, bc_out.size, line_num);
+        dbuf_putc(&bc_out, OP_undefined);
+        break;
 
       case OP_insert2:
         if (OPTIMIZE) {
@@ -28608,28 +28798,13 @@ __exception int resolve_labels(LEPUSContext *ctx, JSFunctionDef *s) {
         goto no_change;
 
       case OP_dup:
-        if (OPTIMIZE) {
-          /* Transformation: dup put_x(n) drop -> put_x(n) */
-          // <Primjs begin>
-          int op1 = -1;
-          int64_t line2 = -1;
-          // <Primjs end>
-          /* Transformation: dup put_x(n) -> set_x(n) */
-          if (code_match(&cc, pos_next,
-                         M3(OP_put_loc, OP_put_arg, OP_put_var_ref), -1, -1)) {
-            if (cc.line_num >= 0) line_num = cc.line_num;
-            op1 = cc.op + 1; /* put_x -> set_x */
-            pos_next = cc.pos;
-            if (code_match(&cc, cc.pos, OP_drop, -1)) {
-              if (cc.line_num >= 0) line_num = cc.line_num;
-              op1 -= 1; /* set_x drop -> put_x */
-              pos_next = cc.pos;
-              if (code_match(&cc, cc.pos, op1 - 1, cc.idx, -1)) {
-                line2 = cc.line_num; /* delay line number update */
-                op1 += 1;            /* put_x(n) get_x(n) -> set_x(n) */
-                pos_next = cc.pos;
-              }
-            }
+        if (OPTIMIZE && !LEPUSNG_OPT_ENABLED()) {
+          int new_pos_next;
+          int64_t line2;
+          int op1 = match_dup_put_pattern(&cc, pos_next, &new_pos_next,
+                                          &line_num, &line2);
+          if (op1 >= 0) {
+            pos_next = new_pos_next;
             add_pc2line_info(s, bc_out.size, line_num);
             put_short_code(&bc_out, op1, cc.idx);
             if (line2 >= 0) line_num = line2;
@@ -28737,7 +28912,6 @@ __exception int resolve_labels(LEPUSContext *ctx, JSFunctionDef *s) {
       case OP_put_arg:
       case OP_put_var_ref:
         if (OPTIMIZE) {
-          /* transformation: put_x(n) get_x(n) -> set_x(n) */
           int idx;
           idx = get_u16(bc_buf + pos + 1);
           if (code_match(&cc, pos_next, op - 1, idx, -1)) {
@@ -28833,16 +29007,20 @@ __exception int resolve_labels(LEPUSContext *ctx, JSFunctionDef *s) {
                 break;
               }
               if (op1 == OP_strict_neq &&
-                  code_match(&cc, cc.pos, OP_if_false, -1)) {
+                  code_match(&cc, cc.pos,
+                             LEPUSNG_OPT_ENABLED() ? M2(OP_if_false, OP_if_true)
+                                                   : OP_if_false,
+                             -1)) {
                 /* transform typeof(s) != "<type>" if_false into is_<type>
-                 * if_true */
+                 * if_true (+ if_true into if_false when opt enabled) */
                 if (cc.line_num >= 0) line_num = cc.line_num;
                 add_pc2line_info(s, bc_out.size, line_num);
                 dbuf_putc(&bc_out, op2);
                 if (!ctx->gc_enable) LEPUS_FreeAtom(ctx, cc.atom);
                 pos_next = cc.pos;
                 label = cc.label;
-                op = OP_if_true;
+                op = LEPUSNG_OPT_ENABLED() ? (cc.op ^ OP_if_false ^ OP_if_true)
+                                           : OP_if_true;
                 goto has_label;
               }
             }
@@ -28866,89 +29044,28 @@ __exception int resolve_labels(LEPUSContext *ctx, JSFunctionDef *s) {
         dbuf_put(&bc_out, bc_buf + pos, len);
         break;
     }
+
+      /* Update constant fold tracker after each iteration */
+#ifdef ENABLE_LEPUSNG_BYTECODE_OPT
+    if (LEPUSNG_OPT_ENABLED()) {
+      lepusng_opt_after_emit(&opt_ctx, &bc_out, cf_emit_start);
+    }
+#endif
   }
 
   /* check that there were no missing labels */
   for (i = 0; i < s->label_count; i++) {
     assert(label_slots[i].first_reloc == NULL);
   }
+
+  /* Run post-pipeline optimizations and clean up */
+#ifdef ENABLE_LEPUSNG_BYTECODE_OPT
+  lepusng_opt_resolve_labels_finish(&opt_ctx, &bc_out, LEPUSNG_OPT_ENABLED());
+#endif
+
 #if SHORT_OPCODES
-  if (OPTIMIZE) {
-    /* more jump optimizations */
-    int patch_offsets = 0;
-    for (i = 0, jp = s->jump_slots; i < s->jump_count; i++, jp++) {
-      LabelSlot *ls;
-      JumpSlot *jp1;
-      int j, pos, diff, delta;
-
-      delta = 3;
-      switch (op = jp->op) {
-        case OP_goto16:
-          delta = 1;
-          /* fall thru */
-        case OP_if_false:
-        case OP_if_true:
-        case OP_goto:
-          pos = jp->pos;
-          diff = s->label_slots[jp->label].addr - pos;
-          if (diff >= -128 && diff <= 127 + delta) {
-            jp->size = 1;
-            if (op == OP_goto16) {
-              bc_out.buf[pos - 1] = jp->op = OP_goto8;
-            } else {
-              bc_out.buf[pos - 1] = jp->op = OP_if_false8 + (op - OP_if_false);
-            }
-            goto shrink;
-          } else if (diff == (int16_t)diff && op == OP_goto) {
-            jp->size = 2;
-            delta = 2;
-            bc_out.buf[pos - 1] = jp->op = OP_goto16;
-          shrink:
-            /* XXX: should reduce complexity, using 2 finger copy scheme */
-            memmove(bc_out.buf + pos + jp->size,
-                    bc_out.buf + pos + jp->size + delta,
-                    bc_out.size - pos - jp->size - delta);
-            bc_out.size -= delta;
-            patch_offsets++;
-            for (j = 0, ls = s->label_slots; j < s->label_count; j++, ls++) {
-              if (ls->addr > pos) ls->addr -= delta;
-            }
-            for (j = i + 1, jp1 = jp + 1; j < s->jump_count; j++, jp1++) {
-              if (jp1->pos > pos) jp1->pos -= delta;
-            }
-            for (j = 0; j < s->line_number_count; j++) {
-              if (s->line_number_slots[j].pc > pos)
-                s->line_number_slots[j].pc -= delta;
-            }
-
-            for (j = 0; j < s->caller_count; ++j) {
-              if (s->caller_slots[j].pc > pos) {
-                s->caller_slots[j].pc -= delta;
-              }
-            }
-            continue;
-          }
-          break;
-      }
-    }
-    if (patch_offsets) {
-      JumpSlot *jp1;
-      int j;
-      for (j = 0, jp1 = s->jump_slots; j < s->jump_count; j++, jp1++) {
-        int diff1 = s->label_slots[jp1->label].addr - jp1->pos;
-        switch (jp1->size) {
-          case 1:
-            put_u8(bc_out.buf + jp1->pos, diff1);
-            break;
-          case 2:
-            put_u16(bc_out.buf + jp1->pos, diff1);
-            break;
-          case 4:
-            put_u32(bc_out.buf + jp1->pos, diff1);
-            break;
-        }
-      }
-    }
+  if (OPTIMIZE && !LEPUSNG_OPT_ENABLED()) {
+    opt_jump_shrink(ctx, s, &bc_out, false);
   }
   if (!ctx->gc_enable) lepus_free(ctx, s->jump_slots);
   s->jump_slots = NULL;
@@ -28973,6 +29090,25 @@ __exception int resolve_labels(LEPUSContext *ctx, JSFunctionDef *s) {
   return 0;
 fail:
   /* XXX: not safe */
+#ifdef ENABLE_LEPUSNG_BYTECODE_OPT
+  lepusng_opt_resolve_labels_finish(&opt_ctx, &bc_out, FALSE);
+#endif
+  /* Clean up resources allocated within this function to keep fail path
+     symmetric with the normal return path. */
+  if (!ctx->gc_enable) {
+    lepus_free(ctx, s->label_slots);
+    s->label_slots = NULL;
+  }
+#if SHORT_OPCODES
+  if (!ctx->gc_enable) {
+    lepus_free(ctx, s->jump_slots);
+    s->jump_slots = NULL;
+  }
+#endif
+  if (!ctx->gc_enable) {
+    lepus_free(ctx, s->line_number_slots);
+    s->line_number_slots = NULL;
+  }
   if (!ctx->gc_enable) dbuf_free(&bc_out);
   return -1;
 }
