@@ -1180,6 +1180,7 @@ typedef struct FinalizationRegistryContext {
 } FinalizationRegistryContext;
 
 typedef struct FinalizationRegistryData {
+  int32_t ref_count;
   struct FinalizationRegistryContext *fg_ctx;
   list_head entries;
   LEPUSValue cbs;
