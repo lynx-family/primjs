@@ -1,0 +1,93 @@
+diff --git a/llvm/lib/Target/AArch64/AArch64FrameLowering.cpp b/llvm/lib/Target/AArch64/AArch64FrameLowering.cpp
+index 0f33e77d4eec..46f79f385cd4 100644
+--- a/llvm/lib/Target/AArch64/AArch64FrameLowering.cpp
++++ b/llvm/lib/Target/AArch64/AArch64FrameLowering.cpp
+@@ -1815,8 +1815,8 @@ void AArch64FrameLowering::emitPrologue(MachineFunction &MF,
+ 
+   // All calls are tail calls in GHC calling conv, and functions have no
+   // prologue/epilogue.
+-  if (MF.getFunction().getCallingConv() == CallingConv::GHC)
+-    return;
++  // if (MF.getFunction().getCallingConv() == CallingConv::GHC)
++  //   return;
+ 
+   // Set tagged base pointer to the requested stack slot.
+   // Ideally it should match SP value after prologue.
+@@ -2266,8 +2266,8 @@ void AArch64FrameLowering::emitEpilogue(MachineFunction &MF,
+ 
+   // All calls are tail calls in GHC calling conv, and functions have no
+   // prologue/epilogue.
+-  if (MF.getFunction().getCallingConv() == CallingConv::GHC)
+-    return;
++  // if (MF.getFunction().getCallingConv() == CallingConv::GHC)
++  //   return;
+ 
+   // How much of the stack used by incoming arguments this function is expected
+   // to restore in this particular epilogue.
+@@ -3590,8 +3590,8 @@ void AArch64FrameLowering::determineCalleeSaves(MachineFunction &MF,
+                                                 RegScavenger *RS) const {
+   // All calls are tail calls in GHC calling conv, and functions have no
+   // prologue/epilogue.
+-  if (MF.getFunction().getCallingConv() == CallingConv::GHC)
+-    return;
++  // if (MF.getFunction().getCallingConv() == CallingConv::GHC)
++  //   return;
+ 
+   TargetFrameLowering::determineCalleeSaves(MF, SavedRegs, RS);
+   const AArch64RegisterInfo *RegInfo = static_cast<const AArch64RegisterInfo *>(
+diff --git a/llvm/lib/Target/AArch64/AArch64ISelLowering.cpp b/llvm/lib/Target/AArch64/AArch64ISelLowering.cpp
+index 29b753a7d3a4..ef95898c7880 100644
+--- a/llvm/lib/Target/AArch64/AArch64ISelLowering.cpp
++++ b/llvm/lib/Target/AArch64/AArch64ISelLowering.cpp
+@@ -8572,6 +8572,7 @@ static bool mayTailCallThisCC(CallingConv::ID CC) {
+   case CallingConv::SwiftTail:
+   case CallingConv::Tail:
+   case CallingConv::Fast:
++  case CallingConv::GHC:
+     return true;
+   default:
+     return false;
+diff --git a/llvm/lib/Target/AArch64/AArch64RegisterInfo.cpp b/llvm/lib/Target/AArch64/AArch64RegisterInfo.cpp
+index f49d96758df2..801d9db67237 100644
+--- a/llvm/lib/Target/AArch64/AArch64RegisterInfo.cpp
++++ b/llvm/lib/Target/AArch64/AArch64RegisterInfo.cpp
+@@ -74,10 +74,14 @@ AArch64RegisterInfo::getCalleeSavedRegs(const MachineFunction *MF) const {
+ 
+   if (MF->getFunction().getCallingConv() == CallingConv::RTS_TO_INTERPRETER)
+     return CSR_AArch64_AllRegs_SaveList;
+-  if (MF->getFunction().getCallingConv() == CallingConv::GHC)
++  if (MF->getFunction().getCallingConv() == CallingConv::GHC) {
+     // GHC set of callee saved regs is empty as all those regs are
+     // used for passing STG regs around
+-    return CSR_AArch64_NoRegs_SaveList;
++    if (MF->getFunction().hasFnAttribute(Attribute::NoUnwind))
++      return CSR_AArch64_NoRegs_SaveList;
++    else
++      return CSR_AArch64_NoneRegs_SaveList;
++  }
+   if (MF->getFunction().getCallingConv() == CallingConv::PreserveNone)
+     return CSR_AArch64_NoneRegs_SaveList;
+   if (MF->getFunction().getCallingConv() == CallingConv::AnyReg)
+@@ -561,6 +565,22 @@ AArch64RegisterInfo::getReservedRegs(const MachineFunction &MF) const {
+   // which becomes considerably expensive when considering the _HI registers.
+   Reserved |= getStrictlyReservedRegs(MF);
+ 
++  // begin GHC reserved regs
++  // if (MF.getFunction().getCallingConv() == CallingConv::GHC) {
++    markSuperRegs(Reserved, AArch64::W0);
++    markSuperRegs(Reserved, AArch64::W21);
++    markSuperRegs(Reserved, AArch64::W22);
++    markSuperRegs(Reserved, AArch64::W23);
++    markSuperRegs(Reserved, AArch64::W24);
++    markSuperRegs(Reserved, AArch64::W25);
++    markSuperRegs(Reserved, AArch64::W26);
++    markSuperRegs(Reserved, AArch64::W27);
++    markSuperRegs(Reserved, AArch64::W28);
++    markSuperRegs(Reserved, AArch64::W29);
++    markSuperRegs(Reserved, AArch64::W30);
++  // }
++  // end GHC reserved regs
++
+   return Reserved;
+ }
+ 

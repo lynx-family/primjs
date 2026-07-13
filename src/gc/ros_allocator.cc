@@ -2137,13 +2137,14 @@ void RosAllocImpl::ReleaseEmptyLocalruns() {
   for (size_t i = 0; i < RunConfig::kRunConfigs; i++) {
     if (globalMutator.localRuns[i]) {
       if (LocalRunIsEmpty(*globalMutator.localRuns[i])) {
-        LOG(LEVEL_1) << "ReleaseEmptyLocalruns, i: " << i
-                     << "\t, runslot: " << globalMutator.localRuns[i];
-        FreeRun(*globalMutator.localRuns[i]);
+        RunSlots *run_to_free = globalMutator.localRuns[i];
+
+        globalMutator.localRuns[i] = nullptr;
         globalMutator.freeListSizes[i] = 0;
         globalMutator.freeLists[i].SetHead(0);
         globalMutator.freeLists[i].SetTail(0);
-        globalMutator.localRuns[i] = nullptr;
+
+        FreeRun(*run_to_free);
       }
     }
   }

@@ -37,11 +37,13 @@ void Finalizer::DoFinalizer2(void *ptr) noexcept {
 void Visitor::VisitLEPUSLepusRef(void *ptr, GCWorkStack &workStack) noexcept {
   LEPUSLepusRef *pref = reinterpret_cast<LEPUSLepusRef *>(ptr);
   PushObjLEPUSValue(pref->lepus_val, workStack);
+#ifdef ENABLE_LEPUSNG
   auto rt = workStack.GetRuntime();
   if (rt->js_callbacks_.ref_counted_obj_visitor)
     rt->js_callbacks_.ref_counted_obj_visitor(
         rt, pref->p, reinterpret_cast<uint64_t>(&workStack), pref->tag,
         set_mark_func);
+#endif
 }
 
 void Visitor::VisitJSVarRef(void *ptr, GCWorkStack &workStack) noexcept {

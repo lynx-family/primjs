@@ -45,6 +45,9 @@
 #include "inspector/interface.h"
 #include "inspector/protocols.h"
 
+QJS_HIDE LEPUSValue js_closure(LEPUSContext* ctx, LEPUSValue bfunc,
+                               JSVarRef** cur_var_refs, LEPUSStackFrame* sf);
+
 const char kConsoleDerivedObjectsProp[] = "__debuggerConsoleObjects__";
 const char kConsoleObjectIdPrefix[] = "console:";
 

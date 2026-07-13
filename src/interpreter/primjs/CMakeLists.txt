@@ -1,0 +1,2 @@
+add_subdirectory(interp)
+add_subdirectory(codegen)

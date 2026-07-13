@@ -19,6 +19,9 @@
 #include "inspector/heapprofiler/heapprofiler.h"
 #include "quickjs/include/bignum.h"
 
+QJS_HIDE LEPUSValue JS_GetSeparableStringContentNotDup(LEPUSContext* ctx,
+                                                       LEPUSValue val);
+
 namespace quickjs {
 namespace heapprofiler {
 

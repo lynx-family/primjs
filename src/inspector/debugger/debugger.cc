@@ -45,6 +45,8 @@
 typedef struct DebuggerParams DebuggerParams;
 char *FindDebuggerMagicContent(LEPUSContext *ctx, char *content1, char *name1,
                                uint8_t multi_line);
+QJS_HIDE JSProperty *add_property(LEPUSContext *ctx, LEPUSObject *p,
+                                  JSAtom prop, int prop_flags);
 
 struct LEPUSDebuggerInfo *GetDebuggerInfo(LEPUSContext *ctx) {
   return ctx->debugger_info;
@@ -1792,7 +1794,7 @@ void HandleEnable(DebuggerParams *debugger_options) {
     // if the session is already enabled, do not send Debugger.scriptParsed
     // event
     if (!is_already_enabled) {
-      ctx->debugger_mode = 1;
+      LEPUS_AttachDebugger(ctx);
       info->is_debugger_enabled += 1;
       int32_t script_num = info->script_num;
       for (int32_t index = 0; index < script_num; ++index) {
@@ -2402,7 +2404,7 @@ LEPUSDebuggerInfo::LEPUSDebuggerInfo(LEPUSContext *ctx_) : ctx{ctx_} {
 
   if (auto *check_connect = ctx->rt->debugger_callbacks_.is_devtool_on) {
     if (check_connect(ctx->rt)) {
-      ctx_->debugger_mode = 1;
+      LEPUS_AttachDebugger(ctx_);
     }
   }
   return;
@@ -2475,7 +2477,7 @@ LEPUSDebuggerInfo::~LEPUSDebuggerInfo() {
     FreeFixedShapeObj(this);
     FreeStringPool(this);
   }
-  ctx->debugger_mode = 0;
+  LEPUS_DetachDebugger(ctx);
   return;
 }
 

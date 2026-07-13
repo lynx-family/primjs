@@ -167,6 +167,35 @@ void force_inline HeapObjStore(LEPUSContext *ctx, void *fieldAddr,
 #pragma clang diagnostic ignored "-Wconditional-uninitialized"
 #pragma clang diagnostic ignored "-Wunreachable-code"
 // <Primjs end>
+
+QJS_HIDE void free_var_ref(LEPUSRuntime *rt, JSVarRef *var_ref);
+QJS_HIDE JSProperty *add_property(LEPUSContext *ctx, LEPUSObject *p,
+                                  JSAtom prop, int prop_flags);
+QJS_HIDE LEPUSValue JS_GetPropertyInternalImpl(LEPUSContext *ctx,
+                                               LEPUSValueConst obj, JSAtom prop,
+                                               LEPUSValueConst this_obj,
+                                               BOOL throw_ref_error);
+QJS_HIDE LEPUSValue JS_GetGlobalVarImpl(LEPUSContext *ctx, JSAtom prop,
+                                        BOOL throw_ref_error);
+QJS_HIDE int JS_SetPropertyInternalImpl(LEPUSContext *ctx,
+                                        LEPUSValueConst this_obj, JSAtom prop,
+                                        LEPUSValue val, int flags);
+QJS_HIDE int JS_SetPropertyValue(LEPUSContext *ctx, LEPUSValueConst this_obj,
+                                 LEPUSValue prop, LEPUSValue val, int flags);
+QJS_HIDE int JS_ToBoolFree(LEPUSContext *ctx, LEPUSValue val);
+QJS_HIDE LEPUSValue JS_CallConstructorInternal(LEPUSContext *ctx,
+                                               LEPUSValueConst func_obj,
+                                               LEPUSValueConst new_target,
+                                               int argc, LEPUSValue *argv,
+                                               int flags);
+QJS_HIDE LEPUSValue js_regexp_constructor_internal(LEPUSContext *ctx,
+                                                   LEPUSValueConst ctor,
+                                                   LEPUSValue pattern,
+                                                   LEPUSValue bc);
+QJS_HIDE LEPUSValue js_function_apply(LEPUSContext *ctx,
+                                      LEPUSValueConst this_val, int argc,
+                                      LEPUSValueConst *argv, int magic);
+
 #if defined(EMSCRIPTEN)
 #define DIRECT_DISPATCH 0
 #else
@@ -7451,6 +7480,14 @@ uint32_t GetLEPUSShapePropertyFlags(JSShapeProperty *prs) {
 typedef LEPUSValue JSAutoInitFunc(LEPUSContext *ctx, LEPUSObject *p,
                                   JSAtom atom, void *opaque);
 
+static inline JSAutoInitFunc *js_autoinit_get_func(JSProperty *pr) {
+  return (JSAutoInitFunc *)pr->u.init.init_func;
+}
+
+static inline void set_js_autoinit_func(JSProperty *pr, JSAutoInitFunc *func) {
+  pr->u.init.init_func = (uintptr_t)func;
+}
+
 QJS_STATIC int JS_AutoInitProperty(LEPUSContext *ctx, LEPUSObject *p,
                                    JSAtom prop, JSProperty *pr,
                                    JSShapeProperty *prs) {
@@ -7458,7 +7495,7 @@ QJS_STATIC int JS_AutoInitProperty(LEPUSContext *ctx, LEPUSObject *p,
   JSAutoInitFunc *func;
 
   if (js_shape_prepare_update(ctx, p, &prs)) return -1;
-  func = pr->u.init.init_func;
+  func = js_autoinit_get_func(pr);
   /* 'func' shall not modify the object properties 'pr' */
   val = func(ctx, p, prop, pr->u.init.opaque);
   prs->flags &= ~LEPUS_PROP_TMASK;
@@ -9732,7 +9769,7 @@ QJS_STATIC int JS_DefineAutoInitProperty(
   pr = add_property(ctx, p, prop,
                     (flags & LEPUS_PROP_C_W_E) | LEPUS_PROP_AUTOINIT);
   if (unlikely(!pr)) return -1;
-  pr->u.init.init_func = init_func;
+  set_js_autoinit_func(pr, init_func);
   pr->u.init.opaque = opaque;
   return TRUE;
 }
@@ -11301,7 +11338,7 @@ static __attribute__((unused)) void JS_DumpObject(LEPUSRuntime *rt,
         } else if ((prs->flags & LEPUS_PROP_TMASK) == LEPUS_PROP_VARREF) {
           write("[varref %p]", (void *)pr->u.var_ref);
         } else if ((prs->flags & LEPUS_PROP_TMASK) == LEPUS_PROP_AUTOINIT) {
-          write("[autoinit %p %p]", (void *)pr->u.init.init_func,
+          write("[autoinit %p %p]", (void *)js_autoinit_get_func(pr),
                 (void *)pr->u.init.opaque);
         } else {
           JS_DumpValueShortNoPrint(rt, pr->u.value, dump_buf);
@@ -13666,7 +13703,7 @@ LEPUSValue js_closure(LEPUSContext *ctx, LEPUSValue bfunc,
     pr = add_property(ctx, p, JS_ATOM_prototype,
                       LEPUS_PROP_WRITABLE | LEPUS_PROP_AUTOINIT);
     if (pr) {
-      pr->u.init.init_func = js_instantiate_prototype;
+      set_js_autoinit_func(pr, js_instantiate_prototype);
       pr->u.init.opaque = nullptr;
     }
   }
@@ -51112,6 +51149,24 @@ LEPUS_BOOL LEPUS_IsPrimjsEnabled(LEPUSRuntime *rt) {
 #endif
 }
 
+#ifdef ENABLE_PRIMJS_SNAPSHOT
+extern "C" void InstallDebuggerBcHandler(LEPUSContext *ctx, bool attach);
+#endif
+
+void LEPUS_AttachDebugger(LEPUSContext *ctx) {
+  ctx->debugger_mode = TRUE;
+#ifdef ENABLE_PRIMJS_SNAPSHOT
+  InstallDebuggerBcHandler(ctx, true);
+#endif
+}
+
+void LEPUS_DetachDebugger(LEPUSContext *ctx) {
+  ctx->debugger_mode = FALSE;
+#ifdef ENABLE_PRIMJS_SNAPSHOT
+  InstallDebuggerBcHandler(ctx, false);
+#endif
+}
+
 /* return JS_ATOM_NULL in case of exception */
 JSAtom LEPUS_ValueToAtom(LEPUSContext *ctx, LEPUSValueConst val) {
   CallGCFunc(JS_ValueToAtom_GC, ctx, val);
@@ -51712,10 +51767,10 @@ void PrepareQJSDebuggerForSharedContext(LEPUSContext *ctx, void **funcs,
   }
 
   if (devtool_connect) {
-    ctx->debugger_mode = 1;
+    LEPUS_AttachDebugger(ctx);
   } else {
     ctx->debugger_parse_script = 1;
-    ctx->debugger_mode = 0;
+    LEPUS_DetachDebugger(ctx);
   }
 #endif
   return;

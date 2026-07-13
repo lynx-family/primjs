@@ -20,7 +20,11 @@ extern "C" {
 #include "gc/thread_pool.h"
 #include "gc/trace-gc.h"
 #include "quickjs/include/quickjs-inner.h"
-
+QJS_HIDE LEPUSValue JS_CallConstructorInternal(LEPUSContext *ctx,
+                                               LEPUSValueConst func_obj,
+                                               LEPUSValueConst new_target,
+                                               int argc, LEPUSValue *argv,
+                                               int flags);
 namespace heap_test {
 
 class Heap {

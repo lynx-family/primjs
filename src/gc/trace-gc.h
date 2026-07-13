@@ -167,4 +167,6 @@ void LEPUS_WriteBarrierNoStore(LEPUSContext *ctx, void *value);
 void LEPUS_HeapObjStoreNoCtx(void *fieldAddr, LEPUSValue value);
 void LEPUS_HeapObjStoreNoCtx(void *fieldAddr, void *value);
 
+void LEPUS_AttachDebugger(LEPUSContext *ctx);
+void LEPUS_DetachDebugger(LEPUSContext *ctx);
 #endif  // SRC_GC_TRACE_GC_H_

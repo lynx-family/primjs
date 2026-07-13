@@ -1,0 +1,162 @@
+/*
+ * Copyright (c) 2025 The Lynx Authors. All rights reserved.
+ */
+#ifndef DEF_NODE_KIND
+#define DEF_NODE_KIND(...)
+#endif
+
+#ifndef DEF_COMMON_IR
+#define DEF_COMMON_IR(name, f, k) DEF_NODE_KIND(name, f, k)
+#endif
+
+#ifndef DEF_MIR
+#define DEF_MIR(name, f, k) DEF_NODE_KIND(name, f, k)
+#endif
+
+#ifndef DEF_META_KIND
+#define DEF_META_KIND(...)
+#endif
+
+#ifndef DEF_META_FLAG
+#define DEF_META_FLAG(...)
+#endif
+
+#ifndef DEF_NODE_CONSTANT
+#define DEF_NODE_CONSTANT(...)
+#endif
+
+DEF_META_KIND(Meta0)
+DEF_META_KIND(Meta1)
+
+DEF_META_FLAG(None, 0)
+DEF_META_FLAG(Throw, 1 << 0)
+DEF_META_FLAG(Control, 1 << 1)
+DEF_META_FLAG(NoWrite, 1 << 2)
+DEF_META_FLAG(NoRead, 1 << 3)
+
+DEF_COMMON_IR(Dead, None, Meta0)
+DEF_COMMON_IR(Phi, None, Meta0)
+DEF_COMMON_IR(DependPhi, None, Meta0)
+DEF_COMMON_IR(Merge, Control, Meta0)
+DEF_COMMON_IR(Loop, Control, Meta0)
+DEF_COMMON_IR(Start, Control, Meta0)
+DEF_COMMON_IR(End, Control, Meta0)
+DEF_COMMON_IR(Parameter, None, Meta1)
+DEF_COMMON_IR(Constant, None, Meta1)
+DEF_COMMON_IR(FunctionPointer, None, Meta1)
+DEF_COMMON_IR(IfTrue, Control, Meta0)
+DEF_COMMON_IR(IfFalse, Control, Meta0)
+DEF_COMMON_IR(Branch, Control, Meta1)
+DEF_COMMON_IR(Switch, Control, Meta0)
+DEF_COMMON_IR(SwitchCase, Control, Meta1)
+DEF_COMMON_IR(DefaultCase, Control, Meta0)
+DEF_COMMON_IR(IfSuccess, Control, Meta0)
+DEF_COMMON_IR(IfException, Control, Meta0)
+DEF_COMMON_IR(Goto, Control, Meta0)
+
+DEF_MIR(Convert, None, Meta1)
+
+DEF_MIR(Sub, None, Meta0)
+DEF_MIR(Add, None, Meta0)
+DEF_MIR(Mul, None, Meta0)
+DEF_MIR(Div, None, Meta0)
+DEF_MIR(Mod, None, Meta0)
+DEF_MIR(LShift, None, Meta0)
+DEF_MIR(RShift, None, Meta0)
+DEF_MIR(URshift, None, Meta0)
+DEF_MIR(And, None, Meta0)
+DEF_MIR(Or, None, Meta0)
+DEF_MIR(Xor, None, Meta0)
+
+DEF_MIR(Int32Max, None, Meta0)
+DEF_MIR(Int32Min, None, Meta0)
+DEF_MIR(AddWithOverFlow, None, Meta0)
+DEF_MIR(SubWithOverFlow, None, Meta0)
+DEF_MIR(MulWithOverFlow, None, Meta0)
+DEF_MIR(ExtractValue, None, Meta0)
+DEF_MIR(Neg, None, Meta0)
+DEF_MIR(Not, None, Meta0)
+
+DEF_MIR(FCmp, None, Meta1)
+DEF_MIR(ICmp, None, Meta1)
+
+DEF_MIR(Load, NoWrite, Meta0)
+DEF_MIR(Store, NoRead, Meta0)
+DEF_MIR(TailCall, None, Meta1)
+DEF_MIR(Call, None, Meta1)
+DEF_MIR(Return, None, Meta0)
+DEF_MIR(ExceptionReturn, None, Meta0)
+DEF_MIR(Alloca, None, Meta0)
+DEF_MIR(SaveStack, None, Meta0)
+DEF_MIR(RestoreStack, None, Meta0)
+DEF_MIR(ReadRegister, None, Meta1)
+DEF_MIR(WriteRegister, None, Meta1)
+DEF_MIR(Unreachable, None, Meta0)
+DEF_MIR(Message, None, Meta1)
+
+DEF_NODE_CONSTANT(Phi1, Phi, None, 1, 0, 1)
+DEF_NODE_CONSTANT(Phi2, Phi, None, 1, 0, 2)
+DEF_NODE_CONSTANT(Phi3, Phi, None, 1, 0, 3)
+
+DEF_NODE_CONSTANT(DependPhi1, DependPhi, None, 1, 1, 0)
+DEF_NODE_CONSTANT(DependPhi2, DependPhi, None, 1, 2, 0)
+DEF_NODE_CONSTANT(DependPhi3, DependPhi, None, 1, 3, 0)
+
+DEF_NODE_CONSTANT(Merge1, Merge, Control, 1, 0, 0)
+DEF_NODE_CONSTANT(Merge2, Merge, Control, 2, 0, 0)
+DEF_NODE_CONSTANT(Merge3, Merge, Control, 3, 0, 0)
+
+DEF_NODE_CONSTANT(Loop1, Loop, Control, 1, 0, 0)
+DEF_NODE_CONSTANT(Loop2, Loop, Control, 2, 0, 0)
+DEF_NODE_CONSTANT(Loop3, Loop, Control, 3, 0, 0)
+
+DEF_NODE_CONSTANT(Start, Start, Control, 0, 0, 0)
+DEF_NODE_CONSTANT(IfTrue, IfTrue, Control, 1, 0, 0)
+DEF_NODE_CONSTANT(IfFalse, IfFalse, Control, 1, 0, 0)
+DEF_NODE_CONSTANT(DefaultCase, DefaultCase, Control, 1, 0, 0)
+DEF_NODE_CONSTANT(IfSuccess, IfSuccess, Control, 1, 0, 0)
+DEF_NODE_CONSTANT(IfException, IfException, Control, 1, 1, 0)
+DEF_NODE_CONSTANT(Goto, Goto, Control, 1, 0, 0)
+DEF_NODE_CONSTANT(Switch, Switch, Control, 1, 0, 1)
+
+DEF_NODE_CONSTANT(Unreachable, Unreachable, None, 1, 1, 0)
+
+DEF_NODE_CONSTANT(Add, Add, None, 0, 0, 2)
+DEF_NODE_CONSTANT(Sub, Sub, None, 0, 0, 2)
+DEF_NODE_CONSTANT(Mul, Mul, None, 0, 0, 2)
+DEF_NODE_CONSTANT(Div, Div, Throw, 0, 0, 2)
+DEF_NODE_CONSTANT(Mod, Mod, Throw, 0, 0, 2)
+
+DEF_NODE_CONSTANT(Int32Max, Int32Max, None, 0, 0, 2)
+DEF_NODE_CONSTANT(Int32Min, Int32Min, None, 0, 0, 2)
+DEF_NODE_CONSTANT(AddWithOverFlow, AddWithOverFlow, None, 0, 0, 2)
+DEF_NODE_CONSTANT(SubWithOverFlow, SubWithOverFlow, None, 0, 0, 2)
+DEF_NODE_CONSTANT(MulWithOverFlow, MulWithOverFlow, None, 0, 0, 2)
+DEF_NODE_CONSTANT(ExtractValue, ExtractValue, None, 0, 0, 2)
+DEF_NODE_CONSTANT(Alloca, Alloca, None, 0, 0, 1)
+DEF_NODE_CONSTANT(SaveStack, SaveStack, None, 1, 1, 0)
+DEF_NODE_CONSTANT(RestoreStack, RestoreStack, None, 1, 1, 1)
+DEF_NODE_CONSTANT(Neg, Neg, None, 0, 0, 1)
+DEF_NODE_CONSTANT(Not, Not, None, 0, 0, 1)
+
+DEF_NODE_CONSTANT(LShift, LShift, None, 0, 0, 2)
+DEF_NODE_CONSTANT(RShift, RShift, None, 0, 0, 2)
+DEF_NODE_CONSTANT(URshift, URshift, None, 0, 0, 2)
+DEF_NODE_CONSTANT(And, And, None, 0, 0, 2)
+DEF_NODE_CONSTANT(Or, Or, None, 0, 0, 2)
+DEF_NODE_CONSTANT(Xor, Xor, None, 0, 0, 2)
+
+DEF_NODE_CONSTANT(Return1, Return, None, 1, 1, 1)
+DEF_NODE_CONSTANT(Return0, Return, None, 1, 1, 0)
+DEF_NODE_CONSTANT(Dead, Dead, None, 0, 0, 0)
+
+DEF_NODE_CONSTANT(Load, Load, NoWrite, 1, 1, 2)
+DEF_NODE_CONSTANT(Store, Store, NoRead, 1, 1, 3)
+DEF_NODE_CONSTANT(ExceptionReturn, ExceptionReturn, None, 1, 1, 0)
+
+#undef DEF_NODE_KIND
+#undef DEF_COMMON_IR
+#undef DEF_MIR
+#undef DEF_META_KIND
+#undef DEF_NODE_CONSTANT
+#undef DEF_META_FLAG
