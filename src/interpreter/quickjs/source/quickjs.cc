@@ -5431,11 +5431,11 @@ QJS_STATIC void mark_children(LEPUSRuntime *rt, LEPUSValueConst val,
       JSShape *sh;
       int i;
       sh = p->shape;
+      if (sh == nullptr) break;
       mark_func(rt, LEPUS_MKPTR(LEPUS_TAG_SHAPE, sh), trace_tool);
       /* mark all the fields */
       prs = get_shape_prop(sh);
       if (p->class_id != JS_CLASS_WeakRef) {
-        if (sh == nullptr) return;
         for (i = 0; i < sh->prop_count; i++) {
           JSProperty *pr = &p->prop[i];
           if (prs->atom != JS_ATOM_NULL) {
@@ -44300,6 +44300,15 @@ QJS_STATIC void js_weakref_finalizer(LEPUSRuntime *rt, LEPUSValue val) {
   return;
 }
 
+QJS_STATIC void frd_decref(LEPUSRuntime *rt, FinalizationRegistryData *frd) {
+  if (--frd->ref_count == 0) {
+    LEPUS_FreeValueRT(rt, frd->cbs);
+    free_finalization_registry_context(rt, frd->fg_ctx);
+    lepus_free_rt(rt, frd);
+  }
+  return;
+}
+
 QJS_STATIC void js_finalizationRegistry_finalizer(LEPUSRuntime *rt,
                                                   LEPUSValue val) {
   LEPUSObject *p = LEPUS_VALUE_GET_OBJ(val);
@@ -44307,17 +44316,28 @@ QJS_STATIC void js_finalizationRegistry_finalizer(LEPUSRuntime *rt,
       LEPUS_GetOpaque(val, JS_CLASS_FinalizationRegistry));
   if (!frd) return;
   list_head *el, *el1;
+  struct list_head to_free;
+  // First pass: unlink every entry from frd->entries and drop its weak-ref
+  // record so no live target can still reach these nodes.
+  init_list_head(&to_free);
   list_for_each_safe(el, el1, &frd->entries) {
     FinalizationRegistryEntry *fin_node =
         list_entry(el, FinalizationRegistryEntry, link);
+    list_del(&fin_node->link);
     delete_weak_ref(rt, LEPUS_VALUE_GET_OBJ(fin_node->target), fin_node);
+    list_add_tail(&fin_node->link, &to_free);
+  }
+  // Second pass: release the collected entries now that the traversal is done.
+  list_for_each_safe(el, el1, &to_free) {
+    FinalizationRegistryEntry *fin_node =
+        list_entry(el, FinalizationRegistryEntry, link);
+    list_del(&fin_node->link);
     LEPUS_FreeValueRT(rt, fin_node->held_value);
     LEPUS_FreeValueRT(rt, fin_node->token);
     lepus_free_rt(rt, fin_node);
+    frd_decref(rt, frd);  // drop this entry's reference
   }
-  LEPUS_FreeValueRT(rt, frd->cbs);
-  free_finalization_registry_context(rt, frd->fg_ctx);
-  lepus_free_rt(rt, frd);
+  frd_decref(rt, frd);  // drop the registry object's own reference
   return;
 }
 
@@ -44671,6 +44691,8 @@ QJS_STATIC void map_decref_record(LEPUSRuntime *rt, JSMapRecord *mr) {
 
 QJS_STATIC void reset_weak_ref(LEPUSRuntime *rt, LEPUSObject *p) {
   WeakRefRecord *wr, *wr_next;
+  list_head *el, *el1;
+  struct list_head map_to_free;
 
   /* first pass to remove the records from the WeakMap/WeakSet
      lists */
@@ -44697,12 +44719,13 @@ QJS_STATIC void reset_weak_ref(LEPUSRuntime *rt, LEPUSObject *p) {
 
   /* second pass to free the values to avoid modifying the weak
      reference list while traversing it. */
+  init_list_head(&map_to_free);
   for (wr = p->first_weak_ref; wr != nullptr; wr = wr_next) {
     wr_next = wr->next_weak_ref;
     switch (wr->kind) {
       case WEAK_REF_KIND_WEAK_MAP: {
-        LEPUS_FreeValueRT(rt, wr->u.map_record->value);
-        lepus_free_rt(rt, wr->u.map_record);
+        // Defer releasing the value.
+        list_add_tail(&wr->u.map_record->link, &map_to_free);
       } break;
       case WEAK_REF_KIND_FINALIZATION_REGISTRY: {
         FinalizationRegistryEntry *fin_node = wr->u.fin_node;
@@ -44715,11 +44738,19 @@ QJS_STATIC void reset_weak_ref(LEPUSRuntime *rt, LEPUSObject *p) {
         LEPUS_FreeValueRT(rt, fin_node->held_value);
         LEPUS_FreeValueRT(rt, fin_node->token);
         lepus_free_rt(rt, fin_node);
+        frd_decref(rt, frd);  // drop this entry's reference
       } break;
       default:
         break;
     }
     lepus_free_rt(rt, wr);
+  }
+  // Release the deferred WeakMap values now that the traversal is done.
+  list_for_each_safe(el, el1, &map_to_free) {
+    JSMapRecord *mr = list_entry(el, JSMapRecord, link);
+    list_del(&mr->link);
+    LEPUS_FreeValueRT(rt, mr->value);
+    lepus_free_rt(rt, mr);
   }
   return;
 }
@@ -45310,6 +45341,7 @@ LEPUSValue js_finalizationRegistry_register(LEPUSContext *ctx,
     return LEPUS_EXCEPTION;
   }
   fin_node->data = frd;
+  frd->ref_count++;  // each entry pins its registry's data
   fin_node->target = target;
   fin_node->held_value = LEPUS_DupValue(ctx, held_value);
   fin_node->token = LEPUS_DupValue(ctx, token);
@@ -45329,6 +45361,7 @@ LEPUSValue js_finalizationRegistry_unregister(LEPUSContext *ctx,
   FinalizationRegistryEntry *fin_node;
   LEPUSObject *token_p;
   bool removed = false;
+  struct list_head to_free;
 
   frd = static_cast<FinalizationRegistryData *>(
       LEPUS_GetOpaque(this_val, JS_CLASS_FinalizationRegistry));
@@ -45341,17 +45374,26 @@ LEPUSValue js_finalizationRegistry_unregister(LEPUSContext *ctx,
     return LEPUS_ThrowTypeError(ctx, "unregisterToken must be an object");
   }
   token_p = LEPUS_VALUE_GET_OBJ(token);
+  // Only unlink matching entries here.
+  init_list_head(&to_free);
   list_for_each_safe(el, el1, &frd->entries) {
     fin_node = list_entry(el, FinalizationRegistryEntry, link);
     if (LEPUS_VALUE_IS_OBJECT(fin_node->token) &&
         LEPUS_VALUE_GET_OBJ(fin_node->token) == token_p) {
       list_del(&fin_node->link);
       delete_weak_ref(ctx->rt, LEPUS_VALUE_GET_OBJ(fin_node->target), fin_node);
-      LEPUS_FreeValue(ctx, fin_node->held_value);
-      LEPUS_FreeValue(ctx, fin_node->token);
-      lepus_free(ctx, fin_node);
+      list_add_tail(&fin_node->link, &to_free);
       removed = true;
     }
+  }
+  // Release the collected entries.
+  list_for_each_safe(el, el1, &to_free) {
+    fin_node = list_entry(el, FinalizationRegistryEntry, link);
+    list_del(&fin_node->link);
+    LEPUS_FreeValue(ctx, fin_node->held_value);
+    LEPUS_FreeValue(ctx, fin_node->token);
+    lepus_free(ctx, fin_node);
+    frd_decref(ctx->rt, frd);  // drop this entry's reference
   }
   return LEPUS_NewBool(ctx, removed);
 };
@@ -45378,6 +45420,7 @@ QJS_STATIC LEPUSValue js_finalizationRegistry_constructor(
   }
   frd->fg_ctx = ctx->fg_ctx;
   frd->fg_ctx->ref_count++;
+  frd->ref_count = 1;  // the registry object itself holds one reference
   init_list_head(&frd->entries);
   frd->cbs = LEPUS_DupValue(ctx, executor);
   LEPUS_SetOpaque(val, frd);
