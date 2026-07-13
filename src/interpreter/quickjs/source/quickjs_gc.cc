@@ -8465,7 +8465,9 @@ static LEPUSValue js_async_generator_resolve_function(
     }
   } else {
     /* restart function execution after await() */
-    assert(s->state == JS_ASYNC_GENERATOR_STATE_EXECUTING);
+    if (s->state != JS_ASYNC_GENERATOR_STATE_EXECUTING) {
+      return LEPUS_UNDEFINED;
+    }
     s->func_state.throw_flag = is_reject;
     if (is_reject) {
       LEPUS_Throw(ctx, arg);
