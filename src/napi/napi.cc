@@ -881,6 +881,14 @@ size_t ArrayBuffer::ByteLength() {
   return length;
 }
 
+void ArrayBuffer::Detach() {
+  napi_status status = napi_generic_failure;
+  if (napi_env(_env)->napi_detach_arraybuffer != nullptr) {
+    status = NAPI_ENV_CALL(detach_arraybuffer, _env, _value);
+  }
+  CheckStatus(_env, status, "failed to call napi_detach_arraybuffer");
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 // DataView class
 ////////////////////////////////////////////////////////////////////////////////

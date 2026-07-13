@@ -900,6 +900,7 @@ class NAPI_EXTERN ArrayBuffer : public Object {
 
   void* Data();         ///< Gets a pointer to the data buffer.
   size_t ByteLength();  ///< Gets the length of the array buffer in bytes.
+  void Detach();        ///< Detaches the underlying data buffer.
 };
 
 /// A JavaScript typed-array value with unknown array type.

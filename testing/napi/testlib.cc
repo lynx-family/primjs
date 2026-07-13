@@ -2,10 +2,13 @@
 
 #include <gtest/gtest.h>
 
+#include <array>
 #include <chrono>
 #include <thread>
 #include <unordered_map>
 #include <unordered_set>
+
+#include "napi/adapter/js_native_api_adapter.h"
 
 using namespace Napi;
 
@@ -1336,6 +1339,77 @@ TEST_P(NAPITest, NapiCreateExteranArrayBuffer) {
     EXPECT_NE(arrayBuffe.Data(), nullptr);
     EXPECT_EQ(arrayBuffe.ByteLength(), length);
   }
+}
+
+TEST_P(NAPITest, NapiDetachArrayBuffer) {
+  if (std::get<0>(GetParam()) != "QJS") {
+    GTEST_SKIP() << "napi_detach_arraybuffer is only attached by QuickJS";
+  }
+
+  HandleScope hscope(env);
+  std::array<uint8_t, 8> external_data = {0, 1, 2, 3, 4, 5, 6, 7};
+  ArrayBuffer array_buffer =
+      ArrayBuffer::New(env, external_data.data(), external_data.size());
+  Uint8Array view = Uint8Array::New(env, external_data.size(), array_buffer, 0);
+
+  EXPECT_EQ(
+      napi_detach_arraybuffer_primjs(static_cast<napi_env>(env),
+                                     static_cast<napi_value>(array_buffer)),
+      napi_ok);
+
+  auto has_zero_byte_length =
+      env.RunScript("(function(value) { return value.byteLength === 0; })")
+          .As<Function>();
+  EXPECT_TRUE(has_zero_byte_length.Call({array_buffer}).ToBoolean());
+  EXPECT_TRUE(has_zero_byte_length.Call({view}).ToBoolean());
+
+  auto detached_view_is_inaccessible =
+      env.RunScript(
+             "(function(view) {"
+             "  try {"
+             "    var value = view[0];"
+             "    view[0] = 99;"
+             "    return value === undefined && view[0] === undefined;"
+             "  } catch (error) {"
+             "    return error instanceof TypeError;"
+             "  }"
+             "})")
+          .As<Function>();
+  EXPECT_TRUE(detached_view_is_inaccessible.Call({view}).ToBoolean());
+
+  auto detached_buffer_rejects_new_view =
+      env.RunScript(
+             "(function(buffer) {"
+             "  try {"
+             "    new Uint8Array(buffer);"
+             "    return false;"
+             "  } catch (error) {"
+             "    return error instanceof TypeError;"
+             "  }"
+             "})")
+          .As<Function>();
+  EXPECT_TRUE(
+      detached_buffer_rejects_new_view.Call({array_buffer}).ToBoolean());
+
+  EXPECT_EQ(external_data[0], 0);
+  external_data[0] = 42;
+  EXPECT_EQ(external_data[0], 42);
+
+  EXPECT_EQ(
+      napi_detach_arraybuffer_primjs(static_cast<napi_env>(env),
+                                     static_cast<napi_value>(array_buffer)),
+      napi_detachable_arraybuffer_expected);
+
+  EXPECT_EQ(
+      napi_detach_arraybuffer_primjs(static_cast<napi_env>(env),
+                                     static_cast<napi_value>(Object::New(env))),
+      napi_arraybuffer_expected);
+
+  Value shared_array_buffer = env.RunScript("new SharedArrayBuffer(8)");
+  EXPECT_EQ(napi_detach_arraybuffer_primjs(
+                static_cast<napi_env>(env),
+                static_cast<napi_value>(shared_array_buffer)),
+            napi_detachable_arraybuffer_expected);
 }
 
 TEST_P(NAPITest, NapiTypedArrayTest) {
