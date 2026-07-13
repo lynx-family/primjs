@@ -40613,6 +40613,8 @@ QJS_STATIC inline void js_json_get_number(JSParseState *s, bool is_neg,
     double d;
     LEPUS_ToFloat64(ctx, &d, val); /* no exception possible */
     val = LEPUS_NewFloat64(ctx, -d);
+  } else {
+    val = LEPUS_DupValue(ctx, val);
   }
   json_val->uni.num = val;
   json_val->tag = JSON_TYPE_NUM;
@@ -40741,17 +40743,24 @@ json_val *json_parse_value(JSParseState *s, size_t dat_len) {
   const uint8_t *end = cur + dat_len;
   HandleScope func_scope(ctx);
 
-#define json_parse_err(msg)                        \
-  do {                                             \
-    s->last_ptr = cur;                             \
-    if (!ctx->gc_enable) lepus_free(ctx, val_hdr); \
-    js_parse_error(s, msg);                        \
-    return nullptr;                                \
+#define json_parse_err(msg)                           \
+  do {                                                \
+    s->last_ptr = cur;                                \
+    if (!ctx->gc_enable) {                            \
+      for (json_val *p = val_hdr; p <= val; p++) {    \
+        if (unsafe_json_get_type(p) == JSON_TYPE_NUM) \
+          LEPUS_FreeValue(ctx, p->uni.num);           \
+      }                                               \
+      lepus_free(ctx, val_hdr);                       \
+    }                                                 \
+    js_parse_error(s, msg);                           \
+    return nullptr;                                   \
   } while (false)
 
 #define val_incr()                                                        \
   do {                                                                    \
     val++;                                                                \
+    val->tag = 0;                                                         \
     if (unlikely(val >= val_end)) {                                       \
       alc_len += alc_len / 2;                                             \
       val_tmp = static_cast<json_val *>(                                  \
@@ -40789,6 +40798,7 @@ json_val *json_parse_value(JSParseState *s, size_t dat_len) {
   func_scope.PushHandle(&val_hdr, HANDLE_TYPE_HEAP_OBJ);
   val_end = val_hdr + (alc_len - 2); /* padding for key-value pair reading */
   val = val_hdr;
+  val->tag = 0;
   ctn = val;
   ctn_len = 0;
   /*
@@ -40967,12 +40977,14 @@ obj_key_end:
 obj_val_begin:
   if (*cur == '"') {
     val++;
+    val->tag = 0;
     ctn_len++;
     if (likely(read_string(s, (uint8_t **)&cur, val))) goto obj_val_end;
     goto fail_string;
   }
   if (char_is_number(*cur)) {
     val++;
+    val->tag = 0;
     ctn_len++;
     is_neg = 0;
     if (*cur == '-') {
@@ -40999,6 +41011,7 @@ obj_val_begin:
   }
   if (*cur == 't') {
     val++;
+    val->tag = 0;
     ctn_len++;
     if (likely(read_true(&cur, val))) {
       goto obj_val_end;
@@ -41007,6 +41020,7 @@ obj_val_begin:
   }
   if (*cur == 'f') {
     val++;
+    val->tag = 0;
     ctn_len++;
     if (likely(read_false(&cur, val))) {
       goto obj_val_end;
@@ -41015,6 +41029,7 @@ obj_val_begin:
   }
   if (*cur == 'n') {
     val++;
+    val->tag = 0;
     ctn_len++;
     if (likely(read_null(&cur, val))) {
       goto obj_val_end;
@@ -41112,12 +41127,23 @@ fail_literal:
 fail_trailing_comma:
   json_parse_err("trailing comma is not allowed");
 fail_alloc:
+  if (!val_hdr) {
+    s->last_ptr = cur;
+    js_parse_error(s, "json parse memory allocation failed");
+    return nullptr;
+  }
   json_parse_err("json parse memory allocation failed");
 fail:
   json_parse_err("unexpected content after document");
 fail_number:
 fail_string:
-  if (!ctx->gc_enable) lepus_free(ctx, val_hdr);
+  if (!ctx->gc_enable) {
+    for (json_val *p = val_hdr; p <= val; p++) {
+      if (unsafe_json_get_type(p) == JSON_TYPE_NUM)
+        LEPUS_FreeValue(ctx, p->uni.num);
+    }
+    lepus_free(ctx, val_hdr);
+  }
   return nullptr;
 #undef val_incr
 }
