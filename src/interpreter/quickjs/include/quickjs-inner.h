@@ -2565,7 +2565,6 @@ QJS_HIDE uint8_t *json_val_write_format(LEPUSContext *ctx, json_val *root,
 QJS_HIDE uint8_t *json_val_write(LEPUSContext *ctx, json_val *root);
 QJS_HIDE void parse_json_space(JSParseState *s, const uint8_t **cur);
 QJS_HIDE bool read_string(JSParseState *s, uint8_t **ptr, json_val *val);
-QJS_HIDE json_val *json_parse_value(JSParseState *s, size_t dat_len);
 QJS_HIDE void js_parse_init(LEPUSContext *ctx, JSParseState *s,
                             const char *input, size_t input_len,
                             const char *filename, int start_line_num = 0);

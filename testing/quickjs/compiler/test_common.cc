@@ -1724,6 +1724,72 @@ TEST_F(CommonQjsTest, JsonParseBigIntPositive) {
   if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, ret);
 }
 
+TEST_F(CommonQjsTest, LepusParseJsonBigIntPositive) {
+  const char* input = R"({"root":2n,"array":[3n,4n]})";
+  LEPUSValue parsed = LEPUS_ParseJSON(ctx_, input, strlen(input), "test.json");
+  ASSERT_FALSE(LEPUS_IsException(parsed));
+
+  LEPUSValue root = LEPUS_GetPropertyStr(ctx_, parsed, "root");
+  ASSERT_TRUE(LEPUS_IsBigInt(root));
+  int64_t value = 0;
+  ASSERT_EQ(0, LEPUS_ToBigInt64(ctx_, &value, root));
+  EXPECT_EQ(2, value);
+
+  LEPUSValue array = LEPUS_GetPropertyStr(ctx_, parsed, "array");
+  ASSERT_TRUE(LEPUS_IsArray(ctx_, array));
+  for (uint32_t i = 0; i < 2; i++) {
+    LEPUSValue element = LEPUS_GetPropertyUint32(ctx_, array, i);
+    ASSERT_TRUE(LEPUS_IsBigInt(element));
+    ASSERT_EQ(0, LEPUS_ToBigInt64(ctx_, &value, element));
+    EXPECT_EQ(static_cast<int64_t>(i + 3), value);
+    if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, element);
+  }
+
+  if (!ctx_->gc_enable) {
+    LEPUS_FreeValue(ctx_, array);
+    LEPUS_FreeValue(ctx_, root);
+    LEPUS_FreeValue(ctx_, parsed);
+  }
+}
+
+#ifdef ENABLE_COMPATIBLE_MM
+TEST(JsonParseBigIntGCTest, TemporaryTreeKeepsBigIntsAlive) {
+  LEPUSRuntime* rt = JS_NewRuntime_GC(0);
+  ASSERT_NE(nullptr, rt);
+  LEPUSContext* ctx = LEPUS_NewContext(rt);
+  ASSERT_NE(nullptr, ctx);
+
+  {
+    std::string input = "[";
+    for (int i = 0; i < 128; i++) {
+      if (i != 0) input += ',';
+      input += std::to_string(i) + "n";
+    }
+    input += ']';
+
+    LEPUSValue parsed = LEPUS_UNDEFINED;
+    HandleScope scope(ctx, &parsed, HANDLE_TYPE_LEPUS_VALUE);
+    parsed = JS_ParseJSONOPT(ctx, input.c_str(), input.size(), "test.json");
+    ASSERT_FALSE(LEPUS_IsException(parsed));
+    ASSERT_TRUE(LEPUS_IsArray(ctx, parsed));
+
+    LEPUS_RunGC(rt);
+    for (uint32_t i = 0; i < 128; i++) {
+      LEPUSValue element = LEPUS_UNDEFINED;
+      HandleScope element_scope(ctx, &element, HANDLE_TYPE_LEPUS_VALUE);
+      element = LEPUS_GetPropertyUint32(ctx, parsed, i);
+      ASSERT_TRUE(LEPUS_IsBigInt(element));
+      int64_t value = -1;
+      ASSERT_EQ(0, LEPUS_ToBigInt64(ctx, &value, element));
+      EXPECT_EQ(static_cast<int64_t>(i), value);
+    }
+  }
+
+  LEPUS_FreeContext(ctx);
+  LEPUS_FreeRuntime(rt);
+}
+#endif
+
 TEST_F(CommonQjsTest, JsonParseBigIntNegative) {
   // The is_neg path converts BigInt to float64 (LEPUS_ToFloat64 on BigInt
   // returns NaN in PrimJS). This test verifies no crash and documents behavior.

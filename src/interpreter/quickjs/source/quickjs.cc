@@ -40606,13 +40606,20 @@ static force_inline bool read_null(const uint8_t **ptr, json_val *val) {
 }
 
 QJS_STATIC inline void js_json_get_number(JSParseState *s, bool is_neg,
-                                          json_val *json_val) {
+                                          json_val *json_val,
+                                          HandleScope &root_scope) {
   LEPUSContext *ctx = s->ctx;
   LEPUSValue val = s->token.u.num.val;
   if (is_neg) {
     double d;
     LEPUS_ToFloat64(ctx, &d, val); /* no exception possible */
     val = LEPUS_NewFloat64(ctx, -d);
+  } else if (ctx->gc_enable) {
+    /* json_val storage is not traced, so keep heap numbers rooted until the
+       temporary tree has been materialized as JS objects. */
+    if (LEPUS_VALUE_HAS_REF_COUNT(val)) {
+      root_scope.PushHandle(LEPUS_VALUE_GET_PTR(val), HANDLE_TYPE_DIR_HEAP_OBJ);
+    }
   } else {
     val = LEPUS_DupValue(ctx, val);
   }
@@ -40736,7 +40743,8 @@ LEPUSValue make_json_object(LEPUSContext *ctx, json_val *cur_val) {
   return LEPUS_NULL;
 }
 
-json_val *json_parse_value(JSParseState *s, size_t dat_len) {
+json_val *json_parse_value(JSParseState *s, size_t dat_len,
+                           HandleScope &root_scope) {
   LEPUSContext *ctx = s->ctx;
   BOOL is_neg;
   const uint8_t *cur = (uint8_t *)s->buf_ptr;
@@ -40857,7 +40865,7 @@ arr_val_begin:
       goto fail_number;
     }
     cur = s->buf_ptr;
-    js_json_get_number(s, is_neg, val);
+    js_json_get_number(s, is_neg, val, root_scope);
     goto arr_val_end;
   }
   if (*cur == '"') {
@@ -40998,7 +41006,7 @@ obj_val_begin:
       goto fail_number;
     }
     cur = s->buf_ptr;
-    js_json_get_number(s, is_neg, val);
+    js_json_get_number(s, is_neg, val, root_scope);
     goto obj_val_end;
   }
   if (*cur == '{') {
@@ -41084,7 +41092,7 @@ single:
       goto fail_number;
     }
     cur = s->buf_ptr;
-    js_json_get_number(s, is_neg, val);
+    js_json_get_number(s, is_neg, val, root_scope);
     goto doc_end;
   }
   if (*cur == '"') {
@@ -41233,6 +41241,8 @@ QJS_STATIC LEPUSValue json_parse_value(JSParseState *s) {
         double d;
         LEPUS_ToFloat64(ctx, &d, val); /* no exception possible */
         val = LEPUS_NewFloat64(ctx, -d);
+      } else {
+        val = LEPUS_DupValue(ctx, val);
       }
       if (next_token(s)) goto fail;
       break;
@@ -41265,7 +41275,7 @@ LEPUSValue LEPUS_ParseJSON(LEPUSContext *ctx, const char *buf, size_t buf_len,
 #ifndef NO_QUICKJS_COMPILER
   CallGCFunc(JS_ParseJSONOPT, ctx, buf, buf_len, filename);
   JSParseState s1, *s = &s1;
-  LEPUSValue val;
+  LEPUSValue val = LEPUS_UNDEFINED;
   js_parse_init(ctx, s, buf, buf_len, filename);
 
   if (next_token(s)) goto fail;
@@ -41309,7 +41319,7 @@ LEPUSValue JS_ParseJSONOPT(LEPUSContext *ctx, const char *buf, size_t buf_len,
     goto fail;
   }
 
-  json_val_arr = json_parse_value(s, buf_end - cur);
+  json_val_arr = json_parse_value(s, buf_end - cur, func_scope);
   func_scope.PushHandle(json_val_arr, HANDLE_TYPE_DIR_HEAP_OBJ);
   if (json_val_arr) {
     val = make_json_object(ctx, json_val_arr);
