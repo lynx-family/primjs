@@ -1707,6 +1707,196 @@ TEST_F(CommonQjsTest, GeneratorYieldStarNormalOperation) {
   if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, ret);
 }
 
+TEST_F(CommonQjsTest, JsonParseBigIntPositive) {
+  // Verify JSON.parse correctly handles positive BigInt literals without UAF.
+  std::string src = R"(
+    var arr = JSON.parse("[1, 2n]");
+    if (arr[0] !== 1) throw new Error("arr[0] mismatch: " + arr[0]);
+    if (arr[1] !== 2n) throw new Error("arr[1] mismatch: " + arr[1]);
+    if (typeof arr[1] !== "bigint") throw new Error("type mismatch: " + typeof arr[1]);
+  )";
+  auto ret = LEPUS_Eval(ctx_, src.c_str(), src.size(), "test.js",
+                        LEPUS_EVAL_TYPE_GLOBAL);
+  if (LEPUS_IsException(ret)) {
+    std::string err = js_get_exception_string(ctx_);
+    FAIL() << err;
+  }
+  if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, ret);
+}
+
+TEST_F(CommonQjsTest, JsonParseBigIntNegative) {
+  // The is_neg path converts BigInt to float64 (LEPUS_ToFloat64 on BigInt
+  // returns NaN in PrimJS). This test verifies no crash and documents behavior.
+  std::string src = R"(
+    var arr = JSON.parse("[-3n]");
+    // Negative BigInt goes through ToFloat64 which yields NaN for BigInt
+    if (typeof arr[0] !== "number")
+      throw new Error("expected number type, got: " + typeof arr[0]);
+    if (!isNaN(arr[0]))
+      throw new Error("expected NaN for negative bigint, got: " + arr[0]);
+  )";
+  auto ret = LEPUS_Eval(ctx_, src.c_str(), src.size(), "test.js",
+                        LEPUS_EVAL_TYPE_GLOBAL);
+  if (LEPUS_IsException(ret)) {
+    std::string err = js_get_exception_string(ctx_);
+    FAIL() << err;
+  }
+  if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, ret);
+}
+
+TEST_F(CommonQjsTest, JsonParseBigIntNested) {
+  // Verify nested objects and arrays with BigInt values.
+  std::string src = R"(
+    var obj = JSON.parse('{"a": [1n, 2n], "b": {"c": 999999999999999999n}}');
+    if (obj.a[0] !== 1n) throw new Error("obj.a[0] mismatch");
+    if (obj.a[1] !== 2n) throw new Error("obj.a[1] mismatch");
+    if (typeof obj.b.c !== "bigint") throw new Error("obj.b.c type mismatch");
+  )";
+  auto ret = LEPUS_Eval(ctx_, src.c_str(), src.size(), "test.js",
+                        LEPUS_EVAL_TYPE_GLOBAL);
+  if (LEPUS_IsException(ret)) {
+    std::string err = js_get_exception_string(ctx_);
+    FAIL() << err;
+  }
+  if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, ret);
+}
+
+TEST_F(CommonQjsTest, JsonParseBigIntMixedWithRegularNumbers) {
+  // Verify no interference between regular numbers and BigInt in same parse.
+  std::string src = R"(
+    var arr = JSON.parse("[42, 3.14, 7n, 0, 123456789012345678n]");
+    if (arr[0] !== 42) throw new Error("int mismatch");
+    if (Math.abs(arr[1] - 3.14) > 1e-10) throw new Error("float mismatch");
+    if (arr[2] !== 7n) throw new Error("bigint mismatch");
+    if (arr[3] !== 0) throw new Error("zero mismatch");
+    if (typeof arr[4] !== "bigint") throw new Error("large bigint type mismatch");
+  )";
+  auto ret = LEPUS_Eval(ctx_, src.c_str(), src.size(), "test.js",
+                        LEPUS_EVAL_TYPE_GLOBAL);
+  if (LEPUS_IsException(ret)) {
+    std::string err = js_get_exception_string(ctx_);
+    FAIL() << err;
+  }
+  if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, ret);
+}
+
+TEST_F(CommonQjsTest, JsonParseErrorAfterBigIntNoLeak) {
+  // Verify error path: parse a BigInt then hit invalid trailing content.
+  // The error path must free the DupValue'd BigInt without leaking.
+  std::string src = R"(
+    var caught = false;
+    try {
+      JSON.parse("[1n, ]");
+    } catch (e) {
+      caught = true;
+    }
+    if (!caught) throw new Error("should have thrown on trailing comma");
+  )";
+  auto ret = LEPUS_Eval(ctx_, src.c_str(), src.size(), "test.js",
+                        LEPUS_EVAL_TYPE_GLOBAL);
+  if (LEPUS_IsException(ret)) {
+    std::string err = js_get_exception_string(ctx_);
+    FAIL() << err;
+  }
+  if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, ret);
+}
+
+TEST_F(CommonQjsTest, JsonParseErrorMidArrayAfterNumbers) {
+  // Verify error path: multiple numbers parsed, then invalid content.
+  std::string src = R"(
+    var caught = false;
+    try {
+      JSON.parse("[1n, 2n, 3n invalid");
+    } catch (e) {
+      caught = true;
+    }
+    if (!caught) throw new Error("should have thrown on invalid content");
+  )";
+  auto ret = LEPUS_Eval(ctx_, src.c_str(), src.size(), "test.js",
+                        LEPUS_EVAL_TYPE_GLOBAL);
+  if (LEPUS_IsException(ret)) {
+    std::string err = js_get_exception_string(ctx_);
+    FAIL() << err;
+  }
+  if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, ret);
+}
+
+TEST_F(CommonQjsTest, JsonParseErrorAfterDocumentEnd) {
+  // Verify error path: valid number followed by unexpected trailing content.
+  std::string src = R"(
+    var caught = false;
+    try {
+      JSON.parse("42n extra");
+    } catch (e) {
+      caught = true;
+    }
+    if (!caught) throw new Error("should have thrown on trailing content");
+  )";
+  auto ret = LEPUS_Eval(ctx_, src.c_str(), src.size(), "test.js",
+                        LEPUS_EVAL_TYPE_GLOBAL);
+  if (LEPUS_IsException(ret)) {
+    std::string err = js_get_exception_string(ctx_);
+    FAIL() << err;
+  }
+  if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, ret);
+}
+
+TEST_F(CommonQjsTest, JsonParseNormalNumbersNoRegression) {
+  // Verify regular JSON parsing is unaffected by the fix.
+  std::string src = R"(
+    var obj = JSON.parse('{"a": 1, "b": 2.5, "c": -3, "d": [0, 1e10]}');
+    if (obj.a !== 1) throw new Error("a mismatch");
+    if (obj.b !== 2.5) throw new Error("b mismatch");
+    if (obj.c !== -3) throw new Error("c mismatch");
+    if (obj.d[0] !== 0) throw new Error("d[0] mismatch");
+    if (obj.d[1] !== 1e10) throw new Error("d[1] mismatch");
+  )";
+  auto ret = LEPUS_Eval(ctx_, src.c_str(), src.size(), "test.js",
+                        LEPUS_EVAL_TYPE_GLOBAL);
+  if (LEPUS_IsException(ret)) {
+    std::string err = js_get_exception_string(ctx_);
+    FAIL() << err;
+  }
+  if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, ret);
+}
+
+TEST_F(CommonQjsTest, JsonParseRepeatedCallsNoCumulativeLeak) {
+  // Stress test: repeated parse with BigInt to catch cumulative leaks.
+  std::string src = R"(
+    for (var i = 0; i < 1000; i++) {
+      var r = JSON.parse("[" + i + "n]");
+      if (r[0] !== BigInt(i)) throw new Error("mismatch at " + i);
+    }
+  )";
+  auto ret = LEPUS_Eval(ctx_, src.c_str(), src.size(), "test.js",
+                        LEPUS_EVAL_TYPE_GLOBAL);
+  if (LEPUS_IsException(ret)) {
+    std::string err = js_get_exception_string(ctx_);
+    FAIL() << err;
+  }
+  if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, ret);
+}
+
+TEST_F(CommonQjsTest, JsonParseRepeatedErrorsNoCumulativeLeak) {
+  // Stress test: repeated parse failures with BigInt to catch error-path leaks.
+  std::string src = R"(
+    for (var i = 0; i < 1000; i++) {
+      try {
+        JSON.parse("[" + i + "n, ]");
+      } catch (e) {
+        // expected
+      }
+    }
+  )";
+  auto ret = LEPUS_Eval(ctx_, src.c_str(), src.size(), "test.js",
+                        LEPUS_EVAL_TYPE_GLOBAL);
+  if (LEPUS_IsException(ret)) {
+    std::string err = js_get_exception_string(ctx_);
+    FAIL() << err;
+  }
+  if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, ret);
+}
+
 TEST_F(CommonQjsTest, AsyncGeneratorStaleReactionNoUAF) {
   // Bug #4: An async generator's await reaction could fire after the generator
   // was reentrantly completed, writing into freed frame memory. The fix checks
