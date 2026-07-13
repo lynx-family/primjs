@@ -1,6 +1,6 @@
-# Copyright 2024 The Lynx Authors. All rights reserved.
-# Licensed under the Apache License Version 2.0 that can be found in the
-# LICENSE file in the root directory of this source tree.
+# Copyright 2024 The Lynx Authors. All rights reserved. Licensed under the
+# Apache License Version 2.0 that can be found in the LICENSE file in the root
+# directory of this source tree.
 
 cmake_minimum_required(VERSION 3.10.1)
 
@@ -9,6 +9,8 @@ project("primjs")
 enable_language(C CXX ASM)
 set(CMAKE_CXX_STANDARD 17)
 set(REGEX_TRUE "True|true|TRUE|1")
+
+set(VM_ROOT_DIR "${CMAKE_SOURCE_DIR}")
 
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE "Release")
@@ -34,6 +36,7 @@ option(ENABLE_ASAN "Enable address sanitizer" OFF)
 option(ENABLE_UNITTESTS "Enable build unittests" OFF)
 option(ENABLE_BUILD_AAR "Enable build aar" OFF)
 option(ENABLE_VIRTUAL_STACK "Enable use virtual sp" OFF)
+option(ENABLE_GEN_EMBEDDED "Enable gen snapshot assemble file " OFF)
 
 set(CMAKE_COMMON_FLAGS
     "${CMAKE_COMMON_FLAGS} -Os -fPIC -ffunction-sections -fdata-sections \
@@ -91,7 +94,9 @@ endif()
 
 if(${ENABLE_LEPUSNG_BYTECODE_OPT})
   if(NOT ${ENABLE_LEPUSNG})
-    message(WARNING "ENABLE_LEPUSNG_BYTECODE_OPT requires ENABLE_LEPUSNG, forcing OFF")
+    message(
+      WARNING "ENABLE_LEPUSNG_BYTECODE_OPT requires ENABLE_LEPUSNG, forcing OFF"
+    )
     set(ENABLE_LEPUSNG_BYTECODE_OPT OFF)
   endif()
 endif()
@@ -112,28 +117,34 @@ if(ENABLE_PRIMJS_HARMONY)
   add_definitions(-DUSE_PRIMJS_NAPI)
   add_definitions(-DGNU_SUPPORT=1)
 else()
-if(CMAKE_SYSTEM_NAME STREQUAL "Android")
-  set(PLATFORM_ABI ${ANDROID_ABI})
-  add_definitions(-DOS_ANDROID=1)
+  if(CMAKE_SYSTEM_NAME STREQUAL "Android")
+    set(PLATFORM_ABI ${ANDROID_ABI})
+    add_definitions(-DOS_ANDROID=1)
+  endif()
 endif()
-endif()
-
 
 # primjs snapshot version
-if(${ENABLE_COMPATIBLE_MM} AND (${PLATFORM_ABI} MATCHES "arm64"))
+if((${ENABLE_COMPATIBLE_MM} AND (${PLATFORM_ABI} MATCHES "arm64"))
+   OR (${ENABLE_GEN_EMBEDDED}))
   add_definitions(-DENABLE_PRIMJS_SNAPSHOT)
   add_definitions(-DENABLE_COMPATIBLE_MM)
-  if (ENABLE_TT_ANDROID_MODE MATCHES ${REGEX_TRUE})
+  if(ENABLE_TT_ANDROID_MODE MATCHES ${REGEX_TRUE})
     add_definitions(-DENABLE_TT_ANDROID_MODE)
   endif()
+  set(primjs_embedded_sources
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/primjs/interp/call_stub.cc)
   if(${ENABLE_QUICKJS_DEBUGGER})
     set(primjs_embedded_sources
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/primjs/android/embedded-inspector.S
+        ${primjs_embedded_sources}
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/primjs/interp/android/embedded-inspector.S
     )
   else()
     set(primjs_embedded_sources
-        ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/primjs/android/embedded.S)
+        ${primjs_embedded_sources}
+        ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/primjs/interp/android/embedded.S
+    )
   endif()
+  add_subdirectory(src/interpreter/primjs/interp)
 endif()
 
 # armeabi can't use fenv.h/fesetround()
@@ -185,7 +196,8 @@ set(quickjs_sources
     ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/quickjs_version.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/quickjs-libc.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/quickjs.cc
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/quickjs-opt-bytecode.cc)
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/quickjs-opt-bytecode.cc
+)
 
 set(heapprofiler_sources
     ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/heapprofiler/edge.cc
@@ -227,9 +239,9 @@ set(napi_sources
     ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/napi.cc)
 
 if(ENABLE_PRIMJS_HARMONY)
-set(primjs_harmony_napi_source
-    ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/harmony/js_native_api_harmony.cc)
-set(napi_sources ${napi_sources} ${primjs_harmony_napi_source})
+  set(primjs_harmony_napi_source
+      ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/harmony/js_native_api_harmony.cc)
+  set(napi_sources ${napi_sources} ${primjs_harmony_napi_source})
 endif()
 
 if(${ENABLE_CODECACHE})
@@ -246,18 +258,23 @@ endif()
 set(napi_v8_sources ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/v8/js_native_api_v8.cc)
 
 set(WEAK_NODE_API_GENERATED_CPP
-    ${CMAKE_CURRENT_SOURCE_DIR}/packages/weak-node-api/generated/weak_node_api.cpp)
+    ${CMAKE_CURRENT_SOURCE_DIR}/packages/weak-node-api/generated/weak_node_api.cpp
+)
 set(napi_adapter_sources
     ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/adapter/js_native_api_adapter.cc)
 
 if(EXISTS ${WEAK_NODE_API_GENERATED_CPP})
-  list(APPEND napi_adapter_sources
-       ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/adapter/weak_napi_host_generator.cc
-       ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/adapter/weak_napi_host_injector.cc
-       ${WEAK_NODE_API_GENERATED_CPP})
+  list(
+    APPEND
+    napi_adapter_sources
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/adapter/weak_napi_host_generator.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/adapter/weak_napi_host_injector.cc
+    ${WEAK_NODE_API_GENERATED_CPP})
 else()
-  message(STATUS
-          "weak-node-api generated sources not found, skip weak-node-api adapter integration")
+  message(
+    STATUS
+      "weak-node-api generated sources not found, skip weak-node-api adapter integration"
+  )
 endif()
 
 include_directories(
@@ -278,7 +295,7 @@ if(EXISTS ${WEAK_NODE_API_GENERATED_CPP})
     ${CMAKE_CURRENT_SOURCE_DIR}/packages/weak-node-api/defs_header)
 endif()
 
-if (ENABLE_PRIMJS_HARMONY)
+if(ENABLE_PRIMJS_HARMONY)
   get_filename_component(PARENT_PARENT_DIR ${CMAKE_SOURCE_DIR}/../.. ABSOLUTE)
   get_filename_component(PARENT_PARENT_DIR_NAME ${PARENT_PARENT_DIR} NAME)
   if(PARENT_PARENT_DIR_NAME STREQUAL "primjs")
@@ -334,10 +351,12 @@ if(ENABLE_BUILD_AAR)
   add_library(napi SHARED ${napi_sources})
   add_library(napi_v8 SHARED ${napi_v8_sources})
   add_library(napi_adapter SHARED ${napi_adapter_sources})
-  if (ENABLE_PRIMJS_HARMONY)
+  if(ENABLE_PRIMJS_HARMONY)
     find_library(log_lib "hilog_ndk.z")
     find_library(libm m)
-    set(JS_V8_LIBRARY ${CMAKE_SOURCE_DIR}/../../../v8so/harmony/libs/${OHOS_ARCH}/libv8_libfull.so)
+    set(JS_V8_LIBRARY
+        ${CMAKE_SOURCE_DIR}/../../../v8so/harmony/libs/${OHOS_ARCH}/libv8_libfull.so
+    )
   else()
     find_library(log_lib log)
     set(JS_V8_LIBRARY ${JS_V8_LIBRARY}/${ANDROID_ABI}/libv8_libfull.cr.so)
@@ -345,7 +364,7 @@ if(ENABLE_BUILD_AAR)
 
   target_link_libraries(quick ${log_lib})
   target_link_libraries(napi quick ${log_lib})
-  if (ENABLE_PRIMJS_HARMONY)
+  if(ENABLE_PRIMJS_HARMONY)
     target_link_libraries(napi ${libm} libace_napi.z.so libjsvm.so)
   endif()
   target_include_directories(napi_v8 PRIVATE ${JS_V8_HEADERS})
@@ -430,6 +449,10 @@ if(WIN32)
     /DEBUG)
 endif()
 
+if(ENABLE_GEN_EMBEDDED)
+  add_subdirectory(src/interpreter/primjs/codegen)
+endif()
+
 if(ENABLE_UNITTESTS)
   # qjs and run-test262 link the pre-built quickjs static library rather than
   # re-compiling all quickjs sources, avoiding duplicate compilation and
@@ -437,10 +460,14 @@ if(ENABLE_UNITTESTS)
   set(qjs_sources ${CMAKE_CURRENT_SOURCE_DIR}/testing/quickjs/compiler/qjs.cc)
   set(test262_sources
       ${CMAKE_CURRENT_SOURCE_DIR}/testing/quickjs/run-test262.cc)
-  add_executable(run-test262 ${test262_sources})
-  target_link_libraries(run-test262 quickjs)
   add_executable(qjs ${qjs_sources})
+  add_executable(run-test262 ${test262_sources})
   target_link_libraries(qjs quickjs)
+  target_link_libraries(run-test262 quickjs)
+  if(ENABLE_PRIMJS_SNAPSHOT)
+    target_link_libraries(qjs primjs_static)
+    target_link_libraries(run-test262 primjs_static)
+  endif()
   set_target_properties(qjs run-test262 PROPERTIES RUNTIME_OUTPUT_DIRECTORY
                                                    ${CMAKE_BINARY_DIR})
 endif()

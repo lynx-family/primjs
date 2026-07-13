@@ -746,6 +746,8 @@ enum {
 };
 
 struct FinalizationRegistryContext;
+constexpr size_t kFunctionShapeLengthNamePrototype = 0;
+constexpr size_t kFunctionShapeLengthName = 1;
 constexpr size_t kFunctionShapeSize = 2;
 struct WeakRefData;
 struct FinalizationRegistryData;
@@ -801,6 +803,10 @@ struct LEPUSContext {
   // <Primjs begin>
   int64_t napi_env;
   BOOL no_lepus_strict_mode;
+#if defined(ENABLE_VIRTUAL_STACK) || defined(ENABLE_PRIMJS_SNAPSHOT)
+  uint8_t *stack_limit;
+  uint8_t *stack_pos;
+#endif
 #ifdef ENABLE_QUICKJS_DEBUGGER
   LEPUSDebuggerInfo *debugger_info;  // structure for quickjs debugger
 #endif
@@ -1009,12 +1015,6 @@ typedef struct LEPUSFunctionBytecode {
   int cpool_count;
   int closure_var_count;
 
-#ifdef ENABLE_QUICKJS_DEBUGGER
-  DebuggerFuncLevelState func_level_state;
-  struct list_head link; /*ctx->debugger_info->bytecode_list*/
-  LEPUSScriptSource *script;
-  int32_t bp_num;
-#endif
   // <Primjs begin>
   struct list_head gc_link;
   uint32_t function_id;  // for lepusNG debugger encode
@@ -1025,6 +1025,12 @@ typedef struct LEPUSFunctionBytecode {
   uint32_t *coverage_counters;
   JSCoverageSlot *coverage_slots;
   struct JSCoverageInfo *coverage_info;
+#ifdef ENABLE_QUICKJS_DEBUGGER
+  struct list_head link; /*ctx->debugger_info->bytecode_list*/
+  LEPUSScriptSource *script;
+  DebuggerFuncLevelState func_level_state;
+  int32_t bp_num;
+#endif
   // <Primjs end>
   struct {
     /* debug info, move to separate structure to save memory? */
@@ -1103,11 +1109,26 @@ typedef struct JSTypedArray {
   uint32_t length;       /* length in the array buffer */
 } JSTypedArray;
 
+typedef struct QuickCFrameStruct {
+  LEPUSValue this_obj;
+  LEPUSValue new_target;
+  JSVarRef **var_refs_cache;
+  LEPUSValue *cpool;
+  int32_t argc;
+  int32_t padding0;
+  void *padding1;
+  void *last_frame;
+  void *last_lr;
+} QuickCFrameStruct;
+
 typedef struct JSAsyncFunctionState {
   LEPUSValue this_val; /* 'this' generator argument */
   int argc;            /* number of function arguments */
   BOOL throw_flag;     /* used to throw an exception in JS_CallInternal() */
   LEPUSStackFrame frame;
+#ifdef ENABLE_PRIMJS_SNAPSHOT
+  QuickCFrameStruct cframe;
+#endif
   list_head link;
 #ifdef ENABLE_PRIMJS_SNAPSHOT
   LEPUSValue *_arg_buf;
@@ -1762,28 +1783,13 @@ QJS_STATIC inline JSSeparableString *JS_GetSeparableString(LEPUSValue val) {
   return reinterpret_cast<JSSeparableString *>(LEPUS_VALUE_GET_PTR(val));
 }
 
-LEPUSValue JS_GetSeparableStringContent(LEPUSContext *ctx, LEPUSValue val);
-LEPUSValue JS_GetSeparableStringContentNotDup(LEPUSContext *ctx,
-                                              LEPUSValue val);
-
-QJS_HIDE LEPUSValue JS_GetPropertyInternalImpl(LEPUSContext *ctx,
-                                               LEPUSValueConst obj, JSAtom prop,
-                                               LEPUSValueConst this_obj,
-                                               BOOL throw_ref_error);
 QJS_HIDE LEPUSValue JS_GetPropertyInternalImpl_GC(LEPUSContext *ctx,
                                                   LEPUSValueConst obj,
                                                   JSAtom prop,
                                                   LEPUSValueConst this_obj,
                                                   BOOL throw_ref_error);
-QJS_HIDE void prim_js_print_gc(const char *msg);
-QJS_HIDE void prim_js_print_register_gc(uint64_t reg_val);
-QJS_HIDE void prim_js_print_trace_gc(int bytecode, int tos);
-QJS_HIDE void prim_js_print_func_gc(LEPUSContext *ctx, LEPUSValue func_obj);
-
-QJS_HIDE LEPUSValue js_closure(LEPUSContext *ctx, LEPUSValue bfunc,
-                               JSVarRef **cur_var_refs, LEPUSStackFrame *sf);
-LEPUSValue js_closure_gc(LEPUSContext *ctx, LEPUSValue bfunc,
-                         JSVarRef **cur_var_refs, LEPUSStackFrame *sf);
+QJS_HIDE LEPUSValue js_closure_gc(LEPUSContext *ctx, LEPUSValue bfunc,
+                                  JSVarRef **cur_var_refs, LEPUSStackFrame *sf);
 
 QJS_HIDE void DebuggerPause(LEPUSContext *ctx, LEPUSValue val,
                             const uint8_t *pc);
@@ -1793,172 +1799,99 @@ QJS_HIDE void DebuggerCallEachOp(LEPUSContext *ctx, const uint8_t *pc,
 
 QJS_HIDE void DebuggerCallEachFunc(LEPUSContext *ctx, const uint8_t *pc);
 
-QJS_HIDE LEPUSValue __JS_AtomToValue(LEPUSContext *ctx, JSAtom atom,
-                                     BOOL force_string);
 QJS_HIDE LEPUSValue __JS_AtomToValue_GC(LEPUSContext *ctx, JSAtom atom,
                                         BOOL force_string);
-QJS_HIDE BOOL js_check_stack_overflow(LEPUSContext *ctx, size_t alloca_size);
 QJS_HIDE LEPUSValue JS_ThrowStackOverflow(LEPUSContext *ctx);
-QJS_HIDE LEPUSValue JS_ThrowStackOverflow_GC(LEPUSContext *ctx);
 QJS_HIDE void build_backtrace(
     LEPUSContext *ctx, LEPUSValueConst error_obj, const char *filename,
     /* <Primjs begin> */ int64_t line_num, /* <Primjs end> */
     const uint8_t *cur_pc, int backtrace_flags, uint8_t is_parse_error = 0);
-QJS_HIDE LEPUSValue JS_NewSymbolFromAtom(LEPUSContext *ctx, JSAtom descr,
-                                         int atom_type);
 QJS_HIDE LEPUSValue JS_NewSymbolFromAtom_GC(LEPUSContext *ctx, JSAtom descr,
                                             int atom_type);
 QJS_HIDE LEPUSValue JS_ToObject_GC(LEPUSContext *ctx, LEPUSValueConst val);
 QJS_HIDE LEPUSValue PRIM_JS_NewObject_GC(LEPUSContext *ctx);
-QJS_HIDE LEPUSValue js_build_arguments(LEPUSContext *ctx, int argc,
-                                       LEPUSValueConst *argv);
 QJS_HIDE LEPUSValue js_build_arguments_gc(LEPUSContext *ctx, int argc,
                                           LEPUSValueConst *argv);
-QJS_HIDE LEPUSValue js_build_mapped_arguments(LEPUSContext *ctx, int argc,
-                                              LEPUSValueConst *argv,
-                                              LEPUSStackFrame *sf,
-                                              int arg_count);
 QJS_HIDE LEPUSValue js_build_mapped_arguments_gc(LEPUSContext *ctx, int argc,
                                                  LEPUSValueConst *argv,
                                                  LEPUSStackFrame *sf,
                                                  int arg_count);
 QJS_HIDE void prim_close_var_refs_gc(LEPUSContext *ctx, LEPUSStackFrame *sf);
-QJS_HIDE LEPUSValue js_build_rest(LEPUSContext *ctx, int first, int argc,
-                                  LEPUSValueConst *argv);
 QJS_HIDE LEPUSValue js_build_rest_gc(LEPUSContext *ctx, int first, int argc,
                                      LEPUSValueConst *argv);
-QJS_HIDE LEPUSValue js_function_apply(LEPUSContext *ctx,
-                                      LEPUSValueConst this_val, int argc,
-                                      LEPUSValueConst *argv, int magic);
 QJS_HIDE LEPUSValue js_function_apply_gc(LEPUSContext *ctx,
                                          LEPUSValueConst this_val, int argc,
                                          LEPUSValueConst *argv, int magic);
-QJS_HIDE int JS_CheckBrand(LEPUSContext *ctx, LEPUSValueConst obj,
-                           LEPUSValueConst func);
 QJS_HIDE int JS_CheckBrand_GC(LEPUSContext *ctx, LEPUSValueConst obj,
                               LEPUSValueConst func);
-QJS_HIDE int JS_AddBrand(LEPUSContext *ctx, LEPUSValueConst obj,
-                         LEPUSValueConst home_obj);
 QJS_HIDE int JS_AddBrand_GC(LEPUSContext *ctx, LEPUSValueConst obj,
                             LEPUSValueConst home_obj);
 QJS_HIDE int JS_ThrowTypeErrorReadOnly(LEPUSContext *ctx, int flags,
                                        JSAtom atom);
-QJS_HIDE LEPUSValue JS_ThrowSyntaxErrorVarRedeclaration(LEPUSContext *ctx,
-                                                        JSAtom prop);
 QJS_HIDE LEPUSValue JS_ThrowSyntaxErrorVarRedeclaration_GC(LEPUSContext *ctx,
                                                            JSAtom prop);
-QJS_HIDE LEPUSValue JS_ThrowReferenceErrorUninitialized(LEPUSContext *ctx,
-                                                        JSAtom name);
 QJS_HIDE LEPUSValue JS_ThrowReferenceErrorUninitialized_GC(LEPUSContext *ctx,
                                                            JSAtom name);
 QJS_HIDE int JS_IteratorClose(LEPUSContext *ctx, LEPUSValueConst enum_obj,
                               BOOL is_exception_pending);
 
-QJS_HIDE LEPUSValue JS_CallConstructorInternal(LEPUSContext *ctx,
-                                               LEPUSValueConst func_obj,
-                                               LEPUSValueConst new_target,
-                                               int argc, LEPUSValue *argv,
-                                               int flags);
 QJS_HIDE LEPUSValue JS_CallConstructorInternal_GC(LEPUSContext *ctx,
                                                   LEPUSValueConst func_obj,
                                                   LEPUSValueConst new_target,
                                                   int argc, LEPUSValue *argv,
                                                   int flags);
-QJS_HIDE int JS_CheckGlobalVar(LEPUSContext *ctx, JSAtom prop);
 QJS_HIDE int JS_CheckGlobalVar_GC(LEPUSContext *ctx, JSAtom prop);
-QJS_HIDE LEPUSValue JS_GetPropertyValue(LEPUSContext *ctx,
-                                        LEPUSValueConst this_obj,
-                                        LEPUSValue prop);
-
 QJS_HIDE LEPUSValue JS_GetPropertyValue_GC(LEPUSContext *ctx,
                                            LEPUSValueConst this_obj,
                                            LEPUSValue prop);
-QJS_HIDE int JS_DefineGlobalVar(LEPUSContext *ctx, JSAtom prop, int def_flags);
 QJS_HIDE int JS_DefineGlobalVar_GC(LEPUSContext *ctx, JSAtom prop,
                                    int def_flags);
-QJS_HIDE LEPUSValue PRIM_JS_NewArray_GC(LEPUSContext *ctx);
-
-QJS_HIDE LEPUSValue js_regexp_constructor_internal(LEPUSContext *ctx,
-                                                   LEPUSValueConst ctor,
-                                                   LEPUSValue pattern,
-                                                   LEPUSValue bc);
 QJS_HIDE LEPUSValue js_regexp_constructor_internal_gc(LEPUSContext *ctx,
                                                       LEPUSValueConst ctor,
                                                       LEPUSValue pattern,
                                                       LEPUSValue bc);
-QJS_HIDE int JS_SetPropertyValue(LEPUSContext *ctx, LEPUSValueConst this_obj,
-                                 LEPUSValue prop, LEPUSValue val, int flags);
 QJS_HIDE int JS_SetPropertyValue_GC(LEPUSContext *ctx, LEPUSValueConst this_obj,
                                     LEPUSValue prop, LEPUSValue val, int flags);
-QJS_HIDE int JS_CheckDefineGlobalVar(LEPUSContext *ctx, JSAtom prop, int flags);
 QJS_HIDE int JS_CheckDefineGlobalVar_GC(LEPUSContext *ctx, JSAtom prop,
                                         int flags);
-QJS_HIDE int JS_DefineGlobalFunction(LEPUSContext *ctx, JSAtom prop,
-                                     LEPUSValueConst func, int def_flags);
 QJS_HIDE int JS_DefineGlobalFunction_GC(LEPUSContext *ctx, JSAtom prop,
                                         LEPUSValueConst func, int def_flags);
-QJS_HIDE LEPUSValue JS_GetPrivateField(LEPUSContext *ctx, LEPUSValueConst obj,
-                                       LEPUSValueConst name);
 QJS_HIDE LEPUSValue JS_GetPrivateField_GC(LEPUSContext *ctx,
                                           LEPUSValueConst obj,
                                           LEPUSValueConst name);
-QJS_HIDE int JS_DefinePrivateField(LEPUSContext *ctx, LEPUSValueConst obj,
-                                   LEPUSValueConst name, LEPUSValue val);
 QJS_HIDE int JS_DefinePrivateField_GC(LEPUSContext *ctx, LEPUSValueConst obj,
                                       LEPUSValueConst name, LEPUSValue val);
 QJS_HIDE int JS_DefineObjectName(LEPUSContext *ctx, LEPUSValueConst obj,
                                  JSAtom name, int flags);
-QJS_HIDE int JS_DefineObjectNameComputed(LEPUSContext *ctx, LEPUSValueConst obj,
-                                         LEPUSValueConst str, int flags);
 QJS_HIDE int JS_DefineObjectNameComputed_GC(LEPUSContext *ctx,
                                             LEPUSValueConst obj,
                                             LEPUSValueConst str, int flags);
-QJS_HIDE int JS_SetPrototypeInternal(LEPUSContext *ctx, LEPUSValueConst obj,
-                                     LEPUSValueConst proto_val,
-                                     BOOL throw_flag);
 QJS_HIDE int JS_SetPrototypeInternal_GC(LEPUSContext *ctx, LEPUSValueConst obj,
                                         LEPUSValueConst proto_val,
                                         BOOL throw_flag);
-QJS_HIDE void js_method_set_home_object(LEPUSContext *ctx,
-                                        LEPUSValueConst func_obj,
-                                        LEPUSValueConst home_obj);
 QJS_HIDE void js_method_set_home_object_gc(LEPUSContext *ctx,
                                            LEPUSValueConst func_obj,
                                            LEPUSValueConst home_obj);
-QJS_HIDE int JS_DefinePropertyValueValue(LEPUSContext *ctx,
-                                         LEPUSValueConst this_obj,
-                                         LEPUSValue prop, LEPUSValue val,
-                                         int flags);
 QJS_HIDE int JS_DefinePropertyValueValue_GC(LEPUSContext *ctx,
                                             LEPUSValueConst this_obj,
                                             LEPUSValue prop, LEPUSValue val,
                                             int flags);
-QJS_HIDE __exception int js_append_enumerate(LEPUSContext *ctx, LEPUSValue *sp);
 QJS_HIDE __exception int js_append_enumerate_gc(LEPUSContext *ctx,
                                                 LEPUSValue *sp);
-QJS_HIDE int js_method_set_properties(LEPUSContext *ctx,
-                                      LEPUSValueConst func_obj, JSAtom name,
-                                      int flags, LEPUSValueConst home_obj);
 QJS_HIDE int js_method_set_properties_gc(LEPUSContext *ctx,
                                          LEPUSValueConst func_obj, JSAtom name,
                                          int flags, LEPUSValueConst home_obj);
 QJS_HIDE int prim_js_copy_data_properties_gc(LEPUSContext *ctx, LEPUSValue *sp,
                                              int mask);
-QJS_HIDE int JS_ToBoolFree(LEPUSContext *ctx, LEPUSValue val);
 QJS_HIDE int JS_ToBoolFree_GC(LEPUSContext *ctx, LEPUSValue val);
 QJS_HIDE int js_op_define_class(LEPUSContext *ctx, LEPUSValue *sp,
                                 JSAtom class_name, int class_flags,
                                 JSVarRef **cur_var_refs, LEPUSStackFrame *sf);
 QJS_HIDE void close_lexical_var(LEPUSContext *ctx, LEPUSStackFrame *sf,
                                 int idx);
-QJS_HIDE int JS_SetPropertyGeneric(LEPUSContext *ctx, LEPUSObject *p,
-                                   JSAtom prop, LEPUSValue val,
-                                   LEPUSValueConst this_obj, int flags);
 QJS_HIDE int JS_SetPropertyGeneric_GC(LEPUSContext *ctx, LEPUSObject *p,
                                       JSAtom prop, LEPUSValue val,
                                       LEPUSValueConst this_obj, int flags);
-QJS_HIDE int JS_SetPrivateField(LEPUSContext *ctx, LEPUSValueConst obj,
-                                LEPUSValueConst name, LEPUSValue val);
 QJS_HIDE int JS_SetPrivateField_GC(LEPUSContext *ctx, LEPUSValueConst obj,
                                    LEPUSValueConst name, LEPUSValue val);
 QJS_HIDE LEPUSValue JS_ThrowTypeErrorNotAnObject(LEPUSContext *ctx);
@@ -1976,45 +1909,25 @@ QJS_HIDE JSPropertyGC *add_property_gc(LEPUSContext *ctx, LEPUSObject *p,
                                        JSAtom prop, int prop_flags);
 QJS_HIDE void prim_HeapObjStoreLEPUSValue(void *fieldAddr, LEPUSValue value);
 QJS_HIDE void prim_WriteBarrierNoStore(LEPUSValue value, LEPUSContext *ctx);
-QJS_HIDE void prim_HeapObjStorePtr(void *dstObj, address_t offset, void *value);
-QJS_HIDE LEPUSValue js_get_length(LEPUSContext *ctx, LEPUSValueConst obj);
-
-QJS_HIDE LEPUSValue js_get_length(LEPUSContext *ctx, LEPUSValueConst obj);
 QJS_HIDE LEPUSValue prim_js_op_eval_gc(LEPUSContext *ctx, int scope_idx,
                                        LEPUSValue op1);
 
-QJS_HIDE LEPUSValue JS_GetGlobalVarImpl(LEPUSContext *ctx, JSAtom prop,
-                                        BOOL throw_ref_error);
 QJS_HIDE LEPUSValue JS_GetGlobalVarImpl_GC(LEPUSContext *ctx, JSAtom prop,
                                            BOOL throw_ref_error);
-QJS_HIDE int JS_GetGlobalVarRef(LEPUSContext *ctx, JSAtom prop, LEPUSValue *sp);
 QJS_HIDE int JS_GetGlobalVarRef_GC(LEPUSContext *ctx, JSAtom prop,
                                    LEPUSValue *sp);
 QJS_HIDE LEPUSValue prim_js_for_in_start_gc(LEPUSContext *ctx, LEPUSValue op);
-QJS_HIDE int js_for_in_next(LEPUSContext *ctx, LEPUSValue *sp);
 QJS_HIDE int js_for_in_next_gc(LEPUSContext *ctx, LEPUSValue *sp);
-QJS_HIDE int js_for_await_of_next(LEPUSContext *ctx, LEPUSValue *sp);
 QJS_HIDE int js_for_await_of_next_gc(LEPUSContext *ctx, LEPUSValue *sp);
-QJS_HIDE int js_iterator_get_value_done(LEPUSContext *ctx, LEPUSValue *sp);
 QJS_HIDE int js_iterator_get_value_done_gc(LEPUSContext *ctx, LEPUSValue *sp);
-QJS_HIDE int js_for_of_start(LEPUSContext *ctx, LEPUSValue *sp, BOOL is_async);
 QJS_HIDE int js_for_of_start_gc(LEPUSContext *ctx, LEPUSValue *sp,
                                 BOOL is_async);
-QJS_HIDE int js_for_of_next(LEPUSContext *ctx, LEPUSValue *sp, int offset);
 QJS_HIDE int js_for_of_next_gc(LEPUSContext *ctx, LEPUSValue *sp, int offset);
-QJS_HIDE LEPUSValue *prim_js_iterator_close_return_gc(LEPUSContext *ctx,
-                                                      LEPUSValue *sp);
 QJS_HIDE int prim_js_async_iterator_close_gc(LEPUSContext *ctx, LEPUSValue *sp);
 QJS_HIDE int prim_js_async_iterator_get_gc(LEPUSContext *ctx, LEPUSValue *sp,
                                            int flags);
 QJS_HIDE LEPUSValue primjs_get_super_ctor_gc(LEPUSContext *ctx, LEPUSValue op);
 
-QJS_HIDE LEPUSValue JS_ToPrimitiveFree(LEPUSContext *ctx, LEPUSValue val,
-                                       int hint);
-QJS_HIDE LEPUSValue JS_ToPrimitiveFree_GC(LEPUSContext *ctx, LEPUSValue val,
-                                          int hint);
-QJS_HIDE LEPUSValue JS_ConcatString(LEPUSContext *ctx, LEPUSValue op1,
-                                    LEPUSValue op2);
 QJS_HIDE LEPUSValue JS_ConcatString_GC(LEPUSContext *ctx, LEPUSValue op1,
                                        LEPUSValue op2);
 QJS_HIDE LEPUSValue prim_js_unary_arith_slow_gc(LEPUSContext *ctx,
@@ -2026,7 +1939,6 @@ QJS_HIDE no_inline LEPUSValue prim_js_not_slow_gc(LEPUSContext *ctx,
 QJS_HIDE LEPUSValue prim_js_binary_arith_slow_gc(LEPUSContext *ctx,
                                                  LEPUSValue op1, LEPUSValue op2,
                                                  OPCodeEnum op);
-QJS_HIDE double prim_js_fmod_double_gc(double a, double b);
 QJS_HIDE int js_post_inc_slow_gc(LEPUSContext *ctx, LEPUSValue *sp,
                                  OPCodeEnum op);
 QJS_HIDE LEPUSValue prim_js_binary_logic_slow_gc(LEPUSContext *ctx,
@@ -2049,26 +1961,44 @@ QJS_HIDE __exception int js_operator_typeof_gc(LEPUSContext *ctx,
                                                LEPUSValue op1);
 QJS_HIDE LEPUSValue prim_js_operator_delete_gc(LEPUSContext *ctx,
                                                LEPUSValue op1, LEPUSValue op2);
-QJS_HIDE int JS_SetPropertyInternalImpl(LEPUSContext *ctx,
-                                        LEPUSValueConst this_obj, JSAtom prop,
-                                        LEPUSValue val, int flags);
 QJS_HIDE int JS_SetPropertyInternalImpl_GC(LEPUSContext *ctx,
                                            LEPUSValueConst this_obj,
                                            JSAtom prop, LEPUSValue val,
                                            int flags);
 
-QJS_HIDE int set_array_length(LEPUSContext *ctx, LEPUSObject *p, LEPUSValue val,
-                              int flags);
+QJS_HIDE int add_fast_array_element_gc(LEPUSContext *ctx, LEPUSObject *p,
+                                       LEPUSValue val, int flags);
 
-QJS_HIDE BOOL JS_IsUncatchableError(LEPUSContext *ctx, LEPUSValueConst val);
 QJS_HIDE BOOL JS_IsUncatchableError_GC(LEPUSContext *ctx, LEPUSValueConst val);
-QJS_HIDE JSAtom js_value_to_atom(LEPUSContext *ctx, LEPUSValueConst val);
 QJS_HIDE JSAtom js_value_to_atom_gc(LEPUSContext *ctx, LEPUSValueConst val);
-QJS_HIDE LEPUSValue JS_ThrowReferenceErrorNotDefined(LEPUSContext *ctx,
-                                                     JSAtom name);
 QJS_HIDE LEPUSValue JS_ThrowReferenceErrorNotDefined_GC(LEPUSContext *ctx,
                                                         JSAtom name);
-LEPUSValue JS_ThrowTypeErrorNotFunction(LEPUSContext *ctx);
+QJS_HIDE LEPUSValue JS_ThrowTypeErrorNotFunction(LEPUSContext *ctx);
+
+QJS_HIDE LEPUSValue JS_Call_GC(LEPUSContext *ctx, LEPUSValueConst func_obj,
+                               LEPUSValueConst this_obj, int argc,
+                               LEPUSValueConst *argv);
+QJS_HIDE int JS_DefinePropertyValue_GC(LEPUSContext *ctx,
+                                       LEPUSValueConst this_obj, JSAtom prop,
+                                       LEPUSValue val, int flags);
+
+QJS_HIDE int JS_DeleteProperty_GC(LEPUSContext *ctx, LEPUSValueConst obj,
+                                  JSAtom prop, int flags);
+QJS_HIDE LEPUSValueConst JS_GetPrototype_GC(LEPUSContext *ctx,
+                                            LEPUSValueConst val);
+
+QJS_HIDE LEPUSValue JS_NewArrayWithArgs_GC(LEPUSContext *ctx, int32_t size,
+                                           LEPUSValue *values);
+QJS_HIDE LEPUSValue JS_NewObjectProto_GC(LEPUSContext *ctx,
+                                         LEPUSValueConst proto);
+
+QJS_HIDE int JS_SetGlobalVar_GC(LEPUSContext *ctx, JSAtom prop, LEPUSValue val,
+                                int flag);
+QJS_HIDE LEPUSValue JS_ToPropertyKey_GC(LEPUSContext *ctx, LEPUSValueConst val);
+QJS_HIDE int JS_DefineProperty_GC(LEPUSContext *ctx, LEPUSValueConst this_obj,
+                                  JSAtom prop, LEPUSValueConst val,
+                                  LEPUSValueConst getter,
+                                  LEPUSValueConst setter, int flags);
 
 QJS_HIDE int EnsureCoverageCounters(LEPUSContext *ctx,
                                     LEPUSFunctionBytecode *b);
@@ -2080,8 +2010,6 @@ typedef LEPUSValue (*QuickJsCallStub)(LEPUSValue this_arg,
                                       int argc, LEPUSValue *argv, int flags);
 
 inline QuickJsCallStub entry;
-
-QJS_HIDE void compile_function(LEPUSContext *, LEPUSFunctionBytecode *bytecode);
 #endif
 
 // <primjs end>
@@ -2145,11 +2073,8 @@ static __attribute__((unused)) LEPUSValue JS_ToString_RC(LEPUSContext *ctx,
 /* <rc end> */
 
 /* <gc begin> */
-LEPUSValue JS_GetSeparableStringContent_GC(LEPUSContext *ctx, LEPUSValue val);
-LEPUSValue JS_GetSeparableStringContentNotDup_GC(LEPUSContext *ctx,
-                                                 LEPUSValue val);
-QJS_HIDE int set_array_length_gc(LEPUSContext *ctx, LEPUSObject *p,
-                                 LEPUSValue val, int flags);
+QJS_HIDE LEPUSValue JS_GetSeparableStringContentNotDup_GC(LEPUSContext *ctx,
+                                                          LEPUSValue val);
 bool gc_enabled();
 LEPUSRuntime *JS_NewRuntime_GC(uint32_t mode);
 LEPUSRuntime *JS_NewRuntime2_GC(const LEPUSMallocFunctions *mf, void *opaque,
@@ -3134,6 +3059,9 @@ QJS_HIDE LEPUS_BOOL JS_LepusRefIsArray(LEPUSRuntime *rt, LEPUSValue v);
 QJS_HIDE LEPUS_BOOL JS_LepusRefIsTable(LEPUSRuntime *rt, LEPUSValue v);
 QJS_HIDE JSShape *js_dup_shape(JSShape *sh);
 
+QJS_HIDE LEPUSValue js_create_iterator_result_gc(LEPUSContext *ctx,
+                                                 LEPUSValue val, BOOL done);
+
 typedef struct JSCFunctionDataRecord {
   LEPUSCFunctionData *func;
   uint8_t length;
@@ -3384,19 +3312,6 @@ JSAtom __JS_NewAtomInit(LEPUSRuntime *rt, const char *str, int len,
 int init_bigint_name(LEPUSRuntime *rt);
 uintptr_t get_thread_stack_limit();
 
-inline uintptr_t get_thread_stack_limit2() {
-  thread_local uintptr_t stack_limit = 0;
-  if (stack_limit == 0) {
-    stack_limit = get_thread_stack_limit();
-  }
-  if (stack_limit != 0) {
-    return stack_limit;
-  }
-  // Do not cache this fallback; retry pthread stack discovery on later calls.
-  uint8_t stack_marker = 0;
-  return reinterpret_cast<uintptr_t>(&stack_marker) - 400 * 1024;
-}
-
 uint32_t map_hash_key(LEPUSContext *ctx, LEPUSValueConst key,
                       uint32_t hash_bits);
 
@@ -3425,6 +3340,11 @@ class VirtualStack {
 
   ~VirtualStack() { delete[] (reinterpret_cast<uint64_t *>(stack_limit_)); }
 
+  void InitVirtualStack(LEPUSContext *ctx) {
+    ctx->stack_limit = stack_limit_;
+    ctx->stack_pos = stack_;
+  }
+
   uint8_t *PushVirtualSp(size_t stack_size) {
     size_t alloc_size = alignment(stack_size);
     if (stack_ - alloc_size < stack_limit_) {
@@ -3447,6 +3367,7 @@ class VirtualStack {
 };
 
 #endif
+
 QJS_HIDE LEPUSValue js_throw_type_error(LEPUSContext *ctx,
                                         LEPUSValueConst this_val, int argc,
                                         LEPUSValueConst *argv);

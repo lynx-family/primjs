@@ -37,11 +37,13 @@ void Finalizer::DoFinalizer2(void *ptr) noexcept {
 void Visitor::VisitLEPUSLepusRef(void *ptr, GCWorkStack &workStack) noexcept {
   LEPUSLepusRef *pref = reinterpret_cast<LEPUSLepusRef *>(ptr);
   PushObjLEPUSValue(pref->lepus_val, workStack);
+#ifdef ENABLE_LEPUSNG
   auto rt = workStack.GetRuntime();
   if (rt->js_callbacks_.ref_counted_obj_visitor)
     rt->js_callbacks_.ref_counted_obj_visitor(
         rt, pref->p, reinterpret_cast<uint64_t>(&workStack), pref->tag,
         set_mark_func);
+#endif
 }
 
 void Visitor::VisitJSVarRef(void *ptr, GCWorkStack &workStack) noexcept {
@@ -164,68 +166,19 @@ void Visitor::VisitJSFunctionDef(void *ptr, GCWorkStack &workStack) noexcept {
   workStack.push_back((address_t)fd->coverage_slots);
 }
 
-void Visitor::PushBytecodeAtoms(const uint8_t *bc_buf, int bc_len,
-                                int use_short_opcodes,
-                                GCWorkStack &workStack) noexcept {
-  auto rt = workStack.GetRuntime();
-  if (!rt->con_mark_state) {
-    int pos, len, op;
-    LEPUSAtom atom;
-    const JSOpCode *oi;
-
-    pos = 0;
-    while ((pos + 1) < bc_len) {
-      op = bc_buf[pos];
-      if (use_short_opcodes)
-        oi = &short_opcode_info(op);
-      else
-        oi = &opcode_info[op];
-
-      len = oi->size;
-      switch (oi->fmt) {
-        case OP_FMT_atom:
-        case OP_FMT_atom_u8:
-        case OP_FMT_atom_u16:
-        case OP_FMT_atom_label_u8:
-        case OP_FMT_atom_label_u16:
-          atom = get_u32(bc_buf + pos + 1);
-          PushObjAtom(atom, workStack);
-          break;
-        default:
-          break;
-      }
-      pos += len;
-    }
-  }
-}
-
 void Visitor::VisitLEPUSFunctionBytecode(void *ptr,
                                          GCWorkStack &workStack) noexcept {
   LEPUSFunctionBytecode *b = static_cast<LEPUSFunctionBytecode *>(ptr);
-  PushBytecodeAtoms(b->byte_code_buf, b->byte_code_len, TRUE, workStack);
-  int i;
-  if (b->vardefs) {
-    if (b->vardefs_ext) {
-      workStack.push_back((address_t)b->vardefs);
-    }
-    for (i = 0; i < b->arg_count + b->var_count; i++) {
-      workStack.push_back(
-          (address_t)GetAtomObj(b->vardefs[i].var_name, workStack));
-    }
+  if (b->vardefs && b->vardefs_ext) {
+    workStack.push_back((address_t)b->vardefs);
   }
   if (b->cpool) {
-    for (i = 0; i < b->cpool_count; i++) {
+    for (int i = 0; i < b->cpool_count; i++) {
       PushObjLEPUSValue(b->cpool[i], workStack);
     }
   }
-  for (i = 0; i < b->closure_var_count; i++) {
-    LEPUSClosureVar *cv = &b->closure_var[i];
-    workStack.push_back((address_t)GetAtomObj(cv->var_name, workStack));
-  }
-  workStack.push_back((address_t)GetAtomObj(b->func_name, workStack));
   // debug
   if (b->has_debug) {
-    workStack.push_back((address_t)GetAtomObj(b->debug.filename, workStack));
     workStack.push_back((address_t)b->debug.pc2line_buf);
     workStack.push_back((address_t)b->debug.source);
     workStack.push_back((address_t)b->debug.caller_slots);

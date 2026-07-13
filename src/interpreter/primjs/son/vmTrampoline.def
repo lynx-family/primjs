@@ -1,0 +1,279 @@
+// Copyright 2025 The Lynx Authors. All rights reserved.
+// Licensed under the Apache License Version 2.0 that can be found in the
+// LICENSE file in the root directory of this source tree.
+
+#ifndef DEF_CALL_DESC
+#define DEF_CALL_DESC(...)
+#endif
+
+#ifndef DEF_CALL_DESC_0
+#define DEF_CALL_DESC_0(name, k, flags, ...) DEF_CALL_DESC(name, k, flags)
+#endif
+
+#ifndef DEF_CALL_DESC_1
+#define DEF_CALL_DESC_1(name, k, flags, ...) DEF_CALL_DESC(name, k, flags)
+#endif
+
+#ifndef DEF_CALL_DESC_2
+#define DEF_CALL_DESC_2(name, k, flags, ...) DEF_CALL_DESC(name, k, flags)
+#endif
+
+#ifndef DEF_CALL_DESC_3
+#define DEF_CALL_DESC_3(name, k, flags, ...) DEF_CALL_DESC(name, k, flags)
+#endif
+
+#ifndef DEF_CALL_DESC_4
+#define DEF_CALL_DESC_4(name, k, flags, ...) DEF_CALL_DESC(name, k, flags)
+#endif
+
+#ifndef DEF_CALL_DESC_5
+#define DEF_CALL_DESC_5(name, k, flags, ...) DEF_CALL_DESC(name, k, flags)
+#endif
+
+#ifndef DEF_CALL_DESC_6
+#define DEF_CALL_DESC_6(name, k, flags, ...) DEF_CALL_DESC(name, k, flags)
+#endif
+
+#ifndef DEF_CALL_DESC_7
+#define DEF_CALL_DESC_7(name, k, flags, ...) DEF_CALL_DESC(name, k, flags)
+#endif
+
+#ifndef DEF_CALL_R_DESC_1
+#define DEF_CALL_R_DESC_1(name, r1, r2) DEF_CALL_DESC_1(name, kRuntime, Throw, r1, r2)
+#endif
+
+#ifndef DEF_CALL_R_DESC_2
+#define DEF_CALL_R_DESC_2(name, r1, r2, r3) DEF_CALL_DESC_2(name, kRuntime, Throw, r1, r2, r3)
+#endif
+
+#ifndef DEF_CALL_R_DESC_3
+#define DEF_CALL_R_DESC_3(name, r1, r2, r3, r4) \
+    DEF_CALL_DESC_3(name, kRuntime, Throw, r1, r2, r3, r4)
+#endif
+
+#ifndef DEF_CALL_R_DESC_4
+#define DEF_CALL_R_DESC_4(name, r1, r2, r3, r4, r5) \
+    DEF_CALL_DESC_4(name, kRuntime, Throw, r1, r2, r3, r4, r5)
+#endif
+
+#ifndef DEF_CALL_R_DESC_5
+#define DEF_CALL_R_DESC_5(name, r1, r2, r3, r4, r5, r6) \
+    DEF_CALL_DESC_5(name, kRuntime, Throw, r1, r2, r3, r4, r5, r6)
+#endif
+
+#ifndef DEF_CALL_R_DESC_6
+#define DEF_CALL_R_DESC_6(name, r1, r2, r3, r4, r5, r6, r7) \
+    DEF_CALL_DESC_6(name, kRuntime, Throw, r1, r2, r3, r4, r5, r6, r7)
+#endif
+
+#ifndef DEF_CALL_R_DESC_7
+#define DEF_CALL_R_DESC_7(name, r1, r2, r3, r4, r5, r6, r7, r8) \
+    DEF_CALL_DESC_7(name, kRuntime, Throw, r1, r2, r3, r4, r5, r6, r7, r8)
+#endif
+
+#define DEF_CALL_OPERATOR2(name) \
+    DEF_CALL_R_DESC_3(name, kInt64, kRawType, kInt64, kInt64)
+
+#define DEF_CALL_OPERATOR2_OPCODE(name) \
+    DEF_CALL_R_DESC_4(name, kInt64, kRawType, kInt64, kInt64, kInt8)
+
+#ifndef DEF_VAR_ARG_DESC
+#define DEF_VAR_ARG_DESC(name)
+#endif
+
+DEF_CALL_OPERATOR2(JS_GetPropertyValue_GC)
+DEF_CALL_OPERATOR2(prim_js_add_slow_gc)
+DEF_CALL_OPERATOR2(prim_js_operator_instanceof_gc)
+DEF_CALL_OPERATOR2(prim_js_operator_in_gc)
+DEF_CALL_OPERATOR2(prim_js_operator_delete_gc)
+DEF_CALL_OPERATOR2(JS_GetPrivateField_GC)
+DEF_CALL_OPERATOR2(JS_ConcatString_GC)
+
+DEF_CALL_OPERATOR2_OPCODE(prim_js_relation_slow_gc)
+DEF_CALL_OPERATOR2_OPCODE(prim_js_binary_arith_slow_gc)
+DEF_CALL_OPERATOR2_OPCODE(prim_js_binary_logic_slow_gc)
+DEF_CALL_OPERATOR2(prim_js_shr_slow_gc)
+DEF_CALL_R_DESC_4(prim_js_eq_slow_gc, kInt64, kRawType, kInt64, kInt64, kInt32)
+DEF_CALL_R_DESC_4(prim_js_strict_eq_slow_gc, kInt64, kRawType, kInt64, kInt64, kInt32)
+DEF_CALL_R_DESC_4(js_regexp_constructor_internal_gc, kInt64, kRawType, kInt64, kInt64, kInt64)
+
+DEF_CALL_R_DESC_3(__JS_AtomToValue_GC, kInt64, kRawType, kInt32, kInt32)
+DEF_CALL_R_DESC_2(JS_ValueToAtom_GC, kInt64, kRawType, kInt64)
+
+DEF_CALL_R_DESC_2(JS_ToObject_GC, kInt64, kRawType, kInt64)
+
+DEF_CALL_R_DESC_2(JS_ToBoolFree_GC, kInt32, kRawType, kInt64)
+
+DEF_CALL_R_DESC_2(JS_ToPropertyKey_GC, kInt64, kRawType, kInt64)
+
+DEF_CALL_R_DESC_1(PRIM_JS_NewObject_GC, kInt64, kRawType)
+
+DEF_CALL_R_DESC_6(JS_CallConstructorInternal_GC, kInt64,
+    kRawType, kInt64, kInt64, kInt32, kRawType, kInt32)
+
+DEF_CALL_R_DESC_3(JS_NewArrayWithArgs_GC, kInt64, kRawType, kInt32, kRawType)
+
+DEF_CALL_R_DESC_3(JS_GetGlobalVarImpl_GC, kInt64, kRawType, kInt32, kInt32)
+
+DEF_CALL_R_DESC_4(JS_SetGlobalVar_GC, kInt32, kRawType, kInt32, kInt64, kInt32)
+
+DEF_CALL_R_DESC_3(JS_DefineGlobalVar_GC, kInt32, kRawType, kInt32, kInt32)
+
+DEF_CALL_R_DESC_3(JS_CheckDefineGlobalVar_GC, kInt32, kRawType, kInt32, kInt32)
+
+DEF_CALL_R_DESC_4(JS_DefineGlobalFunction_GC, kInt32, kRawType, kInt32, kInt64, kInt32)
+
+DEF_CALL_R_DESC_5(JS_GetPropertyInternalImpl_GC, kInt64, kRawType, kInt64, kInt32, kInt64, kInt32)
+
+DEF_CALL_R_DESC_5(JS_SetPropertyInternalImpl_GC, kInt32, kRawType, kInt64, kInt32, kInt64, kInt32)
+
+DEF_CALL_R_DESC_5(JS_SetPropertyValue_GC, kInt32, kRawType, kInt64, kInt64, kInt64, kInt32)
+
+DEF_CALL_R_DESC_5(JS_DefinePropertyValue_GC,
+    kInt32, kRawType, kInt64, kInt32, kInt64, kInt32)
+
+DEF_CALL_R_DESC_7(JS_DefineProperty_GC,
+    kInt32, kRawType, kInt64, kInt32, kInt64, kInt64, kInt64, kInt32)
+
+DEF_CALL_R_DESC_6(JS_SetPropertyGeneric_GC,
+    kInt32, kRawType, kRawType, kInt32, kInt64, kInt64, kInt32)
+
+DEF_CALL_R_DESC_4(JS_DefineObjectName, kInt32, kRawType, kInt64, kInt32, kInt32)
+
+DEF_CALL_R_DESC_3(prim_js_unary_arith_slow_gc, kInt64, kRawType, kInt64, kInt8)
+DEF_CALL_R_DESC_3(js_post_inc_slow_gc, kInt32, kRawType, kRawType, kInt8)
+
+DEF_CALL_R_DESC_2(js_operator_typeof_gc, kInt32, kRawType, kInt64)
+DEF_CALL_R_DESC_4(js_closure_gc, kInt64, kRawType, kInt64, kRawType, kRawType)
+
+DEF_CALL_R_DESC_2(prim_js_not_slow_gc, kInt64, kRawType, kInt64)
+
+DEF_CALL_R_DESC_2(JS_IsUncatchableError_GC, kInt32, kRawType, kInt64)
+DEF_CALL_R_DESC_7(build_backtrace, kNone, kRawType, kInt64, kRawType,
+    kInt64, kRawType, kInt32, kInt8)
+DEF_CALL_R_DESC_2(prim_close_var_refs_gc, kNone, kRawType, kRawType)
+DEF_CALL_R_DESC_3(js_build_arguments_gc, kInt64, kRawType, kInt32, kRawType)
+DEF_CALL_R_DESC_5(js_build_mapped_arguments_gc, kInt64, kRawType, kInt32, kRawType, kRawType, kInt32)
+
+DEF_CALL_R_DESC_2(JS_NewObjectProto_GC, kInt64, kRawType, kInt64)
+DEF_CALL_R_DESC_4(add_property_gc, kRawType, kRawType, kRawType, kInt32, kInt32)
+DEF_CALL_R_DESC_4(get_var_ref, kRawType, kRawType, kRawType, kInt32, kInt32)
+
+DEF_CALL_R_DESC_2(prim_js_for_in_start_gc, kInt64, kRawType, kInt64)
+DEF_CALL_R_DESC_2(js_for_in_next_gc, kInt32, kRawType, kRawType)
+DEF_CALL_R_DESC_3(js_for_of_start_gc, kInt32, kRawType, kRawType, kInt32)
+DEF_CALL_R_DESC_3(js_for_of_next_gc, kInt32, kRawType, kRawType, kInt32)
+DEF_CALL_R_DESC_2(js_for_await_of_next_gc, kInt32, kRawType, kRawType)
+
+DEF_CALL_R_DESC_2(LEPUS_Throw, kInt64, kRawType, kInt64)
+
+DEF_CALL_R_DESC_4(add_fast_array_element_gc, kInt32, kRawType, kRawType, kInt64, kInt32)
+
+DEF_CALL_R_DESC_3(JS_ThrowTypeErrorReadOnly, kInt32, kRawType, kInt32, kInt32)
+DEF_CALL_R_DESC_2(JS_ThrowSyntaxErrorVarRedeclaration_GC, kInt64, kRawType, kInt32)
+DEF_CALL_R_DESC_2(JS_ThrowReferenceErrorUninitialized_GC, kInt64, kRawType, kInt32)
+
+DEF_CALL_R_DESC_2(LEPUS_ThrowReferenceError, kInt64, kRawType, kRawType)
+DEF_CALL_R_DESC_2(LEPUS_ThrowTypeError, kInt64, kRawType, kRawType)
+DEF_CALL_R_DESC_2(LEPUS_ThrowInternalError, kInt64, kRawType, kRawType)
+DEF_VAR_ARG_DESC(LEPUS_ThrowInternalError)
+
+DEF_CALL_R_DESC_1(JS_ThrowStackOverflow, kInt64, kRawType)
+DEF_CALL_R_DESC_1(JS_ThrowTypeErrorNotFunction, kInt64, kRawType)
+DEF_CALL_R_DESC_2(JS_ThrowReferenceErrorNotDefined_GC, kInt64, kRawType, kInt32)
+DEF_CALL_R_DESC_1(JS_ThrowTypeErrorNotAnObject, kInt64, kRawType)
+
+DEF_CALL_R_DESC_5(js_method_set_properties_gc, kInt32, kRawType, kInt64, kInt32, kInt32, kInt64)
+DEF_CALL_R_DESC_6(js_op_define_class, kInt32, kRawType, kRawType, kInt32, kInt32, kRawType, kRawType)
+DEF_CALL_R_DESC_3(prim_js_copy_data_properties_gc, kInt32, kRawType, kRawType, kInt32)
+DEF_CALL_R_DESC_2(js_append_enumerate_gc, kInt32, kRawType, kRawType)
+DEF_CALL_R_DESC_5(JS_DefinePropertyValueValue_GC, kInt32, kRawType, kInt64, kInt64, kInt64, kInt32)
+DEF_CALL_R_DESC_4(JS_SetPrototypeInternal_GC, kInt32, kRawType, kInt64, kInt64, kInt32)
+DEF_CALL_R_DESC_3(js_method_set_home_object_gc, kNone, kRawType, kInt64, kInt64)
+DEF_CALL_R_DESC_4(JS_DefineObjectNameComputed_GC, kInt32, kRawType, kInt64, kInt64, kInt32)
+DEF_CALL_R_DESC_3(JS_NewSymbolFromAtom_GC, kInt64, kRawType, kInt32, kInt32)
+DEF_CALL_R_DESC_4(js_build_rest_gc, kInt64, kRawType, kInt32, kInt32, kRawType)
+DEF_CALL_R_DESC_5(js_function_apply_gc, kInt64, kRawType, kInt64, kInt32, kRawType, kInt32)
+DEF_CALL_R_DESC_3(prim_js_op_eval_gc, kInt64, kRawType, kInt32, kInt64)
+DEF_CALL_R_DESC_5(prim_js_with_op_gc, kInt32, kRawType, kRawType, kInt32, kInt32, kInt32)
+
+DEF_CALL_R_DESC_5(JS_Call_GC, kInt64, kRawType, kInt64, kInt64, kInt32, kRawType)
+DEF_CALL_R_DESC_3(JS_GetGlobalVarRef_GC, kInt32, kRawType, kInt32, kRawType)
+DEF_CALL_R_DESC_4(JS_DeleteProperty_GC, kInt32, kRawType, kInt64, kInt32, kInt32)
+DEF_CALL_R_DESC_2(js_dynamic_import, kInt64, kRawType, kInt64)
+DEF_CALL_R_DESC_3(close_lexical_var, kNone, kRawType, kRawType, kInt32)
+
+DEF_CALL_R_DESC_2(JS_GetPrototype_GC, kInt64, kRawType, kInt64)
+DEF_CALL_R_DESC_2(primjs_get_super_ctor_gc, kInt64, kRawType, kInt64)
+DEF_CALL_R_DESC_2(JS_CheckGlobalVar_GC, kInt32, kRawType, kInt32)
+DEF_CALL_R_DESC_2(js_value_to_atom_gc, kInt32, kRawType, kInt64)
+
+DEF_CALL_R_DESC_4(JS_SetPrivateField_GC, kInt32, kRawType, kInt64, kInt64, kInt64)
+DEF_CALL_R_DESC_4(JS_DefinePrivateField_GC, kInt32, kRawType, kInt64, kInt64, kInt64)
+
+DEF_CALL_R_DESC_3(JS_CheckBrand_GC, kInt32, kRawType, kInt64, kInt64)
+DEF_CALL_R_DESC_3(JS_AddBrand_GC, kInt32, kRawType, kInt64, kInt64)
+
+DEF_CALL_R_DESC_2(js_iterator_get_value_done_gc, kInt32, kRawType, kRawType)
+DEF_CALL_R_DESC_2(prim_js_async_iterator_close_gc, kInt32, kRawType, kRawType)
+DEF_CALL_R_DESC_3(prim_js_async_iterator_get_gc, kInt32, kRawType, kRawType, kInt32)
+DEF_CALL_R_DESC_3(JS_IteratorClose, kInt32, kRawType, kInt64, kInt32)
+
+DEF_CALL_R_DESC_3(DebuggerPause, kNone, kRawType, kInt64, kRawType)
+DEF_CALL_R_DESC_3(DebuggerCallEachOp, kNone, kRawType, kRawType, kRawType)
+DEF_CALL_R_DESC_2(DebuggerCallEachFunc, kNone, kRawType, kRawType)
+
+DEF_CALL_R_DESC_2(prim_WriteBarrierNoStore, kNone, kInt64, kRawType)
+DEF_CALL_R_DESC_2(EnsureCoverageCounters, kInt32, kRawType, kRawType)
+
+DEF_CALL_R_DESC_2(fmod, kFloat64, kFloat64, kFloat64)
+
+DEF_CALL_R_DESC_6(call_c_func, kInt64,
+        kRawType, kInt64, kInt64, kInt32, kRawType, kInt32)
+
+DEF_CALL_R_DESC_6(call_cfunc_func, kInt64,
+        kRawType, kInt64, kInt32, kRawType, kInt32, kRawType)
+
+DEF_CALL_R_DESC_4(call_cfunc_generic, kInt64,
+        kRawType, kInt64, kInt32, kRawType)
+DEF_CALL_R_DESC_5(call_cfunc_generic_magic, kInt64,
+        kRawType, kInt64, kInt32, kRawType, kInt32)
+DEF_CALL_R_DESC_2(call_getter, kInt64,
+        kRawType, kInt64)
+DEF_CALL_R_DESC_3(call_setter, kInt64,
+        kRawType, kInt64, kInt64)
+DEF_CALL_R_DESC_3(call_getter_magic, kInt64,
+        kRawType, kInt64, kInt32)
+DEF_CALL_R_DESC_4(call_setter_magic, kInt64,
+        kRawType, kInt64, kInt64, kInt32)
+
+DEF_CALL_R_DESC_5(prim_call_c_function_default, kInt64,
+        kRawType, kInt64, kInt64, kInt32, kRawType)
+
+DEF_CALL_DESC_1(InstallBcHandler, kStub, Throw, kNone, kRawType)
+DEF_CALL_DESC_7(_call_stub_entry, kStub, Throw, kInt64,
+        kInt64, kInt64, kInt64, kRawType, kInt32, kRawType, kInt32)
+
+DEF_CALL_R_DESC_2(prim_abort0, kNone, kInt64, kInt64)
+
+DEF_CALL_R_DESC_2(call_runtime_wrapper, kNone, kRawType, kInt32)
+DEF_CALL_R_DESC_5(prim_debug_trace, kNone, kRawType, kRawType, kRawType, kRawType, kRawType)
+
+#undef DEF_CALL_DESC
+#undef DEF_CALL_DESC_0
+#undef DEF_CALL_DESC_1
+#undef DEF_CALL_DESC_2
+#undef DEF_CALL_DESC_3
+#undef DEF_CALL_DESC_4
+#undef DEF_CALL_DESC_5
+#undef DEF_CALL_DESC_6
+#undef DEF_CALL_DESC_7
+#undef DEF_CALL_R_DESC_1
+#undef DEF_CALL_R_DESC_2
+#undef DEF_CALL_R_DESC_3
+#undef DEF_CALL_R_DESC_4
+#undef DEF_CALL_R_DESC_5
+#undef DEF_CALL_R_DESC_6
+#undef DEF_CALL_OPERATOR2
+#undef DEF_CALL_OPERATOR2_OPCODE
+#undef DEF_VAR_ARG_DESC

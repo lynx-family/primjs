@@ -318,9 +318,6 @@ class Visitor {
                                              GCWorkStack &workStack) noexcept;
   static void PushObjLEPUSStackFrame(LEPUSStackFrame *sf,
                                      GCWorkStack &workStack) noexcept;
-  static void PushBytecodeAtoms(const uint8_t *bc_buf, int bc_len,
-                                int use_short_opcodes,
-                                GCWorkStack &workStack) noexcept;
   static void PushObjFunc(LEPUSObject *obj, GCWorkStack &workStack) noexcept;
   static void PushObjRegExp(LEPUSObject *obj, GCWorkStack &workStack) noexcept;
   static void PushObjProperty(JSPropertyGC *pr,

@@ -55,8 +55,6 @@ declare_args() {
   # Enable force tracing gc
   enable_force_gc = false
 
-  gen_android_embedded = false
-
   use_primjs_napi = false
 
   use_rtti = false

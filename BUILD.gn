@@ -52,6 +52,12 @@ config("quickjs_public_config") {
 
   if (enable_primjs_snapshot) {
     defines += [ "ENABLE_PRIMJS_SNAPSHOT" ]
+
+    # The pre-generated macOS and iOS handlers use vm_codegen's -virtual-sp
+    # mode, so the runtime must initialize the matching virtual stack.
+    if (target_os == "mac" || target_os == "ios") {
+      defines += [ "ENABLE_VIRTUAL_STACK" ]
+    }
   }
 
   if (enable_compatible_mm) {
@@ -72,10 +78,6 @@ config("quickjs_public_config") {
 
   if (enable_gc_log) {
     defines += [ "ENABLE_GC_LOG" ]
-  }
-
-  if (gen_android_embedded) {
-    defines += [ "GEN_ANDROID_EMBEDDED" ]
   }
 
   if (enable_primjs_trace) {
