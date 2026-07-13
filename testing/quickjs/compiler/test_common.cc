@@ -1707,4 +1707,51 @@ TEST_F(CommonQjsTest, GeneratorYieldStarNormalOperation) {
   if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, ret);
 }
 
+TEST_F(CommonQjsTest, AsyncGeneratorStaleReactionNoUAF) {
+  // Bug #4: An async generator's await reaction could fire after the generator
+  // was reentrantly completed, writing into freed frame memory. The fix checks
+  // state != EXECUTING and returns early. This test verifies no crash/assert.
+  std::string src = R"(
+    var resolved = false;
+    var error = null;
+
+    async function* gen() {
+      await Promise.resolve(1);
+      await Promise.resolve(2);
+      await Promise.resolve(3);
+      return "done";
+    }
+
+    var it = gen();
+    // Start - suspends on first await
+    it.next();
+    // Reentrantly complete while await reactions are queued
+    it.return("early");
+    it.return("again");
+    // If we reach here without crash/assert, the fix works
+    resolved = true;
+  )";
+  auto ret = LEPUS_Eval(ctx_, src.c_str(), src.size(), "test.js",
+                        LEPUS_EVAL_TYPE_GLOBAL);
+  if (LEPUS_IsException(ret)) {
+    std::string err = js_get_exception_string(ctx_);
+    FAIL() << err;
+  }
+  if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  // Drain microtask/promise job queue — stale reactions fire here
+  LEPUSContext* ctx1;
+  while (LEPUS_ExecutePendingJob(rt_, &ctx1) > 0) {
+  }
+
+  // Verify the script completed without crash
+  LEPUSValue global = LEPUS_GetGlobalObject(ctx_);
+  LEPUSValue resolved_val = LEPUS_GetPropertyStr(ctx_, global, "resolved");
+  EXPECT_TRUE(LEPUS_ToBool(ctx_, resolved_val));
+  if (!ctx_->gc_enable) {
+    LEPUS_FreeValue(ctx_, resolved_val);
+    LEPUS_FreeValue(ctx_, global);
+  }
+}
+
 }  // namespace common_qjs_test
