@@ -44619,6 +44619,8 @@ QJS_STATIC void map_decref_record(LEPUSRuntime *rt, JSMapRecord *mr) {
 
 QJS_STATIC void reset_weak_ref(LEPUSRuntime *rt, LEPUSObject *p) {
   WeakRefRecord *wr, *wr_next;
+  list_head *el, *el1;
+  struct list_head map_to_free;
 
   /* first pass to remove the records from the WeakMap/WeakSet
      lists */
@@ -44645,12 +44647,13 @@ QJS_STATIC void reset_weak_ref(LEPUSRuntime *rt, LEPUSObject *p) {
 
   /* second pass to free the values to avoid modifying the weak
      reference list while traversing it. */
+  init_list_head(&map_to_free);
   for (wr = p->first_weak_ref; wr != nullptr; wr = wr_next) {
     wr_next = wr->next_weak_ref;
     switch (wr->kind) {
       case WEAK_REF_KIND_WEAK_MAP: {
-        LEPUS_FreeValueRT(rt, wr->u.map_record->value);
-        lepus_free_rt(rt, wr->u.map_record);
+        // Defer releasing the value.
+        list_add_tail(&wr->u.map_record->link, &map_to_free);
       } break;
       case WEAK_REF_KIND_FINALIZATION_REGISTRY: {
         FinalizationRegistryEntry *fin_node = wr->u.fin_node;
@@ -44668,6 +44671,13 @@ QJS_STATIC void reset_weak_ref(LEPUSRuntime *rt, LEPUSObject *p) {
         break;
     }
     lepus_free_rt(rt, wr);
+  }
+  // Release the deferred WeakMap values now that the traversal is done.
+  list_for_each_safe(el, el1, &map_to_free) {
+    JSMapRecord *mr = list_entry(el, JSMapRecord, link);
+    list_del(&mr->link);
+    LEPUS_FreeValueRT(rt, mr->value);
+    lepus_free_rt(rt, mr);
   }
   return;
 }
@@ -45275,6 +45285,7 @@ LEPUSValue js_finalizationRegistry_unregister(LEPUSContext *ctx,
   FinalizationRegistryEntry *fin_node;
   LEPUSObject *token_p;
   bool removed = false;
+  struct list_head to_free;
 
   frd = static_cast<FinalizationRegistryData *>(
       LEPUS_GetOpaque(this_val, JS_CLASS_FinalizationRegistry));
@@ -45287,17 +45298,25 @@ LEPUSValue js_finalizationRegistry_unregister(LEPUSContext *ctx,
     return LEPUS_ThrowTypeError(ctx, "unregisterToken must be an object");
   }
   token_p = LEPUS_VALUE_GET_OBJ(token);
+  // Only unlink matching entries here.
+  init_list_head(&to_free);
   list_for_each_safe(el, el1, &frd->entries) {
     fin_node = list_entry(el, FinalizationRegistryEntry, link);
     if (LEPUS_VALUE_IS_OBJECT(fin_node->token) &&
         LEPUS_VALUE_GET_OBJ(fin_node->token) == token_p) {
       list_del(&fin_node->link);
       delete_weak_ref(ctx->rt, LEPUS_VALUE_GET_OBJ(fin_node->target), fin_node);
-      LEPUS_FreeValue(ctx, fin_node->held_value);
-      LEPUS_FreeValue(ctx, fin_node->token);
-      lepus_free(ctx, fin_node);
+      list_add_tail(&fin_node->link, &to_free);
       removed = true;
     }
+  }
+  // Release the collected entries.
+  list_for_each_safe(el, el1, &to_free) {
+    fin_node = list_entry(el, FinalizationRegistryEntry, link);
+    list_del(&fin_node->link);
+    LEPUS_FreeValue(ctx, fin_node->held_value);
+    LEPUS_FreeValue(ctx, fin_node->token);
+    lepus_free(ctx, fin_node);
   }
   return LEPUS_NewBool(ctx, removed);
 };
