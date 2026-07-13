@@ -2010,4 +2010,168 @@ TEST_F(CommonQjsTest, AsyncGeneratorStaleReactionNoUAF) {
   }
 }
 
+TEST_F(CommonQjsTest, FastArrayShrinkFinalizationReentrancyNoUAF) {
+  // Bug: set_array_length's fast-array shrink loop called LEPUS_FreeValue
+  // before updating p->u.array.count. If FreeValue triggers a
+  // FinalizationRegistry cleanup callback that shrinks the same array,
+  // the outer loop uses a stale count and double-frees slots.
+  // The fix moves count update before the free loop.
+  std::string src = R"(
+    var arr = new Array(4);
+    var witness = 0;
+
+    // Create objects registered with FinalizationRegistry
+    var fr = new FinalizationRegistry(function(held) {
+      // This callback fires synchronously during FreeValue in RC mode.
+      // Before the fix, arr.length was still the old value here,
+      // so shrinking again would double-free.
+      if (arr.length > 0) {
+        arr.length = 0;
+      }
+      witness++;
+    });
+
+    for (var i = 0; i < 4; i++) {
+      var obj = { idx: i };
+      fr.register(obj, i);
+      arr[i] = obj;
+    }
+    // Drop all other references so array holds the only ref
+    obj = undefined;
+
+    // Trigger the shrink — this should not crash/double-free
+    arr.length = 0;
+
+    // If we reach here without crash, the fix works
+    witness = witness;  // keep alive
+  )";
+  auto ret = LEPUS_Eval(ctx_, src.c_str(), src.size(), "test.js",
+                        LEPUS_EVAL_TYPE_GLOBAL);
+  if (LEPUS_IsException(ret)) {
+    std::string err = js_get_exception_string(ctx_);
+    FAIL() << err;
+  }
+  if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, ret);
+}
+
+TEST_F(CommonQjsTest, FastArrayDeleteLastFinalizationReentrancyNoUAF) {
+  // Same reentrancy issue but via delete of the last element.
+  std::string src = R"(
+    var arr = [null, null];
+    var fr = new FinalizationRegistry(function(held) {
+      // Nested shrink via length assignment during finalizer
+      arr.length = 0;
+    });
+
+    var target = { x: 1 };
+    fr.register(target, "t");
+    arr[1] = target;
+    target = undefined;
+
+    // Delete last element triggers FreeValue -> finalizer -> nested shrink
+    delete arr[1];
+
+    // Should not crash
+  )";
+  auto ret = LEPUS_Eval(ctx_, src.c_str(), src.size(), "test.js",
+                        LEPUS_EVAL_TYPE_GLOBAL);
+  if (LEPUS_IsException(ret)) {
+    std::string err = js_get_exception_string(ctx_);
+    FAIL() << err;
+  }
+  if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, ret);
+}
+
+TEST_F(CommonQjsTest, FastArrayShrinkFinalizerPushNoLeak) {
+  // Verify no crash/leak when FinalizationRegistry callback pushes onto the
+  // same array during shrink. Before the snapshot fix, count was overwritten
+  // after the callback returned, orphaning the pushed element.
+  std::string src = R"(
+    var arr = new Array(2);
+    var pushed_obj = { alive: true };
+    var fr = new FinalizationRegistry(function(held) {
+      arr.push(pushed_obj);
+    });
+
+    var target = { x: 1 };
+    fr.register(target, "t");
+    arr[0] = target;
+    arr[1] = { y: 2 };
+    target = undefined;
+
+    // Trigger the shrink — should not crash regardless of whether
+    // the finalizer fires synchronously or asynchronously
+    arr.length = 0;
+  )";
+  auto ret = LEPUS_Eval(ctx_, src.c_str(), src.size(), "test.js",
+                        LEPUS_EVAL_TYPE_GLOBAL);
+  if (LEPUS_IsException(ret)) {
+    std::string err = js_get_exception_string(ctx_);
+    FAIL() << err;
+  }
+  if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, ret);
+}
+
+TEST_F(CommonQjsTest, FastArrayShrinkFinalizerAssignSlotNoUAF) {
+  // Verify that a finalizer assigning to a slot doesn't cause UAF.
+  // Before snapshot fix, FreeValue read from values[i] which the callback
+  // could have overwritten with a new object, causing wrong-object release.
+  std::string src = R"(
+    var arr = new Array(3);
+    var replacement = { replaced: true };
+    var holder = replacement;
+
+    var fr = new FinalizationRegistry(function(held) {
+      arr.length = 2;
+      arr[0] = replacement;
+      arr[1] = replacement;
+    });
+
+    var victim = { v: 1 };
+    fr.register(victim, "v");
+    arr[0] = victim;
+    arr[1] = { b: 2 };
+    arr[2] = { c: 3 };
+    victim = undefined;
+
+    // Should not crash regardless of finalizer timing
+    arr.length = 0;
+  )";
+  auto ret = LEPUS_Eval(ctx_, src.c_str(), src.size(), "test.js",
+                        LEPUS_EVAL_TYPE_GLOBAL);
+  if (LEPUS_IsException(ret)) {
+    std::string err = js_get_exception_string(ctx_);
+    FAIL() << err;
+  }
+  if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, ret);
+}
+
+TEST_F(CommonQjsTest, FastArrayDeleteLastFinalizerPushNoLeak) {
+  // Verify delete-last + finalizer push doesn't leak the pushed value.
+  // delete arr[2] reduces count to 2 but length stays 3.
+  // Verify delete-last + finalizer push doesn't crash.
+  std::string src = R"(
+    var arr = [null, null, null];
+    var pushed = { keep: true };
+    var fr = new FinalizationRegistry(function(held) {
+      arr.push(pushed);
+    });
+
+    var target = { x: 1 };
+    fr.register(target, "t");
+    arr[2] = target;
+    target = undefined;
+
+    // Should not crash regardless of finalizer timing
+    delete arr[2];
+  )";
+  auto ret = LEPUS_Eval(ctx_, src.c_str(), src.size(), "test.js",
+                        LEPUS_EVAL_TYPE_GLOBAL);
+  if (LEPUS_IsException(ret)) {
+    std::string err = js_get_exception_string(ctx_);
+    FAIL() << err;
+  }
+  if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, ret);
+}
+
 }  // namespace common_qjs_test
