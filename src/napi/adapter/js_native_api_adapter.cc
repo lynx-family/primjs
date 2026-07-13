@@ -808,6 +808,16 @@ napi_status napi_get_arraybuffer_info_primjs(napi_env env,
   return env->napi_get_arraybuffer_info(env, arraybuffer, data, byte_length);
 }
 
+napi_status napi_detach_arraybuffer_primjs(napi_env env,
+                                           napi_value arraybuffer) {
+  CHECK_ENV(env);
+  CHECK_ARG(env, arraybuffer);
+  CHECK_TO_ARRAYBUFFER(env, arraybuffer, napi_arraybuffer_expected);
+  RETURN_STATUS_IF_FALSE(env, env->napi_detach_arraybuffer != nullptr,
+                         napi_generic_failure);
+  return env->napi_detach_arraybuffer(env, arraybuffer);
+}
+
 napi_status napi_is_typedarray_primjs(napi_env env, napi_value value,
                                       bool* result) {
   CHECK_ENV(env);

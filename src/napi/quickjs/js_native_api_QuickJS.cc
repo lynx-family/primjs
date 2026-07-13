@@ -2215,6 +2215,29 @@ napi_status napi_get_arraybuffer_info(napi_env env, napi_value arraybuffer,
   return napi_clear_last_error(env);
 }
 
+static napi_status napi_detach_arraybuffer(napi_env env,
+                                           napi_value arraybuffer) {
+  LEPUSValue value = ToJSValue(arraybuffer);
+  LEPUSClassID class_id = LEPUS_GetClassID(env->ctx->ctx, value);
+  if (class_id != JS_CLASS_ARRAY_BUFFER &&
+      class_id != JS_CLASS_SHARED_ARRAY_BUFFER) {
+    return napi_set_last_error(env, napi_arraybuffer_expected);
+  }
+
+  if (class_id == JS_CLASS_SHARED_ARRAY_BUFFER) {
+    return napi_set_last_error(env, napi_detachable_arraybuffer_expected);
+  }
+
+  auto* array_buffer = static_cast<JSArrayBuffer*>(
+      LEPUS_GetOpaque(value, JS_CLASS_ARRAY_BUFFER));
+  if (array_buffer == nullptr || array_buffer->detached) {
+    return napi_set_last_error(env, napi_detachable_arraybuffer_expected);
+  }
+
+  LEPUS_DetachArrayBuffer(env->ctx->ctx, value);
+  return napi_clear_last_error(env);
+}
+
 napi_status napi_is_typedarray(napi_env env, napi_value value, bool* result) {
   LEPUSClassID class_id = LEPUS_GetClassID(env->ctx->ctx, ToJSValue(value));
   *result = class_id >= JS_CLASS_UINT8C_ARRAY &&
@@ -2692,6 +2715,7 @@ void napi_attach_quickjs(napi_env env, LEPUSContext* context) {
 #define SET_METHOD(API) env->napi_##API = &napi_##API;
 
   FOR_EACH_NAPI_ENGINE_CALL(SET_METHOD)
+  env->napi_detach_arraybuffer = &napi_detach_arraybuffer;
 
 #undef SET_METHOD
 

@@ -168,6 +168,8 @@ extern "C" const void* PrimJSGetWeakNodeApiRawPtrHost(void) {
         reinterpret_cast<void*>(napi_create_external_arraybuffer_primjs);
     host->napi_get_arraybuffer_info_rawptr =
         reinterpret_cast<void*>(napi_get_arraybuffer_info_primjs);
+    host->napi_detach_arraybuffer_rawptr =
+        reinterpret_cast<void*>(napi_detach_arraybuffer_primjs);
     host->napi_is_typedarray_rawptr =
         reinterpret_cast<void*>(napi_is_typedarray_primjs);
     host->napi_create_typedarray_rawptr =
