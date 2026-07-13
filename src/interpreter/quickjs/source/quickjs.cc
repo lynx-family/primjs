@@ -8533,8 +8533,9 @@ redo:
             p->class_id == JS_CLASS_ARGUMENTS) {
           /* Special case deleting the last element of a fast Array */
           if (idx == p->u.array.count - 1) {
-            LEPUS_FreeValue(ctx, p->u.array.u.values[idx]);
+            LEPUSValue old_val = p->u.array.u.values[idx];
             p->u.array.count = idx;
+            LEPUS_FreeValue(ctx, old_val);
             return TRUE;
           }
           if (convert_fast_array_to_array(ctx, p)) return -1;
@@ -8590,12 +8591,21 @@ int set_array_length(LEPUSContext *ctx, LEPUSObject *p, LEPUSValue val,
   if (likely(p->fast_array)) {
     uint32_t old_len = p->u.array.count;
     if (len < old_len) {
-      for (i = len; i < old_len; i++) {
-        LEPUS_FreeValue(ctx, p->u.array.u.values[i]);
-      }
+      uint32_t num_free = old_len - len;
+      LEPUSValue *snapshot = static_cast<LEPUSValue *>(
+          lepus_malloc(ctx, num_free * sizeof(LEPUSValue)));
+      if (!snapshot) return -1;
+      memcpy(snapshot, &p->u.array.u.values[len],
+             num_free * sizeof(LEPUSValue));
       p->u.array.count = len;
+      p->prop[0].u.value = JS_NewUint32(ctx, len);
+      for (i = 0; i < (int)num_free; i++) {
+        LEPUS_FreeValue(ctx, snapshot[i]);
+      }
+      lepus_free(ctx, snapshot);
+    } else {
+      p->prop[0].u.value = JS_NewUint32(ctx, len);
     }
-    p->prop[0].u.value = JS_NewUint32(ctx, len);
   } else {
     /* Note: length is always a uint32 because the object is an
        array */
