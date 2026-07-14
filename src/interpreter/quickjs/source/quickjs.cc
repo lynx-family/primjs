@@ -5898,6 +5898,31 @@ gc_scan_incref_child2_label:
   // <Primjs end>
 }
 
+QJS_STATIC void gc_clear_dead_weak_refs(LEPUSRuntime *rt) {
+  struct list_head *el;
+  LEPUSObject *p;
+  WeakRefRecord *wr, **pwr;
+
+  /* Clear WeakRef targets for the entire dead set before running any
+     finalizers. A finalizer for one object must not be able to dereference
+     another not-yet-swept object and reach a zombie in the same cycle.
+     Detach each record at the same time so the WeakRef finalizer can safely
+     release its WeakRefData before the target object is swept. */
+  list_for_each(el, &rt->tmp_obj_list) {
+    p = list_entry(el, LEPUSObject, link);
+    pwr = &p->first_weak_ref;
+    while ((wr = *pwr) != nullptr) {
+      if (wr->kind == WEAK_REF_KIND_WEAK_REF) {
+        wr->u.weak_ref->target = LEPUS_UNDEFINED;
+        *pwr = wr->next_weak_ref;
+        lepus_free_rt(rt, wr);
+      } else {
+        pwr = &wr->next_weak_ref;
+      }
+    }
+  }
+}
+
 QJS_STATIC void gc_free_cycles(LEPUSRuntime *rt) {
   struct list_head *el, *el1;
   LEPUSObject *p;
@@ -5906,6 +5931,7 @@ QJS_STATIC void gc_free_cycles(LEPUSRuntime *rt) {
 #endif
   init_list_head(&rt->free_obj_list);
   rt->in_gc_sweep = TRUE;
+  gc_clear_dead_weak_refs(rt);
   list_for_each_safe(el, el1, &rt->tmp_obj_list) {
     p = list_entry(el, LEPUSObject, link);
     assert(p->gc_header.mark == 3);

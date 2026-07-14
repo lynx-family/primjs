@@ -128,4 +128,42 @@ TEST_F(FinalizationRegistryTest, WrongParamTest) {
   }
 }
 
+TEST_F(FinalizationRegistryTest, ClearWeakRefsBeforeCycleCleanupCallback) {
+  if (LEPUS_IsGCMode(ctx_)) GTEST_SKIP();
+
+  const char* source = R"(
+    globalThis.cleanupCalled = false;
+    globalThis.cleanupResult = "pending";
+    var weakRef;
+    var registry = new FinalizationRegistry(function() {
+      var object = weakRef.deref();
+      cleanupCalled = true;
+      cleanupResult = object && object.ref && object.ref.name;
+    });
+
+    (function() {
+      var first = { name: "first" };
+      var second = { name: "second" };
+      first.ref = second;
+      second.ref = first;
+      weakRef = new WeakRef(second);
+      registry.register(first, "held value");
+    })();
+  )";
+
+  LEPUSValue result = LEPUS_Eval(ctx_, source, strlen(source), "test.js",
+                                 LEPUS_EVAL_TYPE_GLOBAL);
+  ASSERT_FALSE(LEPUS_IsException(result));
+  LEPUS_FreeValue(ctx_, result);
+
+  LEPUS_RunGC(rt_);
+
+  const char* check = "cleanupCalled === true && cleanupResult === undefined";
+  result =
+      LEPUS_Eval(ctx_, check, strlen(check), "test.js", LEPUS_EVAL_TYPE_GLOBAL);
+  ASSERT_FALSE(LEPUS_IsException(result));
+  EXPECT_TRUE(LEPUS_ToBool(ctx_, result));
+  LEPUS_FreeValue(ctx_, result);
+}
+
 }  // namespace finalization_registry_test

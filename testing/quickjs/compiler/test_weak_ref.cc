@@ -156,4 +156,42 @@ TEST_F(WeakRefTest, WrongParamsTest) {
   }
 }
 
+TEST_F(WeakRefTest, DetachDeadWeakRefRecordBeforeWeakRefFinalizer) {
+  if (LEPUS_IsGCMode(ctx_)) GTEST_SKIP();
+
+  const char* source = R"(
+    var root = (function() {
+      var first = {};
+      var second = {};
+      first.peer = second;
+      second.peer = first;
+
+      var weakRef = new WeakRef(first);
+      first.weakRef = weakRef;
+
+      // Keep both objects alive for one collection. The property order makes
+      // the survivor scan put weakRef before its target in the object list.
+      return { weakRef: weakRef, target: first };
+    })();
+  )";
+
+  LEPUSValue result = LEPUS_Eval(ctx_, source, strlen(source), "test.js",
+                                 LEPUS_EVAL_TYPE_GLOBAL);
+  ASSERT_FALSE(LEPUS_IsException(result));
+  LEPUS_FreeValue(ctx_, result);
+
+  LEPUS_RunGC(rt_);
+
+  const char* drop_root = "root = undefined";
+  result = LEPUS_Eval(ctx_, drop_root, strlen(drop_root), "test.js",
+                      LEPUS_EVAL_TYPE_GLOBAL);
+  ASSERT_FALSE(LEPUS_IsException(result));
+  LEPUS_FreeValue(ctx_, result);
+
+  // The WeakRef object and its target are now in the same dead cycle, with
+  // the WeakRef object ordered first. This must not leave a dangling record
+  // on the target's weak-reference list.
+  LEPUS_RunGC(rt_);
+}
+
 }  // namespace weak_ref_test
