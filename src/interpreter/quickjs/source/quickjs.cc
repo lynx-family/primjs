@@ -44596,12 +44596,14 @@ QJS_STATIC LEPUSValue js_map_set(LEPUSContext *ctx, LEPUSValueConst this_val,
     value = argv[1];
   mr = map_find_record(ctx, s, key);
   if (mr) {
-    LEPUS_FreeValue(ctx, mr->value);
+    /* Freeing the old value can run FinalizationRegistry callbacks that
+       delete this record, so install the new value before releasing it. */
+    set_value(ctx, &mr->value, LEPUS_DupValue(ctx, value));
   } else {
     mr = map_add_record(ctx, s, key);
     if (!mr) return LEPUS_EXCEPTION;
+    mr->value = LEPUS_DupValue(ctx, value);
   }
-  mr->value = LEPUS_DupValue(ctx, value);
   return LEPUS_DupValue(ctx, this_val);
 }
 
