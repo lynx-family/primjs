@@ -31919,8 +31919,8 @@ QJS_STATIC LEPUSValue JS_ReadFunction(BCReaderState *s) {
   uint16_t v16;
   uint8_t v8;
   int idx, i, local_count;
-  int function_size, cpool_offset, byte_code_offset;
-  int closure_var_offset, vardefs_offset;
+  size_t function_size, cpool_offset, byte_code_offset;
+  size_t closure_var_offset, vardefs_offset;
 
   if (!s->allow_bytecode) goto fail;
   bc_read_trace(s, "%s {\n", bc_tag_str[tag]);
@@ -31943,8 +31943,9 @@ QJS_STATIC LEPUSValue JS_ReadFunction(BCReaderState *s) {
   bc.read_only_bytecode = s->is_rom_data;
   if (bc_get_u8(s, &v8)) goto fail;
   bc.js_mode = v8;
-  if (bc_get_atom(s, &bc.func_name))  //@ atom leak if failure
+  if (bc_get_atom(s, &bc.func_name))  //@ atom leak if failure below
     goto fail;
+  // TODO: bc.func_name leaks on any subsequent goto fail before obj is built
   if (bc_get_leb128_u16(s, &bc.arg_count)) goto fail;
   if (bc_get_leb128_u16(s, &bc.var_count)) goto fail;
   if (bc_get_leb128_u16(s, &bc.defined_arg_count)) goto fail;
@@ -31954,21 +31955,35 @@ QJS_STATIC LEPUSValue JS_ReadFunction(BCReaderState *s) {
   if (bc_get_leb128_int(s, &bc.byte_code_len)) goto fail;
   if (bc_get_leb128_int(s, &local_count)) goto fail;
 
+  if (bc.closure_var_count < 0 || bc.cpool_count < 0 || bc.byte_code_len < 0 ||
+      local_count < 0)
+    goto fail;
+
   if (bc.has_debug) {
     function_size = sizeof(*b);
   } else {
     function_size = offsetof(LEPUSFunctionBytecode, debug);
   }
   cpool_offset = function_size;
-  function_size += bc.cpool_count * sizeof(*bc.cpool);
+  if ((size_t)bc.cpool_count > (SIZE_MAX - function_size) / sizeof(*bc.cpool))
+    goto fail;
+  function_size += (size_t)bc.cpool_count * sizeof(*bc.cpool);
   vardefs_offset = function_size;
-  function_size += local_count * sizeof(*bc.vardefs);
+  if ((size_t)local_count > (SIZE_MAX - function_size) / sizeof(*bc.vardefs))
+    goto fail;
+  function_size += (size_t)local_count * sizeof(*bc.vardefs);
   closure_var_offset = function_size;
-  function_size += bc.closure_var_count * sizeof(*bc.closure_var);
+  if ((size_t)bc.closure_var_count >
+      (SIZE_MAX - function_size) / sizeof(*bc.closure_var))
+    goto fail;
+  function_size += (size_t)bc.closure_var_count * sizeof(*bc.closure_var);
   byte_code_offset = function_size;
   if (!bc.read_only_bytecode) {
-    function_size += bc.byte_code_len;
+    if ((size_t)bc.byte_code_len > SIZE_MAX - function_size) goto fail;
+    function_size += (size_t)bc.byte_code_len;
   }
+
+  if (function_size > INT32_MAX) goto fail;
 
   b = static_cast<LEPUSFunctionBytecode *>(
       lepus_mallocz(ctx, function_size, ALLOC_TAG_LEPUSFunctionBytecode));
@@ -32041,7 +32056,8 @@ QJS_STATIC LEPUSValue JS_ReadFunction(BCReaderState *s) {
   }
   {
     bc_read_trace(s, "bytecode {\n");
-    if (JS_ReadFunctionBytecode(ctx, s, b, byte_code_offset, b->byte_code_len))
+    if (JS_ReadFunctionBytecode(ctx, s, b, static_cast<int>(byte_code_offset),
+                                b->byte_code_len))
       goto fail;
     obj = LEPUS_MKPTR(LEPUS_TAG_FUNCTION_BYTECODE, b);
     // < primjs end>

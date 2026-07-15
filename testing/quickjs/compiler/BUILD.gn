@@ -46,6 +46,7 @@ unittest_set("quickjs_testset") {
     "test_parse_program.cc",
     "test_primjs_version.cc",
     "test_promise_rejection.cc",
+    "test_read_function_overflow.cc",
     "test_varinfo_outside.cc",
     "test_weak_ref.cc",
   ]
@@ -67,6 +68,14 @@ unit_test("quickjs_unittest") {
 
   public_deps = [ ":quickjs_testset" ]
   data_deps = [ ":test_cases_copy" ]
+}
+
+unit_test("read_function_overflow_unittest") {
+  testonly = true
+  sources = [ "test_read_function_overflow.cc" ]
+  public_configs = [ ":config" ]
+  public_deps = [ "../../../src:quickjs_lib" ]
+  cflags = [ "-Wno-c99-designator" ]
 }
 
 unittest_set("qjs_debug_testset") {
