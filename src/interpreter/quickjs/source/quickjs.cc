@@ -31911,6 +31911,33 @@ QJS_STATIC int JS_ReadFunctionBytecode(LEPUSContext *ctx, BCReaderState *s,
   return 0;
 }
 
+QJS_STATIC int JS_ValidateChildClosureVars(BCReaderState *s,
+                                           const LEPUSFunctionBytecode *parent,
+                                           LEPUSValueConst child_value) {
+  if (!LEPUS_VALUE_IS_FUNCTION_BYTECODE(child_value)) return 0;
+
+  const auto *child = static_cast<const LEPUSFunctionBytecode *>(
+      LEPUS_VALUE_GET_PTR(child_value));
+  for (int i = 0; i < child->closure_var_count; i++) {
+    const LEPUSClosureVar *closure = &child->closure_var[i];
+    uint32_t parent_count;
+    if (!closure->is_local) {
+      parent_count = parent->closure_var_count;
+    } else if (closure->is_arg) {
+      parent_count = parent->arg_count;
+    } else {
+      parent_count = parent->var_count;
+    }
+    if (closure->var_idx >= parent_count) {
+      LEPUS_ThrowSyntaxError(
+          s->ctx, "invalid closure variable index (index=%u limit=%u)",
+          closure->var_idx, parent_count);
+      return s->error_state = -1;
+    }
+  }
+  return 0;
+}
+
 QJS_STATIC LEPUSValue JS_ReadFunction(BCReaderState *s) {
   LEPUSContext *ctx = s->ctx;
   HandleScope func_scope(ctx);
@@ -32119,6 +32146,7 @@ QJS_STATIC LEPUSValue JS_ReadFunction(BCReaderState *s) {
       val = JS_ReadObjectRec(s);
       if (LEPUS_IsException(val)) goto fail;
       HeapObjStore(ctx, &b->cpool[i], val);
+      if (JS_ValidateChildClosureVars(s, b, b->cpool[i])) goto fail;
     }
     bc_read_trace(s, "}\n");
   }
