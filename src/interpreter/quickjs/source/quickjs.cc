@@ -46478,7 +46478,6 @@ QJS_STATIC __exception int perform_promise_then(
   if (s->promise_state == JS_PROMISE_PENDING) {
     for (i = 0; i < 2; i++)
       list_add_tail(&rd_array[i]->link, &s->promise_reactions[i]);
-    WriteBarrierNoStore(ctx, rd_array[i]);
   } else {
     LEPUSValueConst args[5];
     i = s->promise_state - JS_PROMISE_FULFILLED;
