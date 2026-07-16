@@ -1,4 +1,8 @@
 
+// Copyright 2024 The Lynx Authors. All rights reserved.
+// Licensed under the Apache License Version 2.0 that can be found in the
+// LICENSE file in the root directory of this source tree.
+
 #include "js_native_api_harmony.h"
 
 #include <ark_runtime/jsvm.h>
