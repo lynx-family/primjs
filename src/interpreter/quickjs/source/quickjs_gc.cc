@@ -4287,6 +4287,7 @@ int JS_SetPropertyInternalImpl_GC(LEPUSContext *ctx, LEPUSValueConst this_obj,
         goto prototype_lookup;
     }
   }
+  CheckObjectCtx(ctx, this_obj);
   p = LEPUS_VALUE_GET_OBJ(this_obj);
 
   CheckObjectCtx(ctx, val);
