@@ -63,7 +63,14 @@ class SpacePageManager {
   TreeType pageCTree;
 };  // end of SpacePageManager
 
-enum UpdateHeapType { kParallel = 0, kConMark, kReMark, kConSweep, kForbidGC };
+enum UpdateHeapType {
+  kParallel = 0,
+  kConMark,
+  kReMark,
+  kConSweep,
+  kForbidGC,
+  kPolicyChange
+};
 
 class Space {
  public:
@@ -170,6 +177,12 @@ class Space {
 
   size_t GetSize() const { return usedHeapSize; }
 
+  size_t GetHeapHeadroom() const {
+    const size_t heap_size = heapSize;
+    const size_t used_heap_size = usedHeapSize;
+    return heap_size > used_heap_size ? heap_size - used_heap_size : 0;
+  }
+
   // Get the size of the allocated pages
   inline size_t GetAllocatedPageSize() const { return allocatedPageSize; }
   // Get the size of the non-released pages
@@ -207,7 +220,7 @@ class Space {
 
   void Extend(size_t deltaSize);
   address_t NewHugeGroup(size_t req_size) {
-    if ((heapSize - usedHeapSize < req_size)) {
+    if (GetHeapHeadroom() < req_size) {
       return 0;
     }
     PageGroup &group = page_groups.NewHugeMem(req_size);
@@ -254,16 +267,17 @@ class Space {
                                       size_t allocatedInternalSize) noexcept;
 
 #if defined(ENABLE_DEBUG)
-#define CheckHeapSizeChangeTrendForDebug(gc_type)                    \
-  bool expectedHeapSizeChangeTrendForDebug = false;                  \
-  if (gc_type == kForbidGC) {                                        \
-    expectedHeapSizeChangeTrendForDebug = heapSize > originHeapSize; \
-    expectedHeapSizeChangeTrendForDebug |=                           \
-        (originHeapSize == heapGrowthLimit);                         \
-  } else {                                                           \
-    expectedHeapSizeChangeTrendForDebug = heapSize >= usedHeapSize;  \
-  }                                                                  \
-  ROSIMPL_ASSERT(expectedHeapSizeChangeTrendForDebug,                \
+#define CheckHeapSizeChangeTrendForDebug(gc_type)                            \
+  bool expectedHeapSizeChangeTrendForDebug = false;                          \
+  if (gc_type == kForbidGC) {                                                \
+    expectedHeapSizeChangeTrendForDebug = heapSize > originHeapSize;         \
+    expectedHeapSizeChangeTrendForDebug |=                                   \
+        (originHeapSize == heapGrowthLimit);                                 \
+  } else {                                                                   \
+    expectedHeapSizeChangeTrendForDebug =                                    \
+        heapSize >= kRosDefaultPageGroupSize && heapSize <= heapGrowthLimit; \
+  }                                                                          \
+  ROSIMPL_ASSERT(expectedHeapSizeChangeTrendForDebug,                        \
                  "unexpected heap size change trend");
 #else
 #define CheckHeapSizeChangeTrendForDebug(gc_type)

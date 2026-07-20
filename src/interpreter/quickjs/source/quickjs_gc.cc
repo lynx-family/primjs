@@ -638,6 +638,30 @@ LEPUSRuntime *JS_NewRuntime_GC(uint32_t mode) {
   return JS_NewRuntime2_GC(&def_allocate_funcs, NULL, mode);
 }
 
+QJS_STATIC uint8_t
+HeadroomScaleQuartersForLevel(LEPUSGCMemoryPolicyLevel level) {
+  switch (level) {
+    case LEPUS_GC_MEMORY_POLICY_MIN_MEMORY:
+      return 1;
+    case LEPUS_GC_MEMORY_POLICY_LOW_MEMORY:
+      return 2;
+    case LEPUS_GC_MEMORY_POLICY_BALANCED:
+      return 4;
+    case LEPUS_GC_MEMORY_POLICY_HIGH_PERFORMANCE:
+      return 6;
+    case LEPUS_GC_MEMORY_POLICY_MAX_PERFORMANCE:
+      return 8;
+  }
+  ROSIMPL_ASSERT(false, "invalid GC memory policy level");
+  return ROS_GC::GCTracer::kDefaultHeadroomScaleQuarters;
+}
+
+void JS_SetGCMemoryPolicyLevel_GC(LEPUSRuntime *rt,
+                                  LEPUSGCMemoryPolicyLevel level) {
+  rt->ros_->GetGCTracer()->SetHeadroomScaleQuarters(
+      HeadroomScaleQuartersForLevel(level));
+}
+
 void JS_SetMemoryLimit_GC(LEPUSRuntime *rt, size_t limit) {
   rt->ros_->SetHeapGrowthLimit(limit);
 }
@@ -23464,6 +23488,8 @@ static LEPUSCFunctionListEntry js_global_funcs[] = {
     LEPUS_PROP_DOUBLE_DEF("Infinity", 1.0 / 0.0, 0),
     LEPUS_PROP_DOUBLE_DEF("NaN", LEPUS_FLOAT64_NAN, 0),
     LEPUS_PROP_UNDEFINED_DEF("undefined", 0),
+    LEPUS_CFUNC_DEF("lepus_set_gc_memory_policy", 1,
+                    js_lepus_set_gc_memory_policy),
     LEPUS_CFUNC_DEF("eval", 1, js_global_eval),
     LEPUS_PROP_STRING_DEF("[Symbol.toStringTag]", "global",
                           LEPUS_PROP_CONFIGURABLE),

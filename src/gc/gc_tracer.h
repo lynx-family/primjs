@@ -98,6 +98,10 @@ class GCTracer {
 
   void SetAllocator(RosAllocImpl *ros) { ros_ = ros; }
 
+  static constexpr uint8_t kDefaultHeadroomScaleQuarters = 4;
+
+  void SetHeadroomScaleQuarters(uint8_t quarters);
+
   double GetGcSpeed() {
     if (gcSpeedCache_ != 0.0) {
       return gcSpeedCache_;
@@ -198,6 +202,11 @@ class GCTracer {
   double AverageSpeed(const RecordBuffer &buffer,
                       const RecordBuffer::ValueType &initial, double timeInMs);
   bool CanTriggerConcurrentMarking();
+  void RecomputeHeapSizeLimitForPolicyChange();
+  static size_t ScaleByQuarters(size_t value, uint8_t units);
+  size_t CalculateBaseHeapSizeLimit();
+  size_t ApplyGCMemoryPolicy(size_t base_target,
+                             uint8_t headroom_scale_quarters) const;
 
   Space *space_{nullptr};
   RosAllocImpl *ros_{nullptr};
@@ -219,6 +228,11 @@ class GCTracer {
   bool concurrent_sweep_is_running_{false};
   bool concurrent_mark_is_running_{false};
   bool cms_gc_is_running_{false};
+  // Accessed only on the runtime owning thread. Concurrent GC workers do not
+  // call SetHeadroomScaleQuarters() or CalculateHeapSizeLimit().
+  bool gc_event_is_running_{false};
+  bool policy_recompute_pending_{false};
+  uint8_t headroom_scale_quarters_{kDefaultHeadroomScaleQuarters};
 
   RecordBuffer allocationRecordBuffer_;
   RecordBuffer gcRecordBuffer_;
