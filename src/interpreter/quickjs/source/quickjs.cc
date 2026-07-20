@@ -1274,6 +1274,55 @@ void set_gc_info_threshold(LEPUSRuntime *rt, uint32_t mode) {
 #define CallGCParserFunc(GCParserFunc, s, args...)
 #endif
 
+struct GCMemoryPolicyEntry {
+  LEPUSGCMemoryPolicyLevel level;
+  const char *name;
+};
+
+QJS_STATIC constexpr GCMemoryPolicyEntry kGCMemoryPolicyEntries[] = {
+    {LEPUS_GC_MEMORY_POLICY_MIN_MEMORY, "min-memory"},
+    {LEPUS_GC_MEMORY_POLICY_LOW_MEMORY, "low-memory"},
+    {LEPUS_GC_MEMORY_POLICY_BALANCED, "balanced"},
+    {LEPUS_GC_MEMORY_POLICY_HIGH_PERFORMANCE, "high-performance"},
+    {LEPUS_GC_MEMORY_POLICY_MAX_PERFORMANCE, "max-performance"},
+};
+
+QJS_STATIC const GCMemoryPolicyEntry *FindGCMemoryPolicyEntryByLevel(
+    LEPUSGCMemoryPolicyLevel level) {
+  for (const GCMemoryPolicyEntry &entry : kGCMemoryPolicyEntries) {
+    if (entry.level == level) {
+      return &entry;
+    }
+  }
+  return nullptr;
+}
+
+QJS_STATIC const GCMemoryPolicyEntry *FindGCMemoryPolicyEntryByName(
+    const char *name, size_t name_length) {
+  for (const GCMemoryPolicyEntry &entry : kGCMemoryPolicyEntries) {
+    const size_t entry_length = strlen(entry.name);
+    if (entry_length == name_length &&
+        memcmp(entry.name, name, name_length) == 0) {
+      return &entry;
+    }
+  }
+  return nullptr;
+}
+
+int LEPUS_SetGCMemoryPolicyLevel(LEPUSRuntime *rt,
+                                 LEPUSGCMemoryPolicyLevel level) {
+  if (!rt || !FindGCMemoryPolicyEntryByLevel(level)) {
+    return -1;
+  }
+
+#ifdef ENABLE_COMPATIBLE_MM
+  if (rt->gc_enable && !(settingsFlag & DISABLE_GC_MEMORY_POLICY)) {
+    JS_SetGCMemoryPolicyLevel_GC(rt, level);
+  }
+#endif
+  return 0;
+}
+
 void LEPUS_SetMemoryLimit(LEPUSRuntime *rt, size_t limit) {
   CallGCFunc(JS_SetMemoryLimit_GC, rt, limit);
   rt->malloc_state.malloc_limit = limit;
@@ -47251,6 +47300,41 @@ QJS_STATIC LEPUSValue js_global_unescape(LEPUSContext *ctx,
   return string_buffer_end(b);
 }
 
+QJS_HIDE LEPUSValue js_lepus_set_gc_memory_policy(LEPUSContext *ctx,
+                                                  LEPUSValueConst this_val,
+                                                  int argc,
+                                                  LEPUSValueConst *argv) {
+  if (argc < 1 || !LEPUS_IsString(argv[0])) {
+    return LEPUS_ThrowTypeError(ctx, "GC memory policy must be a string");
+  }
+
+  size_t name_length;
+  const char *name = LEPUS_ToCStringLen(ctx, &name_length, argv[0]);
+  if (!name) {
+    return LEPUS_EXCEPTION;
+  }
+  HandleScope func_scope(ctx, &name, HANDLE_TYPE_CSTRING);
+
+  const GCMemoryPolicyEntry *entry =
+      FindGCMemoryPolicyEntryByName(name, name_length);
+  if (!entry) {
+    LEPUSValue exception =
+        LEPUS_ThrowRangeError(ctx, "unknown GC memory policy: %s", name);
+    if (!ctx->gc_enable) {
+      LEPUS_FreeCString(ctx, name);
+    }
+    return exception;
+  }
+
+  if (!ctx->gc_enable) {
+    LEPUS_FreeCString(ctx, name);
+  }
+  if (LEPUS_SetGCMemoryPolicyLevel(ctx->rt, entry->level) != 0) {
+    return LEPUS_ThrowInternalError(ctx, "failed to set GC memory policy");
+  }
+  return LEPUS_UNDEFINED;
+}
+
 /* global object */
 
 static LEPUSCFunctionListEntry js_global_funcs[] = {
@@ -47268,6 +47352,8 @@ static LEPUSCFunctionListEntry js_global_funcs[] = {
     LEPUS_PROP_DOUBLE_DEF("Infinity", 1.0 / 0.0, 0),
     LEPUS_PROP_DOUBLE_DEF("NaN", LEPUS_FLOAT64_NAN, 0),
     LEPUS_PROP_UNDEFINED_DEF("undefined", 0),
+    LEPUS_CFUNC_DEF("lepus_set_gc_memory_policy", 1,
+                    js_lepus_set_gc_memory_policy),
     LEPUS_CFUNC_DEF("eval", 1, js_global_eval),
     LEPUS_PROP_STRING_DEF("[Symbol.toStringTag]", "global",
                           LEPUS_PROP_CONFIGURABLE),

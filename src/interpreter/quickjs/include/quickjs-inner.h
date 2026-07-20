@@ -932,6 +932,7 @@ enum {
   CONCURRENT_DISABLE = 0b100000000000000,
   LEPUSNG_GC_INITIAL_HEAP_BIT0 = 0b1000000000000000,
   LEPUSNG_GC_INITIAL_HEAP_BIT1 = 0b10000000000000000,
+  DISABLE_GC_MEMORY_POLICY = 0b100000000000000000,
 };
 
 inline int settingsFlag = 0;
@@ -2073,6 +2074,8 @@ void JS_FreeContext_GC(LEPUSContext *ctx);
 LEPUSContext *JS_NewContextRaw_GC(LEPUSRuntime *rt);
 
 void JS_SetMemoryLimit_GC(LEPUSRuntime *rt, size_t limit);
+void JS_SetGCMemoryPolicyLevel_GC(LEPUSRuntime *rt,
+                                  LEPUSGCMemoryPolicyLevel level);
 void JS_RunGC_GC(LEPUSRuntime *rt);
 
 void JS_AddIntrinsicBaseObjects_GC(LEPUSContext *ctx);
@@ -2311,6 +2314,10 @@ QJS_HIDE void SetWeakState_GC(LEPUSRuntime *runtime, LEPUSValue *global_handle);
 
 QJS_HIDE void JS_SetGCPauseSuppressionMode_GC(LEPUSRuntime *rt, bool mode);
 QJS_HIDE bool JS_GetGCPauseSuppressionMode_GC(LEPUSRuntime *rt);
+QJS_HIDE LEPUSValue js_lepus_set_gc_memory_policy(LEPUSContext *ctx,
+                                                  LEPUSValueConst this_val,
+                                                  int argc,
+                                                  LEPUSValueConst *argv);
 QJS_HIDE JSString *js_alloc_string(LEPUSContext *ctx, int max_len,
                                    int is_wide_char);
 QJS_HIDE int JS_InitAtoms(LEPUSRuntime *rt);

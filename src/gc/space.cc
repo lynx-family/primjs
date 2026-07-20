@@ -176,7 +176,7 @@ size_t Space::TargetFreePageSizeByUtilization() const {
 }
 
 void Space::Extend(size_t deltaSize) {
-  if ((int64_t)(heapSize - usedHeapSize) >= (int64_t)kRosDefaultPageGroupSize) {
+  if (GetHeapHeadroom() >= kRosDefaultPageGroupSize) {
     page_groups.NewPageGroup();
     usedHeapSize += kRosDefaultPageGroupSize;
     usedMemSize += kRosDefaultPageGroupValidSize;
@@ -246,12 +246,14 @@ Space::~Space() {}
 
 // keep heapSize within legal boundaries
 void Space::AutoAdjustHeapSize(size_t allocSize, size_t allocatedInternalSize) {
-  // todo, update do not consider allocSize if it is a small size
-  // heapSize = std::max(heapSize, usedHeapSize + allocSize);
-  heapSize = heapSize + allocSize * 1.2;
-  // todo, confirm this condition
+  if (allocSize > 0) {
+    const size_t allocation_reserve = SaturatingAdd(allocSize, allocSize / 5);
+    heapSize =
+        SaturatingAdd(std::max(heapSize, usedHeapSize), allocation_reserve);
+  }
   if (newGroupNeeded) {
-    heapSize = std::max(heapSize, usedHeapSize + kRosDefaultPageGroupSize);
+    heapSize = std::max(heapSize,
+                        SaturatingAdd(usedHeapSize, kRosDefaultPageGroupSize));
     newGroupNeeded = false;
   }
   heapSize = std::min(heapGrowthLimit, heapSize);

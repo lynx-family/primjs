@@ -5,6 +5,7 @@
 #include <sys/mman.h>
 #endif
 
+#include <limits>
 #include <random>
 
 #include "gc/sizes.h"
@@ -17,6 +18,27 @@
 #define UNLIKELY(x) __builtin_expect(!!(x), 0)
 #endif
 namespace ROS_GC {
+constexpr size_t SaturatingAdd(size_t lhs, size_t rhs) {
+#ifndef _WIN32
+  const size_t max = std::numeric_limits<size_t>::max();
+#else
+  const size_t max = ~static_cast<size_t>(0);
+#endif
+  return lhs > max - rhs ? max : lhs + rhs;
+}
+
+constexpr size_t SaturatingMultiply(size_t lhs, size_t rhs) {
+#ifndef _WIN32
+  const size_t max = std::numeric_limits<size_t>::max();
+#else
+  const size_t max = ~static_cast<size_t>(0);
+#endif
+  if (lhs == 0 || rhs == 0) {
+    return 0;
+  }
+  return lhs > max / rhs ? max : lhs * rhs;
+}
+
 template <typename T>
 constexpr T AllocUtilRndDown(T x, size_t n) {
   return (x & static_cast<size_t>(-n));

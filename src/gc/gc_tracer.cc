@@ -7,6 +7,7 @@
 
 #include <algorithm>
 
+#include "gc/alloc_utils.h"
 #include "gc/collector_ms.h"
 #include "gc/logger.h"
 #include "gc/ros_allocator.h"
@@ -14,6 +15,8 @@
 namespace ROS_GC {
 
 void GCTracer::Start(GCEventType type, size_t alloc_size) {
+  ROSIMPL_ASSERT(!gc_event_is_running_, "nested GC events are not supported");
+  gc_event_is_running_ = true;
   previousRecord_ = currentRecord_;
   gcStartCount_++;
 
@@ -75,11 +78,16 @@ void GCTracer::Stop() {
   gcSpeedCache_ = 0.0;
   survivalRateCache_ = 0.0;
   UpdateHeapSizeLimit();
+  if (policy_recompute_pending_) {
+    RecomputeHeapSizeLimitForPolicyChange();
+    policy_recompute_pending_ = false;
+  }
+  gc_event_is_running_ = false;
 }
 
 void GCTracer::StartCmsGC() { Start(GCEventType::kEventCms); }
 void GCTracer::StopCmsGC() {
-  if (currentRecord_.type_ == GCEventType::kEventCms) {
+  if (currentRecord_.type_ == GCEventType::kEventCms && gc_event_is_running_) {
     Stop();
   }
 }
@@ -96,9 +104,9 @@ bool GCTracer::TriggerConcurrentMarking() {
   if (!CanTriggerConcurrentMarking()) {
     return false;
   }
-  auto heapSize = space_->heapSize;
   auto usedHeapSize = space_->usedHeapSize;
-  if ((int64_t)(heapSize - usedHeapSize) < (int64_t)kRosDefaultPageGroupSize) {
+  const size_t headroom = space_->GetHeapHeadroom();
+  if (headroom < kRosDefaultPageGroupSize) {
     return false;
   }
   constexpr double kSurvivalRateThreshold = 0.93;
@@ -113,7 +121,7 @@ bool GCTracer::TriggerConcurrentMarking() {
   auto sweeping_speed = CurrentSweepSpeed();
 
   // auto allocatedInternalSize = lastAllocatedInternalSize_;
-  auto alloc_duration = (heapSize - usedHeapSize) / alloc_speed;
+  auto alloc_duration = headroom / alloc_speed;
   auto mark_duration1 = lastAllocatedInternalSize_ / marking_speed;
   auto mark_duration2 = usedHeapSize / sweeping_speed;
 
@@ -139,7 +147,16 @@ bool GCTracer::TryTriggerConcurrentPhases() {
   return false;
 }
 
-size_t GCTracer::CalculateHeapSizeLimit() {
+size_t GCTracer::ScaleByQuarters(size_t value, uint8_t units) {
+  ROSIMPL_ASSERT(units >= 1 && units <= 8,
+                 "invalid GC headroom scale quarters");
+  const size_t quotient = value / 4;
+  const size_t remainder = value % 4;
+  return SaturatingAdd(SaturatingMultiply(quotient, units),
+                       (remainder * units) / 4);
+}
+
+size_t GCTracer::CalculateBaseHeapSizeLimit() {
   auto growingFactor = HeapGrowingFactor();
   size_t oldHeapSize = space_->usedHeapSize;
   size_t heapSize = oldHeapSize;
@@ -152,6 +169,43 @@ size_t GCTracer::CalculateHeapSizeLimit() {
   heapSize = std::min(space_->heapGrowthLimit, heapSize);
   heapSize = std::max(heapSize, kRosDefaultPageGroupSize);
   return heapSize;
+}
+
+size_t GCTracer::ApplyGCMemoryPolicy(size_t base_target,
+                                     uint8_t headroom_scale_quarters) const {
+  const size_t used_heap_size = space_->usedHeapSize;
+  if (base_target <= used_heap_size) {
+    return base_target;
+  }
+
+  const size_t base_headroom = base_target - used_heap_size;
+  const size_t scaled_headroom =
+      ScaleByQuarters(base_headroom, headroom_scale_quarters);
+  return std::min(SaturatingAdd(used_heap_size, scaled_headroom),
+                  space_->heapGrowthLimit);
+}
+
+size_t GCTracer::CalculateHeapSizeLimit() {
+  return ApplyGCMemoryPolicy(CalculateBaseHeapSizeLimit(),
+                             headroom_scale_quarters_);
+}
+
+void GCTracer::SetHeadroomScaleQuarters(uint8_t quarters) {
+  ROSIMPL_ASSERT(quarters >= 1 && quarters <= 8,
+                 "invalid GC headroom scale quarters");
+  headroom_scale_quarters_ = quarters;
+  if (gc_event_is_running_) {
+    policy_recompute_pending_ = true;
+    return;
+  }
+
+  RecomputeHeapSizeLimitForPolicyChange();
+}
+
+void GCTracer::RecomputeHeapSizeLimitForPolicyChange() {
+  const size_t new_heap_size = CalculateHeapSizeLimit();
+  space_->UpdateHeapSizeLimit(kPolicyChange, 0,
+                              ros_->GetAllocatedInternalSize(), new_heap_size);
 }
 
 void GCTracer::UpdateHeapSizeLimit() {
@@ -175,6 +229,7 @@ void GCTracer::UpdateHeapSizeLimit() {
   space_->UpdateHeapSizeLimit(is_parallel ? kParallel : kConSweep,
                               currentAllocSize_, lastAllocatedInternalSize_,
                               newHeapSize);
+  policy_recompute_pending_ = false;
 
   if (is_parallel) {
     heapCompactCounter_ = 0;
