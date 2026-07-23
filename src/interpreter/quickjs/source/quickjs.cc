@@ -34329,6 +34329,7 @@ ok:
 
 void LEPUS_IterateObject(LEPUSContext *ctx, LEPUSValue obj,
                          IterateObject callback, void *pfunc, void *raw_data) {
+  CheckObjectCtx(ctx, obj);
   CallGCFunc(JS_IterateObject_GC, ctx, obj, callback, pfunc, raw_data);
   if (!LEPUS_IsObject(obj)) return;
   LEPUSObject *p = LEPUS_VALUE_GET_OBJ(obj);
