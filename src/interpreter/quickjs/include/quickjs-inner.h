@@ -2375,6 +2375,8 @@ QJS_HIDE int js_parse_assign_expr(JSParseState *s, int parse_flags);
 QJS_HIDE int js_parse_expr(JSParseState *s);
 QJS_HIDE int js_parse_expr2(JSParseState *s, int parse_flags);
 QJS_HIDE __exception int next_token(JSParseState *s);
+QJS_HIDE void update_token_ident(JSParseState *s);
+QJS_HIDE void reparse_ident_token(JSParseState *s);
 struct JSToken;
 QJS_HIDE int js_parse_string(JSParseState *s, int sep, BOOL do_throw,
                              const uint8_t *p, JSToken *token,

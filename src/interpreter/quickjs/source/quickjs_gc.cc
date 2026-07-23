@@ -11754,6 +11754,12 @@ __exception int js_parse_function_decl2_GC(
 done:
   HeapObjStore(ctx, &s->cur_func, fd->parent);
 
+  /* Reparse identifiers after the function is terminated so that the
+     token is parsed in the enclosing function. This is necessary for
+     keywords such as 'await'/'yield' following a nested function
+     declaration and for arrow functions with an expression body. */
+  reparse_ident_token(s);
+
   /* create the function object */
   {
     int idx;

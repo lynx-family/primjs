@@ -18051,6 +18051,50 @@ fail:
 QJS_STATIC void js_gen_debugger_statement(JSParseState *s, LEPUSContext *ctx);
 #endif
 
+/* classify the current identifier token as a keyword according to the
+   current function type. Precondition: s->token.val == TOK_IDENT and
+   s->token.u.ident.{atom,has_escape} are set. */
+void update_token_ident(JSParseState *s) {
+  if (s->token.u.ident.atom <= JS_ATOM_LAST_KEYWORD ||
+      (s->token.u.ident.atom <= JS_ATOM_LAST_STRICT_KEYWORD && s->cur_func &&
+       (s->cur_func->js_mode & JS_MODE_STRICT)) ||
+      (s->token.u.ident.atom == JS_ATOM_yield && s->cur_func &&
+       ((s->cur_func->func_kind & JS_FUNC_GENERATOR) ||
+        (s->cur_func->func_type == JS_PARSE_FUNC_ARROW &&
+         !s->cur_func->in_function_body && s->cur_func->parent &&
+         (s->cur_func->parent->func_kind & JS_FUNC_GENERATOR)))) ||
+      (s->token.u.ident.atom == JS_ATOM_await &&
+       (s->is_module ||
+        (s->cur_func &&
+         ((s->cur_func->func_kind & JS_FUNC_ASYNC) ||
+          (s->cur_func->func_type == JS_PARSE_FUNC_ARROW &&
+           !s->cur_func->in_function_body && s->cur_func->parent &&
+           (s->cur_func->parent->func_kind & JS_FUNC_ASYNC))))))) {
+    if (s->token.u.ident.has_escape) {
+      s->token.u.ident.is_reserved = TRUE;
+      s->token.val = TOK_IDENT;
+    } else {
+      /* The keywords atoms are pre allocated */
+      s->token.val = s->token.u.ident.atom - 1 + TOK_FIRST_KEYWORD;
+    }
+  }
+}
+
+/* if the current token is an identifier or keyword, reparse it
+   according to the current function type. This is needed because the
+   token following a nested function declaration is read while the
+   nested (inner) function is still the current one, so keywords such
+   as 'await'/'yield' must be reclassified once the enclosing function
+   is restored. */
+void reparse_ident_token(JSParseState *s) {
+  if (s->token.val == TOK_IDENT ||
+      (s->token.val >= TOK_FIRST_KEYWORD && s->token.val <= TOK_LAST_KEYWORD)) {
+    s->token.val = TOK_IDENT;
+    s->token.u.ident.is_reserved = FALSE;
+    update_token_ident(s);
+  }
+}
+
 __exception int next_token(JSParseState *s) {
   const uint8_t *p;
   int c;
@@ -18272,31 +18316,8 @@ redo:
       s->token.u.ident.atom = LEPUS_NewAtomLen(s->ctx, buf, q - buf);
       s->token.u.ident.has_escape = ident_has_escape;
       s->token.u.ident.is_reserved = FALSE;
-      if (s->token.u.ident.atom <= JS_ATOM_LAST_KEYWORD ||
-          (s->token.u.ident.atom <= JS_ATOM_LAST_STRICT_KEYWORD &&
-           s->cur_func && (s->cur_func->js_mode & JS_MODE_STRICT)) ||
-          (s->token.u.ident.atom == JS_ATOM_yield && s->cur_func &&
-           ((s->cur_func->func_kind & JS_FUNC_GENERATOR) ||
-            (s->cur_func->func_type == JS_PARSE_FUNC_ARROW &&
-             !s->cur_func->in_function_body && s->cur_func->parent &&
-             (s->cur_func->parent->func_kind & JS_FUNC_GENERATOR)))) ||
-          (s->token.u.ident.atom == JS_ATOM_await &&
-           (s->is_module ||
-            (s->cur_func &&
-             ((s->cur_func->func_kind & JS_FUNC_ASYNC) ||
-              (s->cur_func->func_type == JS_PARSE_FUNC_ARROW &&
-               !s->cur_func->in_function_body && s->cur_func->parent &&
-               (s->cur_func->parent->func_kind & JS_FUNC_ASYNC))))))) {
-        if (ident_has_escape) {
-          s->token.u.ident.is_reserved = TRUE;
-          s->token.val = TOK_IDENT;
-        } else {
-          /* The keywords atoms are pre allocated */
-          s->token.val = s->token.u.ident.atom - 1 + TOK_FIRST_KEYWORD;
-        }
-      } else {
-        s->token.val = TOK_IDENT;
-      }
+      s->token.val = TOK_IDENT;
+      update_token_ident(s);
       break;
     case '#':
       /* private name */
@@ -30232,6 +30253,12 @@ QJS_STATIC __exception int js_parse_function_decl2(
   }
 done:
   s->cur_func = fd->parent;
+
+  /* Reparse identifiers after the function is terminated so that the
+     token is parsed in the enclosing function. This is necessary for
+     keywords such as 'await'/'yield' following a nested function
+     declaration and for arrow functions with an expression body. */
+  reparse_ident_token(s);
 
   /* create the function object */
   {
