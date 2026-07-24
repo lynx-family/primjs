@@ -943,6 +943,7 @@ int init_bigint_name(LEPUSRuntime *rt) {
 }
 
 bool gc_enabled() {
+  return true;
 #ifdef ENABLE_COMPATIBLE_MM
 #if defined(ENABLE_TRACING_GC) || defined(ENABLE_TT_ANDROID_MODE)
   return true;
