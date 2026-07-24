@@ -3,6 +3,8 @@
 // LICENSE file in the root directory of this source tree.
 
 #include <cstring>
+#include <string>
+#include <vector>
 
 #include "gtest/gtest.h"
 #include "inspector/debugger/debugger.h"
@@ -61,6 +63,52 @@ class VarInfoOutsideTest : public ::testing::Test {
       }
     }
     return nullptr;
+  }
+
+  void CollectFunctionBytecodes(LEPUSFunctionBytecode *b,
+                                std::vector<LEPUSFunctionBytecode *> *out) {
+    if (!b) return;
+    out->push_back(b);
+    for (int i = 0; i < b->cpool_count; i++) {
+      if (LEPUS_VALUE_IS_FUNCTION_BYTECODE(b->cpool[i])) {
+        CollectFunctionBytecodes(
+            (LEPUSFunctionBytecode *)LEPUS_VALUE_GET_PTR(b->cpool[i]), out);
+      }
+    }
+  }
+
+  LEPUSFunctionBytecode *FindFunctionBySource(
+      const std::vector<LEPUSFunctionBytecode *> &functions,
+      const std::string &source) {
+    for (LEPUSFunctionBytecode *function : functions) {
+      if (!function || !function->has_debug || !function->debug.source) {
+        continue;
+      }
+      if (std::string(function->debug.source, function->debug.source_len) ==
+          source) {
+        return function;
+      }
+    }
+    return nullptr;
+  }
+
+  void ExpectFunctionSourceOffset(
+      const std::string &root_source,
+      const std::vector<LEPUSFunctionBytecode *> &functions,
+      const std::string &function_source) {
+    SCOPED_TRACE(function_source);
+    auto function_offset = root_source.find(function_source);
+    ASSERT_NE(function_offset, std::string::npos);
+    LEPUSFunctionBytecode *function =
+        FindFunctionBySource(functions, function_source);
+    ASSERT_NE(function, nullptr);
+    EXPECT_EQ(function->debug.source_offset,
+              static_cast<int32_t>(function_offset));
+    EXPECT_EQ(function->debug.source_len,
+              static_cast<int32_t>(function_source.length()));
+    EXPECT_EQ(root_source.substr(function->debug.source_offset,
+                                 function->debug.source_len),
+              function_source);
   }
 
   LEPUSRuntime *rt_;
@@ -1060,5 +1108,91 @@ TEST_F(VarInfoOutsideTest, VarDefsPreservedWhenDebugInfoOutsideDisabled) {
   if (!read_ctx->rt->gc_enable) LEPUS_FreeValue(read_ctx, read_val);
   LEPUS_FreeContext(read_ctx);
   if (!ctx_->rt->gc_enable) lepus_free(ctx_, bc);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, compiled);
+}
+
+TEST_F(VarInfoOutsideTest, DebugSourceOffsetMatchesOriginalSourceSlice) {
+  const std::string src =
+      "const prefix = 1;\n"
+      "class Base {}\n"
+      "class Derived extends Base {}\n"
+      "function outer(a) {\n"
+      "  const arrow = (b) => b + a;\n"
+      "  class Box {\n"
+      "    constructor(value) {\n"
+      "      this.value = value;\n"
+      "    }\n"
+      "    method(delta) {\n"
+      "      return arrow(this.value + delta);\n"
+      "    }\n"
+      "  }\n"
+      "  return new Box(prefix).method(2);\n"
+      "}\n"
+      "outer(3);\n";
+
+  LEPUSValue compiled = CompileOnly(src.c_str());
+  ASSERT_FALSE(LEPUS_IsException(compiled));
+
+  auto *top = (LEPUSFunctionBytecode *)LEPUS_VALUE_GET_PTR(compiled);
+  std::vector<LEPUSFunctionBytecode *> functions;
+  CollectFunctionBytecodes(top, &functions);
+  ASSERT_GE(functions.size(), 6u);
+
+  bool checked_nested_function = false;
+  size_t checked_function_count = 0;
+  const size_t src_len = src.length();
+  for (LEPUSFunctionBytecode *function : functions) {
+    ASSERT_TRUE(function->has_debug);
+    const char *debug_source = function->debug.source;
+    int32_t source_len = function->debug.source_len;
+    int32_t source_offset = function->debug.source_offset;
+
+    if (!debug_source) continue;
+    checked_function_count++;
+    ASSERT_GE(source_len, 0);
+    ASSERT_GE(source_offset, 0);
+    ASSERT_LE(static_cast<size_t>(source_offset), src_len);
+    ASSERT_LE(static_cast<size_t>(source_len), src_len);
+    ASSERT_LE(
+        static_cast<size_t>(source_offset) + static_cast<size_t>(source_len),
+        src_len);
+
+    std::string expected(src.c_str() + source_offset, source_len);
+    EXPECT_EQ(expected, std::string(debug_source, source_len));
+    if (source_offset > 0) checked_nested_function = true;
+  }
+  EXPECT_GT(checked_function_count, 0u);
+  EXPECT_TRUE(checked_nested_function);
+
+  ExpectFunctionSourceOffset(src, functions, "class Base {}");
+  ExpectFunctionSourceOffset(src, functions, "class Derived extends Base {}");
+  ExpectFunctionSourceOffset(src, functions,
+                             "function outer(a) {\n"
+                             "  const arrow = (b) => b + a;\n"
+                             "  class Box {\n"
+                             "    constructor(value) {\n"
+                             "      this.value = value;\n"
+                             "    }\n"
+                             "    method(delta) {\n"
+                             "      return arrow(this.value + delta);\n"
+                             "    }\n"
+                             "  }\n"
+                             "  return new Box(prefix).method(2);\n"
+                             "}");
+  ExpectFunctionSourceOffset(src, functions, "(b) => b + a");
+  ExpectFunctionSourceOffset(src, functions,
+                             "class Box {\n"
+                             "    constructor(value) {\n"
+                             "      this.value = value;\n"
+                             "    }\n"
+                             "    method(delta) {\n"
+                             "      return arrow(this.value + delta);\n"
+                             "    }\n"
+                             "  }");
+  ExpectFunctionSourceOffset(src, functions,
+                             "method(delta) {\n"
+                             "      return arrow(this.value + delta);\n"
+                             "    }");
+
   if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, compiled);
 }

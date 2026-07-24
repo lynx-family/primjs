@@ -1000,6 +1000,7 @@ typedef struct LEPUSFunctionBytecode {
     JSAtom filename;
     int line_num;
     int source_len;
+    int source_offset;
     int pc2line_len;
 #ifdef ENABLE_QUICKJS_DEBUGGER
     int64_t column_num;
@@ -2579,6 +2580,8 @@ typedef struct JSParseState {
   const uint8_t *last_ptr;
   const uint8_t *buf_ptr;
   const uint8_t *buf_end;
+  const uint8_t *source_start;
+  const uint8_t *source_end;
   // <Primjs begin>
   int debugger_last_line_num;
   const uint8_t *line_begin_ptr;
@@ -2953,6 +2956,7 @@ typedef struct JSFunctionDef {
   const char *src_start;
   char *source; /* raw source, utf-8 encoded */
   int source_len;
+  int source_offset;
 
   LEPUSModuleDef *module; /* != NULL when parsing a module */
 } JSFunctionDef;

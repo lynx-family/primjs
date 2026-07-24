@@ -265,6 +265,12 @@ void SetFunctionDebugSource(LEPUSContext *ctx, LEPUSFunctionBytecode *b,
   return;
 }
 
+void SetFunctionDebugSourceOffset(LEPUSFunctionBytecode *b,
+                                  int32_t source_offset) {
+  if (!b || !b->has_debug) return;
+  b->debug.source_offset = source_offset;
+}
+
 void SetFunctionScript(LEPUSFunctionBytecode *b, LEPUSScriptSource *script) {
   LEPUS_HeapObjStoreNoCtx(&b->script, script);
 }
@@ -382,6 +388,15 @@ fail:
 int32_t GetFunctionDebugSourceLen(LEPUSContext *ctx, LEPUSFunctionBytecode *b) {
   if (b && b->has_debug) {
     return b->debug.source_len;
+  } else {
+    return -1;
+  }
+}
+
+int32_t GetFunctionDebugSourceOffset(LEPUSContext *ctx,
+                                     LEPUSFunctionBytecode *b) {
+  if (b && b->has_debug) {
+    return b->debug.source_offset;
   } else {
     return -1;
   }
@@ -788,6 +803,7 @@ QJS_HIDE void DebuggerParseScript(LEPUSContext *ctx, const char *input,
 
   if (script) {
     fd->source_len = input_len;
+    fd->source_offset = 0;
     if (script->source) {
       if (ctx->gc_enable || err) {
         // fd->source free in js_free_function_def

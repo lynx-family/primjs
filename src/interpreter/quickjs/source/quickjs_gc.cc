@@ -11317,6 +11317,7 @@ JSFunctionDef *js_new_function_def_GC(LEPUSContext *ctx, JSFunctionDef *parent,
 
   fd->filename = LEPUS_NewAtom(ctx, filename);
   fd->line_num = line_num;
+  fd->source_offset = -1;
 #ifdef ENABLE_QUICKJS_DEBUGGER
   fd->debugger_cpool_idx = -1;
   fd->statement_cpool_idx = -1;
@@ -11332,6 +11333,17 @@ JSFunctionDef *js_new_function_def_GC(LEPUSContext *ctx, JSFunctionDef *parent,
 #endif
 
 #ifndef NO_QUICKJS_COMPILER
+static int js_parse_source_offset_gc(JSParseState *s, const uint8_t *ptr) {
+  if (!s->source_start || !s->source_end || !ptr) return -1;
+  uintptr_t source_start = reinterpret_cast<uintptr_t>(s->source_start);
+  uintptr_t source_end = reinterpret_cast<uintptr_t>(s->source_end);
+  uintptr_t source_ptr = reinterpret_cast<uintptr_t>(ptr);
+  if (source_ptr < source_start || source_ptr > source_end) return -1;
+  uintptr_t source_offset = source_ptr - source_start;
+  if (source_offset > static_cast<uintptr_t>(INT32_MAX)) return -1;
+  return static_cast<int>(source_offset);
+}
+
 /* func_name must be JS_ATOM_NULL for JS_PARSE_FUNC_STATEMENT and
    JS_PARSE_FUNC_EXPR, JS_PARSE_FUNC_ARROW and JS_PARSE_FUNC_VAR */
 __exception int js_parse_function_decl2_GC(
@@ -11717,6 +11729,7 @@ __exception int js_parse_function_decl2_GC(
         /* the end of the function source code is after the last
            token of the function source stored into s->last_ptr */
         fd->source_len = s->last_ptr - ptr;
+        fd->source_offset = js_parse_source_offset_gc(s, ptr);
         fd->source = js_strmalloc_gc(ctx, (const char *)ptr, fd->source_len);
         if (!fd->source) goto fail;
         WriteBarrierNoStore(ctx, (void *)fd->source);
@@ -11738,6 +11751,7 @@ __exception int js_parse_function_decl2_GC(
   if (!(fd->js_mode & JS_MODE_STRIP)) {
     /* save the function source code */
     fd->source_len = s->buf_ptr - ptr;
+    fd->source_offset = js_parse_source_offset_gc(s, ptr);
     fd->source = js_strmalloc_gc(ctx, (const char *)ptr, fd->source_len);
     if (!fd->source) goto fail;
     WriteBarrierNoStore(ctx, (void *)fd->source);

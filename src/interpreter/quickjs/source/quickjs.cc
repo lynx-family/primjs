@@ -19398,6 +19398,7 @@ QJS_STATIC __exception int js_parse_function_decl2(
     JSParseState *s, JSParseFunctionEnum func_type,
     JSFunctionKindEnum func_kind, JSAtom func_name, const uint8_t *ptr,
     int function_line_num, JSParseExportEnum export_flag, JSFunctionDef **pfd);
+QJS_STATIC int js_parse_source_offset(JSParseState *s, const uint8_t *ptr);
 QJS_STATIC __exception int js_parse_unary(JSParseState *s,
                                           int exponentiation_flag);
 QJS_STATIC void push_break_entry(JSFunctionDef *fd, BlockEnv *be,
@@ -19992,6 +19993,17 @@ QJS_STATIC __exception int js_parse_left_hand_side_expr(JSParseState *s) {
   return js_parse_postfix_expr(s, PF_POSTFIX_CALL);
 }
 
+QJS_STATIC int js_parse_source_offset(JSParseState *s, const uint8_t *ptr) {
+  if (!s->source_start || !s->source_end || !ptr) return -1;
+  uintptr_t source_start = reinterpret_cast<uintptr_t>(s->source_start);
+  uintptr_t source_end = reinterpret_cast<uintptr_t>(s->source_end);
+  uintptr_t source_ptr = reinterpret_cast<uintptr_t>(ptr);
+  if (source_ptr < source_start || source_ptr > source_end) return -1;
+  uintptr_t source_offset = source_ptr - source_start;
+  if (source_offset > static_cast<uintptr_t>(INT32_MAX)) return -1;
+  return static_cast<int>(source_offset);
+}
+
 /* XXX: is there is nicer solution ? */
 __exception int js_parse_class_default_ctor(JSParseState *s, BOOL has_super,
                                             JSFunctionDef **pfd) {
@@ -20508,6 +20520,7 @@ __exception int js_parse_class(JSParseState *s, BOOL is_class_expr,
       slot.off += offset;
     }
     ctor_fd->source_len = s->buf_ptr - class_start_ptr;
+    ctor_fd->source_offset = js_parse_source_offset(s, class_start_ptr);
     if (!ctx->gc_enable) {
       system_free(ctor_fd->source);
       ctor_fd->source =
@@ -25439,6 +25452,7 @@ QJS_STATIC JSFunctionDef *js_new_function_def(LEPUSContext *ctx,
 
   fd->filename = LEPUS_NewAtom(ctx, filename);
   fd->line_num = line_num;
+  fd->source_offset = -1;
 #ifdef ENABLE_QUICKJS_DEBUGGER
   fd->debugger_cpool_idx = -1;
   fd->statement_cpool_idx = -1;
@@ -29657,6 +29671,7 @@ LEPUSValue js_create_function(LEPUSContext *ctx, JSFunctionDef *fd) {
     HeapObjStore(ctx, &b->debug.source, fd->source);
     fd->source = nullptr;
     b->debug.source_len = fd->source_len;
+    b->debug.source_offset = fd->source_offset;
 
     // free excess memory
     HeapObjStore(
@@ -30350,6 +30365,7 @@ QJS_STATIC __exception int js_parse_function_decl2(
         /* the end of the function source code is after the last
            token of the function source stored into s->last_ptr */
         fd->source_len = s->last_ptr - ptr;
+        fd->source_offset = js_parse_source_offset(s, ptr);
         fd->source = js_strmalloc((const char *)ptr, fd->source_len);
         if (!fd->source) goto fail;
         WriteBarrierNoStore(ctx, (void *)fd->source);
@@ -30371,6 +30387,7 @@ QJS_STATIC __exception int js_parse_function_decl2(
   if (!(fd->js_mode & JS_MODE_STRIP)) {
     /* save the function source code */
     fd->source_len = s->buf_ptr - ptr;
+    fd->source_offset = js_parse_source_offset(s, ptr);
     fd->source = js_strmalloc((const char *)ptr, fd->source_len);
     if (!fd->source) goto fail;
     WriteBarrierNoStore(ctx, (void *)fd->source);
@@ -30557,6 +30574,8 @@ void js_parse_init(LEPUSContext *ctx, JSParseState *s, const char *input,
   s->line_num = 1 + start_line_number;
   s->buf_ptr = (const uint8_t *)input;
   s->buf_end = s->buf_ptr + input_len;
+  s->source_start = s->buf_ptr;
+  s->source_end = s->buf_end;
   s->token.val = ' ';
   s->token.line_num = 1 + start_line_number;
 
