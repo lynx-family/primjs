@@ -20,7 +20,7 @@ class Finalizer;
 typedef struct JSString JSAtomStruct;
 struct LEPUSRuntime;
 struct JSAsyncFunctionState;
-struct JSProperty;
+struct JSPropertyGC;
 struct JSRegExp;
 struct BCReaderState;
 struct JSToken;
@@ -323,7 +323,8 @@ class Visitor {
                                 GCWorkStack &workStack) noexcept;
   static void PushObjFunc(LEPUSObject *obj, GCWorkStack &workStack) noexcept;
   static void PushObjRegExp(LEPUSObject *obj, GCWorkStack &workStack) noexcept;
-  static void PushObjProperty(JSProperty *pr, GCWorkStack &workStack) noexcept;
+  static void PushObjProperty(JSPropertyGC *pr,
+                              GCWorkStack &workStack) noexcept;
 
   void DoFinalizer(void *ptr);
 
@@ -394,6 +395,7 @@ class Finalizer {
   LEPUSRuntime *rt_;
 };
 
-void JSPropertyStore(LEPUSContext *ctx, LEPUSObject *obj, JSProperty *new_prop);
+void JSPropertyStore(LEPUSContext *ctx, LEPUSObject *obj,
+                     JSPropertyGC *new_prop);
 
 #endif

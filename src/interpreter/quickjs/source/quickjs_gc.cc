@@ -2086,7 +2086,7 @@ static int add_shape_property(LEPUSContext *ctx, JSShape **psh, LEPUSObject *p,
     js_shape_hash_link(rt, sh);
   }
   /* Initialize the new shape property.
-     The object property at p->prop[sh->prop_count] is uninitialized */
+     The object property at p->gc_prop[sh->prop_count] is uninitialized */
   prop = get_shape_prop(sh);
   pr = &prop[sh->prop_count++];
   pr->atom = atom;
@@ -2155,13 +2155,33 @@ static inline void HeapObjStoreShape(LEPUSContext *ctx, void *fieldAddr,
   }
 }
 
+static JSPropertyGetSet *js_alloc_property_getset_GC(LEPUSContext *ctx) {
+  JSPropertyGetSet *getset = static_cast<JSPropertyGetSet *>(
+      lepus_malloc_gc(ctx, sizeof(*getset), ALLOC_TAG_JSValueArray));
+  if (getset) {
+    getset->getter = nullptr;
+    getset->setter = nullptr;
+  }
+  return getset;
+}
+
+static JSPropertyAutoInit *js_alloc_property_autoinit_GC(LEPUSContext *ctx) {
+  return static_cast<JSPropertyAutoInit *>(
+      lepus_malloc_gc(ctx, sizeof(JSPropertyAutoInit), ALLOC_TAG_WITHOUT_PTR));
+}
+
 QJS_HIDE LEPUSValue JS_NewObjectFromShape_GC(LEPUSContext *ctx, JSShape *sh,
                                              LEPUSClassID class_id) {
   HandleScope func_scope(ctx, get_alloc_from_shape(sh),
                          HANDLE_TYPE_DIR_HEAP_OBJ);
   LEPUSObject *p;
+  bool use_inline_properties;
 
   // js_trigger_gc(ctx->rt, sizeof(LEPUSObject));
+  /* ctx and tid are reused as the first two inline property slots, so they can
+     only be kept when the object does not use inline properties. */
+  use_inline_properties =
+      !ctx->object_ctx_check && sh->prop_size <= LEPUS_IN_OBJECT_PROPERTY_SIZE;
   p = static_cast<LEPUSObject *>(
       lepus_malloc_gc(ctx, LEPUS_OBJECT_SIZE, ALLOC_TAG_LEPUSObject));
   if (unlikely(!p)) goto fail;
@@ -2169,12 +2189,10 @@ QJS_HIDE LEPUSValue JS_NewObjectFromShape_GC(LEPUSContext *ctx, JSShape *sh,
   HeapObjStoreShape(ctx, &p->shape, sh);
   p->class_id = class_id;
   p->extensible = TRUE;
-  if (unlikely(ctx->object_ctx_check)) {
-    p->ctx = ctx;
-    p->tid = get_tid();
-  } else {
-    p->ctx = nullptr;
-    p->tid = 0;
+  p->free_mark = !use_inline_properties;
+  if (!use_inline_properties) {
+    p->ctx = ctx->object_ctx_check ? ctx : nullptr;
+    p->tid = ctx->object_ctx_check ? get_tid() : 0;
   }
 
   switch (class_id) {
@@ -2220,25 +2238,25 @@ QJS_HIDE LEPUSValue JS_NewObjectFromShape_GC(LEPUSContext *ctx, JSShape *sh,
       break;
   }
 
-  if (sh->prop_size > LEPUS_IN_OBJECT_PROPERTY_SIZE) {
-    HeapObjStore(ctx, &p->prop,
-                 static_cast<JSProperty *>(
-                     lepus_malloc_gc(ctx, sizeof(JSProperty) * sh->prop_size,
+  if (!use_inline_properties) {
+    HeapObjStore(ctx, &p->gc_prop,
+                 static_cast<JSPropertyGC *>(
+                     lepus_malloc_gc(ctx, sizeof(JSPropertyGC) * sh->prop_size,
                                      ALLOC_TAG_JSPropertyArray)));
   } else {
-    p->prop = (JSProperty *)&(p->link);
+    p->gc_prop = reinterpret_cast<JSPropertyGC *>(&p->ctx);
   }
-  if (unlikely(!p->prop)) {
+  if (unlikely(!p->gc_prop)) {
   fail:
     js_free_shape(sh);
     return LEPUS_EXCEPTION;
   }
 
   if (class_id == JS_CLASS_ARRAY) {
-    JSProperty *pr;
+    JSPropertyGC *pr;
     /* the length property is always the first one */
     if (likely(sh == ctx->array_shape)) {
-      pr = &p->prop[0];
+      pr = &p->gc_prop[0];
     } else {
       /* only used for the first array */
       /* cannot fail */
@@ -2247,7 +2265,7 @@ QJS_HIDE LEPUSValue JS_NewObjectFromShape_GC(LEPUSContext *ctx, JSShape *sh,
     }
     pr->u.value = LEPUS_NewInt32(ctx, 0);
   } else if (class_id == JS_CLASS_C_FUNCTION) {
-    p->prop[0].u.value = LEPUS_UNDEFINED;
+    p->gc_prop[0].u.value = LEPUS_UNDEFINED;
   }
   return LEPUS_MKPTR(LEPUS_TAG_OBJECT, p);
 }
@@ -2366,7 +2384,7 @@ LEPUSValue JS_NewObject_GC(LEPUSContext *ctx) {
 static void js_function_set_properties(LEPUSContext *ctx, LEPUSObject *p,
                                        JSAtom name, int len) {
   /* ES6 feature non compatible with ES5.1: length is configurable */
-  JSProperty *pr;
+  JSPropertyGC *pr;
   static constexpr int32_t prop_flag = LEPUS_PROP_CONFIGURABLE;
   pr = add_property_gc(ctx, p, JS_ATOM_length, prop_flag);
   if (pr) pr->u.value = LEPUS_NewInt32(ctx, len);
@@ -2553,13 +2571,13 @@ LEPUSValue JS_NewCFunctionData_GC(LEPUSContext *ctx, LEPUSCFunctionData *func,
   return func_obj;
 }
 
-static void free_property(LEPUSRuntime *rt, JSProperty *pr, int prop_flags) {}
+static void free_property(LEPUSRuntime *rt, JSPropertyGC *pr, int prop_flags) {}
 #ifdef QJS_UNITTEST
 static JSShapeProperty *find_own_property(
 #else
 QJS_STATIC force_inline JSShapeProperty *find_own_property(
 #endif
-    JSProperty **ppr, LEPUSObject *p, JSAtom atom) {
+    JSPropertyGC **ppr, LEPUSObject *p, JSAtom atom) {
   JSShape *sh;
   JSShapeProperty *pr, *prop;
   intptr_t h;
@@ -2570,7 +2588,7 @@ QJS_STATIC force_inline JSShapeProperty *find_own_property(
   while (h) {
     pr = &prop[h - 1];
     if (likely(pr->atom == atom)) {
-      *ppr = &p->prop[h - 1];
+      *ppr = &p->gc_prop[h - 1];
       /* the compiler should be able to assume that pr != NULL here */
       return pr;
     }
@@ -2865,7 +2883,7 @@ int JS_IsInstanceOf_GC(LEPUSContext *ctx, LEPUSValueConst val,
 }
 
 #ifdef QJS_UNITTEST
-static LEPUSValue GetLEPUSPropertyValue(JSProperty *pr) {
+static LEPUSValue GetLEPUSPropertyValue(JSPropertyGC *pr) {
   if (pr) {
     return pr->u.value;
   }
@@ -2881,23 +2899,20 @@ static uint32_t GetLEPUSShapePropertyFlags(JSShapeProperty *prs) {
 #endif
 
 /* return the value associated to the autoinit property or an exception */
-typedef LEPUSValue JSAutoInitFunc(LEPUSContext *ctx, LEPUSObject *p,
-                                  JSAtom atom, void *opaque);
-
 static int JS_AutoInitProperty(LEPUSContext *ctx, LEPUSObject *p, JSAtom prop,
-                               JSProperty *pr, JSShapeProperty *prs) {
+                               JSPropertyGC *pr, JSShapeProperty *prs) {
   LEPUSValue val;
   JSAutoInitFunc *func;
+  JSPropertyAutoInit *autoinit = pr->u.autoinit;
 
   if (js_shape_prepare_update(ctx, p, &prs)) return -1;
-  uintptr_t *opaque_ptr = (uintptr_t *)&(pr->u.init.opaque);
+  uintptr_t *opaque_ptr = reinterpret_cast<uintptr_t *>(&autoinit->opaque);
   *(opaque_ptr) = (*opaque_ptr) & (~static_cast<uintptr_t>(LEPUS_CPOINTER_TAG));
-  func = pr->u.init.init_func;
-  void *opaque = pr->u.init.opaque;
+  func = js_autoinit_get_func(pr);
+  void *opaque = autoinit->opaque;
   /* 'func' shall not modify the object properties 'pr' */
   val = func(ctx, p, prop, opaque);
   HandleScope func_scope(ctx, &val, HANDLE_TYPE_LEPUS_VALUE);
-  pr->u.init.opaque = NULL;
   prs->flags &= ~LEPUS_PROP_TMASK;
   pr->u.value = LEPUS_UNDEFINED;
   if (LEPUS_IsException(val)) return -1;
@@ -2916,7 +2931,7 @@ LEPUSValue JS_GetPropertyInternalImpl_GC(LEPUSContext *ctx, LEPUSValueConst obj,
                                          JSAtom prop, LEPUSValueConst this_obj,
                                          BOOL throw_ref_error) {
   LEPUSObject *p = nullptr;
-  JSProperty *pr;
+  JSPropertyGC *pr;
   JSShapeProperty *prs;
   int64_t tag;
   char buf[ATOM_GET_STR_BUF_SIZE];
@@ -3005,11 +3020,11 @@ LEPUSValue JS_GetPropertyInternalImpl_GC(LEPUSContext *ctx, LEPUSValueConst obj,
       /* found */
       if (unlikely(prs->flags & LEPUS_PROP_TMASK)) {
         if ((prs->flags & LEPUS_PROP_TMASK) == LEPUS_PROP_GETSET) {
-          if (unlikely(!pr->u.getset.getter)) {
+          if (unlikely(!pr->u.getset->getter)) {
             return LEPUS_UNDEFINED;
           } else {
             LEPUSValue func =
-                LEPUS_MKPTR(LEPUS_TAG_OBJECT, pr->u.getset.getter);
+                LEPUS_MKPTR(LEPUS_TAG_OBJECT, pr->u.getset->getter);
             LEPUSValue ret = JS_CallFree_GC(ctx, func, this_obj, 0, NULL);
             ctx->ptr_handles->PushLEPUSValuePtr(ret);
             return ret;
@@ -3101,7 +3116,7 @@ int JS_DefinePrivateField_GC(LEPUSContext *ctx, LEPUSValueConst obj,
                              LEPUSValueConst name, LEPUSValue val) {
   LEPUSObject *p;
   JSShapeProperty *prs;
-  JSProperty *pr;
+  JSPropertyGC *pr;
   JSAtom prop;
   HandleScope func_scope(ctx->rt);
 
@@ -3135,7 +3150,7 @@ LEPUSValue JS_GetPrivateField_GC(LEPUSContext *ctx, LEPUSValueConst obj,
                                  LEPUSValueConst name) {
   LEPUSObject *p;
   JSShapeProperty *prs;
-  JSProperty *pr;
+  JSPropertyGC *pr;
   JSAtom prop;
 
   if (unlikely(LEPUS_VALUE_IS_NOT_OBJECT(obj)))
@@ -3158,7 +3173,7 @@ int JS_SetPrivateField_GC(LEPUSContext *ctx, LEPUSValueConst obj,
                           LEPUSValueConst name, LEPUSValue val) {
   LEPUSObject *p;
   JSShapeProperty *prs;
-  JSProperty *pr;
+  JSPropertyGC *pr;
   JSAtom prop;
 
   if (unlikely(LEPUS_VALUE_IS_NOT_OBJECT(obj))) {
@@ -3187,7 +3202,7 @@ int JS_AddBrand_GC(LEPUSContext *ctx, LEPUSValueConst obj,
                    LEPUSValueConst home_obj) {
   LEPUSObject *p, *p1;
   JSShapeProperty *prs;
-  JSProperty *pr;
+  JSPropertyGC *pr;
   LEPUSValue brand = LEPUS_UNDEFINED;
   HandleScope func_scope(ctx, &brand, HANDLE_TYPE_LEPUS_VALUE);
   JSAtom brand_atom;
@@ -3228,7 +3243,7 @@ int JS_CheckBrand_GC(LEPUSContext *ctx, LEPUSValueConst obj,
                      LEPUSValueConst func) {
   LEPUSObject *p, *p1, *home_obj;
   JSShapeProperty *prs;
-  JSProperty *pr;
+  JSPropertyGC *pr;
   LEPUSValueConst brand = LEPUS_UNDEFINED;
   HandleScope func_scope(ctx, &brand, HANDLE_TYPE_LEPUS_VALUE);
 
@@ -3323,7 +3338,7 @@ static int __exception JS_GetOwnPropertyNamesInternal(LEPUSContext *ctx,
            name space (implicit GetOwnProperty) */
         if (unlikely((prs->flags & LEPUS_PROP_TMASK) == LEPUS_PROP_VARREF) &&
             (flags & (LEPUS_GPN_SET_ENUM | LEPUS_GPN_ENUM_ONLY))) {
-          JSVarRef *var_ref = p->prop[i].u.var_ref;
+          JSVarRef *var_ref = p->gc_prop[i].u.var_ref;
           if (unlikely(LEPUS_IsUninitialized(*var_ref->pvalue))) {
             JS_ThrowReferenceErrorUninitialized_GC(ctx, prs->atom);
             return -1;
@@ -3497,7 +3512,7 @@ QJS_STATIC int JS_GetOwnPropertyInternal(LEPUSContext *ctx,
                                          LEPUSPropertyDescriptor *desc,
                                          LEPUSObject *p, JSAtom prop) {
   JSShapeProperty *prs;
-  JSProperty *pr;
+  JSPropertyGC *pr;
 
 retry:
   prs = find_own_property(&pr, p, prop);
@@ -3510,10 +3525,10 @@ retry:
       if (unlikely(prs->flags & LEPUS_PROP_TMASK)) {
         if ((prs->flags & LEPUS_PROP_TMASK) == LEPUS_PROP_GETSET) {
           desc->flags |= LEPUS_PROP_GETSET;
-          if (pr->u.getset.getter)
-            desc->getter = LEPUS_MKPTR(LEPUS_TAG_OBJECT, pr->u.getset.getter);
-          if (pr->u.getset.setter)
-            desc->setter = LEPUS_MKPTR(LEPUS_TAG_OBJECT, pr->u.getset.setter);
+          if (pr->u.getset->getter)
+            desc->getter = LEPUS_MKPTR(LEPUS_TAG_OBJECT, pr->u.getset->getter);
+          if (pr->u.getset->setter)
+            desc->setter = LEPUS_MKPTR(LEPUS_TAG_OBJECT, pr->u.getset->setter);
         } else if ((prs->flags & LEPUS_PROP_TMASK) == LEPUS_PROP_VARREF) {
           LEPUSValue val = *pr->u.var_ref->pvalue;
           if (unlikely(LEPUS_IsUninitialized(val))) {
@@ -3816,8 +3831,8 @@ LEPUSValue JS_GetPropertyStr_GC(LEPUSContext *ctx, LEPUSValueConst this_obj,
 
 /* Note: the property value is not initialized. Return NULL if memory
    error. */
-JSProperty *add_property_gc(LEPUSContext *ctx, LEPUSObject *p, JSAtom prop,
-                            int prop_flags) {
+JSPropertyGC *add_property_gc(LEPUSContext *ctx, LEPUSObject *p, JSAtom prop,
+                              int prop_flags) {
   JSShape *sh, *new_sh;
 
   sh = p->shape;
@@ -3831,34 +3846,34 @@ JSProperty *add_property_gc(LEPUSContext *ctx, LEPUSObject *p, JSAtom prop,
       /* matching shape found: use it */
       /*  the property array may need to be resized */
       if (new_sh->prop_size != sh->prop_size) {
-        JSProperty *new_prop;
-        if (IS_IN_OBJECT_PROP(p, p->prop)) {
+        JSPropertyGC *new_prop;
+        if (IS_IN_OBJECT_PROP(p, p->gc_prop)) {
           if (new_sh->prop_size <= LEPUS_IN_OBJECT_PROPERTY_SIZE) {
-            new_prop = p->prop;
+            new_prop = p->gc_prop;
           } else {
-            new_prop = static_cast<JSProperty *>(
-                lepus_malloc_gc(ctx, sizeof(p->prop[0]) * new_sh->prop_size,
+            new_prop = static_cast<JSPropertyGC *>(
+                lepus_malloc_gc(ctx, sizeof(p->gc_prop[0]) * new_sh->prop_size,
                                 ALLOC_TAG_JSPropertyArray));
             if (!new_prop) return NULL;
             for (size_t i = 0; i < LEPUS_IN_OBJECT_PROPERTY_SIZE; i++) {
-              new_prop[i] = p->prop[i];
+              new_prop[i] = p->gc_prop[i];
             }
             if (UNLIKELY(ctx->con_mark_state))
               JSPropertyStore(ctx, p, new_prop);
           }
         } else {
-          new_prop = static_cast<JSProperty *>(lepus_realloc(
-              ctx, p->prop, sizeof(p->prop[0]) * new_sh->prop_size,
+          new_prop = static_cast<JSPropertyGC *>(lepus_realloc(
+              ctx, p->gc_prop, sizeof(p->gc_prop[0]) * new_sh->prop_size,
               ALLOC_TAG_JSPropertyArray));
         }
         if (!new_prop) return NULL;
-        if (new_prop != p->prop) {
-          HeapObjStore(ctx, &p->prop, new_prop);
+        if (new_prop != p->gc_prop) {
+          HeapObjStore(ctx, &p->gc_prop, new_prop);
         }
       }
       HeapObjStoreShape(ctx, &p->shape, js_dup_shape(new_sh));
       js_free_shape(sh);
-      return &p->prop[new_sh->prop_count - 1];
+      return &p->gc_prop[new_sh->prop_count - 1];
     } else if (sh->header.ref_count != 1) {
       /* if the shape is shared, clone it */
       new_sh = js_clone_shape(ctx, sh);
@@ -3878,14 +3893,14 @@ JSProperty *add_property_gc(LEPUSContext *ctx, LEPUSObject *p, JSAtom prop,
   }
   assert(p->shape->header.ref_count == 1);
   if (add_shape_property(ctx, &p->shape, p, prop, prop_flags)) return NULL;
-  return &p->prop[p->shape->prop_count - 1];
+  return &p->gc_prop[p->shape->prop_count - 1];
 }
 
 /* can be called on Array or Arguments objects. return < 0 if
    memory alloc error. */
 static no_inline __exception int convert_fast_array_to_array(LEPUSContext *ctx,
                                                              LEPUSObject *p) {
-  JSProperty *pr;
+  JSPropertyGC *pr;
   JSShape *sh;
   LEPUSValue *tab;
   uint32_t i, len, new_count;
@@ -3916,7 +3931,7 @@ static no_inline __exception int convert_fast_array_to_array(LEPUSContext *ctx,
 static int delete_property(LEPUSContext *ctx, LEPUSObject *p, JSAtom atom) {
   JSShape *sh;
   JSShapeProperty *pr, *lpr, *prop;
-  JSProperty *pr1;
+  JSPropertyGC *pr1;
   uint32_t lpr_idx;
   intptr_t h, h1;
 
@@ -3944,13 +3959,12 @@ redo:
         sh->prop_hash_end[-h1 - 1] = pr->hash_next;
       }
       /* free the entry */
-      pr1 = &p->prop[h - 1];
+      pr1 = &p->gc_prop[h - 1];
       free_property(ctx->rt, pr1, pr->flags);
       /* put default values */
       pr->flags = 0;
       pr->atom = JS_ATOM_NULL;
       pr1->u.value = LEPUS_UNDEFINED;
-      pr1->u.init.opaque = 0;
       return TRUE;
     }
     lpr = pr;
@@ -4021,12 +4035,12 @@ int set_array_length_gc(LEPUSContext *ctx, LEPUSObject *p, LEPUSValue val,
     if (len < old_len) {
       p->u.array.count = len;
     }
-    p->prop[0].u.value = JS_NewUint32(ctx, len);
+    p->gc_prop[0].u.value = JS_NewUint32(ctx, len);
   } else {
     /* Note: length is always a uint32 because the object is an
        array */
     JS_ToInt32_GC(ctx, reinterpret_cast<int32_t *>(&cur_len),
-                  p->prop[0].u.value);
+                  p->gc_prop[0].u.value);
     if (len < cur_len) {
       uint32_t d;
       JSShape *sh;
@@ -4080,7 +4094,7 @@ int set_array_length_gc(LEPUSContext *ctx, LEPUSObject *p, LEPUSValue val,
     } else {
       cur_len = len;
     }
-    set_value_gc(ctx, &p->prop[0].u.value, JS_NewUint32(ctx, cur_len));
+    set_value_gc(ctx, &p->gc_prop[0].u.value, JS_NewUint32(ctx, cur_len));
     if (unlikely(cur_len > len)) {
       return JS_ThrowTypeErrorOrFalse(ctx, flags, "not configurable");
     }
@@ -4098,13 +4112,13 @@ static int add_fast_array_element(LEPUSContext *ctx, LEPUSObject *p,
   new_len = p->u.array.count + 1;
   /* update the length if necessary. We assume that if the length is
      not an integer, then if it >= 2^31.  */
-  if (likely(LEPUS_VALUE_IS_INT(p->prop[0].u.value))) {
-    array_len = LEPUS_VALUE_GET_INT(p->prop[0].u.value);
+  if (likely(LEPUS_VALUE_IS_INT(p->gc_prop[0].u.value))) {
+    array_len = LEPUS_VALUE_GET_INT(p->gc_prop[0].u.value);
     if (new_len > array_len) {
       if (unlikely(!(get_shape_prop(p->shape)->flags & LEPUS_PROP_WRITABLE))) {
         return JS_ThrowTypeErrorReadOnly(ctx, flags, JS_ATOM_length);
       }
-      p->prop[0].u.value = LEPUS_NewInt32(ctx, new_len);
+      p->gc_prop[0].u.value = LEPUS_NewInt32(ctx, new_len);
     }
   }
   if (unlikely(new_len > p->u.array.u1.size)) {
@@ -4220,7 +4234,7 @@ int JS_SetPropertyInternalImpl_GC(LEPUSContext *ctx, LEPUSValueConst this_obj,
                                   JSAtom prop, LEPUSValue val, int flags) {
   LEPUSObject *p, *p1;
   JSShapeProperty *prs;
-  JSProperty *pr;
+  JSPropertyGC *pr;
   int64_t tag;
   int ret;
   char buf[ATOM_GET_STR_BUF_SIZE];
@@ -4309,7 +4323,7 @@ retry:
       assert(prop == JS_ATOM_length);
       return set_array_length_gc(ctx, p, val, flags);
     } else if ((prs->flags & LEPUS_PROP_TMASK) == LEPUS_PROP_GETSET) {
-      return call_setter(ctx, pr->u.getset.setter, this_obj, val, flags);
+      return call_setter(ctx, pr->u.getset->setter, this_obj, val, flags);
     } else if ((prs->flags & LEPUS_PROP_TMASK) == LEPUS_PROP_VARREF) {
       /* LEPUS_PROP_WRITABLE is always true for variable
          references, but they are write protected in module name
@@ -4416,7 +4430,7 @@ retry:
     prs = find_own_property(&pr, p1, prop);
     if (prs) {
       if ((prs->flags & LEPUS_PROP_TMASK) == LEPUS_PROP_GETSET) {
-        return call_setter(ctx, pr->u.getset.setter, this_obj, val, flags);
+        return call_setter(ctx, pr->u.getset->setter, this_obj, val, flags);
       } else if ((prs->flags & LEPUS_PROP_TMASK) == LEPUS_PROP_AUTOINIT) {
         /* Instantiate property and retry (potentially useless) */
         if (JS_AutoInitProperty(ctx, p1, prop, pr, prs)) return -1;
@@ -4633,7 +4647,7 @@ static int get_prop_flags(int flags, int def_flags) {
 static int JS_CreateProperty(LEPUSContext *ctx, LEPUSObject *p, JSAtom prop,
                              LEPUSValueConst val, LEPUSValueConst getter,
                              LEPUSValueConst setter, int flags) {
-  JSProperty *pr;
+  JSPropertyGC *pr;
   int ret, prop_flags;
 
   /* add a new property or modify an existing exotic one */
@@ -4661,11 +4675,11 @@ static int JS_CreateProperty(LEPUSContext *ctx, LEPUSObject *p, JSAtom prop,
           goto generic_array;
         }
       } else if (JS_AtomIsArrayIndex(ctx, &idx, prop)) {
-        JSProperty *plen;
+        JSPropertyGC *plen;
         JSShapeProperty *pslen;
       generic_array:
         /* update the length field */
-        plen = &p->prop[0];
+        plen = &p->gc_prop[0];
         JS_ToInt32_GC(ctx, reinterpret_cast<int32_t *>(&len), plen->u.value);
         if ((idx + 1) > len) {
           pslen = get_shape_prop(p->shape);
@@ -4709,26 +4723,28 @@ static int JS_CreateProperty(LEPUSContext *ctx, LEPUSObject *p, JSAtom prop,
   if (flags & (LEPUS_PROP_HAS_GET | LEPUS_PROP_HAS_SET)) {
     prop_flags = (flags & (LEPUS_PROP_CONFIGURABLE | LEPUS_PROP_ENUMERABLE)) |
                  LEPUS_PROP_GETSET;
-  } else {
-    prop_flags = flags & LEPUS_PROP_C_W_E;
+    JSPropertyGetSet *getset = js_alloc_property_getset_GC(ctx);
+    if (unlikely(!getset)) return -1;
+    HandleScope getset_scope(ctx, getset, HANDLE_TYPE_DIR_HEAP_OBJ);
+    pr = add_property_gc(ctx, p, prop, prop_flags);
+    if (unlikely(!pr)) return -1;
+    HeapObjStore(ctx, &pr->u.getset, getset);
+    if ((flags & LEPUS_PROP_HAS_GET) && LEPUS_IsFunction(ctx, getter)) {
+      HeapObjStore(ctx, &getset->getter, LEPUS_VALUE_GET_OBJ(getter));
+    }
+    if ((flags & LEPUS_PROP_HAS_SET) && LEPUS_IsFunction(ctx, setter)) {
+      HeapObjStore(ctx, &getset->setter, LEPUS_VALUE_GET_OBJ(setter));
+    }
+    return TRUE;
   }
+
+  prop_flags = flags & LEPUS_PROP_C_W_E;
   pr = add_property_gc(ctx, p, prop, prop_flags);
   if (unlikely(!pr)) return -1;
-  if (flags & (LEPUS_PROP_HAS_GET | LEPUS_PROP_HAS_SET)) {
-    pr->u.getset.getter = NULL;
-    if ((flags & LEPUS_PROP_HAS_GET) && LEPUS_IsFunction(ctx, getter)) {
-      HeapObjStore(ctx, &pr->u.getset.getter, LEPUS_VALUE_GET_OBJ(getter));
-    }
-    pr->u.getset.setter = NULL;
-    if ((flags & LEPUS_PROP_HAS_SET) && LEPUS_IsFunction(ctx, setter)) {
-      HeapObjStore(ctx, &pr->u.getset.setter, LEPUS_VALUE_GET_OBJ(setter));
-    }
+  if (flags & LEPUS_PROP_HAS_VALUE) {
+    HeapObjStore(ctx, &pr->u.value, val);
   } else {
-    if (flags & LEPUS_PROP_HAS_VALUE) {
-      HeapObjStore(ctx, &pr->u.value, val);
-    } else {
-      pr->u.value = LEPUS_UNDEFINED;
-    }
+    pr->u.value = LEPUS_UNDEFINED;
   }
   return TRUE;
 }
@@ -4811,7 +4827,7 @@ int JS_DefineProperty_GC(LEPUSContext *ctx, LEPUSValueConst this_obj,
                          int flags) {
   LEPUSObject *p;
   JSShapeProperty *prs;
-  JSProperty *pr;
+  JSPropertyGC *pr;
   int mask, res;
   // <Primjs begin>
   this_obj = JSRef2Value(ctx, this_obj);
@@ -4853,6 +4869,7 @@ redo_prop_update:
                  LEPUS_PROP_HAS_GET | LEPUS_PROP_HAS_SET)) {
       if (flags & (LEPUS_PROP_HAS_GET | LEPUS_PROP_HAS_SET)) {
         LEPUSObject *new_getter, *new_setter;
+        JSPropertyGetSet *getset;
 
         if (LEPUS_IsFunction(ctx, getter)) {
           new_getter = LEPUS_VALUE_GET_OBJ(getter);
@@ -4866,30 +4883,31 @@ redo_prop_update:
         }
 
         if ((prs->flags & LEPUS_PROP_TMASK) != LEPUS_PROP_GETSET) {
+          getset = js_alloc_property_getset_GC(ctx);
+          if (unlikely(!getset)) return -1;
+          HandleScope getset_scope(ctx, getset, HANDLE_TYPE_DIR_HEAP_OBJ);
           if (js_shape_prepare_update(ctx, p, &prs)) return -1;
           /* convert to getset */
           prs->flags =
               (prs->flags & (LEPUS_PROP_CONFIGURABLE | LEPUS_PROP_ENUMERABLE)) |
               LEPUS_PROP_GETSET;
-          pr->u.getset.getter = NULL;
-          pr->u.getset.setter = NULL;
+          HeapObjStore(ctx, &pr->u.getset, getset);
         } else {
+          getset = pr->u.getset;
           if (!(prs->flags & LEPUS_PROP_CONFIGURABLE)) {
-            if ((flags & LEPUS_PROP_HAS_GET) &&
-                new_getter != pr->u.getset.getter) {
+            if ((flags & LEPUS_PROP_HAS_GET) && new_getter != getset->getter) {
               goto not_configurable;
             }
-            if ((flags & LEPUS_PROP_HAS_SET) &&
-                new_setter != pr->u.getset.setter) {
+            if ((flags & LEPUS_PROP_HAS_SET) && new_setter != getset->setter) {
               goto not_configurable;
             }
           }
         }
         if (flags & LEPUS_PROP_HAS_GET) {
-          HeapObjStore(ctx, &pr->u.getset.getter, new_getter);
+          HeapObjStore(ctx, &getset->getter, new_getter);
         }
         if (flags & LEPUS_PROP_HAS_SET) {
-          HeapObjStore(ctx, &pr->u.getset.setter, new_setter);
+          HeapObjStore(ctx, &getset->setter, new_setter);
         }
       } else {
         if ((prs->flags & LEPUS_PROP_TMASK) == LEPUS_PROP_GETSET) {
@@ -4929,16 +4947,17 @@ redo_prop_update:
           }
           return res;
         } else if ((prs->flags & LEPUS_PROP_TMASK) == LEPUS_PROP_VARREF) {
+          JSVarRef *var_ref = pr->u.var_ref;
           if (flags & LEPUS_PROP_HAS_VALUE) {
             if (p->class_id == JS_CLASS_MODULE_NS) {
               /* LEPUS_PROP_WRITABLE is always true for variable
                  references, but they are write protected in module name
                  spaces. */
-              if (!js_same_value(ctx, val, *pr->u.var_ref->pvalue))
+              if (!js_same_value(ctx, val, *var_ref->pvalue))
                 goto not_configurable;
             }
             /* update the reference */
-            set_value_gc(ctx, pr->u.var_ref->pvalue, val);
+            set_value_gc(ctx, var_ref->pvalue, val);
           }
           /* if writable is set to false, no longer a
              reference (for mapped arguments) */
@@ -4946,7 +4965,7 @@ redo_prop_update:
               LEPUS_PROP_HAS_WRITABLE) {
             LEPUSValue val1;
             if (js_shape_prepare_update(ctx, p, &prs)) return -1;
-            val1 = *pr->u.var_ref->pvalue;
+            val1 = *var_ref->pvalue;
             HeapObjStore(ctx, &pr->u.value, val1);
             prs->flags &= ~(LEPUS_PROP_TMASK | LEPUS_PROP_WRITABLE);
           }
@@ -5055,7 +5074,7 @@ int JS_DefineAutoInitProperty_GC(
                             void *opaque),
     void *opaque, int flags, bool need_find_prop) {
   LEPUSObject *p;
-  JSProperty *pr;
+  JSPropertyGC *pr;
 
   if (LEPUS_VALUE_IS_NOT_OBJECT(this_obj)) return FALSE;
 
@@ -5068,12 +5087,16 @@ int JS_DefineAutoInitProperty_GC(
   }
 
   /* Specialized CreateProperty */
+  JSPropertyAutoInit *autoinit = js_alloc_property_autoinit_GC(ctx);
+  if (unlikely(!autoinit)) return -1;
+  HandleScope autoinit_scope(ctx, autoinit, HANDLE_TYPE_DIR_HEAP_OBJ);
   pr = add_property_gc(ctx, p, prop,
                        (flags & LEPUS_PROP_C_W_E) | LEPUS_PROP_AUTOINIT);
   if (unlikely(!pr)) return -1;
-  pr->u.init.init_func = init_func;
-  pr->u.init.opaque = opaque;
-  uintptr_t *opaque_ptr = (uintptr_t *)(&(pr->u.init.opaque));
+  HeapObjStore(ctx, &pr->u.autoinit, autoinit);
+  set_js_autoinit_func(pr, init_func);
+  autoinit->opaque = opaque;
+  uintptr_t *opaque_ptr = reinterpret_cast<uintptr_t *>(&autoinit->opaque);
   *opaque_ptr = (*opaque_ptr) | LEPUS_CPOINTER_TAG;
 
   return TRUE;
@@ -5150,7 +5173,7 @@ static int JS_CreateDataPropertyUint32(LEPUSContext *ctx,
 }
 
 static BOOL js_object_has_name(LEPUSContext *ctx, LEPUSValueConst obj) {
-  JSProperty *pr;
+  JSPropertyGC *pr;
   JSShapeProperty *prs;
   LEPUSValueConst val;
   JSString *p;
@@ -5256,7 +5279,7 @@ int JS_CheckDefineGlobalVar_GC(LEPUSContext *ctx, JSAtom prop, int flags) {
 int JS_DefineGlobalVar_GC(LEPUSContext *ctx, JSAtom prop, int def_flags) {
   LEPUSObject *p;
   JSShapeProperty *prs;
-  JSProperty *pr;
+  JSPropertyGC *pr;
   LEPUSValue val = LEPUS_UNDEFINED;
   HandleScope func_scope(ctx, &val, HANDLE_TYPE_LEPUS_VALUE);
   int flags;
@@ -5312,7 +5335,7 @@ LEPUSValue JS_GetGlobalVarImpl_GC(LEPUSContext *ctx, JSAtom prop,
                                   BOOL throw_ref_error) {
   LEPUSObject *p;
   JSShapeProperty *prs;
-  JSProperty *pr;
+  JSPropertyGC *pr;
 
   /* no exotic behavior is possible in global_var_obj */
   p = LEPUS_VALUE_GET_OBJ(ctx->global_var_obj);
@@ -5331,7 +5354,7 @@ LEPUSValue JS_GetGlobalVarImpl_GC(LEPUSContext *ctx, JSAtom prop,
 int JS_GetGlobalVarRef_GC(LEPUSContext *ctx, JSAtom prop, LEPUSValue *sp) {
   LEPUSObject *p;
   JSShapeProperty *prs;
-  JSProperty *pr;
+  JSPropertyGC *pr;
 
   /* no exotic behavior is possible in global_var_obj */
   p = LEPUS_VALUE_GET_OBJ(ctx->global_var_obj);
@@ -5389,7 +5412,7 @@ int JS_SetGlobalVar_GC(LEPUSContext *ctx, JSAtom prop, LEPUSValue val,
                        int flag) {
   LEPUSObject *p;
   JSShapeProperty *prs;
-  JSProperty *pr;
+  JSPropertyGC *pr;
   int flags;
 
   if (flag == 3) {
@@ -6740,7 +6763,7 @@ static int js_arguments_define_own_property(LEPUSContext *ctx,
 LEPUSValue js_build_arguments_gc(LEPUSContext *ctx, int argc,
                                  LEPUSValueConst *argv) {
   LEPUSValue val, *tab;
-  JSProperty *pr;
+  JSPropertyGC *pr;
   LEPUSObject *p;
   int i;
 
@@ -6785,40 +6808,46 @@ LEPUSValue js_build_arguments_gc(LEPUSContext *ctx, int argc,
 
 LEPUSObject *ShallowCloneObj(LEPUSContext *ctx, LEPUSObject *src) {
   LEPUSObject *p = src;
-  JSProperty *new_prop = static_cast<JSProperty *>(
-      lepus_malloc_gc(ctx, sizeof(JSProperty) * p->shape->prop_size,
+  JSPropertyGC *new_prop = static_cast<JSPropertyGC *>(
+      lepus_malloc_gc(ctx, sizeof(JSPropertyGC) * p->shape->prop_size,
                       ALLOC_TAG_JSPropertyArray));
-  memcpy(new_prop, p->prop, p->shape->prop_size * sizeof(JSProperty));
+  memcpy(new_prop, p->gc_prop, p->shape->prop_size * sizeof(JSPropertyGC));
 
   HandleScope func_scope(ctx, new_prop, HANDLE_TYPE_DIR_HEAP_OBJ);
   LEPUSObject *new_p = static_cast<LEPUSObject *>(
       lepus_malloc_gc(ctx, LEPUS_OBJECT_SIZE, ALLOC_TAG_LEPUSObject));
   if (UNLIKELY(ctx->con_mark_state)) JSPropertyStore(ctx, p, new_prop);
   memcpy(new_p, p, LEPUS_OBJECT_SIZE);
+  /* the clone always uses an external property array, so ctx/tid are real
+     fields again; the memcpy above may have copied inline property data into
+     them. */
+  new_p->free_mark = 1;
+  new_p->ctx = ctx->object_ctx_check ? ctx : nullptr;
+  new_p->tid = ctx->object_ctx_check ? get_tid() : 0;
   HeapObjStoreShape(ctx, &new_p->shape, p->shape);
   js_dup_shape(p->shape);
-  HeapObjStore(ctx, &new_p->prop, new_prop);
+  HeapObjStore(ctx, &new_p->gc_prop, new_prop);
   return new_p;
 }
 void CopyProps(LEPUSContext *ctx, int argc, int arg_count, LEPUSStackFrame *sf,
                LEPUSObject *new_p, LEPUSValueConst *argv) {
   int i;
-  HeapObjStore(ctx, &new_p->prop[2].u.value,
+  HeapObjStore(ctx, &new_p->gc_prop[2].u.value,
                ctx->rt->current_stack_frame->cur_func);
   size_t start_idx = 3;
   JSVarRef *var_ref = nullptr;
   for (i = 0; i < arg_count; i++) {
     var_ref = get_var_ref(ctx, sf, i, TRUE);
     // if (!var_ref) return LEPUS_EXCEPTION;
-    // new_p->prop[start_idx++].u.var_ref = var_ref;
-    HeapObjStore(ctx, &new_p->prop[start_idx++].u.var_ref, var_ref);
+    // new_p->gc_prop[start_idx++].u.var_ref = var_ref;
+    HeapObjStore(ctx, &new_p->gc_prop[start_idx++].u.var_ref, var_ref);
   }
 
   /* the arguments not mapped to the arguments of the function can
      be normal properties */
   for (i = arg_count; i < argc; i++) {
-    // new_p->prop[start_idx++].u.value = argv[i];
-    HeapObjStore(ctx, &new_p->prop[start_idx++].u.value, argv[i]);
+    // new_p->gc_prop[start_idx++].u.value = argv[i];
+    HeapObjStore(ctx, &new_p->gc_prop[start_idx++].u.value, argv[i]);
   }
 }
 
@@ -6859,7 +6888,7 @@ LEPUSValue js_build_mapped_arguments_gc(LEPUSContext *ctx, int argc,
   }
   // #endif
   LEPUSValue val;
-  JSProperty *pr;
+  JSPropertyGC *pr;
   LEPUSObject *p;
   int i;
 
@@ -7410,7 +7439,7 @@ LEPUSValue js_closure_gc(LEPUSContext *ctx, LEPUSValue bfunc,
   HandleScope func_scope(ctx, &func_obj, HANDLE_TYPE_LEPUS_VALUE);
   JSAtom name_atom;  // life cycle same as b
   LEPUSObject *p;
-  JSProperty *pr;
+  JSPropertyGC *pr;
 
   b = static_cast<LEPUSFunctionBytecode *>(LEPUS_VALUE_GET_PTR(bfunc));
   func_obj = JS_NewObjectClass_GC(ctx, func_kind_to_class_id[b->func_kind]);
@@ -7753,7 +7782,7 @@ LEPUSValue js_create_from_ctor_GC(LEPUSContext *ctx, LEPUSValueConst ctor,
     if (likely(shape->prop_count >= 3 &&
                shape->prop[2].atom == JS_ATOM_prototype &&
                !(shape->prop[2].flags & LEPUS_PROP_TMASK))) {
-      proto = p->prop[2].u.value;
+      proto = p->gc_prop[2].u.value;
     } else {
       proto = JS_GetPropertyInternal_GC(ctx, ctor, JS_ATOM_prototype, ctor, 0);
     }
@@ -13731,9 +13760,11 @@ LEPUSValue JS_DeepEqual_GC(LEPUSContext *ctx, LEPUSValueConst obj1,
       if (pr2->atom == JS_ATOM_NULL && pr2->flags == 0) prop_count2--;
       if (atom != JS_ATOM_NULL && JS_AtomIsString(ctx, atom) &&
           (pr1->flags & LEPUS_PROP_ENUMERABLE)) {
+        /* TMASK slots store getset/varref/autoinit pointers, not a value */
+        if (pr1->flags & LEPUS_PROP_TMASK) goto fail;
         val2 = JS_GetPropertyInternal_GC(ctx, obj2, atom, obj2, 0);
         if (LEPUS_IsException(val2)) goto fail;
-        val1 = p1->prop[i].u.value;
+        val1 = p1->gc_prop[i].u.value;
         result = JS_DeepEqual_GC(ctx, val1, val2);
         if (!LEPUS_VALUE_GET_BOOL(result)) goto fail;
       }
@@ -13778,7 +13809,7 @@ void JS_IterateObject_GC(LEPUSContext *ctx, LEPUSValue obj,
           return;
         }
         atomValue = JS_AtomToValue_GC(ctx, atom);
-        callback(ctx, atomValue, p->prop[i].u.value, pfunc, raw_data);
+        callback(ctx, atomValue, p->gc_prop[i].u.value, pfunc, raw_data);
       }
     }
   }
@@ -14146,7 +14177,7 @@ LEPUSValue js_get_length(LEPUSContext *ctx, LEPUSValueConst obj) {
   LEPUSObject *p = (LEPUSObject *)LEPUS_VALUE_GET_OBJ(obj);
   // Array's length must exist and the idx is 0
   if (likely(LEPUS_VALUE_IS_OBJECT(obj) && p->class_id == JS_CLASS_ARRAY)) {
-    len_val = p->prop[0].u.value;
+    len_val = p->gc_prop[0].u.value;
   } else {
     len_val = JS_GetPropertyInternal_GC(ctx, obj, JS_ATOM_length, obj, 0);
   }
@@ -14160,7 +14191,7 @@ bool js_set_length(LEPUSContext *ctx, LEPUSValueConst obj, int64_t newLen) {
   LEPUSObject *p = (LEPUSObject *)LEPUS_VALUE_GET_OBJ(obj);
   // Array's length must exist and the idx is 0
   if (likely(LEPUS_VALUE_IS_OBJECT(obj) && p->class_id == JS_CLASS_ARRAY)) {
-    p->prop[0].u.value = JS_NewInt64_GC(ctx, newLen);
+    p->gc_prop[0].u.value = JS_NewInt64_GC(ctx, newLen);
     return true;
   } else {
     if (JS_SetPropertyInternal_GC(ctx, obj, JS_ATOM_length,
@@ -21177,7 +21208,7 @@ static void free_weakref_prop(LEPUSRuntime *rt, LEPUSObject *p, JSShape *sh) {
   JSShapeProperty *pr = get_shape_prop(sh);
   js_free_shape(sh);  // p->shape
   p->shape = NULL;
-  p->prop = NULL;
+  p->gc_prop = NULL;
 }
 
 static void js_weakref_finalizer(LEPUSRuntime *rt, LEPUSValue val) {
@@ -26757,7 +26788,7 @@ static LEPUSValue JS_StructuredClone(LEPUSContext *ctx, LEPUSValue src,
 
       LEPUSObject *ret_p = LEPUS_VALUE_GET_OBJ(ret);
       state.SetValue(p, ret_p);
-      if (sh && p->prop) {
+      if (sh && p->gc_prop) {
         // clone property
         LEPUSValue cloned_prop = LEPUS_UNDEFINED;
         HandleScope block_scope(ctx, &cloned_prop, HANDLE_TYPE_LEPUS_VALUE);
@@ -26765,7 +26796,7 @@ static LEPUSValue JS_StructuredClone(LEPUSContext *ctx, LEPUSValue src,
         for (uint32_t i = 0; i < sh->prop_count; ++i, ++prs) {
           int32_t flags = prs->flags;
           if (prs->atom != JS_ATOM_NULL && (flags & LEPUS_PROP_TMASK) == 0) {
-            cloned_prop = JS_StructuredClone(ctx, p->prop[i].u.value, state);
+            cloned_prop = JS_StructuredClone(ctx, p->gc_prop[i].u.value, state);
             if (LEPUS_IsException(cloned_prop) ||
                 (JS_DefinePropertyValue_GC(ctx, ret, prs->atom, cloned_prop,
                                            flags & LEPUS_PROP_C_W_E) < 0)) {
@@ -27042,7 +27073,7 @@ LEPUSValue JS_NewArrayWithArgs_GC(LEPUSContext *ctx, int32_t size,
   p->u.array.u1.size = size;
 
   // length prop
-  p->prop[0].u.value = LEPUS_NewInt32(ctx, size);
+  p->gc_prop[0].u.value = LEPUS_NewInt32(ctx, size);
   return array;
 failed:
   return LEPUS_EXCEPTION;
@@ -28558,14 +28589,9 @@ void Visitor::PushObjRegExp(LEPUSObject *obj, GCWorkStack &workStack) noexcept {
   workStack.push_back((address_t)re->pattern);
 }
 
-void Visitor::PushObjProperty(JSProperty *pr, GCWorkStack &workStack) noexcept {
-  address_t sencodPtr = (address_t)pr->u.getset.setter;
-  address_t val = (address_t)pr->u.init.init_func;
-  if (val != (address_t)(JS_InstantiateFunctionListItem2) &&
-      val != (address_t)(js_module_ns_autoinit)) {
-    PushObjLEPUSValue((LEPUSValue){.as_int64 = (int64_t)val}, workStack);
-    PushObjLEPUSValue((LEPUSValue){.as_int64 = (int64_t)sencodPtr}, workStack);
-  }
+void Visitor::PushObjProperty(JSPropertyGC *pr,
+                              GCWorkStack &workStack) noexcept {
+  PushObjLEPUSValue(pr->u.value, workStack);
 }
 
 void Visitor::VisitLEPUSObject(void *ptr, GCWorkStack &workStack) noexcept {
@@ -28582,7 +28608,7 @@ void Visitor::VisitLEPUSObject(void *ptr, GCWorkStack &workStack) noexcept {
     if (LIKELY(sh->prop_hash_mask != 0)) {
       workStack.push_back((address_t)get_alloc_from_shape(sh));
     }
-    JSProperty *prop = obj->prop;
+    JSPropertyGC *prop = obj->gc_prop;
     bool isInObject = IS_IN_OBJECT_PROP(obj, prop);
     if (isInObject) {
       auto prop_count = LEPUS_IN_OBJECT_PROPERTY_SIZE;
@@ -29020,8 +29046,8 @@ void Visitor::VisitJSValueArray(void *ptr, GCWorkStack &workStack) noexcept {
 }
 
 void Visitor::VisitJSPropertyArray(void *ptr, GCWorkStack &workStack) noexcept {
-  JSProperty *arr = static_cast<JSProperty *>(ptr);
-  auto array_size = get_obj_size(arr) / sizeof(JSProperty);
+  JSPropertyGC *arr = static_cast<JSPropertyGC *>(ptr);
+  auto array_size = get_obj_size(arr) / sizeof(JSPropertyGC);
   for (auto i = 0; i < array_size; i++) {
     PushObjProperty(&arr[i], workStack);
   }

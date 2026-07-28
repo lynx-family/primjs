@@ -40,6 +40,8 @@ class HeapObjPtr {
     kVarRef2Array,
     kAtom2Array,
     kShape2Array,
+    kJSPropertyGetSet,
+    kJSPropertyAutoInit,
     kContext,
     kRuntime,
     kCString,
@@ -51,6 +53,10 @@ class HeapObjPtr {
 #include "quickjs/include/quickjs-tag.h"
 #undef DEFTAG
 #undef deftag
+  explicit HeapObjPtr(const JSPropertyGetSet* ptr)
+      : ptr_{ptr}, type_{PtrType::kJSPropertyGetSet} {}
+  explicit HeapObjPtr(const JSPropertyAutoInit* ptr)
+      : ptr_{ptr}, type_{PtrType::kJSPropertyAutoInit} {}
   explicit HeapObjPtr(const char* str)
       : ptr_{str}, type_{PtrType::kCString}, size_{strlen(str) + 1} {}
   explicit HeapObjPtr(const LEPUSContext* ctx)

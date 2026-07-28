@@ -119,6 +119,8 @@ class QjsHeapExplorer : public HeapEntriesAllocator {
   void ExtractObjectReference(LEPUSContext*, HeapEntry*, const LEPUSObject*);
   void ExtractShapeReference(LEPUSContext*, HeapEntry*, const JSShape*);
   void ExtractVarrefReference(LEPUSContext*, HeapEntry*, const JSVarRef*);
+  void ExtractPropertyGetSetReference(LEPUSContext*, HeapEntry*,
+                                      const JSPropertyGetSet*);
   void ExtractFunctionBytecodeReference(LEPUSContext*, HeapEntry*,
                                         const LEPUSFunctionBytecode*);
   void ExtractValueArrayReference(LEPUSContext*, HeapEntry*, const LEPUSValue*,
