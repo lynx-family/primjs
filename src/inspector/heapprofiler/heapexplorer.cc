@@ -145,6 +145,16 @@ HeapEntry* QjsHeapExplorer::AddEntry(LEPUSContext* ctx, const HeapObjPtr& obj) {
       entry = snapshot_->AddEntry(HeapEntry::kNative, "system / var_ref",
                                   obj_id, sizeof(JSVarRef));
     } break;
+    case HeapObjPtr::kJSPropertyGetSet: {
+      entry =
+          snapshot_->AddEntry(HeapEntry::kNative, "system / property_getset",
+                              obj_id, sizeof(JSPropertyGetSet));
+    } break;
+    case HeapObjPtr::kJSPropertyAutoInit: {
+      entry =
+          snapshot_->AddEntry(HeapEntry::kNative, "system / property_autoinit",
+                              obj_id, sizeof(JSPropertyAutoInit));
+    } break;
     case HeapObjPtr ::kLEPUSModuleDef: {
       auto* m = static_cast<const LEPUSModuleDef*>(obj.ptr_);
       std::string module_name = "system / module";
@@ -360,6 +370,10 @@ void QjsHeapExplorer::ExtractHandleObjReference(LEPUSContext* ctx,
       return ExtractVarrefReference(ctx, entry,
                                     static_cast<const JSVarRef*>(obj.ptr_));
     }
+    case HeapObjPtr::kJSPropertyGetSet: {
+      return ExtractPropertyGetSetReference(
+          ctx, entry, static_cast<const JSPropertyGetSet*>(obj.ptr_));
+    }
     case HeapObjPtr::kLEPUSFunctionBytecode: {
       return ExtractFunctionBytecodeReference(
           ctx, entry, static_cast<const LEPUSFunctionBytecode*>(obj.ptr_));
@@ -497,38 +511,62 @@ void QjsHeapExplorer::ExtractObjectReference(LEPUSContext* ctx,
   ExtractShapeReference(ctx, entry, sh);
   auto* prs = get_shape_prop(sh);
   for (size_t i = 0, size = sh->prop_count; i < size; ++i, ++prs) {
-    auto& pr = p->prop[i];
     if (prs->atom != JS_ATOM_NULL) {
       auto* name = LEPUS_AtomToCString(ctx, prs->atom);
       std::string prop_name = name ? name : "";
       if (!ctx->gc_enable) LEPUS_FreeCString(ctx, name);
       if (prs->flags & LEPUS_PROP_TMASK) {
         if ((prs->flags & LEPUS_PROP_TMASK) == LEPUS_PROP_GETSET) {
-          if (pr.u.getset.getter) {
-            auto* getter_entry = GetEntry(
-                ctx, LEPUS_MKPTR(LEPUS_TAG_OBJECT, pr.u.getset.getter));
-            SetPropertyReference(entry, "(getter) " + prop_name, getter_entry);
-            ExtractObjectReference(ctx, getter_entry, pr.u.getset.getter);
-          }
-          if (pr.u.getset.setter) {
-            auto* setter_entry = GetEntry(
-                ctx, LEPUS_MKPTR(LEPUS_TAG_OBJECT, pr.u.getset.setter));
-            SetPropertyReference(entry, "(setter) " + prop_name, setter_entry);
-            ExtractObjectReference(ctx, setter_entry, pr.u.getset.setter);
+          if (ctx->gc_enable) {
+            const JSPropertyGetSet* getset = p->gc_prop[i].u.getset;
+            if (getset) {
+              auto* getset_entry = GetEntry(ctx, HeapObjPtr{getset});
+              SetInternalReference(entry, "(getset) " + prop_name,
+                                   getset_entry);
+              ExtractPropertyGetSetReference(ctx, getset_entry, getset);
+            }
+          } else {
+            LEPUSObject* getter = p->prop[i].u.getset.getter;
+            LEPUSObject* setter = p->prop[i].u.getset.setter;
+            if (getter) {
+              auto* getter_entry =
+                  GetEntry(ctx, LEPUS_MKPTR(LEPUS_TAG_OBJECT, getter));
+              SetPropertyReference(entry, "(getter) " + prop_name,
+                                   getter_entry);
+              ExtractObjectReference(ctx, getter_entry, getter);
+            }
+            if (setter) {
+              auto* setter_entry =
+                  GetEntry(ctx, LEPUS_MKPTR(LEPUS_TAG_OBJECT, setter));
+              SetPropertyReference(entry, "(setter) " + prop_name,
+                                   setter_entry);
+              ExtractObjectReference(ctx, setter_entry, setter);
+            }
           }
         } else if ((prs->flags & LEPUS_PROP_TMASK) == LEPUS_PROP_VARREF) {
-          if (pr.u.var_ref) {
+          JSVarRef* var_ref =
+              ctx->gc_enable ? p->gc_prop[i].u.var_ref : p->prop[i].u.var_ref;
+          if (var_ref) {
             auto* var_ref_entry =
-                GetEntry(ctx, LEPUS_MKPTR(LEPUS_TAG_VAR_REF, pr.u.var_ref));
+                GetEntry(ctx, LEPUS_MKPTR(LEPUS_TAG_VAR_REF, var_ref));
             SetPropertyReference(entry, prop_name, var_ref_entry);
-            ExtractVarrefReference(ctx, var_ref_entry, pr.u.var_ref);
+            ExtractVarrefReference(ctx, var_ref_entry, var_ref);
+          }
+        } else if ((prs->flags & LEPUS_PROP_TMASK) == LEPUS_PROP_AUTOINIT &&
+                   ctx->gc_enable) {
+          const JSPropertyAutoInit* autoinit = p->gc_prop[i].u.autoinit;
+          if (autoinit) {
+            SetInternalReference(entry, "(autoinit) " + prop_name,
+                                 GetEntry(ctx, HeapObjPtr{autoinit}));
           }
         }
       } else {
         // normal value
-        auto* pr_entry = GetEntry(ctx, pr.u.value);
+        LEPUSValue value =
+            ctx->gc_enable ? p->gc_prop[i].u.value : p->prop[i].u.value;
+        auto* pr_entry = GetEntry(ctx, value);
         SetPropertyReference(ctx, entry, prs->atom, pr_entry);
-        ExtractValueReference(ctx, pr_entry, pr.u.value);
+        ExtractValueReference(ctx, pr_entry, value);
       }
     }
   }
@@ -999,6 +1037,20 @@ void QjsHeapExplorer::ExtractFunctionBytecodeReference(
     SetInternalReference(entry, "debug.source", source_entry);
   }
   return;
+}
+
+void QjsHeapExplorer::ExtractPropertyGetSetReference(
+    LEPUSContext* ctx, HeapEntry* entry, const JSPropertyGetSet* getset) {
+  if (!entry || !getset || HasBeExtracted(getset)) return;
+  InsertExtractedObj(getset);
+  if (getset->getter) {
+    SetAndExtractValue(ctx, entry, "getter",
+                       LEPUS_MKPTR(LEPUS_TAG_OBJECT, getset->getter));
+  }
+  if (getset->setter) {
+    SetAndExtractValue(ctx, entry, "setter",
+                       LEPUS_MKPTR(LEPUS_TAG_OBJECT, getset->setter));
+  }
 }
 
 void QjsHeapExplorer::ExtractValueArrayReference(LEPUSContext* ctx,

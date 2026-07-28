@@ -288,31 +288,12 @@ void Visitor::VisitLEPUSDebuggerInfo(void *ptr,
 }
 
 void no_inline JSPropertyStore(LEPUSContext *ctx, LEPUSObject *obj,
-                               JSProperty *new_prop) {
-  JSProperty *prop = obj->prop;
+                               JSPropertyGC *new_prop) {
+  JSPropertyGC *prop = obj->gc_prop;
   JSShape *sh = obj->shape;
   int prop_count = sh->prop_count;
-  JSShapeProperty *prs = get_shape_prop(sh);
-  int prop_flags = 0;
   for (int i = 0; i < prop_count; i++) {
-    prop_flags = prs->flags;
-    if (unlikely(prop_flags & LEPUS_PROP_TMASK)) {
-      if ((prop_flags & LEPUS_PROP_TMASK) == LEPUS_PROP_GETSET) {
-        if (prop[i].u.getset.getter) {
-          HeapObjStore(ctx, &new_prop[i].u.getset.getter,
-                       prop[i].u.getset.getter);
-        }
-        if (prop[i].u.getset.setter) {
-          HeapObjStore(ctx, &new_prop[i].u.getset.setter,
-                       prop[i].u.getset.setter);
-        }
-      } else if ((prop_flags & LEPUS_PROP_TMASK) == LEPUS_PROP_VARREF) {
-        HeapObjStore(ctx, &new_prop[i].u.var_ref, prop[i].u.var_ref);
-      }
-    } else {
-      HeapObjStore(ctx, &new_prop[i].u.value, prop[i].u.value);
-    }
-    prs++;
+    HeapObjStore(ctx, &new_prop[i].u.value, prop[i].u.value);
   }
 }
 #else

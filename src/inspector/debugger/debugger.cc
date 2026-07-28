@@ -165,8 +165,9 @@ QJS_HIDE void AddFunctionBytecode(LEPUSContext *ctx, LEPUSValue obj,
                 break;
               }
               if (pass != 0) {
-                AddFunctionBytecode(ctx, p->prop[i].u.value, list, use_size,
-                                    total_size);
+                LEPUSValue value = ctx->rt->gc_enable ? p->gc_prop[i].u.value
+                                                      : p->prop[i].u.value;
+                AddFunctionBytecode(ctx, value, list, use_size, total_size);
               }
             }
           }
@@ -555,19 +556,18 @@ QJS_HIDE LEPUSFunctionBytecode *GetFunctionBytecodeByScriptId(
 void DebuggerSetPropertyStr(LEPUSContext *ctx, LEPUSValueConst this_obj,
                             const char *prop, LEPUSValue val) {
   JSAtom atom;
-  JSProperty *pr;
   atom = LEPUS_NewAtom(ctx, prop);
   LEPUSObject *p = LEPUS_VALUE_GET_OBJ(this_obj);
 #ifdef ENABLE_COMPATIBLE_MM
   if (ctx->gc_enable) {
     HandleScope func_scope{ctx->rt};
     func_scope.PushLEPUSAtom(atom);
-    pr = add_property_gc(ctx, p, atom, LEPUS_PROP_C_W_E);
-    if (likely(pr)) LEPUS_HeapObjStore(ctx, &pr->u.value, val);
+    JSPropertyGC *gc_pr = add_property_gc(ctx, p, atom, LEPUS_PROP_C_W_E);
+    if (likely(gc_pr)) LEPUS_HeapObjStore(ctx, &gc_pr->u.value, val);
     return;
   }
 #endif
-  pr = add_property(ctx, p, atom, LEPUS_PROP_C_W_E);
+  JSProperty *pr = add_property(ctx, p, atom, LEPUS_PROP_C_W_E);
   if (likely(pr)) {
     pr->u.value = val;
   } else {
@@ -594,7 +594,11 @@ LEPUSObject *DebuggerCreateObjFromShape(LEPUSDebuggerInfo *info, LEPUSValue obj,
   }
   assert(argc <= p->shape->prop_count);
   for (uint32_t i = 0, size = p->shape->prop_count; i < size; ++i) {
-    LEPUS_HeapObjStore(ctx, &p->prop[i].u.value, argv[i]);
+    if (ctx->gc_enable) {
+      LEPUS_HeapObjStore(ctx, &p->gc_prop[i].u.value, argv[i]);
+    } else {
+      p->prop[i].u.value = argv[i];
+    }
   }
   return p;
 }
@@ -1020,20 +1024,19 @@ static void FreeStringPool(LEPUSDebuggerInfo *info) {
 static void InitializeShape(LEPUSContext *ctx, LEPUSObject *p,
                             const char *key) {
   JSAtom atom = LEPUS_NewAtom(ctx, key);
-  JSProperty *pr = nullptr;
 #ifdef ENABLE_COMPATIBLE_MM
   if (ctx->gc_enable) {
     HandleScope func_scope(ctx);
     func_scope.PushLEPUSAtom(atom);
-    pr = add_property_gc(ctx, p, atom, LEPUS_PROP_C_W_E);
-    if (pr) {
-      pr->u.value = LEPUS_UNDEFINED;
+    JSPropertyGC *gc_pr = add_property_gc(ctx, p, atom, LEPUS_PROP_C_W_E);
+    if (gc_pr) {
+      gc_pr->u.value = LEPUS_UNDEFINED;
     }
     return;
   }
 #endif
 
-  pr = add_property(ctx, p, atom, LEPUS_PROP_C_W_E);
+  JSProperty *pr = add_property(ctx, p, atom, LEPUS_PROP_C_W_E);
   LEPUS_FreeAtom(ctx, atom);
   if (pr) pr->u.value = LEPUS_UNDEFINED;
   return;

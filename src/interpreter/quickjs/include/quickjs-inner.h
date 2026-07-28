@@ -1307,6 +1307,19 @@ typedef struct JSAsyncGeneratorData {
   bool is_completed;
 } JSAsyncGeneratorData;
 
+typedef LEPUSValue JSAutoInitFunc(LEPUSContext *ctx, LEPUSObject *obj,
+                                  JSAtom prop, void *opaque);
+
+typedef struct JSPropertyGetSet {
+  LEPUSObject *getter; /* NULL if undefined */
+  LEPUSObject *setter; /* NULL if undefined */
+} JSPropertyGetSet;
+
+typedef struct JSPropertyAutoInit {
+  uintptr_t init_func;
+  void *opaque;
+} JSPropertyAutoInit;
+
 typedef struct JSProperty {
   union {
     LEPUSValue value;      /* LEPUS_PROP_NORMAL */
@@ -1322,6 +1335,25 @@ typedef struct JSProperty {
     } init;
   } u;
 } JSProperty;
+
+typedef struct JSPropertyGC {
+  union {
+    LEPUSValue value;             /* LEPUS_PROP_NORMAL */
+    JSPropertyGetSet *getset;     /* LEPUS_PROP_GETSET */
+    JSVarRef *var_ref;            /* LEPUS_PROP_VARREF */
+    JSPropertyAutoInit *autoinit; /* LEPUS_PROP_AUTOINIT */
+  } u;
+} JSPropertyGC;
+
+inline JSAutoInitFunc *js_autoinit_get_func(JSPropertyGC *pr) {
+  return reinterpret_cast<JSAutoInitFunc *>(pr->u.autoinit->init_func);
+}
+
+inline void set_js_autoinit_func(JSPropertyGC *pr, JSAutoInitFunc *func) {
+  pr->u.autoinit->init_func = reinterpret_cast<uintptr_t>(func);
+}
+
+static_assert(sizeof(JSPropertyGC) == sizeof(LEPUSValue));
 
 #define JS_PROP_INITIAL_SIZE 2
 #define JS_PROP_INITIAL_HASH_SIZE 4 /* must be a power of two */
@@ -1357,7 +1389,11 @@ struct LEPUSObject {
   LEPUSRefCountHeader header; /* must come first, 32-bit */
   JSGCHeader gc_header;       /* must come after LEPUSRefCountHeader, 8-bit */
   uint8_t extensible : 1;
-  uint8_t free_mark : 1;      /* only used when freeing objects with cycles */
+  /* RC: only used when freeing objects with cycles.
+     GC: TRUE when ctx/tid are real fields, i.e. they are not reused as inline
+     property slots. Unused by the tracing GC otherwise, see
+     LEPUSObjectHasContextFields(). */
+  uint8_t free_mark : 1;
   uint8_t is_exotic : 1;      /* TRUE if object has exotic property handlers */
   uint8_t fast_array : 1;     /* TRUE if u.array is used for get/put */
   uint8_t is_constructor : 1; /* TRUE if object is a constructor function */
@@ -1367,8 +1403,11 @@ struct LEPUSObject {
   uint16_t class_id;                /* see JS_CLASS_x */
   /* byte offsets: 8/8 */
   /* byte offsets: 16/24 */
-  JSShape *shape;   /* prototype and property names + flag */
-  JSProperty *prop; /* array of properties */
+  JSShape *shape; /* prototype and property names + flag */
+  union {
+    JSProperty *prop;      /* RC property array */
+    JSPropertyGC *gc_prop; /* GC property array */
+  };
   /* byte offsets: 24/40 */
   struct WeakRefRecord
       *first_weak_ref; /* XXX: use a bit and an external hash table? */
@@ -1456,13 +1495,26 @@ struct LEPUSObject {
   /* byte sizes: 40/48/72 */
 };
 
-// should config together with kObjRunIdx
+/* ctx and tid are only meaningful when they are not reused as inline property
+   slots. The layout is decided per object at creation time, while
+   object_ctx_check can be turned on later (SetObjectCtxCheckStatus), so the
+   decision has to be recorded on the object itself. */
+static inline bool LEPUSObjectHasContextFields(const LEPUSRuntime *rt,
+                                               const LEPUSObject *obj) {
+  return !rt->gc_enable || obj->free_mark;
+}
+
+// ctx, tid and link are reused as four inline GC property slots when object
+// context checking is disabled.
 #define LEPUS_IN_OBJECT_PROPERTY_SIZE 4
-static_assert((sizeof(struct list_head) + sizeof(JSProperty) * 3) /
-                  sizeof(JSProperty) ==
+#ifdef ENABLE_COMPATIBLE_MM
+static_assert((sizeof(LEPUSObject) - __builtin_offsetof(LEPUSObject, ctx)) /
+                  sizeof(JSPropertyGC) ==
               LEPUS_IN_OBJECT_PROPERTY_SIZE);
-static size_t LEPUS_OBJECT_SIZE = sizeof(LEPUSObject) + sizeof(JSProperty) * 3;
-static size_t OBJECT_PROP_OFFSET = (uintptr_t)(&(((LEPUSObject *)(0x0))->link));
+#endif
+static constexpr size_t LEPUS_OBJECT_SIZE = sizeof(LEPUSObject);
+static constexpr size_t OBJECT_PROP_OFFSET =
+    __builtin_offsetof(LEPUSObject, ctx);
 #define IS_IN_OBJECT_PROP(p, prop) \
   ((uintptr_t)(prop) - (uintptr_t)p == OBJECT_PROP_OFFSET)
 
@@ -1920,8 +1972,8 @@ QJS_HIDE void free_var_ref(LEPUSRuntime *rt, JSVarRef *var_ref);
 
 QJS_HIDE JSProperty *add_property(LEPUSContext *ctx, LEPUSObject *p,
                                   JSAtom prop, int prop_flags);
-QJS_HIDE JSProperty *add_property_gc(LEPUSContext *ctx, LEPUSObject *p,
-                                     JSAtom prop, int prop_flags);
+QJS_HIDE JSPropertyGC *add_property_gc(LEPUSContext *ctx, LEPUSObject *p,
+                                       JSAtom prop, int prop_flags);
 QJS_HIDE void prim_HeapObjStoreLEPUSValue(void *fieldAddr, LEPUSValue value);
 QJS_HIDE void prim_WriteBarrierNoStore(LEPUSValue value, LEPUSContext *ctx);
 QJS_HIDE void prim_HeapObjStorePtr(void *dstObj, address_t offset, void *value);
