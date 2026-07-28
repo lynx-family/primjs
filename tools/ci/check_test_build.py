@@ -39,6 +39,7 @@ def CheckUnitTestsBuild(options):
     is_asan = true
     # is_ubsan = true
     use_lepusng = true
+    enable_compatible_mm = false
     enable_coverage = true
     use_rtti = true
     is_debug = true
@@ -66,9 +67,6 @@ def CheckUnitTestsBuild(options):
         # is_asan = true
         # is_ubsan = true
         use_lepusng = true
-        enable_primjs_snapshot = true
-        enable_compatible_mm = true
-        enable_tracing_gc = true
         enable_coverage = true
         use_rtti = true
         enable_quickjs_debugger = true
@@ -121,6 +119,7 @@ def CheckUnitTestsBuild(options):
         enable_coverage = true
         use_rtti = true
         is_debug = true
+        enable_compatible_mm = false
         enable_quickjs_debugger = true
         {}
         {}

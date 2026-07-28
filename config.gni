@@ -41,10 +41,10 @@ declare_args() {
   enable_quickjs_debugger = false
 
   # Enable primjs snapshot version (with pre-generated embedded.S)
-  enable_primjs_snapshot = false
+  enable_primjs_snapshot = true
 
   # Enable primjs compatible memory management
-  enable_compatible_mm = false
+  enable_compatible_mm = true
 
   enable_ros_debug = false
   enable_ros_force_gc = false
@@ -64,16 +64,21 @@ declare_args() {
   # Enable primjs trace
   enable_primjs_trace = false
 
-  enable_tracing_gc = false
+  enable_tracing_gc = true
   napi_src_dir = "//src/napi/"
   enable_virtual_stack = false
 
   enable_napi_adapter_extern = false
 }
 
-if (target_cpu != "arm64") {
+# Pre-generated PrimJS snapshot assembly is only available for these platforms.
+_has_primjs_embedded =
+    target_os == "android" || target_os == "ios" || target_os == "mac"
+
+if (target_cpu != "arm64" || !_has_primjs_embedded) {
   enable_primjs_snapshot = false
   enable_compatible_mm = false
+  enable_tracing_gc = false
 }
 
 if (!enable_compatible_mm) {

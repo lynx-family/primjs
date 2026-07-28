@@ -2498,7 +2498,7 @@ static LEPUSValue js_c_function_data_call(LEPUSContext *ctx,
   /* XXX: could add the function on the stack for debug */
   if (unlikely(argc < s->length)) {
 #ifdef ENABLE_VIRTUAL_STACK
-    size_t arg_size = sizeof(arg_buf[0]) * s->length;
+    arg_size = sizeof(arg_buf[0]) * s->length;
     arg_buf = js_get_virtual_sp(arg_size);
     if (!arg_buf) return JS_ThrowStackOverflow_GC(ctx);
 #elif !defined(OS_WIN)
