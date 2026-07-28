@@ -47,7 +47,7 @@ if [ -d ${PRIMJS_HOME}/out/default -a x"$force_clean" = x"true" ]; then
 fi
 
 set -x
-gn gen out/default --args="is_debug=true"
+gn gen out/default --args="is_debug=true enable_compatible_mm=false"
 set +x
 
 ninja -C out/default qjs-cli

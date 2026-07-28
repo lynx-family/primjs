@@ -46,14 +46,16 @@ gn gen out/Default
 ninja -C out/Default qjs_exe
 ```
 
-To enable the template interpreter and garbage collector, use the following `gn` arguments (for example, on the arm64 platform, these arguments configure the build system to target ARM64 architecture while enabling the bytecode-based template interpreter and automatic memory management):
+PrimJS snapshot, compatible memory management, and tracing GC are enabled by
+default only for arm64 targets with pre-generated `embedded.S` files. Currently,
+these targets are Android, iOS, and macOS. The features remain disabled on Linux,
+other platforms without `embedded.S`, and non-arm64 targets.
+
+To explicitly target arm64 (on macOS, this also enables these features by
+default):
 
 ```bash
-gn gen out/Default --args= '
-    target_cpu="arm64" 
-    enable_primjs_snapshot = true
-    enable_compatible_mm = true
-    enable_tracing_gc = true'
+gn gen out/Default --args='target_cpu="arm64"'
 ninja -C out/Default -j32 qjs_exe
 ```
 
