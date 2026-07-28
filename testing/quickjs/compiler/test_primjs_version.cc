@@ -7,6 +7,7 @@ extern "C" {
 #endif
 #include "quickjs/include/quickjs-libc.h"
 #include "quickjs/include/quickjs.h"
+#include "quickjs/include/quickjs_version.h"
 #ifdef __cplusplus
 }
 #endif
@@ -109,6 +110,31 @@ static LEPUSValue writeAndReadFile(LEPUSContext* ctx) {
   return val;
 }
 
+static std::vector<uint8_t> writeBytecode(LEPUSContext* ctx) {
+  int flags = LEPUS_WRITE_OBJ_BYTECODE;
+  int eval_flags = LEPUS_EVAL_FLAG_COMPILE_ONLY | LEPUS_EVAL_TYPE_GLOBAL;
+  std::string src = R"(
+    function f() {
+        console.log("success");
+    };
+    f();
+  )";
+  LEPUSValue ret =
+      LEPUS_Eval(ctx, src.c_str(), src.length(), "test.js", eval_flags);
+  if (LEPUS_IsException(ret)) {
+    return {};
+  }
+
+  size_t out_buf_len = 0;
+  uint8_t* out_buf = LEPUS_WriteObject(ctx, &out_buf_len, ret, flags);
+  std::vector<uint8_t> bytecode(out_buf, out_buf + out_buf_len);
+  if (!LEPUS_IsGCMode(ctx)) {
+    lepus_free(ctx, out_buf);
+    LEPUS_FreeValue(ctx, ret);
+  }
+  return bytecode;
+}
+
 TEST_F(PrimjsVersionTest, TESTOldToNew) {
   LEPUSValue val;
   val = writeAndReadFile(ctx_);
@@ -127,19 +153,16 @@ TEST_F(PrimjsVersionTest, TESTNewToNew) {
 
 TEST_F(PrimjsVersionTest, TESTNewLessBC) {
   LEPUSValue val;
-  const uint8_t data[] = {
-      9,   205, 1,   176, 202, 0,   0,   0,   0,   5,   2,   102, 46,  95,
-      95,  108, 101, 112, 117, 115, 78,  71,  95,  102, 117, 110, 99,  116,
-      105, 111, 110, 95,  105, 100, 95,  95,  14,  99,  111, 110, 115, 111,
-      108, 101, 6,   108, 111, 103, 14,  115, 117, 99,  99,  101, 115, 115,
-      13,  0,   6,   0,   158, 1,   0,   1,   0,   1,   0,   1,   22,  1,
-      160, 1,   0,   0,   0,   63,  203, 0,   0,   0,   64,  189, 0,   64,
-      203, 0,   0,   0,   0,   56,  203, 0,   0,   0,   236, 202, 40,  152,
-      3,   2,   0,   13,  67,  6,   0,   150, 3,   0,   0,   0,   3,   0,
-      0,   19,  0,   56,  205, 0,   0,   0,   66,  206, 0,   0,   0,   4,
-      207, 0,   0,   0,   36,  1,   0,   41,  152, 3,   1,   0};
-  size_t size = 138;
-  val = LEPUS_EvalBinary(ctx_, data, size, 0);
+  SetLynxTargetSdkVersion(ctx_, PRIMJS_ADD_VERSION_CODE);
+  std::vector<uint8_t> data = writeBytecode(ctx_);
+  ASSERT_GE(data.size(), 1 + sizeof(uint64_t));
+
+  uint64_t future_version = LEPUS_GetPrimjsVersion() + 1;
+  for (size_t i = 0; i < sizeof(future_version); i++) {
+    data[1 + i] = (future_version >> (i * 8)) & 0xff;
+  }
+
+  val = LEPUS_EvalBinary(ctx_, data.data(), data.size(), 0);
   ASSERT_TRUE(LEPUS_IsException(val));
   std::string exception_val = js_get_exception_string(ctx_);
   std::cout << exception_val << std::endl;

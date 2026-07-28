@@ -371,6 +371,15 @@ DEF(is_null, 1, 1, 1, none)
 DEF(is_function, 1, 1, 1, none)
 #endif
 
+/*
+ * Append-only final opcodes. Keep this block after all existing DEF entries so
+ * old serialized bytecode keeps the same opcode numbers. Because opcode_info[]
+ * also contains the temporary def() entries before this block, read metadata
+ * through opcode_info_for_op() or short_opcode_info(), not opcode_info[]
+ * directly.
+ */
+DEF(object_literal, 5, 0, 1, const)
+
 #undef DEF
 #undef def
 #endif /* DEF */
