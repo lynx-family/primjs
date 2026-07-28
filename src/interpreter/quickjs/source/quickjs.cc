@@ -949,11 +949,7 @@ int init_bigint_name(LEPUSRuntime *rt) {
 
 bool gc_enabled() {
 #ifdef ENABLE_COMPATIBLE_MM
-#if defined(ENABLE_TRACING_GC)
   return true;
-#else
-  return GC_ENABLE & settingsFlag;
-#endif
 #else
   return false;
 #endif
