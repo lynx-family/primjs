@@ -26,8 +26,13 @@ Wasm3Memory::~Wasm3Memory() {
 }
 
 bool Wasm3Memory::grow(uint32_t delta) {
-  WLOGD("memory.grow from %u(+%u) -> %u", memory_->numPages, delta,
-        memory_->numPages + delta);
+  uint32_t cur = memory_->numPages;
+  uint32_t max = memory_->maxPages;
+  if (cur > max || delta > max - cur) {
+    WLOGW("memory.grow rejected: cur=%u delta=%u max=%u", cur, delta, max);
+    return false;
+  }
+  WLOGD("memory.grow from %u(+%u) -> %u", cur, delta, cur + delta);
   return m3Err_none == m3_GrowMemory(memory_, runtime_->GetRuntime(), delta);
 }
 
