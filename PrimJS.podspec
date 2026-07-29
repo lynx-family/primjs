@@ -60,7 +60,8 @@ Pod::Spec.new do |s|
 
     sp.source_files = ["src/gc/*.{h,cc}",
                        "src/interpreter/quickjs/**/*.{h,cc}",
-                       "src/interpreter/primjs/ios/embedded.S",
+                       "src/interpreter/primjs/interp/call_stub.{h,cc}",
+                       "src/interpreter/primjs/interp/ios/embedded.S",
                        "src/inspector/interface.h"]
     sp.dependency "PrimJS/log"
   end
@@ -74,7 +75,8 @@ Pod::Spec.new do |s|
     sp.public_header_files = "src/inspector/*.h"
     sp.header_dir = "devtool/quickjs"
     sp.source_files = ["src/inspector/**/*.{h,cc}",
-                       "src/interpreter/primjs/ios/embedded-inspector.S"]
+                       "src/interpreter/primjs/interp/call_stub.{h,cc}",
+                       "src/interpreter/primjs/interp/ios/embedded-inspector.S"]
     sp.exclude_files = ["src/inspector/interface.h"]
     sp.dependency "PrimJS/quickjs"
   end

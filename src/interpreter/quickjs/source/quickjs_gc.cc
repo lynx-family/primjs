@@ -105,6 +105,11 @@ extern "C" {
 
 static constexpr uint64_t kHeaderSize = ROS_GC::kHeaderSize;
 
+QJS_HIDE BOOL js_check_stack_overflow(LEPUSContext *ctx, size_t alloca_size);
+QJS_HIDE LEPUSValue JS_ToPrimitiveFree(LEPUSContext *ctx, LEPUSValue val,
+                                       int hint);
+QJS_HIDE JSAtom js_value_to_atom(LEPUSContext *ctx, LEPUSValueConst val);
+
 /* define to include Atomics.* operations which depend on the OS
    threads */
 #if !defined(EMSCRIPTEN)
@@ -2881,6 +2886,15 @@ static uint32_t GetLEPUSShapePropertyFlags(JSShapeProperty *prs) {
 typedef LEPUSValue JSAutoInitFunc(LEPUSContext *ctx, LEPUSObject *p,
                                   JSAtom atom, void *opaque);
 
+static inline JSAutoInitFunc *js_autoinit_get_func_gc(JSProperty *pr) {
+  return (JSAutoInitFunc *)(pr->u.init.init_func & ~3);
+}
+
+static inline void set_js_autoinit_func_gc(JSProperty *pr,
+                                           JSAutoInitFunc *func) {
+  pr->u.init.init_func = (uintptr_t)func | 1;
+}
+
 static int JS_AutoInitProperty(LEPUSContext *ctx, LEPUSObject *p, JSAtom prop,
                                JSProperty *pr, JSShapeProperty *prs) {
   LEPUSValue val;
@@ -2889,7 +2903,7 @@ static int JS_AutoInitProperty(LEPUSContext *ctx, LEPUSObject *p, JSAtom prop,
   if (js_shape_prepare_update(ctx, p, &prs)) return -1;
   uintptr_t *opaque_ptr = (uintptr_t *)&(pr->u.init.opaque);
   *(opaque_ptr) = (*opaque_ptr) & (~static_cast<uintptr_t>(LEPUS_CPOINTER_TAG));
-  func = pr->u.init.init_func;
+  func = js_autoinit_get_func_gc(pr);
   void *opaque = pr->u.init.opaque;
   /* 'func' shall not modify the object properties 'pr' */
   val = func(ctx, p, prop, opaque);
@@ -4087,8 +4101,8 @@ int set_array_length_gc(LEPUSContext *ctx, LEPUSObject *p, LEPUSValue val,
 
 /* Preconditions: 'p' must be of class JS_CLASS_ARRAY, p->fast_array =
    TRUE and p->extensible = TRUE */
-static int add_fast_array_element(LEPUSContext *ctx, LEPUSObject *p,
-                                  LEPUSValue val, int flags) {
+int add_fast_array_element_gc(LEPUSContext *ctx, LEPUSObject *p, LEPUSValue val,
+                              int flags) {
   uint32_t new_len, array_len;
   /* extend the array by one */
   /* XXX: convert to slow array if new_len > 2^31-1 elements */
@@ -4444,7 +4458,7 @@ retry:
       uint32_t idx = __JS_AtomToUInt32(prop);
       if (idx == p->u.array.count) {
         /* fast case */
-        return add_fast_array_element(ctx, p, val, flags);
+        return add_fast_array_element_gc(ctx, p, val, flags);
       } else {
         goto generic_create_prop;
       }
@@ -4502,7 +4516,7 @@ int JS_SetPropertyValue_GC(LEPUSContext *ctx, LEPUSValueConst this_obj,
             p1 = sh1->proto;
           }
           /* add element */
-          return add_fast_array_element(ctx, p, val, flags);
+          return add_fast_array_element_gc(ctx, p, val, flags);
         }
         set_value_gc(ctx, &p->u.array.u.values[idx], val);
         break;
@@ -4647,7 +4661,7 @@ static int JS_CreateProperty(LEPUSContext *ctx, LEPUSObject *p, JSAtom prop,
               goto convert_to_array;
             prop_flags = get_prop_flags(flags, 0);
             if (prop_flags != LEPUS_PROP_C_W_E) goto convert_to_array;
-            return add_fast_array_element(ctx, p, val, flags);
+            return add_fast_array_element_gc(ctx, p, val, flags);
           } else {
             goto convert_to_array;
           }
@@ -5068,7 +5082,7 @@ int JS_DefineAutoInitProperty_GC(
   pr = add_property_gc(ctx, p, prop,
                        (flags & LEPUS_PROP_C_W_E) | LEPUS_PROP_AUTOINIT);
   if (unlikely(!pr)) return -1;
-  pr->u.init.init_func = init_func;
+  set_js_autoinit_func_gc(pr, init_func);
   pr->u.init.opaque = opaque;
   uintptr_t *opaque_ptr = (uintptr_t *)(&(pr->u.init.opaque));
   *opaque_ptr = (*opaque_ptr) | LEPUS_CPOINTER_TAG;
@@ -7179,8 +7193,8 @@ __exception int js_iterator_get_value_done_gc(LEPUSContext *ctx,
   return 0;
 }
 
-static LEPUSValue js_create_iterator_result(LEPUSContext *ctx, LEPUSValue val,
-                                            BOOL done) {
+LEPUSValue js_create_iterator_result_gc(LEPUSContext *ctx, LEPUSValue val,
+                                        BOOL done) {
   LEPUSValue obj;
   obj = JS_NewObject_GC(ctx);
   if (LEPUS_IsException(obj)) {
@@ -7443,12 +7457,11 @@ LEPUSValue js_closure_gc(LEPUSContext *ctx, LEPUSValue bfunc,
        creating cycles for every javascript function. The prototype
        object is created on the fly when first accessed */
     LEPUS_SetConstructorBit(ctx, func_obj, TRUE);
-    LEPUSValue obj =
-        js_instantiate_prototype(ctx, p, JS_ATOM_prototype, nullptr);
-    func_scope.PushHandle(&obj, HANDLE_TYPE_LEPUS_VALUE);
-    pr = add_property_gc(ctx, p, JS_ATOM_prototype, LEPUS_PROP_WRITABLE);
+    pr = add_property_gc(ctx, p, JS_ATOM_prototype,
+                         LEPUS_PROP_WRITABLE | LEPUS_PROP_AUTOINIT);
     if (pr) {
-      HeapObjStore(ctx, &pr->u.value, obj);
+      set_js_autoinit_func_gc(pr, js_instantiate_prototype);
+      pr->u.init.opaque = nullptr;
     }
   }
   return func_obj;
@@ -7619,7 +7632,7 @@ QJS_STATIC LEPUSValue js_call_c_function(LEPUSContext *ctx,
                                    p->u.cfunc.magic);
       if (!LEPUS_IsException(ret_val) && done != 2) {
         HandleScope func_scope(ctx, &ret_val, HANDLE_TYPE_LEPUS_VALUE);
-        ret_val = js_create_iterator_result(ctx, ret_val, done);
+        ret_val = js_create_iterator_result_gc(ctx, ret_val, done);
       }
     } break;
     default:
@@ -7696,11 +7709,16 @@ QJS_STATIC inline __exception int js_poll_interrupts(LEPUSContext *ctx) {
   }
 }
 
+#ifdef ENABLE_PRIMJS_SNAPSHOT
+static void check_and_init_thread_stack_limit(LEPUSContext *ctx);
+#endif
+
 LEPUSValue JS_CallInternalTI_GC(LEPUSContext *caller_ctx, LEPUSValue func_obj,
                                 LEPUSValue this_obj, LEPUSValue new_target,
                                 int argc, LEPUSValue *argv, int flags) {
 #ifdef ENABLE_PRIMJS_SNAPSHOT
   if (caller_ctx->rt->use_primjs) {
+    check_and_init_thread_stack_limit(caller_ctx);
     return entry(this_obj, new_target, func_obj, (address)caller_ctx, argc,
                  argv, flags);
   }
@@ -7888,6 +7906,15 @@ static __exception int async_func_init(LEPUSContext *ctx,
   for (i = argc; i < n; i++) sf->arg_buf[i] = LEPUS_UNDEFINED;
   sf->var_refs = nullptr;
   sf->ref_size = sf->arg_count + b->var_count;
+
+#ifdef ENABLE_PRIMJS_SNAPSHOT
+  // no need write barrier for this_obj, var_refs_cache, cpool
+  s->cframe.this_obj = this_obj;
+  s->cframe.new_target = LEPUS_UNDEFINED;
+  s->cframe.var_refs_cache = p->u.func.var_refs;
+  s->cframe.cpool = b->cpool;
+  s->cframe.argc = argc;
+#endif
   return 0;
 }
 
@@ -8326,7 +8353,7 @@ static void js_async_generator_resolve(LEPUSContext *ctx,
                                        JSAsyncGeneratorData *s,
                                        LEPUSValueConst value, BOOL done) {
   LEPUSValue result;
-  result = js_create_iterator_result(ctx, value, done);
+  result = js_create_iterator_result_gc(ctx, value, done);
   HandleScope func_scope(ctx, &result, HANDLE_TYPE_LEPUS_VALUE);
   /* XXX: better exception handling ? */
   js_async_generator_resolve_or_reject(ctx, s, result, 0);
@@ -23001,8 +23028,8 @@ static const LEPUSCFunctionListEntry js_async_function_proto_funcs[] = {
 static LEPUSValue js_async_from_async_iterator_unwrap(
     LEPUSContext *ctx, LEPUSValueConst this_val, int argc,
     LEPUSValueConst *argv, int magic, LEPUSValue *func_data) {
-  return js_create_iterator_result(ctx, func_data[0],
-                                   JS_ToBool_GC(ctx, func_data[1]));
+  return js_create_iterator_result_gc(ctx, func_data[0],
+                                      JS_ToBool_GC(ctx, func_data[1]));
 }
 
 static LEPUSValue js_async_from_async_iterator_unwrap_func_create(
@@ -23060,7 +23087,7 @@ static LEPUSValue js_async_from_sync_iterator_next(LEPUSContext *ctx,
     if (LEPUS_IsException(method)) goto reject;
     if (LEPUS_IsUndefined(method) || LEPUS_IsNull(method)) {
       if (magic == GEN_MAGIC_RETURN) {
-        err = js_create_iterator_result(ctx, argv[0], TRUE);
+        err = js_create_iterator_result_gc(ctx, argv[0], TRUE);
         is_reject = 0;
       } else {
         err = argv[0];
@@ -27958,39 +27985,40 @@ LEPUSValue prim_js_operator_delete_gc(LEPUSContext *ctx, LEPUSValue op1,
 #ifdef ENABLE_PRIMJS_SNAPSHOT
 extern "C" void _call_stub_entry();
 
-extern "C" void _dispatch_table();
-
-extern "C" void _dispatch_table_offset();
+extern "C" void _init_dispatch_table(LEPUSContext *ctx);
 
 typedef unsigned char u_char;
 typedef u_char *address;
 
-address _table_gc[NUM_OF_TOS_STATES][OP_COUNT];
-
 #define CAST_TO_FN_PTR(func_type, value) (reinterpret_cast<func_type>(value))
-
-static void initialize_dispatchTable(LEPUSContext *ctx) {
-  for (int i = 0; i < NUM_OF_TOS_STATES; i++) {
-    for (int j = 1; j < OP_COUNT; j++) {
-      int offset = i * (OP_COUNT - 1) + j - 1;
-      int *table_entry =
-          reinterpret_cast<int *>(&_dispatch_table_offset) + offset;
-      int table_offset = *table_entry;
-      _table_gc[i][j] = (address)&_dispatch_table + table_offset;
-    }
-  }
-  ctx->dispatch_table = _table_gc;
-}
 
 static QuickJsCallStub call_stub() {
   return CAST_TO_FN_PTR(QuickJsCallStub, &_call_stub_entry);
 }
 
-void PrimInit_GC(LEPUSContext *ctx) {
-  initialize_dispatchTable(ctx);
-#ifdef ENABLE_PRIMJS_SNAPSHOT
-  entry = call_stub();
+static void check_and_init_thread_stack_limit(LEPUSContext *ctx) {
+  static thread_local uint8_t *cur_stack_limit = nullptr;
+
+  if (UNLIKELY(ctx->stack_limit != cur_stack_limit)) {
+#ifdef ENABLE_VIRTUAL_STACK
+    VirtualStack::GetThreadLocalInstance().InitVirtualStack(ctx);
+    if (UNLIKELY(cur_stack_limit == nullptr)) {
+      cur_stack_limit = ctx->stack_limit;
+    }
+#else
+    if (UNLIKELY(cur_stack_limit == nullptr)) {
+      cur_stack_limit = (uint8_t *)get_thread_stack_limit();
+    }
+    ctx->stack_limit = cur_stack_limit;
 #endif
+  }
+}
+
+void PrimInit_GC(LEPUSContext *ctx) {
+  _init_dispatch_table(ctx);
+  entry = call_stub();
+  // use fake stack limit init
+  ctx->stack_limit = (uint8_t *)-1;
 }
 
 #endif
@@ -28513,12 +28541,16 @@ void Visitor::PushObjRegExp(LEPUSObject *obj, GCWorkStack &workStack) noexcept {
 }
 
 void Visitor::PushObjProperty(JSProperty *pr, GCWorkStack &workStack) noexcept {
-  address_t sencodPtr = (address_t)pr->u.getset.setter;
-  address_t val = (address_t)pr->u.init.init_func;
-  if (val != (address_t)(JS_InstantiateFunctionListItem2) &&
-      val != (address_t)(js_module_ns_autoinit)) {
+  if (LEPUS_VALUE_IS_OBJECT(pr->u.value) && js_prop_is_autoinit(pr)) {
+    return;
+  } else {
+    address_t sencodPtr = (address_t)pr->u.getset.setter;
+    address_t val = (address_t)pr->u.init.init_func;
     PushObjLEPUSValue((LEPUSValue){.as_int64 = (int64_t)val}, workStack);
-    PushObjLEPUSValue((LEPUSValue){.as_int64 = (int64_t)sencodPtr}, workStack);
+    if (sencodPtr != 0) {
+      PushObjLEPUSValue((LEPUSValue){.as_int64 = (int64_t)sencodPtr},
+                        workStack);
+    }
   }
 }
 
@@ -29194,9 +29226,9 @@ void Finalizer::JSLepusRefFinalizer(void *ptr) noexcept {
 #endif
 
 void Finalizer::JSStringFinalizer(void *ptr) noexcept {
-  JSString *str = static_cast<JSString *>(ptr);
 #ifdef ENABLE_LEPUSNG
   // <Primjs begin>
+  JSString *str = static_cast<JSString *>(ptr);
   JS_FreeStringCache(rt_, str);
   // <Primjs end>
 #endif
@@ -29429,7 +29461,7 @@ char *LEPUS_GetGCTimingInfo(LEPUSContext *ctx, bool is_start) {
     char *gc_info = is_start ? rt->gc_info_start_ : rt->gc_info_end_;
     memset(gc_info, 0, BUF_LEN);
     snprintf(gc_info, BUF_LEN,
-             "{\n  \"gc_count\" : %zu,\n  \"gc_duration\" : %" PRIu64
+             "{\n  \"gc_count\" : %zu,\n  \"gc_duration\" : %zu"
              ",\n  \"gc_heapsize\" : %zu,\n  \"rt_info\" : %s\n}\n",
              rt->ros_->GetGCTracer()->GetGCCount(),
              rt->ros_->GetGCTracer()->GetGCDuration(),
