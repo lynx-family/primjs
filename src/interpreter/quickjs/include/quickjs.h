@@ -1230,7 +1230,7 @@ LEPUSValue LEPUS_Eval(LEPUSContext *ctx, const char *input, size_t input_len,
 LEPUSValue LEPUS_Eval2(LEPUSContext *ctx, const char *input, size_t input_len,
                        const char *filename, int eval_flags,
                        int start_line_number);
-// A positive runtime_id enables coverage instrumentation and collection.
+// A not negative runtime_id enables coverage instrumentation and collection.
 LEPUSValue LEPUS_Eval_WITH_COVERAGE(LEPUSContext *ctx, const char *input,
                                     size_t input_len, const char *filename,
                                     int eval_flags, int start_line_number,

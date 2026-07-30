@@ -187,7 +187,6 @@ TEST(QjsCoverage, NonPositiveRuntimeIdDoesNotEnableCoverage) {
   ASSERT_FALSE(LEPUS_IsException(result));
   if (!LEPUS_IsGCMode(ctx)) LEPUS_FreeValue(ctx, result);
 
-  EXPECT_EQ(CoverageDump(ctx, 0), "{\"result\":[]}");
   EXPECT_EQ(CoverageDump(ctx, -1), "{\"result\":[]}");
 
   LEPUS_FreeContext(ctx);

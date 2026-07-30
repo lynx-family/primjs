@@ -18887,7 +18887,7 @@ int emit_goto(JSParseState *s, int opcode, int label) {
 }
 
 static inline BOOL js_coverage_enabled(JSParseState *s) {
-  return s->cur_func && s->cur_func->runtime_id > 0;
+  return s->cur_func && s->cur_func->runtime_id >= 0;
 }
 
 /* Returns TRUE iff `ptr` lies within the original source buffer
@@ -29921,7 +29921,7 @@ LEPUSValue js_create_function(LEPUSContext *ctx, JSFunctionDef *fd) {
     DebuggerSetFunctionBytecodeScript(ctx, fd, b);
   }
 #endif
-  if (b->runtime_id > 0) {
+  if (b->runtime_id >= 0) {
     RegisterCoverageInfo(ctx, b);
   }
 
@@ -52514,12 +52514,14 @@ static int RegisterCoverageInfo(LEPUSContext *ctx, LEPUSFunctionBytecode *b) {
   info = (JSCoverageInfo *)lepus_mallocz_rt(rt, sizeof(JSCoverageInfo), 0);
   if (!info) return -1;
 
-  info->filename = JS_DupAtomRT(rt, b->debug.filename);
   info->func_name = JS_DupAtomRT(rt, b->func_name);
   info->runtime_id = b->runtime_id;
   info->slot_count = b->coverage_slot_count;
   info->coverage_slots = b->coverage_slots;
   info->coverage_counters = b->coverage_counters;
+  if (b->has_debug) {
+    info->filename = JS_DupAtomRT(rt, b->debug.filename);
+  }
 
   b->coverage_info = info;
   WriteBarrierNoStore(rt, info);
@@ -52667,17 +52669,20 @@ const char *JS_GetCoverageDumpString(LEPUSContext *ctx, int32_t runtime_id,
     if (info->runtime_id != runtime_id) continue;
 
     if (!has_script) {
-      const char *file_name = LEPUS_AtomToCString(ctx, info->filename);
-      if (!file_name) goto fail;
-      HandleScope script_scope(ctx, &file_name, HANDLE_TYPE_CSTRING);
-
       dbuf_printf(
           &dbuf, "{\"scriptId\":\"%d\",\"url\":", static_cast<int>(runtime_id));
-      if (CoverageAppendJSONString(&dbuf, file_name) != 0) {
+      if (info->filename != JS_ATOM_NULL) {
+        const char *file_name = LEPUS_AtomToCString(ctx, info->filename);
+        if (!file_name) goto fail;
+        HandleScope script_scope(ctx, &file_name, HANDLE_TYPE_CSTRING);
+        if (CoverageAppendJSONString(&dbuf, file_name) != 0) {
+          if (!ctx->gc_enable) LEPUS_FreeCString(ctx, file_name);
+          goto fail;
+        }
         if (!ctx->gc_enable) LEPUS_FreeCString(ctx, file_name);
+      } else if (CoverageAppendJSONString(&dbuf, "") != 0) {
         goto fail;
       }
-      if (!ctx->gc_enable) LEPUS_FreeCString(ctx, file_name);
       dbuf_putstr(&dbuf, ",\"functions\":[");
       if (dbuf_error(&dbuf)) goto fail;
       has_script = true;
