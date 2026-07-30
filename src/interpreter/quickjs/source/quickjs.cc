@@ -36221,6 +36221,11 @@ QJS_STATIC LEPUSValue js_array_pop(LEPUSContext *ctx, LEPUSValueConst this_val,
   LEPUSValue *arrp;
   uint32_t count32;
 
+#ifdef ENABLE_LEPUSNG
+  if (JS_LepusRefIsArray(ctx->rt, this_val)) {
+    return ctx->rt->primjs_callbacks_.jsarray_pop(ctx, this_val, shift);
+  }
+#endif
   obj = LEPUS_ToObject(ctx, this_val);
   if (js_get_length64(ctx, &len, obj)) goto exception;
   newLen = 0;
@@ -36271,6 +36276,12 @@ QJS_STATIC LEPUSValue js_array_push(LEPUSContext *ctx, LEPUSValueConst this_val,
   int i;
   int64_t len, from, newLen;
 
+#ifdef ENABLE_LEPUSNG
+  if (JS_LepusRefIsArray(ctx->rt, this_val)) {
+    return ctx->rt->primjs_callbacks_.jsarray_push(ctx, this_val, argc, argv,
+                                                   unshift);
+  }
+#endif
   obj = LEPUS_ToObject(ctx, this_val);
   if (js_get_length64(ctx, &len, obj)) goto exception;
   newLen = len + argc;
