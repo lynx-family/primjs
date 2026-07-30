@@ -52617,12 +52617,10 @@ static int CoverageAppendArchivedFunctionJSON(LEPUSContext *ctx, DynBuf *dbuf,
   bool has_func_name = false;
   int rc = -1;
   bool first = true;
-  HandleScope coverage_scope(ctx);
 
   if (info->func_name != JS_ATOM_NULL) {
     func_name = LEPUS_AtomToCString(ctx, info->func_name);
     if (!func_name) goto done;
-    coverage_scope.PushHandle(&func_name, HANDLE_TYPE_CSTRING);
     has_func_name = true;
   }
 
@@ -52674,7 +52672,6 @@ const char *JS_GetCoverageDumpString(LEPUSContext *ctx, int32_t runtime_id,
       if (info->filename != JS_ATOM_NULL) {
         const char *file_name = LEPUS_AtomToCString(ctx, info->filename);
         if (!file_name) goto fail;
-        HandleScope script_scope(ctx, &file_name, HANDLE_TYPE_CSTRING);
         if (CoverageAppendJSONString(&dbuf, file_name) != 0) {
           if (!ctx->gc_enable) LEPUS_FreeCString(ctx, file_name);
           goto fail;
