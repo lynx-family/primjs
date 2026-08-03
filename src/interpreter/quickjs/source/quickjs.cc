@@ -31573,6 +31573,17 @@ static int JS_WriteFunction(BCWriterState *s, LEPUSValueConst obj) {
   int idx, i;
 
   if (!s->allow_bytecode) goto fail;
+  /* Coverage-instrumented functions embed OP_inc_coverage, which is not
+     recognized by runtimes that were built without this opcode.  Refuse to
+     serialize them so bytecode produced by LEPUS_Eval_WITH_COVERAGE can
+     never be shipped to older runtimes. */
+  if (b->runtime_id >= 0) {
+    LEPUS_ThrowInternalError(
+        s->ctx,
+        "cannot serialize coverage-instrumented bytecode (runtime_id=%d)",
+        b->runtime_id);
+    goto fail;
+  }
   bc_put_u8(s, BC_TAG_FUNCTION_BYTECODE);
   flags = idx = 0;
   bc_set_flags(&flags, &idx, b->has_prototype, 1);
@@ -31944,7 +31955,13 @@ fail:
  */
 uint64_t LEPUS_GetPrimjsVersion() {
   constexpr uint64_t unexpected_cnt = 16;
-  uint64_t op_num = OP_COUNT + unexpected_cnt;
+  /* Opcodes that are only emitted by local-only compile entries (e.g.
+     OP_inc_coverage from LEPUS_Eval_WITH_COVERAGE) never appear in the
+     bytecode produced by the delivery-facing LEPUS_Eval / LEPUS_Eval2
+     path, so they must not shift the on-disk version and break older
+     runtimes loading newly compiled output. */
+  constexpr uint64_t non_shippable_op_cnt = 1;
+  uint64_t op_num = OP_COUNT + unexpected_cnt - non_shippable_op_cnt;
   uint64_t atom_num = JS_ATOM_END - 1;
   uint64_t primjs_version = op_num + atom_num;
   primjs_version |= VERSION_PLACEHOLDER;

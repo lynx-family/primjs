@@ -70,6 +70,43 @@ bool CoverageRecordHasCount(const std::string& function_record, int count) {
          std::string::npos;
 }
 
+TEST(QjsCoverage, CoverageCompileOnlyCannotGenerateCodeCache) {
+  constexpr int32_t kRuntimeId = 101;
+  constexpr char kSource[] = "function covered() { return 1; }";
+
+  LEPUSRuntime* rt = LEPUS_NewRuntime();
+  ASSERT_NE(rt, nullptr);
+  LEPUSContext* ctx = LEPUS_NewContext(rt);
+  ASSERT_NE(ctx, nullptr);
+
+  LEPUSValue compiled = LEPUS_Eval_WITH_COVERAGE(
+      ctx, kSource, strlen(kSource), "coverage_codecache.js",
+      LEPUS_EVAL_FLAG_COMPILE_ONLY | LEPUS_EVAL_TYPE_GLOBAL, 0, kRuntimeId);
+  ASSERT_FALSE(LEPUS_IsException(compiled));
+
+  size_t bytecode_length = 1;
+  uint8_t* bytecode = LEPUS_WriteObject(ctx, &bytecode_length, compiled,
+                                        LEPUS_WRITE_OBJ_BYTECODE);
+  EXPECT_EQ(bytecode, nullptr);
+  EXPECT_EQ(bytecode_length, 0u);
+
+  LEPUSValue exception = LEPUS_GetException(ctx);
+  const char* exception_string = LEPUS_ToCString(ctx, exception);
+  ASSERT_NE(exception_string, nullptr);
+  EXPECT_NE(std::string(exception_string)
+                .find("cannot serialize coverage-instrumented bytecode"),
+            std::string::npos);
+
+  if (!LEPUS_IsGCMode(ctx)) {
+    LEPUS_FreeCString(ctx, exception_string);
+    LEPUS_FreeValue(ctx, exception);
+    LEPUS_FreeValue(ctx, compiled);
+    lepus_free(ctx, bytecode);
+  }
+  LEPUS_FreeContext(ctx);
+  LEPUS_FreeRuntime(rt);
+}
+
 TEST(QjsCoverage, DumpFiltersByRuntimeId) {
   constexpr int32_t kFirstRuntimeId = 101;
   constexpr int32_t kSecondRuntimeId = 202;
