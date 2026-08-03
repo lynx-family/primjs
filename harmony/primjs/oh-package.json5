@@ -3,8 +3,8 @@
   "description": "A JavaScript Engine Optimized for Lynx",
   "repository": "https://github.com/lynx-family/primjs.git",
   "main": "Index.ets",
-  "author": "lynx",
+  "author": "Lynx Authors <lynx.authors@gmail.com> (https://github.com/lynx-family/primjs)",
   "license": "Apache-2.0",
   "dependencies": {},
-  "version": "2.11.1-rc.1"
+  "version": "4.0.0"
 }
