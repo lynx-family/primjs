@@ -69,6 +69,12 @@ FMT(u64)
 #define def(id, size, n_pop, n_push, f) DEF(id, size, n_pop, n_push, f)
 #endif
 
+/* Runtime opcodes that must never be serialized into shipped bytecode. */
+#ifndef DEF_NON_SHIPPABLE
+#define DEF_NON_SHIPPABLE(id, size, n_pop, n_push, f) \
+  DEF(id, size, n_pop, n_push, f)
+#endif
+
 DEF(invalid, 1, 0, 0, none) /* never emitted */
 
 /* push values */
@@ -373,8 +379,9 @@ DEF(is_null, 1, 1, 1, none)
 DEF(is_function, 1, 1, 1, none)
 #endif
 
-DEF(inc_coverage, 5, 0, 0, u32)
+DEF_NON_SHIPPABLE(inc_coverage, 5, 0, 0, u32)
 
+#undef DEF_NON_SHIPPABLE
 #undef DEF
 #undef def
 #endif /* DEF */

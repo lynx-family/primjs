@@ -736,6 +736,15 @@ typedef enum OPCodeEnum {
   OP_TEMP_END,
 } OPCodeEnum;
 
+/* Count only opcodes that participate in the shipped bytecode ABI. */
+enum {
+#define DEF(id, size, n_pop, n_push, f) +1
+#define def(id, size, n_pop, n_push, f)
+#define DEF_NON_SHIPPABLE(id, size, n_pop, n_push, f)
+  OP_SHIPPABLE_COUNT = 0
+#include "quickjs/include/quickjs-opcode.h"
+};
+
 struct FinalizationRegistryContext;
 constexpr size_t kFunctionShapeSize = 2;
 struct WeakRefData;

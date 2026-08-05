@@ -31955,13 +31955,7 @@ fail:
  */
 uint64_t LEPUS_GetPrimjsVersion() {
   constexpr uint64_t unexpected_cnt = 16;
-  /* Opcodes that are only emitted by local-only compile entries (e.g.
-     OP_inc_coverage from LEPUS_Eval_WITH_COVERAGE) never appear in the
-     bytecode produced by the delivery-facing LEPUS_Eval / LEPUS_Eval2
-     path, so they must not shift the on-disk version and break older
-     runtimes loading newly compiled output. */
-  constexpr uint64_t non_shippable_op_cnt = 1;
-  uint64_t op_num = OP_COUNT + unexpected_cnt - non_shippable_op_cnt;
+  uint64_t op_num = OP_SHIPPABLE_COUNT + unexpected_cnt;
   uint64_t atom_num = JS_ATOM_END - 1;
   uint64_t primjs_version = op_num + atom_num;
   primjs_version |= VERSION_PLACEHOLDER;
