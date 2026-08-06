@@ -1173,7 +1173,6 @@ QJS_STATIC inline size_t js_def_malloc_usable_size(const void *ptr) {
 
 QJS_STATIC void *js_def_malloc(JSMallocState *s, size_t size,
                                int alloc_tag = ALLOC_TAG_WITHOUT_PTR) {
-  JS_UpdateGCInfo(s->runtime, size);
   void *ptr;
 
   /* Do not allocate zero bytes: behavior is platform dependent */
@@ -1186,6 +1185,7 @@ QJS_STATIC void *js_def_malloc(JSMallocState *s, size_t size,
 
   s->malloc_count++;
   s->malloc_size += js_def_malloc_usable_size(ptr) + MALLOC_OVERHEAD;
+  JS_UpdateGCInfo(s->runtime, size);
   return ptr;
 }
 
@@ -1199,7 +1199,6 @@ QJS_STATIC void js_def_free(JSMallocState *s, void *ptr) {
 
 QJS_STATIC void *js_def_realloc(JSMallocState *s, void *ptr, size_t size,
                                 int alloc_tag = ALLOC_TAG_WITHOUT_PTR) {
-  JS_UpdateGCInfo(s->runtime, size);
   size_t old_size;
 
   if (!ptr) {
@@ -1219,6 +1218,7 @@ QJS_STATIC void *js_def_realloc(JSMallocState *s, void *ptr, size_t size,
   if (!ptr) return NULL;
 
   s->malloc_size += js_def_malloc_usable_size(ptr) - old_size;
+  JS_UpdateGCInfo(s->runtime, size);
   return ptr;
 }
 
