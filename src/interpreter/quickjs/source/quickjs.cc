@@ -1309,13 +1309,31 @@ QJS_STATIC const GCMemoryPolicyEntry *FindGCMemoryPolicyEntryByName(
 
 int LEPUS_SetGCMemoryPolicyLevel(LEPUSRuntime *rt,
                                  LEPUSGCMemoryPolicyLevel level) {
-  if (!rt || !FindGCMemoryPolicyEntryByLevel(level)) {
+  const GCMemoryPolicyEntry *entry = FindGCMemoryPolicyEntryByLevel(level);
+  if (!rt || !entry) {
     return -1;
   }
 
 #ifdef ENABLE_COMPATIBLE_MM
   if (rt->gc_enable && !(settingsFlag & DISABLE_GC_MEMORY_POLICY)) {
+#if defined(ANDROID) || defined(__ANDROID__)
+    auto *ros = rt->ros_;
+    const size_t heap_size_before = ros->GetHeapSize();
+    const size_t heap_growth_limit_before = ros->GetHeapGrowthLimit();
+    const size_t allocated_internal_size_before =
+        ros->GetAllocatedInternalSize();
+#endif
     JS_SetGCMemoryPolicyLevel_GC(rt, level);
+#if defined(ANDROID) || defined(__ANDROID__)
+    __android_log_print(
+        ANDROID_LOG_INFO, "PRIMJS",
+        "GC policy: rt=%p, level=%s(%d), heap_size=%zu->%zu, "
+        "heap_growth_limit=%zu->%zu, allocated_internal_size=%zu->%zu",
+        static_cast<void *>(rt), entry->name, static_cast<int>(level),
+        heap_size_before, ros->GetHeapSize(), heap_growth_limit_before,
+        ros->GetHeapGrowthLimit(), allocated_internal_size_before,
+        ros->GetAllocatedInternalSize());
+#endif
   }
 #endif
   return 0;
