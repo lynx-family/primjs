@@ -361,6 +361,21 @@ typedef struct JSCoverageInfo {
   uint32_t *coverage_counters;
 } JSCoverageInfo;
 
+static constexpr uint32_t kFirstCachedSingleCharacter = 0x00;
+static constexpr uint32_t kLastCachedSingleCharacter = 0x7f;
+static constexpr uint32_t kSingleCharacterStringTableSize =
+    kLastCachedSingleCharacter - kFirstCachedSingleCharacter + 1;
+
+static constexpr uint32_t kFirstCachedTwoDigitNumber = 10;
+static constexpr uint32_t kLastCachedTwoDigitNumber = 99;
+static constexpr uint32_t kTwoDigitNumberStringTableSize =
+    kLastCachedTwoDigitNumber - kFirstCachedTwoDigitNumber + 1;
+
+struct JSStrCacheOrphan {
+  void *cache;
+  JSStrCacheOrphan *next;
+};
+
 struct LEPUSRuntime {
   LEPUSMallocFunctions mf;
   const char *rt_info;
@@ -483,6 +498,9 @@ struct LEPUSRuntime {
   std::unordered_set<FinalizationRegistryData *> *fr_data_finalizer_recoder;
   size_t gc_info_threshold;
   size_t gc_info_interval_size;
+  JSAtom single_character_string_table[kSingleCharacterStringTableSize];
+  JSAtom two_digit_number_string_table[kTwoDigitNumberStringTableSize];
+  JSStrCacheOrphan *str_cache_orphans;
 };
 
 static const char *const native_error_name[JS_NATIVE_ERROR_COUNT] = {
@@ -648,27 +666,88 @@ enum TOK {
 #define TOK_LAST_KEYWORD TOK_AWAIT
 struct JSString {
   LEPUSRefCountHeader header; /* must come first, 32-bit */
-  uint32_t len : 31;
-  uint8_t is_wide_char : 1; /* 0 = 8 bits, 1 = 16 bits characters */
-  /* for JS_ATOM_TYPE_SYMBOL: hash = 0, atom_type = 3,
-     for JS_ATOM_TYPE_PRIVATE: hash = 1, atom_type = 3
-     XXX: could change encoding to have one more bit in hash */
-  uint32_t hash : 30;
-  uint8_t atom_type : 2; /* != 0 if atom, JS_ATOM_TYPE_x */
-  uint32_t hash_next;    /* atom_index for JS_ATOM_TYPE_SYMBOL */
+  uint32_t len : 30;          /* JS_STRING_LEN_MAX is (1 << 30) - 1 */
+  uint32_t is_wide_char : 1;  /* 0 = 8 bits, 1 = 16 bits characters */
+  uint32_t is_atom : 1;       /* atom metadata is active */
+  union {
+    struct {
+      /* for JS_ATOM_TYPE_SYMBOL: hash = 0, atom_type = 3,
+         for JS_ATOM_TYPE_PRIVATE: hash = 1, atom_type = 3
+         XXX: could change encoding to have one more bit in hash */
+      uint32_t hash : 30;
+      uint32_t atom_type : 2; /* != 0 if atom, JS_ATOM_TYPE_x */
+      uint32_t hash_next;     /* atom_index for JS_ATOM_TYPE_SYMBOL */
+    } atom;                   /* only valid when is_atom */
+#ifdef ENABLE_LEPUSNG
+    void *cache; /* only valid when !is_atom */
+#endif
+  };
 #ifdef DUMP_LEAKS
   struct list_head link; /* string list */
-#endif
-
-#ifdef ENABLE_LEPUSNG
-  // Primjs add
-  void *cache_;  // add to convert to jsString
 #endif
   union {
     uint8_t str8[0]; /* 8 bit strings will get an extra null terminator */
     uint16_t str16[0];
   } u;
 };
+
+#ifndef DUMP_LEAKS
+static_assert(sizeof(JSString) == 16, "JSString must stay 16 bytes");
+static_assert(__builtin_offsetof(JSString, u) == 16,
+              "JSString character data must start at offset 16");
+#endif
+
+static force_inline size_t JS_StringDataSize(size_t len, int is_wide_char) {
+  return (len << is_wide_char) + 1 - is_wide_char;
+}
+
+/* Atoms carry an extra aligned cache slot after their character data when
+   LepusNG is enabled. */
+static force_inline size_t JS_AtomStructAllocSize(size_t len,
+                                                  int is_wide_char) {
+  const size_t data_size = JS_StringDataSize(len, is_wide_char);
+#ifdef ENABLE_LEPUSNG
+  constexpr size_t kCacheAlignment = alignof(void *);
+  const size_t aligned_data_size =
+      (data_size + kCacheAlignment - 1) & ~(kCacheAlignment - 1);
+  return sizeof(JSString) + aligned_data_size + sizeof(void *);
+#else
+  return sizeof(JSString) + data_size;
+#endif
+}
+
+#ifdef ENABLE_LEPUSNG
+// <Primjs begin>
+/* An atom carries its lepus string cache in the aligned word right after the
+   character data. Atoms are immutable and never reallocated, so the offset is
+   stable for the lifetime of the atom. Non-atoms keep the cache in their
+   header. */
+static force_inline void **JS_StrCacheSlot(JSString *p) {
+  if (!p->is_atom) return &p->cache;
+  return reinterpret_cast<void **>(
+      reinterpret_cast<uint8_t *>(p) +
+      JS_AtomStructAllocSize(p->len, p->is_wide_char) - sizeof(void *));
+}
+
+static force_inline void *JS_StrCacheGet(JSString *p) {
+  return *JS_StrCacheSlot(p);
+}
+
+static force_inline void JS_StrCacheSet(JSString *p, void *cache) {
+  *JS_StrCacheSlot(p) = cache;
+}
+
+/* Shared by the refcounting and the tracing GC build of the interpreter: the
+   cache slot moves with the string, so its release path must not diverge. */
+static force_inline void JS_FreeStringCache(LEPUSRuntime *rt, JSString *p) {
+  void *cache = JS_StrCacheGet(p);
+  if (cache && rt->js_callbacks_.free_str_cache) {
+    rt->js_callbacks_.free_str_cache(cache, NULL);
+    JS_StrCacheSet(p, NULL);
+  }
+}
+// <Primjs end>
+#endif
 
 typedef struct JSGCHeader {
   uint8_t mark;
@@ -3119,6 +3198,38 @@ QJS_STATIC inline BOOL atom_is_free(const JSAtomStruct *p) {
 
 QJS_STATIC inline BOOL __JS_AtomIsTaggedInt(JSAtom v) {
   return (v & JS_ATOM_TAG_INT) != 0;
+}
+
+static force_inline bool IsCachedSingleCharacter(uint32_t c) {
+  static_assert(kFirstCachedSingleCharacter == 0,
+                "range check below assumes the table starts at NUL");
+  return c <= kLastCachedSingleCharacter;
+}
+
+static force_inline LEPUSValue
+GetSingleCharacterString_GC_Impl(LEPUSRuntime *rt, uint32_t c) {
+  DCHECK(IsCachedSingleCharacter(c));
+  JSAtom atom =
+      rt->single_character_string_table[c - kFirstCachedSingleCharacter];
+  DCHECK(atom != JS_ATOM_NULL);
+  DCHECK(!__JS_AtomIsTaggedInt(atom));
+  return LEPUS_MKPTR(LEPUS_TAG_STRING, rt->atom_array[atom]);
+}
+
+static force_inline bool IsCachedTwoDigitNumber(uint32_t c0, uint32_t c1) {
+  return c0 >= '1' && c0 <= '9' && c1 >= '0' && c1 <= '9';
+}
+
+static force_inline LEPUSValue GetTwoDigitNumberString_GC_Impl(LEPUSRuntime *rt,
+                                                               uint32_t c0,
+                                                               uint32_t c1) {
+  DCHECK(IsCachedTwoDigitNumber(c0, c1));
+  uint32_t n = (c0 - '0') * 10 + (c1 - '0');
+  JSAtom atom =
+      rt->two_digit_number_string_table[n - kFirstCachedTwoDigitNumber];
+  DCHECK(atom != JS_ATOM_NULL);
+  DCHECK(!__JS_AtomIsTaggedInt(atom));
+  return LEPUS_MKPTR(LEPUS_TAG_STRING, rt->atom_array[atom]);
 }
 
 QJS_STATIC inline JSAtom __JS_AtomFromUInt32(uint32_t v) {

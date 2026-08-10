@@ -24,7 +24,7 @@ void Finalizer::DoFinalizer2(void *ptr) noexcept {
       JSLepusRefFinalizer(ptr);
       break;
     case ALLOC_TAG_JSString:
-      if (!(static_cast<JSString *>(ptr)->atom_type)) {
+      if (!static_cast<JSString *>(ptr)->is_atom) {
         JSStringOnlyFinalizer(ptr);
       }
       break;
