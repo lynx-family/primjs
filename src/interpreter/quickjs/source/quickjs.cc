@@ -2503,6 +2503,25 @@ int JS_InitAtoms(LEPUSRuntime *rt) {
       return -1;
     p = p + len + 1;
   }
+  if (rt->gc_enable) {
+    for (uint32_t c = kFirstCachedSingleCharacter;
+         c <= kLastCachedSingleCharacter; c++) {
+      char ch = static_cast<char>(c);
+      /* __JS_NewAtomInit interns directly, so decimal characters stay
+         string atoms instead of becoming tagged integers. */
+      JSAtom atom = __JS_NewAtomInit(rt, &ch, 1, JS_ATOM_TYPE_STRING, false);
+      if (atom == JS_ATOM_NULL) return -1;
+      rt->single_character_string_table[c - kFirstCachedSingleCharacter] = atom;
+    }
+    for (uint32_t n = kFirstCachedTwoDigitNumber;
+         n <= kLastCachedTwoDigitNumber; n++) {
+      char buf[2] = {static_cast<char>('0' + n / 10),
+                     static_cast<char>('0' + n % 10)};
+      JSAtom atom = __JS_NewAtomInit(rt, buf, 2, JS_ATOM_TYPE_STRING, false);
+      if (atom == JS_ATOM_NULL) return -1;
+      rt->two_digit_number_string_table[n - kFirstCachedTwoDigitNumber] = atom;
+    }
+  }
   return 0;
 }
 
@@ -3355,6 +3374,15 @@ LEPUSValue js_new_string8_len(LEPUSContext *ctx, const char *buf, int32_t len) {
 
   if (len <= 0) {
     return LEPUS_AtomToString(ctx, JS_ATOM_empty_string);
+  }
+  if (ctx->gc_enable) {
+    const auto *chars = reinterpret_cast<const uint8_t *>(buf);
+    if (len == 1 && IsCachedSingleCharacter(chars[0])) {
+      return GetSingleCharacterString_GC_Impl(ctx->rt, chars[0]);
+    }
+    if (len == 2 && IsCachedTwoDigitNumber(chars[0], chars[1])) {
+      return GetTwoDigitNumberString_GC_Impl(ctx->rt, chars[0], chars[1]);
+    }
   }
   str = js_alloc_string(ctx, len, 0);
   if (!str) return LEPUS_EXCEPTION;

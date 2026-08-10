@@ -210,6 +210,28 @@ static std::unordered_set<LEPUSRuntime *> *js_get_rt_set() {
 #ifdef ENABLE_LEPUSNG
 static __attribute__((unused)) void JS_FreeStringCache(LEPUSRuntime *rt,
                                                        JSString *p);
+
+static void JS_FreeStrCacheOrphans(LEPUSRuntime *rt) {
+  for (JSStrCacheOrphan *node = rt->str_cache_orphans; node;) {
+    JSStrCacheOrphan *next = node->next;
+    if (rt->js_callbacks_.free_str_cache) {
+      rt->js_callbacks_.free_str_cache(node->cache, NULL);
+    }
+    system_free(node);
+    node = next;
+  }
+  rt->str_cache_orphans = NULL;
+}
+
+static void JS_FreeAtomStringCaches(LEPUSRuntime *rt) {
+  for (int i = 0; i < rt->atom_size; i++) {
+    JSAtomStruct *atom = rt->atom_array[i];
+    if (!atom_is_free(atom)) {
+      JS_FreeStringCache(rt, atom);
+    }
+  }
+  JS_FreeStrCacheOrphans(rt);
+}
 #endif
 // <Primjs end>
 static LEPUSValue js_call_c_function(LEPUSContext *ctx,
@@ -760,12 +782,7 @@ void JS_FreeRuntime_GC(LEPUSRuntime *rt) {
 
   /* free the atoms */
 #ifdef ENABLE_LEPUSNG
-  for (int i = 0; i < rt->atom_size; i++) {
-    JSAtomStruct *p = rt->atom_array[i];
-    if (!atom_is_free(p)) {
-      JS_FreeStringCache(rt, p);
-    }
-  }
+  JS_FreeAtomStringCaches(rt);
 #endif
   rt->atom_size = 0;
   rt->atom_array = NULL;
@@ -829,6 +846,9 @@ void JS_FreeRuntimeForEffect(LEPUSRuntime *rt) {
   rt->class_array = NULL;
 
   /* free the atoms */
+#ifdef ENABLE_LEPUSNG
+  JS_FreeAtomStringCaches(rt);
+#endif
   rt->atom_size = 0;
   rt->atom_array = NULL;
   rt->atom_hash = NULL;
@@ -1429,6 +1449,15 @@ static LEPUSValue js_new_string16(LEPUSContext *ctx, const uint16_t *buf,
   return LEPUS_MKPTR(LEPUS_TAG_STRING, str);
 }
 
+static int string_get(const JSString *p, int idx) {
+  return p->is_wide_char ? p->u.str16[idx] : p->u.str8[idx];
+}
+
+/* StringBuffer owns the authoritative representation until it is finalized. */
+static int string_buffer_get(const StringBuffer *s, int idx) {
+  return s->is_wide_char ? s->str->u.str16[idx] : s->str->u.str8[idx];
+}
+
 static LEPUSValue js_new_string_char(LEPUSContext *ctx, uint16_t c) {
   if (c < 0x100) {
     uint8_t ch8 = c;
@@ -1444,6 +1473,16 @@ static LEPUSValue js_sub_string(LEPUSContext *ctx, JSString *p, int start,
   int len = end - start;
   if (start == 0 && end == p->len) {
     return LEPUS_MKPTR(LEPUS_TAG_STRING, p);
+  }
+  if (len == 1) {
+    return js_new_string_char(ctx, string_get(p, start));
+  }
+  if (len == 2) {
+    uint32_t c0 = string_get(p, start);
+    uint32_t c1 = string_get(p, start + 1);
+    if (IsCachedTwoDigitNumber(c0, c1)) {
+      return GetTwoDigitNumberString_GC_Impl(ctx->rt, c0, c1);
+    }
   }
   if (p->is_wide_char && len > 0) {
     JSString *str;
@@ -1501,10 +1540,6 @@ static int string_buffer_set_error(StringBuffer *s) {
   return s->error_status = -1;
 }
 
-static int string_get(const JSString *p, int idx) {
-  return p->is_wide_char ? p->u.str16[idx] : p->u.str8[idx];
-}
-
 /* appending an ASCII string */
 static int string_buffer_puts8(StringBuffer *s, const char *str) {
   return string_buffer_write8(s, (const uint8_t *)str, strlen(str));
@@ -1556,6 +1591,23 @@ static LEPUSValue string_buffer_end(StringBuffer *s) {
   if (s->len == 0) {
     s->str = NULL;
     return JS_AtomToString_GC(s->ctx, JS_ATOM_empty_string);
+  }
+  if (s->len == 1) {
+    uint32_t c = string_buffer_get(s, 0);
+    if (IsCachedSingleCharacter(c)) {
+      /* the abandoned buffer string is reclaimed by the tracing GC */
+      s->str = NULL;
+      return GetSingleCharacterString_GC_Impl(s->ctx->rt, c);
+    }
+  }
+  if (s->len == 2) {
+    uint32_t c0 = string_buffer_get(s, 0);
+    uint32_t c1 = string_buffer_get(s, 1);
+    if (IsCachedTwoDigitNumber(c0, c1)) {
+      /* the abandoned buffer string is reclaimed by the tracing GC */
+      s->str = NULL;
+      return GetTwoDigitNumberString_GC_Impl(s->ctx->rt, c0, c1);
+    }
   }
   if (s->len < s->size) {
     /* smaller size so lepus_realloc should not fail, but OK if it does */
@@ -6351,6 +6403,21 @@ static LEPUSValue JS_ToBigInt(LEPUSContext *ctx, LEPUSValueConst val) {
 // <Primjs begin>
 #ifdef ENABLE_LEPUSNG
 
+static void JS_RecordStrCacheOrphan(LEPUSRuntime *rt, void *p) {
+  if (!p) return;
+  JSStrCacheOrphan *node =
+      static_cast<JSStrCacheOrphan *>(system_malloc(sizeof(JSStrCacheOrphan)));
+  if (!node) return;
+  node->cache = p;
+  JSStrCacheOrphan *head =
+      __atomic_load_n(&rt->str_cache_orphans, __ATOMIC_RELAXED);
+  do {
+    node->next = head;
+  } while (!__atomic_compare_exchange_n(&rt->str_cache_orphans, &head, node,
+                                        true, __ATOMIC_RELEASE,
+                                        __ATOMIC_RELAXED));
+}
+
 void JS_SetStringCache_GC(LEPUSContext *ctx, LEPUSValue val, void *p) {
   if (JS_IsSeparableString(val)) {
     auto content = JS_GetSeparableString(val)->flat_content;
@@ -6362,6 +6429,15 @@ void JS_SetStringCache_GC(LEPUSContext *ctx, LEPUSValue val, void *p) {
     return;
   }
   JSString *str = LEPUS_VALUE_GET_STRING(val);
+  if (str->atom_type != 0) {
+    void *expected = NULL;
+    if (!__atomic_compare_exchange_n(&str->cache_, &expected, p, false,
+                                     __ATOMIC_RELEASE, __ATOMIC_ACQUIRE)) {
+      JS_RecordStrCacheOrphan(ctx->rt, p);
+    }
+    ctx->rt->js_callbacks_.free_str_cache(NULL, p);
+    return;
+  }
   void *old_ptr = str->cache_;
   str->cache_ = p;
   ctx->rt->js_callbacks_.free_str_cache(old_ptr, p);
@@ -6387,7 +6463,8 @@ void *LEPUS_GetStringCache_GC(LEPUSValue val) {
     return nullptr;
   }
   JSString *str = LEPUS_VALUE_GET_STRING(val);
-  return str->cache_;
+  /* pairs with the release CAS in JS_SetStringCache_GC */
+  return __atomic_load_n(&str->cache_, __ATOMIC_ACQUIRE);
 }
 #endif
 // <Primjs end>
@@ -16632,9 +16709,12 @@ static LEPUSValue js_thisStringValue(LEPUSContext *ctx,
 static LEPUSValue js_string_fromCharCode(LEPUSContext *ctx,
                                          LEPUSValueConst this_val, int argc,
                                          LEPUSValueConst *argv) {
+  if (argc == 1 && LEPUS_VALUE_IS_INT(argv[0])) {
+    return js_new_string_char(ctx, LEPUS_VALUE_GET_INT(argv[0]) & 0xffff);
+  }
+
   int i;
   StringBuffer b_s, *b = &b_s;
-
   string_buffer_init(ctx, b, argc);
   HandleScope func_scope(ctx, &b->str, HANDLE_TYPE_HEAP_OBJ);
 
@@ -16657,8 +16737,10 @@ static LEPUSValue js_string_fromCodePoint(LEPUSContext *ctx,
   StringBuffer b_s, *b = &b_s;
   HandleScope func_scope(ctx);
 
-  /* XXX: could pre-compute string length if all arguments are LEPUS_TAG_INT
-   */
+  if (argc == 1 && LEPUS_VALUE_IS_INT(argv[0])) {
+    c = LEPUS_VALUE_GET_INT(argv[0]);
+    if (static_cast<uint32_t>(c) <= 0xffff) return js_new_string_char(ctx, c);
+  }
 
   if (string_buffer_init(ctx, b, argc)) goto fail;
   func_scope.PushHandle(&b->str, HANDLE_TYPE_HEAP_OBJ);

@@ -361,6 +361,21 @@ typedef struct JSCoverageInfo {
   uint32_t *coverage_counters;
 } JSCoverageInfo;
 
+static constexpr uint32_t kFirstCachedSingleCharacter = 0x00;
+static constexpr uint32_t kLastCachedSingleCharacter = 0x7f;
+static constexpr uint32_t kSingleCharacterStringTableSize =
+    kLastCachedSingleCharacter - kFirstCachedSingleCharacter + 1;
+
+static constexpr uint32_t kFirstCachedTwoDigitNumber = 10;
+static constexpr uint32_t kLastCachedTwoDigitNumber = 99;
+static constexpr uint32_t kTwoDigitNumberStringTableSize =
+    kLastCachedTwoDigitNumber - kFirstCachedTwoDigitNumber + 1;
+
+struct JSStrCacheOrphan {
+  void *cache;
+  JSStrCacheOrphan *next;
+};
+
 struct LEPUSRuntime {
   LEPUSMallocFunctions mf;
   const char *rt_info;
@@ -483,6 +498,9 @@ struct LEPUSRuntime {
   std::unordered_set<FinalizationRegistryData *> *fr_data_finalizer_recoder;
   size_t gc_info_threshold;
   size_t gc_info_interval_size;
+  JSAtom single_character_string_table[kSingleCharacterStringTableSize];
+  JSAtom two_digit_number_string_table[kTwoDigitNumberStringTableSize];
+  JSStrCacheOrphan *str_cache_orphans;
 };
 
 static const char *const native_error_name[JS_NATIVE_ERROR_COUNT] = {
@@ -3044,6 +3062,38 @@ QJS_STATIC inline BOOL atom_is_free(const JSAtomStruct *p) {
 
 QJS_STATIC inline BOOL __JS_AtomIsTaggedInt(JSAtom v) {
   return (v & JS_ATOM_TAG_INT) != 0;
+}
+
+static force_inline bool IsCachedSingleCharacter(uint32_t c) {
+  static_assert(kFirstCachedSingleCharacter == 0,
+                "range check below assumes the table starts at NUL");
+  return c <= kLastCachedSingleCharacter;
+}
+
+static force_inline LEPUSValue
+GetSingleCharacterString_GC_Impl(LEPUSRuntime *rt, uint32_t c) {
+  DCHECK(IsCachedSingleCharacter(c));
+  JSAtom atom =
+      rt->single_character_string_table[c - kFirstCachedSingleCharacter];
+  DCHECK(atom != JS_ATOM_NULL);
+  DCHECK(!__JS_AtomIsTaggedInt(atom));
+  return LEPUS_MKPTR(LEPUS_TAG_STRING, rt->atom_array[atom]);
+}
+
+static force_inline bool IsCachedTwoDigitNumber(uint32_t c0, uint32_t c1) {
+  return c0 >= '1' && c0 <= '9' && c1 >= '0' && c1 <= '9';
+}
+
+static force_inline LEPUSValue GetTwoDigitNumberString_GC_Impl(LEPUSRuntime *rt,
+                                                               uint32_t c0,
+                                                               uint32_t c1) {
+  DCHECK(IsCachedTwoDigitNumber(c0, c1));
+  uint32_t n = (c0 - '0') * 10 + (c1 - '0');
+  JSAtom atom =
+      rt->two_digit_number_string_table[n - kFirstCachedTwoDigitNumber];
+  DCHECK(atom != JS_ATOM_NULL);
+  DCHECK(!__JS_AtomIsTaggedInt(atom));
+  return LEPUS_MKPTR(LEPUS_TAG_STRING, rt->atom_array[atom]);
 }
 
 QJS_STATIC inline JSAtom __JS_AtomFromUInt32(uint32_t v) {
