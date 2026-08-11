@@ -218,7 +218,23 @@ class RunSlots {
                   size_t hint = std::numeric_limits<size_t>::max());
 #endif
 
-  void FreeIterator(std::function<void(address_t, address_t, size_t)> visitor);
+  template <typename Visitor>
+  inline void FreeIterator(Visitor &&visitor) {
+    if (IsEmpty()) {
+      return;
+    }
+
+    size_t slotSize = GetRunSize();
+    size_t slotCount = GetMaxSlots();
+    address_t slotAddr = GetBaseAddress();
+    for (size_t i = 0; i < slotCount; ++i) {
+      address_t objAddr = ROSIMPL_GET_OBJ_FROM_ADDR(slotAddr);
+      if (IsAllocatedByAllocator(objAddr)) {
+        visitor(objAddr, slotAddr, slotSize);
+      }
+      slotAddr += slotSize;
+    }
+  }
 };
 
 // this implements a partially sorted list, according to a node's "Value", in

@@ -1400,24 +1400,6 @@ void RosAllocImpl::FreeObj(address_t objAddr) {
   allocatedInternalSize -= freedBytes;
 }
 
-void RunSlots::FreeIterator(
-    std::function<void(address_t, address_t, size_t)> visitor) {
-  if (IsEmpty()) {
-    return;
-  }
-
-  size_t slotSize = GetRunSize();
-  size_t slotCount = GetMaxSlots();
-  address_t slotAddr = GetBaseAddress();
-  for (size_t i = 0; i < slotCount; ++i) {
-    address_t objAddr = ROSIMPL_GET_OBJ_FROM_ADDR(slotAddr);
-    if (IsAllocatedByAllocator(objAddr)) {
-      visitor(objAddr, slotAddr, slotSize);
-    }
-    slotAddr += slotSize;
-  }
-}
-
 // used for concurrent step2
 bool RosAllocImpl::SweepHugeObjs(
     std::function<bool(address_t, ROS_GC::Bitmap *)> shouldFree) {
