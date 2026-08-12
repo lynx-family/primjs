@@ -56,6 +56,7 @@ extern "C" {
 
 #include <algorithm>
 #include <atomic>
+#include <cstddef>
 #include <cstdint>
 #include <cstdlib>
 #include <mutex>
@@ -1026,18 +1027,19 @@ bool lepusng_gc_disabled() {
 }
 
 static inline uint8_t *js_get_stack_pointer(void);
-LEPUSRuntime *LEPUS_NewRuntime2(const LEPUSMallocFunctions *mf, void *opaque,
-                                uint32_t mode) {
-#ifdef ENABLE_COMPATIBLE_MM
-  if (gc_enabled()) {
-    return JS_NewRuntime2_GC(mf, opaque, mode);
-  }
-#endif
+QJS_STATIC LEPUSRuntime *JS_NewRuntime_RC(const LEPUSMallocFunctions *mf,
+                                          void *opaque, uint32_t mode,
+                                          int32_t *ptr_to_current_slot) {
   LEPUSRuntime *rt;
   JSMallocState ms;
 
   memset(&ms, 0, sizeof(ms));
   ms.opaque = opaque;
+  ms.max_slot_index = LEPUS_MEMORY_CATEGORY_SLOT_OVERFLOW;
+  ms.ptr_to_current_slot = ptr_to_current_slot;
+  if (ptr_to_current_slot) {
+    *ptr_to_current_slot = LEPUS_MEMORY_CATEGORY_COMMON;
+  }
   ms.malloc_limit = -1;
 
   MonitorEvent(MODULE_QUICK, DEFAULT_BIZ_NAME, "NewRuntime", MODULE_QUICK);
@@ -1120,6 +1122,16 @@ LEPUSRuntime *LEPUS_NewRuntime2(const LEPUSMallocFunctions *mf, void *opaque,
 fail:
   LEPUS_FreeRuntime(rt);
   return NULL;
+}
+
+LEPUSRuntime *LEPUS_NewRuntime2(const LEPUSMallocFunctions *mf, void *opaque,
+                                uint32_t mode) {
+#ifdef ENABLE_COMPATIBLE_MM
+  if (gc_enabled()) {
+    return JS_NewRuntime2_GC(mf, opaque, mode);
+  }
+#endif
+  return JS_NewRuntime_RC(mf, opaque, mode, nullptr);
 }
 
 void JS_ResetRuntimeForEffect(LEPUSRuntime *rt, const LEPUSMallocFunctions *mf,
@@ -1254,6 +1266,132 @@ QJS_STATIC void *js_def_realloc(JSMallocState *s, void *ptr, size_t size,
   return ptr;
 }
 
+#if QJS_RC_MEMORY_SLOT_TRACKING_SUPPORTED
+static uint8_t js_get_current_memory_slot(JSMallocState *s) {
+  assert(s->ptr_to_current_slot);
+  int32_t slot = *s->ptr_to_current_slot;
+  assert(slot >= LEPUS_MEMORY_CATEGORY_UNKNOWN);
+  assert(slot <= s->max_slot_index);
+  assert(slot < LEPUS_MEMORY_SIZE_SLOTS);
+  return static_cast<uint8_t>(slot);
+}
+
+// Preserve malloc alignment and reserve one byte at the end of the usable
+// block.
+static constexpr size_t kMemorySlotAllocationOverhead = sizeof(uint8_t);
+
+static uint8_t js_get_allocation_memory_slot(const void *raw_ptr,
+                                             size_t malloc_usable_size) {
+  assert(malloc_usable_size > 0);
+  return static_cast<const uint8_t *>(raw_ptr)[malloc_usable_size - 1];
+}
+
+static void js_set_allocation_memory_slot(void *raw_ptr,
+                                          size_t malloc_usable_size,
+                                          uint8_t slot) {
+  assert(malloc_usable_size > 0);
+  static_cast<uint8_t *>(raw_ptr)[malloc_usable_size - 1] = slot;
+}
+
+QJS_STATIC void *js_def_malloc_with_memory_slot(
+    JSMallocState *s, size_t size, int alloc_tag = ALLOC_TAG_WITHOUT_PTR) {
+  /* Do not allocate zero bytes: behavior is platform dependent */
+  assert(size != 0);
+
+  size_t allocation_size = size + kMemorySlotAllocationOverhead;
+  if (unlikely(s->malloc_size + allocation_size > s->malloc_limit)) {
+    return NULL;
+  }
+
+  void *malloc_ptr = malloc(allocation_size);
+  if (!malloc_ptr) return NULL;
+
+  size_t malloc_size = js_def_malloc_usable_size(malloc_ptr) + MALLOC_OVERHEAD;
+  uint8_t slot = js_get_current_memory_slot(s);
+  js_set_allocation_memory_slot(malloc_ptr, malloc_size - MALLOC_OVERHEAD,
+                                slot);
+  // RC allocation and destruction run on the Runtime's owning thread.
+  s->memory_size_slots[slot] += malloc_size;
+  s->malloc_count++;
+  s->malloc_size += malloc_size;
+  JS_UpdateGCInfo(s->runtime, allocation_size);
+  return malloc_ptr;
+}
+
+QJS_STATIC void js_def_free_with_memory_slot(JSMallocState *s, void *ptr) {
+  if (!ptr) return;
+
+  size_t malloc_usable_size = js_def_malloc_usable_size(ptr);
+  size_t malloc_size = malloc_usable_size + MALLOC_OVERHEAD;
+  uint8_t slot = js_get_allocation_memory_slot(ptr, malloc_usable_size);
+  assert(slot <= s->max_slot_index);
+  assert(s->memory_size_slots[slot] >= malloc_size);
+  s->memory_size_slots[slot] -= malloc_size;
+  s->malloc_count--;
+  s->malloc_size -= malloc_size;
+  free(ptr);
+}
+
+QJS_STATIC void *js_def_realloc_with_memory_slot(
+    JSMallocState *s, void *ptr, size_t size,
+    int alloc_tag = ALLOC_TAG_WITHOUT_PTR) {
+  if (!ptr) {
+    if (size == 0) return NULL;
+    return js_def_malloc_with_memory_slot(s, size, alloc_tag);
+  }
+  if (size == 0) {
+    js_def_free_with_memory_slot(s, ptr);
+    return NULL;
+  }
+
+  size_t old_malloc_usable_size = js_def_malloc_usable_size(ptr);
+  size_t old_malloc_size = old_malloc_usable_size + MALLOC_OVERHEAD;
+  uint8_t slot = js_get_allocation_memory_slot(ptr, old_malloc_usable_size);
+  assert(slot <= s->max_slot_index);
+  size_t allocation_size = size + kMemorySlotAllocationOverhead;
+  uint64_t malloc_size_without_old =
+      s->malloc_size - old_malloc_size + MALLOC_OVERHEAD;
+  if (unlikely(malloc_size_without_old + allocation_size > s->malloc_limit)) {
+    return NULL;
+  }
+
+  void *new_malloc_ptr = realloc(ptr, allocation_size);
+  if (!new_malloc_ptr) return NULL;
+
+  size_t new_malloc_usable_size = js_def_malloc_usable_size(new_malloc_ptr);
+  size_t new_malloc_size = new_malloc_usable_size + MALLOC_OVERHEAD;
+  if (new_malloc_size >= old_malloc_size) {
+    size_t delta = new_malloc_size - old_malloc_size;
+    s->memory_size_slots[slot] += delta;
+    s->malloc_size += delta;
+  } else {
+    size_t delta = old_malloc_size - new_malloc_size;
+    assert(s->memory_size_slots[slot] >= delta);
+    s->memory_size_slots[slot] -= delta;
+    s->malloc_size -= delta;
+  }
+
+  js_set_allocation_memory_slot(new_malloc_ptr, new_malloc_usable_size, slot);
+  JS_UpdateGCInfo(s->runtime, allocation_size);
+  return new_malloc_ptr;
+}
+
+QJS_STATIC size_t js_def_malloc_usable_size_with_memory_slot(const void *ptr) {
+  if (!ptr) return 0;
+
+  size_t malloc_size = js_def_malloc_usable_size(ptr);
+  if (malloc_size <= kMemorySlotAllocationOverhead) return 0;
+  return malloc_size - kMemorySlotAllocationOverhead;
+}
+
+static const LEPUSMallocFunctions def_malloc_funcs_with_memory_slot = {
+    js_def_malloc_with_memory_slot,
+    js_def_free_with_memory_slot,
+    js_def_realloc_with_memory_slot,
+    js_def_malloc_usable_size_with_memory_slot,
+};
+#endif  // QJS_RC_MEMORY_SLOT_TRACKING_SUPPORTED
+
 static const LEPUSMallocFunctions def_malloc_funcs = {
     js_def_malloc,
     js_def_free,
@@ -1262,23 +1400,62 @@ static const LEPUSMallocFunctions def_malloc_funcs = {
 };
 
 LEPUSRuntime *LEPUS_NewRuntime() {
-  settingsFlag = GetSettingsFlag();
-#ifdef ENABLE_COMPATIBLE_MM
-  if (gc_enabled() == TRUE) {
-    return JS_NewRuntime_GC(0);
-  }
-#endif
-  return LEPUS_NewRuntime2(&def_malloc_funcs, NULL, 0);
+  return LEPUS_NewRuntimeWithModeMemoryTrackSlot(0, nullptr);
 }
 
 LEPUSRuntime *LEPUS_NewRuntimeWithMode(uint32_t mode) {
+  return LEPUS_NewRuntimeWithModeMemoryTrackSlot(mode, nullptr);
+}
+
+LEPUSRuntime *LEPUS_NewRuntimeWithModeMemoryTrackSlot(
+    uint32_t mode, int32_t *ptr_to_current_slot) {
   settingsFlag = GetSettingsFlag();
 #ifdef ENABLE_COMPATIBLE_MM
-  if (gc_enabled() == TRUE) {
-    return JS_NewRuntime_GC(mode);
+  if (gc_enabled()) {
+    return JS_NewRuntime_GC(mode, ptr_to_current_slot);
   }
 #endif
-  return LEPUS_NewRuntime2(&def_malloc_funcs, NULL, mode);
+  const LEPUSMallocFunctions *malloc_funcs = &def_malloc_funcs;
+#if QJS_RC_MEMORY_SLOT_TRACKING_SUPPORTED
+  if (ptr_to_current_slot) malloc_funcs = &def_malloc_funcs_with_memory_slot;
+#else
+  ptr_to_current_slot = nullptr;
+#endif
+  return JS_NewRuntime_RC(malloc_funcs, NULL, mode, ptr_to_current_slot);
+}
+
+void LEPUS_RebindRuntimeMemoryTrackSlot(LEPUSRuntime *rt,
+                                        int32_t *ptr_to_current_slot) {
+  // You can only reset it if memory statistics are already enabled for this VM.
+  if (rt->malloc_state.ptr_to_current_slot && ptr_to_current_slot) {
+    rt->malloc_state.ptr_to_current_slot = ptr_to_current_slot;
+  }
+}
+
+LEPUS_BOOL LEPUS_IsMemorySlotTrackingEnabled(LEPUSRuntime *rt) {
+  return rt && rt->malloc_state.ptr_to_current_slot != nullptr;
+}
+
+int32_t LEPUS_AllocateMemorySlot(LEPUSRuntime *rt) {
+  if (!rt || !rt->malloc_state.ptr_to_current_slot ||
+      rt->malloc_state.max_slot_index >= LEPUS_MEMORY_SIZE_SLOTS - 1) {
+    return -1;
+  }
+  return ++rt->malloc_state.max_slot_index;
+}
+
+int32_t LEPUS_DumpMemorySlots(
+    LEPUSRuntime *rt, size_t memory_size_slots[LEPUS_MEMORY_SIZE_SLOTS]) {
+#ifdef ENABLE_COMPATIBLE_MM
+  if (rt->gc_enable && rt->ros_->HasMemoryTracking()) {
+    assert(!rt->ros_->GetConcurrentMarkState());
+    assert(!rt->ros_->GetConcurrentSweepState());
+    rt->ros_->FlushPendingMemorySlotAllocations();
+  }
+#endif
+  memcpy(memory_size_slots, rt->malloc_state.memory_size_slots,
+         sizeof(rt->malloc_state.memory_size_slots));
+  return rt->malloc_state.max_slot_index;
 }
 
 void set_gc_info_threshold(LEPUSRuntime *rt, uint32_t mode) {
@@ -5440,6 +5617,10 @@ QJS_STATIC void free_object(LEPUSRuntime *rt, LEPUSObject *p) {
   if (!rt->in_gc_sweep) free_object2(rt, p);
 }
 
+bool LEPUS_IsGCModeDefault() {
+  settingsFlag = GetSettingsFlag();
+  return gc_enabled();
+}
 bool LEPUS_IsGCMode(LEPUSContext *ctx) { return ctx->gc_enable; }
 bool LEPUS_IsGCModeRT(LEPUSRuntime *rt) { return rt->gc_enable; }
 

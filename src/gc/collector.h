@@ -121,11 +121,34 @@ void force_inline *js_realloc_rt_gc(LEPUSRuntime *rt, void *ptr, size_t size,
                                     int alloc_tag) {
   return (void *)ROS_GC::RosAllocImpl::ReallocateObj(rt, ptr, size, alloc_tag);
 }
+
+// Runtime creation installs one of these two function pairs, keeping the
+// untracked js_malloc_rt/js_realloc_rt path free of an accounting branch.
+void force_inline *js_malloc_rt_gc_with_memory_slot(LEPUSRuntime *rt,
+                                                    size_t size,
+                                                    int alloc_tag) {
+  return (void *)ROS_GC::RosAllocImpl::AllocateObjWithMemorySlot(rt, size,
+                                                                 alloc_tag);
+}
+
+void force_inline *js_realloc_rt_gc_with_memory_slot(LEPUSRuntime *rt,
+                                                     void *ptr, size_t size,
+                                                     int alloc_tag) {
+  return (void *)ROS_GC::RosAllocImpl::ReallocateObjWithMemorySlot(
+      rt, ptr, size, alloc_tag);
+}
+
 void force_inline *lepus_malloc_gc(LEPUSContext *ctx, size_t size,
                                    int alloc_tag) {
   void *ptr;
-  ptr = (void *)ROS_GC::RosAllocImpl::AllocateObj(ctx->rt, size, alloc_tag);
-  // ptr = js_malloc_rt_gc(ctx->rt, size, alloc_tag);
+  // Context-based allocations cannot use the Runtime function pointers above,
+  // so this is their single mode check before entering a specialized allocator.
+  if (UNLIKELY(ctx->rt->malloc_state.ptr_to_current_slot != nullptr)) {
+    ptr = (void *)ROS_GC::RosAllocImpl::AllocateObjWithMemorySlot(ctx->rt, size,
+                                                                  alloc_tag);
+  } else {
+    ptr = (void *)ROS_GC::RosAllocImpl::AllocateObj(ctx->rt, size, alloc_tag);
+  }
   if (unlikely(!ptr)) {
     LEPUS_ThrowOutOfMemory(ctx);
     return NULL;
