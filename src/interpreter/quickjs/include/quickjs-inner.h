@@ -80,12 +80,20 @@ volatile inline std::atomic<uint32_t> *to_std_atomic32(volatile uint32_t *ptr) {
   return reinterpret_cast<volatile std::atomic<uint32_t> *>(ptr);
 }
 
-inline void init_obj_header(void *ptr, int obj_size, int alloc_tag) {
+static_assert(LEPUS_MEMORY_SIZE_SLOTS ==
+                  (static_cast<uint32_t>(1) << ROS_GC::kMemorySlotBits),
+              "memory slot count must fit in GC metadata");
+
+inline void init_obj_header(void *ptr, int obj_size, int alloc_tag,
+                            uint8_t memory_slot = 0) {
+  assert(obj_size >= 0);
+  assert(static_cast<uint32_t>(obj_size) <= ROS_GC::kPayloadSizeMask);
   auto addr =
       to_std_atomic64(reinterpret_cast<address_t>(ptr) - ROS_GC::kHeaderSize);
-  uint64_t val = (static_cast<uint64_t>(obj_size) << 32) |
-                 ROS_GC::kAllocatedBit64 |
-                 (static_cast<uint64_t>(alloc_tag) & 0x3F);
+  uint64_t val =
+      (static_cast<uint64_t>(obj_size) << 32) |
+      (static_cast<uint64_t>(memory_slot) << ROS_GC::kMemorySlotShift) |
+      ROS_GC::kAllocatedBit64 | (static_cast<uint64_t>(alloc_tag) & 0x3F);
   std::atomic_store_explicit(addr, val, std::memory_order_release);
 }
 
@@ -110,7 +118,15 @@ inline int get_alloc_tag(void *ptr) {
 inline uint32_t get_obj_size(void *ptr) {
   auto atomic_ptr = to_std_atomic32(reinterpret_cast<uint32_t *>(ptr) - 1);
   return std::atomic_load_explicit(atomic_ptr, std::memory_order_acquire) &
-         0x7FFFFFFF;
+         ROS_GC::kPayloadSizeMask;
+}
+
+inline uint8_t get_memory_slot(void *ptr) {
+  auto atomic_ptr = to_std_atomic32(reinterpret_cast<uint32_t *>(ptr) - 2);
+  return static_cast<uint8_t>(
+      (std::atomic_load_explicit(atomic_ptr, std::memory_order_acquire) &
+       ROS_GC::kMemorySlotMask) >>
+      ROS_GC::kMemorySlotShift);
 }
 
 #ifdef ENABLE_QUICKJS_DEBUGGER
@@ -261,6 +277,17 @@ typedef struct JSMallocState {
   uint64_t malloc_size;
   uint64_t malloc_limit;
   LEPUSRuntime *runtime;
+
+  // When non-null, ptr_to_current_slot points to a caller-owned slot selector
+  // that must outlive this Runtime. Each allocation retains the selected slot
+  // index and accounts memory_size_slots[index] until that allocation is freed.
+  // Slot 0 is reserved for unknown ownership and slot 1 for Runtime-wide common
+  // memory. Runtime creation selects slot 1. Later page instances obtain slots
+  // from LEPUS_AllocateMemorySlot and select them before entering the VM.
+  int32_t max_slot_index;
+  int32_t *ptr_to_current_slot;
+  size_t memory_size_slots[LEPUS_MEMORY_SIZE_SLOTS];
+
   // <Primjs end>
   void *opaque; /* user opaque */
 } JSMallocState;
@@ -483,6 +510,33 @@ struct LEPUSRuntime {
   JSAtom single_character_string_table[kSingleCharacterStringTableSize];
   JSAtom two_digit_number_string_table[kTwoDigitNumberStringTableSize];
   JSStrCacheOrphan *str_cache_orphans;
+};
+
+// Temporarily attributes allocations to the Runtime-wide common memory slot.
+// Scopes may be nested; a Runtime without memory tracking is a no-op.
+class ScopedCommonMemorySlot {
+ public:
+  explicit ScopedCommonMemorySlot(LEPUSRuntime *rt) {
+    assert(rt);
+    ptr_to_current_slot_ = rt->malloc_state.ptr_to_current_slot;
+    if (!ptr_to_current_slot_) return;
+
+    previous_slot_ = *ptr_to_current_slot_;
+    *ptr_to_current_slot_ = LEPUS_MEMORY_CATEGORY_COMMON;
+  }
+
+  ~ScopedCommonMemorySlot() {
+    if (ptr_to_current_slot_) {
+      *ptr_to_current_slot_ = previous_slot_;
+    }
+  }
+
+  ScopedCommonMemorySlot(const ScopedCommonMemorySlot &) = delete;
+  ScopedCommonMemorySlot &operator=(const ScopedCommonMemorySlot &) = delete;
+
+ private:
+  int32_t *ptr_to_current_slot_ = nullptr;
+  int32_t previous_slot_ = LEPUS_MEMORY_CATEGORY_UNKNOWN;
 };
 
 static const char *const native_error_name[JS_NATIVE_ERROR_COUNT] = {
@@ -2085,10 +2139,12 @@ static __attribute__((unused)) LEPUSValue JS_ToString_RC(LEPUSContext *ctx,
 QJS_HIDE LEPUSValue JS_GetSeparableStringContentNotDup_GC(LEPUSContext *ctx,
                                                           LEPUSValue val);
 bool gc_enabled();
-LEPUSRuntime *JS_NewRuntime_GC(uint32_t mode);
+LEPUSRuntime *JS_NewRuntime_GC(uint32_t mode,
+                               int32_t *ptr_to_current_slot = nullptr);
 LEPUSRuntime *JS_NewRuntime2_GC(const LEPUSMallocFunctions *mf, void *opaque,
-                                uint32_t mode);
-void JS_FreeRuntime_GC(LEPUSRuntime *rt);
+                                uint32_t mode,
+                                int32_t *ptr_to_current_slot = nullptr);
+void JS_FreeRuntime_GC(LEPUSRuntime *rt, size_t *memory_size_slots = nullptr);
 void JS_FreeRuntimeForEffect(LEPUSRuntime *rt);
 LEPUSContext *JS_NewContext_GC(LEPUSRuntime *rt);
 void JS_FreeContext_GC(LEPUSContext *ctx);

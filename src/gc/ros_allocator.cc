@@ -1188,11 +1188,8 @@ void FreeList::Init(address_t baseAddr, size_t slotSize, size_t slotCount) {
   lastSlot->SetNext(0);
 }
 
-// the memory used by RunSlots have already cleared by its constructor&Init
-// so the metadata and each allocatedBit is guaranteed implicitly.
-// so we no longer need to check the metadata
-// and if we encounter uaf issue, just open ENABLE_RTS_GC_DEBUG to deal with it
-// which will zap freed memory
+// Init establishes free-list links before SetInit makes the Run visible to
+// heap scans. For UAF diagnostics, ROS_DEBUG additionally zaps freed memory.
 RunSlots::RunSlots(uint32_t idx) {
   magic = RosAllocImpl::kRunMagic;
   mIdx = static_cast<uint8_t>(idx);
@@ -1271,8 +1268,13 @@ RosAllocImpl::RosAllocImpl(LEPUSRuntime *rt, bool enable_concurrent)
     : Allocator(),
       allocSpace("ROS memory space", "std_alloc_ros", true),
       rt_(rt),
+      has_memory_tracking_(rt->malloc_state.ptr_to_current_slot != nullptr),
       enable_concurrent_(enable_concurrent),
       gcPauseSuppressionMode(false) {  // managed space
+  if (has_memory_tracking_) {
+    pending_memory_slot_ =
+        static_cast<uint8_t>(*rt->malloc_state.ptr_to_current_slot);
+  }
   GetGCTracer()->SetAllocator(this);
   InterceptSigbusAsan(this);
 #if !defined(ANDROID) && !defined(__ANDROID__) && !defined(OS_IOS)
@@ -1304,6 +1306,17 @@ std::vector<address_t> RosAllocImpl::DumpHeap() {
 
 RosAllocImpl::~RosAllocImpl() {}
 
+void RosAllocImpl::FlushPendingMemorySlotAllocations() {
+  if (!HasMemoryTracking() || pending_memory_slot_bytes_ == 0) return;
+
+  ROSIMPL_ASSERT(pending_memory_slot_ <= rt_->malloc_state.max_slot_index,
+                 "invalid memory slot");
+  size_t pendingBytes = pending_memory_slot_bytes_;
+  pending_memory_slot_bytes_ = 0;
+  __atomic_fetch_add(&rt_->malloc_state.memory_size_slots[pending_memory_slot_],
+                     pendingBytes, __ATOMIC_RELAXED);
+}
+
 address_t RosAllocImpl::AllocPagesInternal(size_t reqSize, size_t &actualSize,
                                            int forceLevel, uint32_t &idx) {
   actualSize = ALLOCUTIL_PAGE_RND_UP(reqSize);
@@ -1321,8 +1334,11 @@ address_t RosAllocImpl::AllocHugeInternal(size_t reqSize) {
   return allocSpace.NewHugeGroup(reqSize);
 }
 
-address_t RosAllocImpl::AllocateObj(LEPUSRuntime *rt, size_t size,
-                                    int alloc_tag) {
+template <bool TrackMemory>
+address_t RosAllocImpl::AllocateObjInternal(LEPUSRuntime *rt, size_t size,
+                                            int alloc_tag) {
+  // The template removes accounting branches after Runtime creation. Both
+  // variants use the same 8-byte metadata header.
   auto ros = rt->ros_;
 #ifdef ROS_FORCE_GC
   static int cc = 0;
@@ -1333,7 +1349,16 @@ address_t RosAllocImpl::AllocateObj(LEPUSRuntime *rt, size_t size,
   }
   cc++;
 #endif
-  JS_UpdateGCInfo(rt, size);
+  uint8_t memorySlot = LEPUS_MEMORY_CATEGORY_UNKNOWN;
+  if constexpr (TrackMemory) {
+    int32_t *ptrToCurrentSlot = rt->malloc_state.ptr_to_current_slot;
+    ROSIMPL_ASSERT(ptrToCurrentSlot, "pointer to current slot is null");
+    int32_t slot = *ptrToCurrentSlot;
+    ROSIMPL_ASSERT(slot >= LEPUS_MEMORY_CATEGORY_UNKNOWN &&
+                       slot <= rt->malloc_state.max_slot_index,
+                   "invalid memory slot");
+    memorySlot = static_cast<uint8_t>(slot);
+  }
   size_t allocSize = AllocUtilRndUp(size + kHeaderSize, kAllocAlign);
   if (UNLIKELY(ros->NeedTriggerConcurrentPhases(allocSize))) {
     ros->collector->TryTriggerConcurrentPhases(allocSize);
@@ -1341,14 +1366,31 @@ address_t RosAllocImpl::AllocateObj(LEPUSRuntime *rt, size_t size,
   address_t ret = ros->NewObjInternal(allocSize);
   if (UNLIKELY(ret == 0)) return 0;
 
+  if constexpr (TrackMemory) {
+    ros->AccumulateMemorySlotAllocation(memorySlot, allocSize);
+  }
   void *ptr = (void *)(ret + kHeaderSize);
   memset(ptr, 0, size);
-  init_obj_header(ptr, size, alloc_tag);
+  init_obj_header(ptr, size, alloc_tag, memorySlot);
+  JS_UpdateGCInfo(rt, size);
   return (address_t)ptr;
 }
 
-address_t RosAllocImpl::ReallocateObj(LEPUSRuntime *rt, void *ptr, size_t size,
-                                      int alloc_tag) {
+address_t RosAllocImpl::AllocateObj(LEPUSRuntime *rt, size_t size,
+                                    int alloc_tag) {
+  return AllocateObjInternal<false>(rt, size, alloc_tag);
+}
+
+address_t RosAllocImpl::AllocateObjWithMemorySlot(LEPUSRuntime *rt, size_t size,
+                                                  int alloc_tag) {
+  return AllocateObjInternal<true>(rt, size, alloc_tag);
+}
+
+template <bool TrackMemory>
+address_t RosAllocImpl::ReallocateObjInternal(LEPUSRuntime *rt, void *ptr,
+                                              size_t size, int alloc_tag) {
+  // A reallocated object keeps its original slot even if the caller has since
+  // selected another page instance.
   if (size == 0) return 0;
   auto ros = rt->ros_;
 #ifdef ROS_FORCE_GC
@@ -1360,32 +1402,66 @@ address_t RosAllocImpl::ReallocateObj(LEPUSRuntime *rt, void *ptr, size_t size,
   }
   cc++;
 #endif
-  JS_UpdateGCInfo(rt, size);
   size_t allocSize = AllocUtilRndUp(size + kHeaderSize, kAllocAlign);
   if (UNLIKELY(ros->NeedTriggerConcurrentPhases(allocSize))) {
     ros->collector->TryTriggerConcurrentPhases(allocSize);
   }
   if (!ptr) {
+    uint8_t memorySlot = LEPUS_MEMORY_CATEGORY_UNKNOWN;
+    if constexpr (TrackMemory) {
+      int32_t *ptrToCurrentSlot = rt->malloc_state.ptr_to_current_slot;
+      ROSIMPL_ASSERT(ptrToCurrentSlot, "pointer to current slot is null");
+      int32_t slot = *ptrToCurrentSlot;
+      ROSIMPL_ASSERT(slot >= LEPUS_MEMORY_CATEGORY_UNKNOWN &&
+                         slot <= rt->malloc_state.max_slot_index,
+                     "invalid memory slot");
+      memorySlot = static_cast<uint8_t>(slot);
+    }
     address_t ret = ros->NewObjInternal(allocSize);
     if (UNLIKELY(ret == 0)) return 0;
-    void *ptr = (void *)(ret + kHeaderSize);
-    memset(ptr, 0, size);
-    init_obj_header(ptr, size, alloc_tag);
-    return (address_t)ptr;
+    if constexpr (TrackMemory) {
+      ros->AccumulateMemorySlotAllocation(memorySlot, allocSize);
+    }
+    void *newPtr = (void *)(ret + kHeaderSize);
+    memset(newPtr, 0, size);
+    init_obj_header(newPtr, size, alloc_tag, memorySlot);
+    JS_UpdateGCInfo(rt, size);
+    return (address_t)newPtr;
   }
   auto old_size = get_obj_size(ptr);
+  uint8_t memorySlot = LEPUS_MEMORY_CATEGORY_UNKNOWN;
+  if constexpr (TrackMemory) {
+    memorySlot = get_memory_slot(ptr);
+    ROSIMPL_ASSERT(memorySlot <= rt->malloc_state.max_slot_index,
+                   "invalid memory slot");
+  }
   if (old_size >= size) {
     memset((uint8_t *)ptr + size, 0, old_size - size);
-    init_obj_header(ptr, size, alloc_tag);
+    init_obj_header(ptr, size, alloc_tag, memorySlot);
     return (address_t)ptr;
   }
   address_t ret = ros->NewObjInternal(allocSize);
   if (UNLIKELY(ret == 0)) return 0;
+  if constexpr (TrackMemory) {
+    ros->AccumulateMemorySlotAllocation(memorySlot, allocSize);
+  }
   void *new_ptr = (void *)(ret + kHeaderSize);
   memcpy(new_ptr, ptr, old_size);
   memset((uint8_t *)new_ptr + old_size, 0, size - old_size);
-  init_obj_header(new_ptr, size, alloc_tag);
+  init_obj_header(new_ptr, size, alloc_tag, memorySlot);
+  JS_UpdateGCInfo(rt, size);
   return (address_t)new_ptr;
+}
+
+address_t RosAllocImpl::ReallocateObj(LEPUSRuntime *rt, void *ptr, size_t size,
+                                      int alloc_tag) {
+  return ReallocateObjInternal<false>(rt, ptr, size, alloc_tag);
+}
+
+address_t RosAllocImpl::ReallocateObjWithMemorySlot(LEPUSRuntime *rt, void *ptr,
+                                                    size_t size,
+                                                    int alloc_tag) {
+  return ReallocateObjInternal<true>(rt, ptr, size, alloc_tag);
 }
 
 // used for concurrent step2
@@ -1408,24 +1484,26 @@ bool RosAllocImpl::SweepHugeObjs(
   return released;
 }
 
+template <bool TrackMemory>
 void RosAllocImpl::SweepRunForConSweepPrologue(
     RunSlots &run, std::function<bool(address_t, ROS_GC::Bitmap *)> &shouldFree,
     PageGroups &groups) {
+  MemorySlotReleaseBatch<TrackMemory> releaseBatch(*this);
   address_t runAddr = (address_t)(&run);
   int32_t gIdx = groups.GetGroupIdx(runAddr);
   Bitmap *markBitmap = groups.GetBitMap(gIdx);
 
   size_t releasedBytes = 0;
   auto ros = this;
-  run.FreeIterator([&releasedBytes, &markBitmap, &shouldFree, &ros, &run](
-                       address_t objAddr, address_t slotAddr, size_t slotSize) {
-    if (shouldFree(objAddr, markBitmap)) {
-      LOG(LEVEL_1) << "ros, SweepLocalRuns: " << (void *)(objAddr);
-      ros->SweepSlot(run, slotAddr);
-      ClearAllocatedBit(objAddr);
-      releasedBytes += slotSize;
-    }
-  });
+  run.FreeIterator(
+      [&releasedBytes, &markBitmap, &shouldFree, &releaseBatch, &ros, &run](
+          address_t objAddr, address_t slotAddr, size_t slotSize) {
+        if (shouldFree(objAddr, markBitmap)) {
+          LOG(LEVEL_1) << "ros, SweepLocalRuns: " << (void *)(objAddr);
+          ros->SweepSlot<TrackMemory>(run, slotAddr, releaseBatch);
+          releasedBytes += slotSize;
+        }
+      });
 
   RecordTotalReleasedBytesForGCLog(releasedBytes);
 
@@ -1433,6 +1511,16 @@ void RosAllocImpl::SweepRunForConSweepPrologue(
 
   // set as swept to prevent resweeping by concurrent-sweep thread
   groups.GetPageMapById(gIdx)->SetSweptReleaseInConcurrent(runAddr);
+}
+
+void RosAllocImpl::SweepRunForConSweepPrologue(
+    RunSlots &run, std::function<bool(address_t, ROS_GC::Bitmap *)> &shouldFree,
+    PageGroups &groups) {
+  if (HasMemoryTracking()) {
+    SweepRunForConSweepPrologue<true>(run, shouldFree, groups);
+  } else {
+    SweepRunForConSweepPrologue<false>(run, shouldFree, groups);
+  }
 }
 
 // used for concurrent step2
@@ -1604,6 +1692,9 @@ class ConcurrentFreeTask : public BaseFreeTask {
 };
 
 void RosAllocImpl::ConSweepPrologue() {
+  // Every object eligible for this sweep must have a committed charge before
+  // worker threads begin releasing slot bytes.
+  FlushPendingMemorySlotAllocations();
   concurrent_sweep_is_running = true;
   auto &groups = allocSpace.page_groups.GetGroupArray();
   std::for_each(groups, groups + kRosDefaultPageGroupNums,
@@ -1662,6 +1753,8 @@ void RosAllocImpl::ConMarkEpilogue() {
 }
 
 bool RosAllocImpl::ParallelFreeAllIf(MplThreadPool &threadPool) {
+  // Publish allocations before parallel sweep starts subtracting them.
+  FlushPendingMemorySlotAllocations();
   const int32_t threadCount = threadPool.GetMaxThreadNum() + 1;
   auto &page_groups = allocSpace.page_groups;
   auto &groups = page_groups.GetGroupArray();
@@ -1707,7 +1800,51 @@ bool RosAllocImpl::ParallelFreeAllIf(MplThreadPool &threadPool) {
   return true;
 }
 
-void RosAllocImpl::ReleaseAllPageGroups() {
+// Only needed by FreeRuntime when exporting final per-slot values to
+// memory_size_slots; remove charges for objects still live at teardown.
+void RosAllocImpl::ReleaseAllMemorySlotCharges() {
+  if (!HasMemoryTracking()) return;
+
+  FlushPendingMemorySlotAllocations();
+  MemorySlotReleaseBatch<true> releaseBatch(*this);
+  auto &groups = allocSpace.page_groups.GetGroupArray();
+  for (auto &group : groups) {
+    if (!group.IsInitialized()) continue;
+    if (group.IsHugeObj()) {
+      address_t objAddr = group.GetBegin();
+      if (IsAllocatedByAllocator(objAddr)) {
+        releaseBatch.Add(objAddr, group.GetCurrSize());
+      }
+      continue;
+    }
+
+    PageMap *pageMap = group.GetPageMap();
+    size_t end = pageMap->GetPageIndex(pageMap->GetEndAddr());
+    for (size_t index = 0; index < end; ++index) {
+      PageLabel pageType = pageMap->GetType(index);
+      if (pageType == kPRun) {
+        auto *run = reinterpret_cast<RunSlots *>(pageMap->GetPageAddr(index));
+        run->FreeIterator(
+            [&releaseBatch](address_t objAddr, address_t, size_t internalSize) {
+              releaseBatch.Add(objAddr, internalSize);
+            });
+        index += pageMap->RunPageCount(reinterpret_cast<address_t>(run)) - 1;
+      } else if (pageType == kPLargeObj) {
+        address_t objAddr = pageMap->GetPageAddr(index);
+        size_t pageCount = pageMap->LargeObjPageCount(objAddr);
+        if (IsAllocatedByAllocator(objAddr)) {
+          releaseBatch.Add(objAddr, ALLOCUTIL_PAGE_CNT2BYTE(pageCount));
+        }
+        index += pageCount - 1;
+      }
+    }
+  }
+}
+
+void RosAllocImpl::ReleaseAllPageGroups(bool release_memory_slot_charges) {
+  if (release_memory_slot_charges) {
+    ReleaseAllMemorySlotCharges();
+  }
   auto &page_groups = allocSpace.page_groups;
   auto &groups = page_groups.GetGroupArray();
   for (auto &group : groups) {
@@ -1975,10 +2112,10 @@ void RosAllocImpl::FreeLargeObj(address_t objAddr, size_t &internalSize,
   size_t pageCnt =
       allocSpace.page_groups.ClearLargeObjPageAndCount(memAddr, false);
   size_t totalObjSize = ALLOCUTIL_PAGE_CNT2BYTE(pageCnt);
+  ReleaseObjectMemorySlotIfTracked(objAddr, totalObjSize);
 
-  // ensure header is cleared in 8 bytes
+  // Large objects bypass RunSlots::FreeSlot, so clear metadata explicitly.
   *reinterpret_cast<uint64_t *>(memAddr) = 0;
-  ClearAllocatedBit(memAddr);
 
   while (true) {
     if (globalLock.try_lock()) {
@@ -2008,10 +2145,10 @@ void RosAllocImpl::FreeHugeObj(PageGroup &group, size_t &internalSize) {
   address_t memAddr = group.GetBegin();
   DCHECK_OBJ_IS_ALLOCATED_BY_ALLOCATOR(memAddr);
   CheckObjHasValidKlassForDebug(memAddr);
-  ClearAllocatedBit(memAddr);
-  // ensure header is cleared in 8 bytes
-  *reinterpret_cast<uint64_t *>(memAddr) = 0;
   size_t totalObjSize = group.GetCurrSize();
+  ReleaseObjectMemorySlotIfTracked(memAddr, totalObjSize);
+  // Huge objects also bypass RunSlots::FreeSlot.
+  *reinterpret_cast<uint64_t *>(memAddr) = 0;
   // hugeobj's memory will munmap directly, can check uaf naturally
   if (!TryToReleaseHugeMemForAsan(group)) allocSpace.ReleaseHugeMem(group);
   ResetCurDealtObjAddrIsInAsanObjAddrSetAndEarlyReturnIfNeedForAsan();
