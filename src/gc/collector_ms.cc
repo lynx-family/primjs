@@ -672,6 +672,15 @@ void MarkSweepCollector::ConcurrentMarkPhase(size_t alloc_size) {
   ConcurrentMark(threadCount);
 }
 
+void MarkSweepCollector::ClearMappedArgumentsBoilerplates() {
+  // Drop these runtime roots
+  LEPUSRuntime *rt = ros->GetRuntime();
+  rt->boilerplateArg0 = nullptr;
+  rt->boilerplateArg1 = nullptr;
+  rt->boilerplateArg2 = nullptr;
+  rt->boilerplateArg3 = nullptr;
+}
+
 void MarkSweepCollector::ParallelMarkPhase() {
   SCOPED_LOGGER(__func__);
   TRACE_EVENT("PRIMJS_ParallelMarkPhase");
@@ -679,6 +688,8 @@ void MarkSweepCollector::ParallelMarkPhase() {
   MplThreadPool *threadPool = GetThreadPool();
   const size_t threadCount = threadPool->GetMaxThreadNum() + 1;
   {
+    ClearMappedArgumentsBoilerplates();
+
     MarkPrologue(threadCount);
     ros->MarkPrologue();
 

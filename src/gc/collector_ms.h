@@ -110,6 +110,7 @@ class MarkSweepCollector {
   void ScanStackNormal(RootSet *rootSet, address_t obj);
 
   // parallel phases.
+  void ClearMappedArgumentsBoilerplates();
   void ParallelMarkAndSweep();
   void ParallelMarkPhase();
   void ParallelScanMark();

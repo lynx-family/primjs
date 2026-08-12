@@ -6808,12 +6808,13 @@ LEPUSValue js_build_arguments_gc(LEPUSContext *ctx, int argc,
 
 LEPUSObject *ShallowCloneObj(LEPUSContext *ctx, LEPUSObject *src) {
   LEPUSObject *p = src;
+  HandleScope func_scope(ctx, p, HANDLE_TYPE_DIR_HEAP_OBJ);
   JSPropertyGC *new_prop = static_cast<JSPropertyGC *>(
       lepus_malloc_gc(ctx, sizeof(JSPropertyGC) * p->shape->prop_size,
                       ALLOC_TAG_JSPropertyArray));
   memcpy(new_prop, p->gc_prop, p->shape->prop_size * sizeof(JSPropertyGC));
 
-  HandleScope func_scope(ctx, new_prop, HANDLE_TYPE_DIR_HEAP_OBJ);
+  func_scope.PushHandle(new_prop, HANDLE_TYPE_DIR_HEAP_OBJ);
   LEPUSObject *new_p = static_cast<LEPUSObject *>(
       lepus_malloc_gc(ctx, LEPUS_OBJECT_SIZE, ALLOC_TAG_LEPUSObject));
   if (UNLIKELY(ctx->con_mark_state)) JSPropertyStore(ctx, p, new_prop);
