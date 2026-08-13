@@ -635,7 +635,7 @@ TEST_P(NAPITest, ArrayTest) {
   Array arr = seven.As<Array>();
 
   EXPECT_EQ(arr.Length(), 2);
-  EXPECT_EQ(arr.Get(size_t(0)).ToString().Utf8Value(), "eight");
+  EXPECT_EQ(arr.Get(uint32_t(0)).ToString().Utf8Value(), "eight");
   EXPECT_EQ(arr.Get(size_t(1)).ToString().Utf8Value(), "nine");
   EXPECT_EQ(arr.Get(size_t(2)).ToString().Utf8Value(), "undefined");
 
@@ -646,13 +646,13 @@ TEST_P(NAPITest, ArrayTest) {
   EXPECT_EQ(arr.Get(size_t(1)).ToString().Utf8Value(), "modified");
   seven.Set(String::New(env, "0"), "modified2");
   EXPECT_EQ(seven.Get("0").ToString().Utf8Value(), "modified2");
-  EXPECT_EQ(arr.Get(size_t(0)).ToString().Utf8Value(), "modified2");
+  EXPECT_EQ(arr.Get(uint32_t(0)).ToString().Utf8Value(), "modified2");
 
   Array alpha = Array::New(env, 4);
-  EXPECT_TRUE(alpha.Get(size_t(0)).IsUndefined());
+  EXPECT_TRUE(alpha.Get(uint32_t(0)).IsUndefined());
   EXPECT_TRUE(alpha.Get(size_t(3)).IsUndefined());
   EXPECT_EQ(alpha.Length(), 4);
-  alpha.Set(size_t(0), "a");
+  alpha.Set(uint32_t(0), "a");
   alpha.Set(size_t(1), "b");
   EXPECT_EQ(alpha.Length(), 4);
   alpha.Set(size_t(2), "c");
@@ -911,7 +911,7 @@ TEST_P(NAPITest, InstanceData) {
                  .As<Function>();
   d->object.Reset(fun, 1);
   EXPECT_EQ(fun.Call({}).As<Number>().Uint32Value(), 233);
-  auto func = [](int*) { throw std::runtime_error("should not call"); };
+  auto func = [](int*) { ADD_FAILURE() << "should not call"; };
   int a = 33;
   env.AddCleanupHook<int>(func, &a);
   env.RemoveCleanupHook<int>(func, &a);

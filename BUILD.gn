@@ -131,6 +131,9 @@ config("napi_public_config") {
   defines = [
     "PRIMJS_MIN_LOG_LEVEL=5",  # disable alog in unittests
   ]
+  if (is_win) {
+    defines += [ "OS_WIN=1" ]
+  }
   if (use_primjs_napi) {
     defines += [ "USE_PRIMJS_NAPI" ]
   }

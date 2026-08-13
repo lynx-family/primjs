@@ -10,14 +10,19 @@
 // LICENSE file in the root directory of this source tree.
 #include "napi_runtime.h"
 
-#if !defined(OS_WIN)
+#if defined(OS_WIN)
+#include <process.h>
+#include <windows.h>
+#else
 #include <pthread.h>
 #endif
 
 #include <atomic>
 #include <cassert>
+#include <cstdint>
 #include <cstdlib>
 #include <future>
+#include <limits>
 #include <memory>
 #include <mutex>
 #include <queue>
@@ -48,13 +53,18 @@ class WorkerThread {
         on_worker_stop_(on_worker_stop),
         task_handler_(task_handler),
         worker_ctx_(worker_ctx) {
-#if !defined(OS_WIN)
-#if WIN32
-    thread_.p = nullptr;
-    thread_.x = 0;
+#if defined(OS_WIN)
+    assert(stack_size <= std::numeric_limits<unsigned>::max());
+    thread_ = _beginthreadex(
+        nullptr, static_cast<unsigned>(stack_size),
+        [](void* data) -> unsigned {
+          static_cast<WorkerThread*>(data)->Run();
+          return 0;
+        },
+        this, 0, nullptr);
+    assert(thread_ != 0);
 #else
     thread_ = (pthread_t)((unsigned long long)0);
-#endif
     pthread_attr_t thread_attr;
     pthread_attr_init(&thread_attr);
 
@@ -86,24 +96,29 @@ class WorkerThread {
   ~WorkerThread() { Stop(); }
 
   void Stop() {
-#if !defined(OS_WIN)
-#if WIN32
-    if (nullptr != thread_.p) {
+#if defined(OS_WIN)
+    if (thread_ != 0) {
+      {
+        std::lock_guard<std::mutex> lock(mutex_);
+        stopped_ = true;
+        cond_.notify_one();
+      }
+      HANDLE thread_handle = reinterpret_cast<HANDLE>(thread_);
+      DWORD result = WaitForSingleObject(thread_handle, INFINITE);
+      (void)result;
+      assert(result == WAIT_OBJECT_0);
+      CloseHandle(thread_handle);
+      thread_ = 0;
+    }
 #else
     if ((pthread_t)((unsigned long long)0) != thread_) {
-#endif
       {
         std::lock_guard<std::mutex> lock(mutex_);
         stopped_ = true;
         cond_.notify_one();
       }
       ::pthread_join(thread_, nullptr);
-#if WIN32
-      thread_.p = nullptr;
-      thread_.x = 0;
-#else
       thread_ = (pthread_t)((unsigned long long)0);
-#endif
     }
 #endif
   }
@@ -145,7 +160,9 @@ class WorkerThread {
     }
   }
 
-#if !defined(OS_WIN)
+#if defined(OS_WIN)
+  uintptr_t thread_{0};
+#else
   pthread_t thread_;
 #endif
   std::mutex mutex_;
@@ -313,8 +330,20 @@ AutoCloseable::~AutoCloseable() { rt_->RemoveCloseable(this); }
 namespace {
 class Work : AutoCloseable {
  public:
+  enum class State {
+    kCreated,
+    kQueued,
+    kRunning,
+    kCompleted,
+    kCancelled,
+  };
+
   void onClose() override {
     // no need to lock, since the worker thread is stopped
+    State state = state_.load();
+    if (state == State::kCreated || state == State::kQueued) {
+      state_.store(State::kCancelled);
+    }
     Complete(this);
   }
 
@@ -326,18 +355,26 @@ class Work : AutoCloseable {
   static void Delete(Work* w) { delete w; }
 
   void ScheduleWork() {
+    State expected = State::kCreated;
+    bool queued = state_.compare_exchange_strong(expected, State::kQueued);
+    (void)queued;
+    assert(queued);
+
     rt_->PostWorkerTask([this] {
-      if (!canceled_) {
+      State expected = State::kQueued;
+      if (state_.compare_exchange_strong(expected, State::kRunning)) {
         execute_(rt_->Env(), data_);
-        finished_ = true;
+        state_.store(State::kCompleted);
+      } else {
+        assert(expected == State::kCancelled);
       }
       rt_->PostJSTask<Work>(this, Complete);
     });
   }
 
   bool CancelWork() {
-    bool already_cancelled = canceled_.exchange(true);
-    return already_cancelled;
+    State expected = State::kQueued;
+    return state_.compare_exchange_strong(expected, State::kCancelled);
   }
 
  private:
@@ -352,7 +389,9 @@ class Work : AutoCloseable {
 
   static void Complete(Work* work) {
     work->rt_->CallIntoModule([&](Napi::Env env) {
-      work->complete_(env, work->finished_ ? napi_ok : napi_cancelled,
+      napi_status status =
+          work->state_.load() == State::kCompleted ? napi_ok : napi_cancelled;
+      work->complete_(env, status,
                       work->data_);  // deleted during complete
     });
   }
@@ -360,8 +399,7 @@ class Work : AutoCloseable {
   napi_async_execute_callback execute_;
   napi_async_complete_callback complete_;
   void* data_;
-  bool finished_{false};
-  std::atomic_bool canceled_{false};
+  std::atomic<State> state_{State::kCreated};
 };
 
 napi_status napi_runtime_create_async_work(
@@ -391,7 +429,7 @@ napi_status napi_runtime_cancel_async_work(napi_env env, napi_async_work work) {
   Work* w = reinterpret_cast<Work*>(work);
 
   if (!w->CancelWork()) {
-    return napi_set_last_error(env, napi_cancelled);
+    return napi_set_last_error(env, napi_generic_failure);
   }
 
   return napi_clear_last_error(env);

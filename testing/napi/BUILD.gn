@@ -18,7 +18,10 @@ unittest_set("napi_testset") {
     deps += [ "../../src/napi:napi_jsc" ]
   }
   public = [ "testlib.h" ]
-  sources = [ "testlib.cc" ]
+  sources = [
+    "async_work_unittests.cc",
+    "testlib.cc",
+  ]
 }
 
 unit_test("napi_unittest") {
