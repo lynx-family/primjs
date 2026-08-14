@@ -1368,6 +1368,15 @@ int LEPUS_SetGCMemoryPolicyLevel(LEPUSRuntime *rt,
   return 0;
 }
 
+LEPUSGCMemoryPolicyLevel LEPUS_GetGCMemoryPolicyLevel(LEPUSRuntime *rt) {
+#ifdef ENABLE_COMPATIBLE_MM
+  if (rt->gc_enable) {
+    return JS_GetGCMemoryPolicyLevel_GC(rt);
+  }
+#endif
+  return LEPUS_GC_MEMORY_POLICY_BALANCED;
+}
+
 void LEPUS_SetMemoryLimit(LEPUSRuntime *rt, size_t limit) {
   CallGCFunc(JS_SetMemoryLimit_GC, rt, limit);
   rt->malloc_state.malloc_limit = limit;

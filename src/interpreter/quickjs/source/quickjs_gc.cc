@@ -684,10 +684,33 @@ HeadroomScaleQuartersForLevel(LEPUSGCMemoryPolicyLevel level) {
   return ROS_GC::GCTracer::kDefaultHeadroomScaleQuarters;
 }
 
+QJS_STATIC LEPUSGCMemoryPolicyLevel
+LevelForHeadroomScaleQuarters(uint8_t quarters) {
+  switch (quarters) {
+    case 1:
+      return LEPUS_GC_MEMORY_POLICY_MIN_MEMORY;
+    case 2:
+      return LEPUS_GC_MEMORY_POLICY_LOW_MEMORY;
+    case 4:
+      return LEPUS_GC_MEMORY_POLICY_BALANCED;
+    case 6:
+      return LEPUS_GC_MEMORY_POLICY_HIGH_PERFORMANCE;
+    case 8:
+      return LEPUS_GC_MEMORY_POLICY_MAX_PERFORMANCE;
+  }
+  ROSIMPL_ASSERT(false, "invalid GC headroom scale quarters");
+  return LEPUS_GC_MEMORY_POLICY_BALANCED;
+}
+
 void JS_SetGCMemoryPolicyLevel_GC(LEPUSRuntime *rt,
                                   LEPUSGCMemoryPolicyLevel level) {
   rt->ros_->GetGCTracer()->SetHeadroomScaleQuarters(
       HeadroomScaleQuartersForLevel(level));
+}
+
+LEPUSGCMemoryPolicyLevel JS_GetGCMemoryPolicyLevel_GC(LEPUSRuntime *rt) {
+  return LevelForHeadroomScaleQuarters(
+      rt->ros_->GetGCTracer()->GetHeadroomScaleQuarters());
 }
 
 void JS_SetMemoryLimit_GC(LEPUSRuntime *rt, size_t limit) {

@@ -2106,6 +2106,7 @@ LEPUSContext *JS_NewContextRaw_GC(LEPUSRuntime *rt);
 void JS_SetMemoryLimit_GC(LEPUSRuntime *rt, size_t limit);
 void JS_SetGCMemoryPolicyLevel_GC(LEPUSRuntime *rt,
                                   LEPUSGCMemoryPolicyLevel level);
+LEPUSGCMemoryPolicyLevel JS_GetGCMemoryPolicyLevel_GC(LEPUSRuntime *rt);
 void JS_RunGC_GC(LEPUSRuntime *rt);
 
 void JS_AddIntrinsicBaseObjects_GC(LEPUSContext *ctx);

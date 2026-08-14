@@ -101,6 +101,7 @@ class GCTracer {
   static constexpr uint8_t kDefaultHeadroomScaleQuarters = 4;
 
   void SetHeadroomScaleQuarters(uint8_t quarters);
+  uint8_t GetHeadroomScaleQuarters() const { return headroom_scale_quarters_; }
 
   double GetGcSpeed() {
     if (gcSpeedCache_ != 0.0) {
