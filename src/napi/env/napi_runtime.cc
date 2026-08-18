@@ -224,7 +224,9 @@ struct napi_runtime__ {
   }
 
   void ReportUncaught(napi_value exc) {
-    conf_.uncaught_handler(env_, exc, conf_.uncaught_ctx);
+    if (conf_.uncaught_handler) {
+      conf_.uncaught_handler(env_, exc, conf_.uncaught_ctx);
+    }
   }
 
   template <typename T>
