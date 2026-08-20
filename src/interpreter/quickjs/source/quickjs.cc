@@ -6280,12 +6280,9 @@ size_t GetResidentUsageForRanges(const std::vector<VMPssRange> &ranges) {
   return 0;
 #endif
 }
-}  // namespace
-#endif
 
-void LEPUS_ComputeMemoryUsage(LEPUSRuntime *rt, LEPUSMemoryUsage *s) {
-  memset(s, 0, sizeof(*s));
-#ifdef ENABLE_QUICKJS_DEBUGGER
+void LEPUS_ComputeMemoryUsageInternal(LEPUSRuntime *rt, LEPUSMemoryUsage *s,
+                                      bool brief) {
   size_t common_base_size = 0;
   {
     if (rt->ptr_handles != nullptr) {
@@ -6353,11 +6350,12 @@ void LEPUS_ComputeMemoryUsage(LEPUSRuntime *rt, LEPUSMemoryUsage *s) {
   s->malloc_count = rt->malloc_state.malloc_count;
   s->malloc_size = rt->malloc_state.malloc_size;
   s->malloc_limit = rt->malloc_state.malloc_limit;
+  s->base_malloc_size = common_base_size;
+  if (brief) return;
 
   s->memory_used_count = 2; /* rt + rt->class_array */
   s->memory_used_size = sizeof(LEPUSRuntime) +
                         sizeof(LEPUSValue) * rt->class_count + common_base_size;
-  s->base_malloc_size = common_base_size;
 
   list_for_each(el, &rt->context_list) {
     LEPUSContext *ctx = list_entry(el, LEPUSContext, link);
@@ -6612,6 +6610,28 @@ void LEPUS_ComputeMemoryUsage(LEPUSRuntime *rt, LEPUSMemoryUsage *s) {
   s->memory_used_size += s->atom_size + s->str_size + s->obj_size +
                          s->prop_size + s->shape_size + s->lepus_func_size +
                          s->lepus_func_code_size + s->lepus_func_pc2line_size;
+}
+}  // namespace
+#endif
+
+void LEPUS_ComputeMemoryUsage(LEPUSRuntime *rt, LEPUSMemoryUsage *s) {
+  memset(s, 0, sizeof(*s));
+#ifdef ENABLE_QUICKJS_DEBUGGER
+  LEPUS_ComputeMemoryUsageInternal(rt, s, false);
+#endif
+}
+
+void LEPUS_ComputeMemoryUsageBrief(LEPUSRuntime *rt, LEPUSMemoryUsageBrief *s) {
+  memset(s, 0, sizeof(*s));
+#ifdef ENABLE_QUICKJS_DEBUGGER
+  LEPUSMemoryUsage full_usage;
+  memset(&full_usage, 0, sizeof(full_usage));
+  LEPUS_ComputeMemoryUsageInternal(rt, &full_usage, true);
+  s->base_malloc_size = full_usage.base_malloc_size;
+  s->malloc_size = full_usage.malloc_size;
+  s->page_rss_size = LEPUS_IsGCModeRT(rt) ? full_usage.memory_used_size
+                                          : full_usage.malloc_size;
+  s->malloc_count = full_usage.malloc_count;
 #endif
 }
 

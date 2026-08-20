@@ -884,7 +884,17 @@ typedef struct LEPUSMemoryUsage {
   int64_t binary_object_count, binary_object_size;
 } LEPUSMemoryUsage;
 
+typedef struct LEPUSMemoryUsageBrief {
+  int64_t base_malloc_size;
+  int64_t malloc_size;    // Heap size accumulating each object.
+  int64_t page_rss_size;  // In GC mode, it represents the physical memory
+                          // footprint memory pages (the RSS footprint
+                          // obtained by using mincore on the mmap region).
+  int64_t malloc_count;   // Only available in RC mode.
+} LEPUSMemoryUsageBrief;
+
 void LEPUS_ComputeMemoryUsage(LEPUSRuntime *rt, LEPUSMemoryUsage *s);
+void LEPUS_ComputeMemoryUsageBrief(LEPUSRuntime *rt, LEPUSMemoryUsageBrief *s);
 void LEPUS_DumpMemoryUsage(FILE *fp, const LEPUSMemoryUsage *s,
                            LEPUSRuntime *rt);
 
