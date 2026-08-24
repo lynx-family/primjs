@@ -211,6 +211,20 @@ TEST_F(CommonQjsTest, WStringRejection) {
   }
 }
 
+TEST_F(CommonQjsTest, ShortStringCachePreservesWideStringBufferContents) {
+  std::string src = R"(
+    "\u0130".toUpperCase() === "\u0130" &&
+    String.fromCodePoint(0x3037, 0x30FB) === "\u3037\u30FB";
+  )";
+
+  LEPUSValue ret = LEPUS_Eval(ctx_, src.c_str(), src.size(), "test.js",
+                              LEPUS_EVAL_TYPE_GLOBAL);
+
+  ASSERT_FALSE(LEPUS_IsException(ret));
+  EXPECT_TRUE(LEPUS_ToBool(ctx_, ret));
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+}
+
 TEST_F(CommonQjsTest, DISABLED_libcTest) {
   const char* str =
       "import * as std from 'std';\n"
