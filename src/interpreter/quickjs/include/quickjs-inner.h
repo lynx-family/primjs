@@ -361,6 +361,11 @@ typedef struct JSCoverageInfo {
   uint32_t *coverage_counters;
 } JSCoverageInfo;
 
+static constexpr uint32_t kFirstCachedSingleCharacter = 0x00;
+static constexpr uint32_t kLastCachedSingleCharacter = 0x7f;
+static constexpr uint32_t kSingleCharacterStringTableSize =
+    kLastCachedSingleCharacter - kFirstCachedSingleCharacter + 1;
+
 struct LEPUSRuntime {
   LEPUSMallocFunctions mf;
   const char *rt_info;
@@ -483,6 +488,7 @@ struct LEPUSRuntime {
   std::unordered_set<FinalizationRegistryData *> *fr_data_finalizer_recoder;
   size_t gc_info_threshold;
   size_t gc_info_interval_size;
+  JSAtom single_character_string_table[kSingleCharacterStringTableSize];
 };
 
 static const char *const native_error_name[JS_NATIVE_ERROR_COUNT] = {
@@ -3119,6 +3125,33 @@ QJS_STATIC inline BOOL atom_is_free(const JSAtomStruct *p) {
 
 QJS_STATIC inline BOOL __JS_AtomIsTaggedInt(JSAtom v) {
   return (v & JS_ATOM_TAG_INT) != 0;
+}
+
+static force_inline bool IsCachedSingleCharacter(uint32_t c) {
+  return c >= kFirstCachedSingleCharacter && c <= kLastCachedSingleCharacter;
+}
+
+static force_inline LEPUSValue
+GetSingleCharacterString_GC_Impl(LEPUSRuntime *rt, uint32_t c) {
+  DCHECK(IsCachedSingleCharacter(c));
+  JSAtom atom =
+      rt->single_character_string_table[c - kFirstCachedSingleCharacter];
+  DCHECK(atom != JS_ATOM_NULL);
+  DCHECK(!__JS_AtomIsTaggedInt(atom));
+  return LEPUS_MKPTR(LEPUS_TAG_STRING, rt->atom_array[atom]);
+}
+
+/* Shared by the string_buffer_end variants in quickjs.cc and quickjs_gc.cc.
+   If the buffer holds a single cached character, releases the buffer and
+   stores the cached string in *res. */
+static force_inline bool TryGetCachedSingleCharacterString(StringBuffer *s,
+                                                           LEPUSValue *res) {
+  if (!s->ctx->gc_enable || s->len != 1) return false;
+  uint32_t c = s->is_wide_char ? s->str->u.str16[0] : s->str->u.str8[0];
+  if (!IsCachedSingleCharacter(c)) return false;
+  s->str = NULL;
+  *res = GetSingleCharacterString_GC_Impl(s->ctx->rt, c);
+  return true;
 }
 
 QJS_STATIC inline JSAtom __JS_AtomFromUInt32(uint32_t v) {

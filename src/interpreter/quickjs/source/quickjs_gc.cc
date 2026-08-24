@@ -1552,6 +1552,9 @@ static LEPUSValue string_buffer_end(StringBuffer *s) {
     s->str = NULL;
     return JS_AtomToString_GC(s->ctx, JS_ATOM_empty_string);
   }
+  LEPUSValue cached_single_char;
+  if (TryGetCachedSingleCharacterString(s, &cached_single_char))
+    return cached_single_char;
   if (s->len < s->size) {
     /* smaller size so lepus_realloc should not fail, but OK if it does */
     /* XXX: should add some slack to avoid unnecessary calls */

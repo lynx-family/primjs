@@ -2474,6 +2474,23 @@ int JS_InitAtoms(LEPUSRuntime *rt) {
       return -1;
     p = p + len + 1;
   }
+  if (rt->gc_enable) {
+    /* Pre-create atoms for the 128 ASCII single-character strings,
+       including control characters such as '\n' ("...".split("\n") is
+       a common pattern).
+       __JS_NewAtomInit never applies the num-string -> tagged-int
+       conversion done by JS_NewAtomStr, so '0'..'9' also get real string
+       atoms with atom_array entries, which the cache lookup relies on.
+       is_const is false so these strings are ordinary GC-managed objects,
+       like any other dynamically created atom. */
+    for (uint32_t c = kFirstCachedSingleCharacter;
+         c <= kLastCachedSingleCharacter; c++) {
+      char ch = static_cast<char>(c);
+      JSAtom atom = __JS_NewAtomInit(rt, &ch, 1, JS_ATOM_TYPE_STRING, false);
+      if (atom == JS_ATOM_NULL) return -1;
+      rt->single_character_string_table[c - kFirstCachedSingleCharacter] = atom;
+    }
+  }
   return 0;
 }
 
@@ -3327,6 +3344,11 @@ LEPUSValue js_new_string8_len(LEPUSContext *ctx, const char *buf, int32_t len) {
   if (len <= 0) {
     return LEPUS_AtomToString(ctx, JS_ATOM_empty_string);
   }
+  if (len == 1 && ctx->rt->gc_enable &&
+      IsCachedSingleCharacter(static_cast<uint8_t>(buf[0]))) {
+    return GetSingleCharacterString_GC_Impl(ctx->rt,
+                                            static_cast<uint8_t>(buf[0]));
+  }
   str = js_alloc_string(ctx, len, 0);
   if (!str) return LEPUS_EXCEPTION;
   memcpy(str->u.str8, buf, len);
@@ -3663,6 +3685,9 @@ QJS_STATIC LEPUSValue string_buffer_end(StringBuffer *s) {
     s->str = NULL;
     return LEPUS_AtomToString(s->ctx, JS_ATOM_empty_string);
   }
+  LEPUSValue cached_single_char;
+  if (TryGetCachedSingleCharacterString(s, &cached_single_char))
+    return cached_single_char;
   if (s->len < s->size) {
     /* smaller size so lepus_realloc should not fail, but OK if it does */
     /* XXX: should add some slack to avoid unnecessary calls */
