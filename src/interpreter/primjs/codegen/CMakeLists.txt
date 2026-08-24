@@ -107,6 +107,9 @@ file(GLOB PRIMJS_SRC "${PRIMJS_ROOT_DIR}/base/*.cc"
 
 add_executable(vm_codegen ${PRIMJS_SRC})
 
+# vm_codegen always emits AArch64 handlers, even when built on an x86_64 host.
+target_compile_definitions(vm_codegen PRIVATE __aarch64__)
+
 target_compile_options(
   vm_codegen
   PRIVATE -Wall

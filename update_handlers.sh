@@ -71,7 +71,7 @@ echo "Using LLVM path: $LLVM_PATH"
 cd "$SCRIPT_DIR"
 
 CC=clang CXX=clang++ cmake -S . -Bbuild -DENABLE_UNITTESTS=ON -DENABLE_LEPUSNG=ON -DENABLE_GEN_EMBEDDED=ON -DLLVM_PATH="$LLVM_PATH"
-cmake --build ./build -t vm_codegen
+cmake --build ./build --target vm_codegen --parallel "${BUILD_JOBS:-8}"
 ./build/bin/vm_codegen -multi-table -virtual-sp primjs
 "$LLVM_PATH/build/bin/llc" -O3 -mtriple=aarch64-apple-darwin -o ./src/interpreter/primjs/interp/mac/embedded.S primjs.ll
 wrap_generated_assembly ./src/interpreter/primjs/interp/mac/embedded.S
