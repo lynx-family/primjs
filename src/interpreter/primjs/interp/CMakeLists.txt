@@ -9,12 +9,30 @@ file(GLOB SRC "${CMAKE_CURRENT_SOURCE_DIR}/*.cc")
 
 add_library(primjs_static STATIC ${SRC})
 
-if(${ENABLE_QUICKJS_DEBUGGER})
-  target_sources(primjs_static
-                 PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/mac/embedded-inspector.S")
+if(ENABLE_PRIMJS_HARMONY OR CMAKE_SYSTEM_NAME STREQUAL "Android"
+   OR CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  set(PRIMJS_EMBEDDED_PLATFORM android)
+elseif(CMAKE_SYSTEM_NAME STREQUAL "iOS"
+       OR CMAKE_OSX_SYSROOT MATCHES "[iI][pP]hone")
+  set(PRIMJS_EMBEDDED_PLATFORM ios)
+elseif(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+  set(PRIMJS_EMBEDDED_PLATFORM mac)
 else()
-  target_sources(primjs_static
-                 PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/mac/embedded.S")
+  message(
+    FATAL_ERROR
+      "primjs_static does not support target platform: ${CMAKE_SYSTEM_NAME}")
 endif()
+
+if(ENABLE_QUICKJS_DEBUGGER)
+  set(PRIMJS_EMBEDDED_FILE embedded-inspector.S)
+else()
+  set(PRIMJS_EMBEDDED_FILE embedded.S)
+endif()
+
+target_sources(
+  primjs_static
+  PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/${PRIMJS_EMBEDDED_PLATFORM}/${PRIMJS_EMBEDDED_FILE}"
+)
 
 target_link_libraries(primjs_static quick_static)
