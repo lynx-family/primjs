@@ -2150,9 +2150,14 @@ address_t RosAllocImpl::GetValidHeapAddr(address_t addr) {
 void RosAllocImpl::DumpSpace() const {
   size_t run_obj_cnt[RunConfig::kRunConfigs] = {0};
   std::map<size_t, size_t> large_obj_cnt;
+  std::map<size_t, size_t> huge_obj_cnt;
   size_t allocated_slots_size = 0, used_slots_size = 0;
   for (const auto &group : allocSpace.page_groups.GetGroupArray()) {
     if (!group.IsInitialized()) continue;
+    if (group.IsHugeObj()) {
+      ++huge_obj_cnt[group.GetCurrSize()];
+      continue;
+    }
     auto &page_map = group.GetPageMap();
     size_t end_index = page_map.GetPageIndex(page_map.GetEndAddr());
     for (size_t index = 0; index < end_index; ++index) {
@@ -2161,7 +2166,7 @@ void RosAllocImpl::DumpSpace() const {
         address_t run_slots = page_map.GetPageAddr(index);
         RunSlots &slots = *reinterpret_cast<RunSlots *>(run_slots);
         auto slot_idx = slots.mIdx;
-        index += RunConfig::kCfgs[slot_idx].numPagesPerRun;
+        index += RunConfig::kCfgs[slot_idx].numPagesPerRun - 1;
         allocated_slots_size +=
             RunConfig::kCfgs[slot_idx].numPagesPerRun * ALLOCUTIL_PAGE_SIZE;
         used_slots_size += sizeof(RunSlots);
@@ -2193,13 +2198,21 @@ void RosAllocImpl::DumpSpace() const {
           "Allocated slots's size: %zu bytes, used slots' size: %zu bytes, "
           "fragmentation rate: %%%.2f\n",
           allocated_slots_size, used_slots_size,
-          (1 - (double)(used_slots_size * 1.0 / allocated_slots_size)) * 100.0);
+          allocated_slots_size ? (1 - static_cast<double>(used_slots_size) /
+                                          allocated_slots_size) *
+                                     100.0
+                               : 0.0);
   fprintf(stdout, "DUMP_RunSlots end.\nDUMP_LargeObj:\n");
   for (const auto &large_info : large_obj_cnt) {
     fprintf(stdout, "page size: %zu KBs, object count:%zu\n",
-            large_info.first * ALLOCUTIL_PAGE_SIZE, large_info.second);
+            large_info.first * ALLOCUTIL_PAGE_SIZE / KB, large_info.second);
   }
-  fprintf(stdout, "DUMP_LargeObj end\n");
+  fprintf(stdout, "DUMP_LargeObj end\nDUMP_HugeObj:\n");
+  for (const auto &huge_info : huge_obj_cnt) {
+    fprintf(stdout, "object size: %zu KBs, object count:%zu\n",
+            huge_info.first / KB, huge_info.second);
+  }
+  fprintf(stdout, "DUMP_HugeObj end\n");
   fprintf(stdout, "MemMapSize: %zu bytes, allocated size: %zu bytes\n",
           allocSpace.GetSize(), allocatedInternalSize.load());
   fprintf(stdout, "DUMP_AllocPace end!\n");
