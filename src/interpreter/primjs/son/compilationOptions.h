@@ -30,9 +30,8 @@ class CompilationOptions {
     kDebugTrace = 1 << 2,
     kHost = 1 << 3,
     kSupportMutiTable = 1 << 4,
-    kSupportDebugger = 1 << 5,
-    kSupportVirtualSp = 1 << 6,
-    kUseFastPath = 1 << 7,
+    kSupportVirtualSp = 1 << 5,
+    kUseFastPath = 1 << 6,
   };
 
   CompilationOptions() : _flags(0), _target_arch(TargetArch::kAARCH64) {}
@@ -48,7 +47,6 @@ class CompilationOptions {
   bool IsHost() const { return GetFlag(kHost); }
   bool IsDebugTrace() const { return GetFlag(kDebugTrace); }
   bool SupportMultiTable() const { return GetFlag(kSupportMutiTable); }
-  bool SupportDebugger() const { return GetFlag(kSupportDebugger); }
   bool SupportVirtualSp() const { return GetFlag(kSupportVirtualSp); }
   bool UseFastPath() const { return GetFlag(kUseFastPath); }
 

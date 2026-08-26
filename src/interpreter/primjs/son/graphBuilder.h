@@ -46,7 +46,6 @@ class GraphBuilder {
   base::Zone* zone() const { return _zone; }
   NodeGraph* graph() const { return _graph; }
   bool Is32Bit() { return graph()->options().Is32Bit(); }
-  bool IsDebugger() { return graph()->options().SupportDebugger(); }
   bool IsHost() { return graph()->options().IsHost(); }
   bool IsDebugTrace() { return graph()->options().IsDebugTrace(); }
   Node* Branch(Node* condition, Label* true_label, Label* false_label,

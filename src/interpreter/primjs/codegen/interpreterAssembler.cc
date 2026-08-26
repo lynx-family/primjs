@@ -17,7 +17,6 @@ InterpreterAssembler::InterpreterAssembler(son::node::NodeGraph* graph,
   _dispatch_table = new (zone) DispatchTable(this);
   graph->NewParameter(0, son::node::NodeType::RawType());
   graph->NewParameter(1, son::node::NodeType::RawType());
-  _is_debugger = graph->options().SupportDebugger();
   _use_virtual_sp = graph->options().SupportVirtualSp();
   _multi_table = graph->options().SupportMultiTable();
   _use_fast_path = graph->options().UseFastPath();
@@ -278,7 +277,7 @@ void InterpreterAssembler::PopStackFrame(son::node::Node* prev_sf) {
 }
 
 void InterpreterAssembler::DebuggerCallEachOp() {
-  if (!_is_debugger) return;
+#ifdef ENABLE_QUICKJS_DEBUGGER
   son::node::Label not_debugger_mode(this);
 
   auto debug_mode = GetIsDebuggerMode();
@@ -293,10 +292,11 @@ void InterpreterAssembler::DebuggerCallEachOp() {
     Jump(&not_debugger_mode);
   }
   Bind(&not_debugger_mode);
+#endif
 }
 
 void InterpreterAssembler::DebuggerCallEachFunc() {
-  if (!_is_debugger) return;
+#ifdef ENABLE_QUICKJS_DEBUGGER
   son::node::Label not_debugger_mode(this);
 
   auto debug_mode = GetIsDebuggerMode();
@@ -310,6 +310,7 @@ void InterpreterAssembler::DebuggerCallEachFunc() {
     Jump(&not_debugger_mode);
   }
   Bind(&not_debugger_mode);
+#endif
 }
 
 void InterpreterAssembler::prim_debug_trace() {

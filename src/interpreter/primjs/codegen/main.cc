@@ -49,7 +49,6 @@ static void PrintHelper() {
   printf("-h|--help Print available options\n");
   printf("-trace trace asm debug trace\n");
   printf("-multi-table support mutil-table opt\n");
-  printf("-debugger support debugger mode\n");
   printf("-virtual-sp support virtual sp\n");
   printf("-no-fast-path not support fast path\n");
 }
@@ -72,12 +71,14 @@ int main(int argc, char **argv) {
       options.SetFlag(son::CompilationOptions::Flag::kDebugTrace);
     } else if (arg == "-multi-table") {
       options.SetFlag(son::CompilationOptions::Flag::kSupportMutiTable);
-    } else if (arg == "-debugger") {
-      options.SetFlag(son::CompilationOptions::Flag::kSupportDebugger);
     } else if (arg == "-virtual-sp") {
       options.SetFlag(son::CompilationOptions::Flag::kSupportVirtualSp);
     } else if (arg == "-no-fast-path") {
       use_fast_path = false;
+    } else if (!arg.empty() && arg.front() == '-') {
+      fprintf(stderr, "Unknown option: %.*s\n", static_cast<int>(arg.size()),
+              arg.data());
+      return EXIT_FAILURE;
     } else {
       file_name = argv[i];
     }

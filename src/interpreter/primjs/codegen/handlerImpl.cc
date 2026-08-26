@@ -2501,7 +2501,7 @@ void HandlerImpl::GenCallCFunction(son::node::Label* call_fail) {
   BranchIf(cond, call_fail, son::node::BranchHint::kFalse);
 
   // LEPUSStackFrame sf_s, *sf = &sf_s, *prev_sf;
-  auto alloc_size = IntValue(AccessBuilder::js_stack_frame_size(_is_debugger));
+  auto alloc_size = IntValue(AccessBuilder::js_stack_frame_size());
   auto prev_frame = GetFrame();
   son::node::Node* prev_stack = nullptr;
   auto sf = PushStackFrame(alloc_size, &prev_stack);
@@ -2989,7 +2989,7 @@ void HandlerImpl::GenCommonCallInternal(son::node::Node* b,
     val_count = Int32Add(val_count, call_argc);
   }
   auto alloca_size = Int32Mul(val_count, IntValue(sizeof(LEPUSValue)));
-  auto frame_size = IntValue(AccessBuilder::js_stack_frame_size(_is_debugger));
+  auto frame_size = IntValue(AccessBuilder::js_stack_frame_size());
   alloca_size = Int32Add(alloca_size, frame_size);
   auto ctx = GetCtx();
 
@@ -3039,8 +3039,8 @@ void HandlerImpl::GenCommonCallInternal(son::node::Node* b,
   son::node::Node* var_buf = nullptr;
   // if (unlikely(arg_allocated_size)) {
   if (arg_allocated_size != nullptr) {
-    auto local_buf = CastToRaw(IntPtrAdd(
-        sf, IntPtrValue(AccessBuilder::js_stack_frame_size(_is_debugger))));
+    auto local_buf = CastToRaw(
+        IntPtrAdd(sf, IntPtrValue(AccessBuilder::js_stack_frame_size())));
     // int n = min_int(call_argc, arg_count); // call_argc < arg_count
     auto n = Int32Min(call_argc, arg_count);
     // for (i = 0; i < n; i++) arg_buf[i] = call_argv[i];
@@ -3060,8 +3060,8 @@ void HandlerImpl::GenCommonCallInternal(son::node::Node* b,
     SaveArgBuffer(local_buf);
   } else if (from_entry) {
     // copy argv
-    auto local_buf = CastToRaw(IntPtrAdd(
-        sf, IntPtrValue(AccessBuilder::js_stack_frame_size(_is_debugger))));
+    auto local_buf = CastToRaw(
+        IntPtrAdd(sf, IntPtrValue(AccessBuilder::js_stack_frame_size())));
     // for (i = 0; i < n; i++) arg_buf[i] = call_argv[i];
     auto offset = IntPtrMul(ZExtInt32ToIntPtr(call_argc),
                             IntPtrValue(sizeof(LEPUSValue)));
@@ -3073,8 +3073,8 @@ void HandlerImpl::GenCommonCallInternal(son::node::Node* b,
     // sf->arg_buf = arg_buf;
     SaveArgBuffer(local_buf);
   } else {
-    var_buf = CastToRaw(IntPtrAdd(
-        sf, IntPtrValue(AccessBuilder::js_stack_frame_size(_is_debugger))));
+    var_buf = CastToRaw(
+        IntPtrAdd(sf, IntPtrValue(AccessBuilder::js_stack_frame_size())));
     // sf->arg_count = call_argc;
     SaveArgCount(call_argc);
     // sf->arg_buf = arg_buf;
@@ -3336,18 +3336,18 @@ void HandlerImpl::GenPushConst(PrimjsOpcode opcode) {
     idx = Fetch_32(0);
   }
   auto val = LoadLepusVal(cpool, idx);
-  if (_is_debugger) {
-    son::node::Label not_debugger_mode(this);
+#ifdef ENABLE_QUICKJS_DEBUGGER
+  son::node::Label not_debugger_mode(this);
 
-    auto debug_mode = GetIsDebuggerMode();
-    BranchIfFalse(debug_mode, &not_debugger_mode);
-    {
-      auto desc = son::node::CallDescriptors::DebuggerPause();
-      CallRuntimeNoCheck(desc, GetCtx(), val, GetPc());
-      Jump(&not_debugger_mode);
-    }
-    Bind(&not_debugger_mode);
+  auto debug_mode = GetIsDebuggerMode();
+  BranchIfFalse(debug_mode, &not_debugger_mode);
+  {
+    auto desc = son::node::CallDescriptors::DebuggerPause();
+    CallRuntimeNoCheck(desc, GetCtx(), val, GetPc());
+    Jump(&not_debugger_mode);
   }
+  Bind(&not_debugger_mode);
+#endif
   PushSp(val);
   Dispatch(opcode);
 }

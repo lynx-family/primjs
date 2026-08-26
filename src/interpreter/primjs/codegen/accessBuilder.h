@@ -14,6 +14,14 @@
 
 namespace primjs {
 
+// vm_codegen uses the same frame ABI as the runtime configuration it is built
+// for, so all generated offsets come directly from the active structure.
+#ifdef ENABLE_QUICKJS_DEBUGGER
+using CodegenQuickStackFrame = DebuggerQuickStackFrame;
+#else
+using CodegenQuickStackFrame = QuickStackFrame;
+#endif
+
 struct FieldAccess {
   son::node::MachineType _type;
   int _offset;
@@ -39,137 +47,98 @@ struct FieldAccess {
 class AccessBuilder {
  public:
   static constexpr int align_sp(int n) { return ((n + 15) / 16) * 16; }
-  static constexpr int js_stack_frame_size(bool is_debugger) {
-    return align_sp(size_of_stack_frame(is_debugger) +
-                    sizeof(QuickCFrameStruct));
+  static constexpr int js_stack_frame_size() {
+    return align_sp(size_of_stack_frame() + sizeof(QuickCFrameStruct));
   }
 
-  static constexpr int size_of_stack_frame(bool is_debugger) {
-    return is_debugger ? sizeof(DebuggerQuickStackFrame)
-                       : sizeof(QuickStackFrame);
+  static constexpr int size_of_stack_frame() {
+    return sizeof(CodegenQuickStackFrame);
   }
 
-  static constexpr int js_stack_frame_js_mode_offset(bool is_debugger) {
-    if (is_debugger) {
-      return offsetof(DebuggerQuickStackFrame, js_mode);
-    }
-    return offsetof(QuickStackFrame, js_mode);
+  static constexpr int js_stack_frame_js_mode_offset() {
+    return offsetof(CodegenQuickStackFrame, js_mode);
   }
 
-  static constexpr int js_stack_frame_arg_count_offset(bool is_debugger) {
-    if (is_debugger) {
-      return offsetof(DebuggerQuickStackFrame, arg_count);
-    }
-    return offsetof(QuickStackFrame, arg_count);
+  static constexpr int js_stack_frame_arg_count_offset() {
+    return offsetof(CodegenQuickStackFrame, arg_count);
   }
 
-  static constexpr int js_stack_frame_var_ref_list_offset(bool is_debugger) {
-    if (is_debugger) {
-      return offsetof(DebuggerQuickStackFrame, var_ref_list);
-    }
-    return offsetof(QuickStackFrame, var_ref_list);
+  static constexpr int js_stack_frame_var_ref_list_offset() {
+    return offsetof(CodegenQuickStackFrame, var_ref_list);
   }
 
-  static int js_stack_frame_var_refs_offset(bool is_debugger) {
-    if (is_debugger) {
-      return offsetof(DebuggerQuickStackFrame, var_refs);
-    }
-    return offsetof(QuickStackFrame, var_refs);
+  static int js_stack_frame_var_refs_offset() {
+    return offsetof(CodegenQuickStackFrame, var_refs);
   }
 
-  static constexpr int js_stack_frame_ref_size_offset(bool is_debugger) {
-    if (is_debugger) {
-      return offsetof(DebuggerQuickStackFrame, ref_size);
-    }
-    return offsetof(QuickStackFrame, ref_size);
+  static constexpr int js_stack_frame_ref_size_offset() {
+    return offsetof(CodegenQuickStackFrame, ref_size);
   }
 
-  static constexpr int js_stack_frame_var_buf_offset(bool is_debugger) {
-    if (is_debugger) {
-      return offsetof(DebuggerQuickStackFrame, var_buf);
-    }
-    return offsetof(QuickStackFrame, var_buf);
+  static constexpr int js_stack_frame_var_buf_offset() {
+    return offsetof(CodegenQuickStackFrame, var_buf);
   }
 
-  static constexpr int js_stack_frame_arg_buf_offset(bool is_debugger) {
-    if (is_debugger) {
-      return offsetof(DebuggerQuickStackFrame, arg_buf);
-    }
-    return offsetof(QuickStackFrame, arg_buf);
+  static constexpr int js_stack_frame_arg_buf_offset() {
+    return offsetof(CodegenQuickStackFrame, arg_buf);
   }
 
-  static constexpr int js_stack_frame_prev_frame_offset(bool is_debugger) {
-    if (is_debugger) {
-      return offsetof(DebuggerQuickStackFrame, prev_frame);
-    }
-    return offsetof(QuickStackFrame, prev_frame);
+  static constexpr int js_stack_frame_prev_frame_offset() {
+    return offsetof(CodegenQuickStackFrame, prev_frame);
   }
 
-  static constexpr int js_stack_frame_cur_func_offset(bool is_debugger) {
-    if (is_debugger) {
-      return offsetof(DebuggerQuickStackFrame, cur_func);
-    }
-    return offsetof(QuickStackFrame, cur_func);
+  static constexpr int js_stack_frame_cur_func_offset() {
+    return offsetof(CodegenQuickStackFrame, cur_func);
   }
 
-  static constexpr int js_stack_frame_cur_pc_offset(bool is_debugger) {
-    if (is_debugger) {
-      return offsetof(DebuggerQuickStackFrame, cur_pc);
-    }
-    return offsetof(QuickStackFrame, cur_pc);
+  static constexpr int js_stack_frame_cur_pc_offset() {
+    return offsetof(CodegenQuickStackFrame, cur_pc);
   }
 
-  static constexpr int js_stack_frame_cur_sp_offset(bool is_debugger) {
-    if (is_debugger) {
-      return offsetof(DebuggerQuickStackFrame, cur_sp);
-    }
-    return offsetof(QuickStackFrame, cur_sp);
+  static constexpr int js_stack_frame_cur_sp_offset() {
+    return offsetof(CodegenQuickStackFrame, cur_sp);
   }
 
-  static constexpr int js_stack_frame_sp_offset(bool is_debugger) {
-    if (is_debugger) {
-      return offsetof(DebuggerQuickStackFrame, sp);
-    }
-    return offsetof(QuickStackFrame, sp);
+  static constexpr int js_stack_frame_sp_offset() {
+    return offsetof(CodegenQuickStackFrame, sp);
   }
 
-  static constexpr int interpreter_frame_this_obj_offset(bool is_debugger) {
-    return size_of_stack_frame(is_debugger) +
-           offsetof(QuickCFrameStruct, this_obj);
+  static constexpr int interpreter_frame_this_obj_offset() {
+    return size_of_stack_frame() + offsetof(QuickCFrameStruct, this_obj);
   }
 
-  static constexpr int interpreter_frame_new_target_offset(bool is_debugger) {
-    return size_of_stack_frame(is_debugger) +
-           offsetof(QuickCFrameStruct, new_target);
+  static constexpr int interpreter_frame_new_target_offset() {
+    return size_of_stack_frame() + offsetof(QuickCFrameStruct, new_target);
   }
 
-  static constexpr int interpreter_frame_var_refs_cache_offset(
-      bool is_debugger) {
-    return size_of_stack_frame(is_debugger) +
-           offsetof(QuickCFrameStruct, var_refs_cache);
+  static constexpr int interpreter_frame_var_refs_cache_offset() {
+    return size_of_stack_frame() + offsetof(QuickCFrameStruct, var_refs_cache);
   }
 
-  static constexpr int interpreter_frame_cpool_offset(bool is_debugger) {
-    return size_of_stack_frame(is_debugger) +
-           offsetof(QuickCFrameStruct, cpool);
+  static constexpr int interpreter_frame_cpool_offset() {
+    return size_of_stack_frame() + offsetof(QuickCFrameStruct, cpool);
   }
 
-  static constexpr int interpreter_frame_argc_offset(bool is_debugger) {
-    return size_of_stack_frame(is_debugger) + offsetof(QuickCFrameStruct, argc);
+  static constexpr int interpreter_frame_argc_offset() {
+    return size_of_stack_frame() + offsetof(QuickCFrameStruct, argc);
   }
 
-  static constexpr int interpreter_frame_last_frame_offset(bool is_debugger) {
-    return size_of_stack_frame(is_debugger) +
-           offsetof(QuickCFrameStruct, last_frame);
+  static constexpr int interpreter_frame_last_frame_offset() {
+    return size_of_stack_frame() + offsetof(QuickCFrameStruct, last_frame);
   }
-  static constexpr int interpreter_frame_last_lr_offset(bool is_debugger) {
-    return size_of_stack_frame(is_debugger) +
-           offsetof(QuickCFrameStruct, last_lr);
+  static constexpr int interpreter_frame_last_lr_offset() {
+    return size_of_stack_frame() + offsetof(QuickCFrameStruct, last_lr);
   }
 
+#ifdef ENABLE_QUICKJS_DEBUGGER
   static constexpr int js_stack_frame_pthis_offset() {
     return offsetof(DebuggerQuickStackFrame, pthis);
   }
+
+  static constexpr int debugger_mode_offset() {
+    return offsetof(LEPUSContext, debugger_mode);
+  }
+#endif
 
   static constexpr int async_stack_frame_offset() {
     return offsetof(JSAsyncFunctionState, frame);
@@ -183,13 +152,6 @@ class AccessBuilder {
   }
   static constexpr int global_var_obj_offset() {
     return offsetof(LEPUSContext, global_var_obj);
-  }
-  static constexpr int debugger_mode_offset(bool is_debugger) {
-    auto offset = offsetof(LEPUSContext, debugger_mode);
-    if (is_debugger) {
-      return offset + sizeof(LEPUSDebuggerInfo*);
-    }
-    return offset;
   }
 
   static constexpr int class_id_offset() {
@@ -317,12 +279,8 @@ class AccessBuilder {
   static constexpr int js_stack_offset() {
     return offsetof(LEPUSContext, stack_pos);
   }
-  static constexpr int con_mark_state_offset(bool is_debugger) {
-    auto offset = offsetof(LEPUSContext, con_mark_state);
-    if (is_debugger) {
-      return offset + sizeof(LEPUSDebuggerInfo*);
-    }
-    return offset;
+  static constexpr int con_mark_state_offset() {
+    return offsetof(LEPUSContext, con_mark_state);
   }
   static constexpr int current_stack_frame_offset() {
     return offsetof(LEPUSRuntime, current_stack_frame);

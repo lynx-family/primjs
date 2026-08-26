@@ -69,7 +69,6 @@ class InterpreterAssembler : public CodeAssembler {
   son::node::Node* _new_pc{nullptr};
   son::node::Node* _new_frame{nullptr};
   DispatchTable* _dispatch_table;
-  bool _is_debugger;
   bool _use_virtual_sp;
   bool _multi_table;
   bool _use_fast_path;
@@ -381,34 +380,30 @@ class InterpreterAssembler : public CodeAssembler {
 
   son::node::Node* RestoreThis() {
     auto frame = GetFrame();
-    auto offset =
-        AccessBuilder::interpreter_frame_this_obj_offset(_is_debugger);
+    auto offset = AccessBuilder::interpreter_frame_this_obj_offset();
     return LoadByteOffset(son::node::MachineType::kInt64, frame, offset);
   }
   son::node::Node* RestoreNewTarget() {
     auto frame = GetFrame();
-    auto offset =
-        AccessBuilder::interpreter_frame_new_target_offset(_is_debugger);
+    auto offset = AccessBuilder::interpreter_frame_new_target_offset();
     return LoadByteOffset(son::node::MachineType::kInt64, frame, offset);
   }
 
   son::node::Node* RestoreLastFrame() {
     auto frame = GetFrame();
-    auto offset =
-        AccessBuilder::interpreter_frame_last_frame_offset(_is_debugger);
+    auto offset = AccessBuilder::interpreter_frame_last_frame_offset();
     return LoadByteOffset(son::node::MachineType::kRawType, frame, offset);
   }
 
   void SaveLastFrame(son::node::Node* val) {
     auto frame = GetFrame();
-    auto offset =
-        AccessBuilder::interpreter_frame_last_frame_offset(_is_debugger);
+    auto offset = AccessBuilder::interpreter_frame_last_frame_offset();
     StoreByteOffset(son::node::MachineType::kRawType, frame, offset, val);
   }
 
   void RestoreLastLr() {
     auto frame = GetFrame();
-    auto offset = AccessBuilder::interpreter_frame_last_lr_offset(_is_debugger);
+    auto offset = AccessBuilder::interpreter_frame_last_lr_offset();
     auto lr = LoadByteOffset(son::node::MachineType::kIntptr, frame, offset);
     SetVar64(HandlerVarIndex::kLr, lr);
   }
@@ -416,13 +411,13 @@ class InterpreterAssembler : public CodeAssembler {
   void SaveLastLr() {
     auto val = GetVar64(HandlerVarIndex::kLr);
     auto frame = GetFrame();
-    auto offset = AccessBuilder::interpreter_frame_last_lr_offset(_is_debugger);
+    auto offset = AccessBuilder::interpreter_frame_last_lr_offset();
     StoreByteOffset(son::node::MachineType::kIntptr, frame, offset, val);
   }
 
   son::node::Node* RestoreCurFunc() {
     auto frame = GetFrame();
-    auto offset = AccessBuilder::js_stack_frame_cur_func_offset(_is_debugger);
+    auto offset = AccessBuilder::js_stack_frame_cur_func_offset();
     auto func_obj =
         LoadByteOffset(son::node::MachineType::kInt64, frame, offset);
     return func_obj;
@@ -433,13 +428,13 @@ class InterpreterAssembler : public CodeAssembler {
     if (pc == nullptr) {
       pc = GetPc();
     }
-    auto offset = AccessBuilder::js_stack_frame_cur_pc_offset(_is_debugger);
+    auto offset = AccessBuilder::js_stack_frame_cur_pc_offset();
     StoreByteOffset(son::node::MachineType::kRawType, frame, offset, pc);
   }
 
   void SaveArgCount(son::node::Node* val) {
     auto frame = GetFrame();
-    auto offset = AccessBuilder::js_stack_frame_arg_count_offset(_is_debugger);
+    auto offset = AccessBuilder::js_stack_frame_arg_count_offset();
     StoreByteOffset(son::node::MachineType::kInt32, frame, offset, val);
   }
 
@@ -448,26 +443,26 @@ class InterpreterAssembler : public CodeAssembler {
       val = GetSp();
     }
     auto frame = GetFrame();
-    auto offset = AccessBuilder::js_stack_frame_cur_sp_offset(_is_debugger);
+    auto offset = AccessBuilder::js_stack_frame_cur_sp_offset();
     StoreByteOffset(son::node::MachineType::kRawType, frame, offset, val);
   }
 
   void SaveFrameSp(son::node::Node* val) {
     auto frame = GetFrame();
-    auto offset = AccessBuilder::js_stack_frame_sp_offset(_is_debugger);
+    auto offset = AccessBuilder::js_stack_frame_sp_offset();
     StoreByteOffset(son::node::MachineType::kRawType, frame, offset, val);
   }
 
   void SaveVarBuf(son::node::Node* val) {
     auto frame = GetFrame();
-    auto offset = AccessBuilder::js_stack_frame_var_buf_offset(_is_debugger);
+    auto offset = AccessBuilder::js_stack_frame_var_buf_offset();
     StoreByteOffset(son::node::MachineType::kRawType, frame, offset, val);
     SetVar(HandlerVarIndex::kVarBuf, val);
   }
 
   void ReloadVarBuf() {
     auto frame = GetFrame();
-    auto offset = AccessBuilder::js_stack_frame_var_buf_offset(_is_debugger);
+    auto offset = AccessBuilder::js_stack_frame_var_buf_offset();
     auto val = LoadByteOffset(son::node::MachineType::kRawType, frame, offset);
     SetVar(HandlerVarIndex::kVarBuf, val);
   }
@@ -481,13 +476,13 @@ class InterpreterAssembler : public CodeAssembler {
   son::node::Node* RestoreVarBuf() { return GetVar(HandlerVarIndex::kVarBuf); }
   void SaveArgBuffer(son::node::Node* val) {
     auto frame = GetFrame();
-    auto offset = AccessBuilder::js_stack_frame_arg_buf_offset(_is_debugger);
+    auto offset = AccessBuilder::js_stack_frame_arg_buf_offset();
     StoreByteOffset(son::node::MachineType::kRawType, frame, offset, val);
     SetVar(HandlerVarIndex::kArgBuf, val);
   }
   void ReloadArgBuf() {
     auto frame = GetFrame();
-    auto offset = AccessBuilder::js_stack_frame_arg_buf_offset(_is_debugger);
+    auto offset = AccessBuilder::js_stack_frame_arg_buf_offset();
     auto val = LoadByteOffset(son::node::MachineType::kRawType, frame, offset);
     SetVar(HandlerVarIndex::kArgBuf, val);
   }
@@ -500,121 +495,115 @@ class InterpreterAssembler : public CodeAssembler {
   }
   void SaveVarRefsCache(son::node::Node* val) {
     auto frame = GetFrame();
-    auto offset =
-        AccessBuilder::interpreter_frame_var_refs_cache_offset(_is_debugger);
+    auto offset = AccessBuilder::interpreter_frame_var_refs_cache_offset();
     SetVar(HandlerVarIndex::kVarRef, val);
     StoreByteOffset(son::node::MachineType::kRawType, frame, offset, val);
   }
   void ReloadVarRefsCache() {
     auto frame = GetFrame();
-    auto offset =
-        AccessBuilder::interpreter_frame_var_refs_cache_offset(_is_debugger);
+    auto offset = AccessBuilder::interpreter_frame_var_refs_cache_offset();
     auto val = LoadByteOffset(son::node::MachineType::kRawType, frame, offset);
     SetVar(HandlerVarIndex::kVarRef, val);
   }
   void SaveCpool(son::node::Node* val) {
     auto frame = GetFrame();
-    auto offset = AccessBuilder::interpreter_frame_cpool_offset(_is_debugger);
+    auto offset = AccessBuilder::interpreter_frame_cpool_offset();
     StoreByteOffset(son::node::MachineType::kRawType, frame, offset, val);
   }
   son::node::Node* RestoreCpool() {
     auto frame = GetFrame();
-    auto offset = AccessBuilder::interpreter_frame_cpool_offset(_is_debugger);
+    auto offset = AccessBuilder::interpreter_frame_cpool_offset();
     return LoadByteOffset(son::node::MachineType::kRawType, frame, offset);
   }
 
   son::node::Node* RestoreArgBuf() { return GetVar(HandlerVarIndex::kArgBuf); }
   void SaveCurFunc(son::node::Node* val) {
     auto frame = GetFrame();
-    auto offset = AccessBuilder::js_stack_frame_cur_func_offset(_is_debugger);
+    auto offset = AccessBuilder::js_stack_frame_cur_func_offset();
     StoreByteOffset(son::node::MachineType::kInt64, frame, offset, val);
   }
 
   void SaveJsMode(son::node::Node* val) {
     auto frame = GetFrame();
-    auto offset = AccessBuilder::js_stack_frame_js_mode_offset(_is_debugger);
+    auto offset = AccessBuilder::js_stack_frame_js_mode_offset();
     StoreByteOffset(son::node::MachineType::kInt32, frame, offset, val);
   }
 
   void SaveVarRefs(son::node::Node* val) {
     auto frame = GetFrame();
-    auto offset = AccessBuilder::js_stack_frame_var_refs_offset(_is_debugger);
+    auto offset = AccessBuilder::js_stack_frame_var_refs_offset();
     StoreByteOffset(son::node::MachineType::kRawType, frame, offset, val);
   }
 
   void SaveVarRefSize(son::node::Node* val) {
     auto frame = GetFrame();
-    auto offset = AccessBuilder::js_stack_frame_ref_size_offset(_is_debugger);
+    auto offset = AccessBuilder::js_stack_frame_ref_size_offset();
     StoreByteOffset(son::node::MachineType::kInt32, frame, offset, val);
   }
   void SaveThisObject(son::node::Node* val) {
     auto frame = GetFrame();
-    auto offset =
-        AccessBuilder::interpreter_frame_this_obj_offset(_is_debugger);
+    auto offset = AccessBuilder::interpreter_frame_this_obj_offset();
     StoreByteOffset(son::node::MachineType::kInt64, frame, offset, val);
-    if (_is_debugger) {
-      offset = AccessBuilder::js_stack_frame_pthis_offset();
-      StoreByteOffset(son::node::MachineType::kInt64, frame, offset, val);
-    }
+#ifdef ENABLE_QUICKJS_DEBUGGER
+    offset = AccessBuilder::js_stack_frame_pthis_offset();
+    StoreByteOffset(son::node::MachineType::kInt64, frame, offset, val);
+#endif
   }
 
   void SaveDebuggerThisObject(son::node::Node* val) {
-    if (_is_debugger) {
-      auto frame = GetFrame();
-      auto offset = AccessBuilder::js_stack_frame_pthis_offset();
-      StoreByteOffset(son::node::MachineType::kInt64, frame, offset, val);
-    }
+#ifdef ENABLE_QUICKJS_DEBUGGER
+    auto frame = GetFrame();
+    auto offset = AccessBuilder::js_stack_frame_pthis_offset();
+    StoreByteOffset(son::node::MachineType::kInt64, frame, offset, val);
+#endif
   }
 
   void SaveNewTarget(son::node::Node* val) {
     auto frame = GetFrame();
-    auto offset =
-        AccessBuilder::interpreter_frame_new_target_offset(_is_debugger);
+    auto offset = AccessBuilder::interpreter_frame_new_target_offset();
     StoreByteOffset(son::node::MachineType::kInt64, frame, offset, val);
   }
 
   void SavePrevFrame(son::node::Node* val) {
     auto frame = GetFrame();
-    auto offset = AccessBuilder::js_stack_frame_prev_frame_offset(_is_debugger);
+    auto offset = AccessBuilder::js_stack_frame_prev_frame_offset();
     StoreByteOffset(son::node::MachineType::kRawType, frame, offset, val);
   }
 
   void SetPrevFrame(son::node::Node* cur_frame, son::node::Node* prev_frame) {
-    StoreByteOffset(
-        son::node::MachineType::kRawType, cur_frame,
-        AccessBuilder::js_stack_frame_prev_frame_offset(_is_debugger),
-        prev_frame);
+    StoreByteOffset(son::node::MachineType::kRawType, cur_frame,
+                    AccessBuilder::js_stack_frame_prev_frame_offset(),
+                    prev_frame);
     return;
   }
 
   son::node::Node* GetVarRefListAddress() {
     auto frame = GetFrame();
-    auto offset =
-        AccessBuilder::js_stack_frame_var_ref_list_offset(_is_debugger);
+    auto offset = AccessBuilder::js_stack_frame_var_ref_list_offset();
     return CastToRaw(IntPtrAdd(frame, IntPtrValue(offset)));
   }
 
   son::node::Node* RestoreCurPc() {
     auto frame = GetFrame();
-    auto offset = AccessBuilder::js_stack_frame_cur_pc_offset(_is_debugger);
+    auto offset = AccessBuilder::js_stack_frame_cur_pc_offset();
     return LoadByteOffset(son::node::MachineType::kRawType, frame, offset);
   }
 
   son::node::Node* RestoreCurSp() {
     auto frame = GetFrame();
-    auto offset = AccessBuilder::js_stack_frame_cur_sp_offset(_is_debugger);
+    auto offset = AccessBuilder::js_stack_frame_cur_sp_offset();
     return LoadByteOffset(son::node::MachineType::kRawType, frame, offset);
   }
 
   son::node::Node* RestoreArgc() {
     auto frame = GetFrame();
-    auto offset = AccessBuilder::interpreter_frame_argc_offset(_is_debugger);
+    auto offset = AccessBuilder::interpreter_frame_argc_offset();
     return LoadByteOffset(son::node::MachineType::kInt32, frame, offset);
   }
 
   void SaveArgc(son::node::Node* value) {
     auto frame = GetFrame();
-    auto offset = AccessBuilder::interpreter_frame_argc_offset(_is_debugger);
+    auto offset = AccessBuilder::interpreter_frame_argc_offset();
     StoreByteOffset(son::node::MachineType::kInt32, frame, offset, value);
   }
 
@@ -627,19 +616,19 @@ class InterpreterAssembler : public CodeAssembler {
 
   son::node::Node* RestoreJsMode() {
     auto frame = GetFrame();
-    auto offset = AccessBuilder::js_stack_frame_js_mode_offset(_is_debugger);
+    auto offset = AccessBuilder::js_stack_frame_js_mode_offset();
     return LoadByteOffset(son::node::MachineType::kInt32, frame, offset);
   }
 
   son::node::Node* RestorePrevFrame() {
     auto frame = GetFrame();
-    auto offset = AccessBuilder::js_stack_frame_prev_frame_offset(_is_debugger);
+    auto offset = AccessBuilder::js_stack_frame_prev_frame_offset();
     return LoadByteOffset(son::node::MachineType::kRawType, frame, offset);
   }
 
   son::node::Node* RestoreVarRefs() {
     auto frame = GetFrame();
-    auto offset = AccessBuilder::js_stack_frame_var_refs_offset(_is_debugger);
+    auto offset = AccessBuilder::js_stack_frame_var_refs_offset();
     return LoadByteOffset(son::node::MachineType::kRawType, frame, offset);
   }
 
@@ -663,12 +652,14 @@ class InterpreterAssembler : public CodeAssembler {
     auto offset = AccessBuilder::global_var_obj_offset();
     return LoadByteOffset(son::node::MachineType::kInt64, ctx, offset);
   }
+#ifdef ENABLE_QUICKJS_DEBUGGER
   son::node::Node* GetIsDebuggerMode() {
     auto ctx = GetCtx();
-    auto offset = AccessBuilder::debugger_mode_offset(_is_debugger);
+    auto offset = AccessBuilder::debugger_mode_offset();
     auto val = LoadByteOffset(son::node::MachineType::kInt32, ctx, offset);
     return NotEqual(val, Int32Value(0));
   }
+#endif
 
   void CheckException(son::node::Node* value);
   void JumpIfException(son::node::Node* value, son::node::Label* throw_e);

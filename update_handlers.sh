@@ -70,28 +70,36 @@ echo "Using LLVM path: $LLVM_PATH"
 
 cd "$SCRIPT_DIR"
 
-CC=clang CXX=clang++ cmake -S . -Bbuild -DENABLE_UNITTESTS=ON -DENABLE_LEPUSNG=ON -DENABLE_GEN_EMBEDDED=ON -DLLVM_PATH="$LLVM_PATH"
-cmake --build ./build --target vm_codegen --parallel "${BUILD_JOBS:-8}"
-./build/bin/vm_codegen -multi-table -virtual-sp primjs
+NORMAL_BUILD_DIR=./build
+INSPECTOR_BUILD_DIR="$NORMAL_BUILD_DIR/inspector"
+GENERATED_IR="$SCRIPT_DIR/primjs.ll"
+trap 'rm -f "$GENERATED_IR"' EXIT
+
+CC=clang CXX=clang++ cmake -S . -B "$NORMAL_BUILD_DIR" -DENABLE_UNITTESTS=ON -DENABLE_LEPUSNG=ON -DENABLE_GEN_EMBEDDED=ON -DENABLE_QUICKJS_DEBUGGER=OFF -DLLVM_PATH="$LLVM_PATH"
+CC=clang CXX=clang++ cmake -S . -B "$INSPECTOR_BUILD_DIR" -DENABLE_UNITTESTS=ON -DENABLE_LEPUSNG=ON -DENABLE_GEN_EMBEDDED=ON -DENABLE_QUICKJS_DEBUGGER=ON -DLLVM_PATH="$LLVM_PATH"
+cmake --build "$NORMAL_BUILD_DIR" --target vm_codegen --parallel "${BUILD_JOBS:-8}"
+cmake --build "$INSPECTOR_BUILD_DIR" --target vm_codegen --parallel "${BUILD_JOBS:-8}"
+
+"$NORMAL_BUILD_DIR/bin/vm_codegen" -multi-table -virtual-sp primjs
 "$LLVM_PATH/build/bin/llc" -O3 -mtriple=aarch64-apple-darwin -o ./src/interpreter/primjs/interp/mac/embedded.S primjs.ll
 wrap_generated_assembly ./src/interpreter/primjs/interp/mac/embedded.S
 
-./build/bin/vm_codegen -multi-table -debugger -virtual-sp primjs
-"$LLVM_PATH/build/bin/llc" -O3 -mtriple=aarch64-apple-darwin -o ./src/interpreter/primjs/interp/mac/embedded-inspector.S primjs.ll
-wrap_generated_assembly ./src/interpreter/primjs/interp/mac/embedded-inspector.S
-
-./build/bin/vm_codegen -multi-table -virtual-sp primjs
+"$NORMAL_BUILD_DIR/bin/vm_codegen" -multi-table -virtual-sp primjs
 "$LLVM_PATH/build/bin/llc" -O3 -mtriple=aarch64-apple-ios -o ./src/interpreter/primjs/interp/ios/embedded.S primjs.ll
 wrap_generated_assembly ./src/interpreter/primjs/interp/ios/embedded.S
 
-./build/bin/vm_codegen -multi-table -debugger -virtual-sp primjs
-"$LLVM_PATH/build/bin/llc" -O3 -mtriple=aarch64-apple-ios -o ./src/interpreter/primjs/interp/ios/embedded-inspector.S primjs.ll
-wrap_generated_assembly ./src/interpreter/primjs/interp/ios/embedded-inspector.S
-
-./build/bin/vm_codegen -multi-table primjs
+"$NORMAL_BUILD_DIR/bin/vm_codegen" -multi-table primjs
 "$LLVM_PATH/build/bin/llc" -O3 -mtriple=aarch64-unknown-linux-gn -o ./src/interpreter/primjs/interp/android/embedded.S primjs.ll
 wrap_generated_assembly ./src/interpreter/primjs/interp/android/embedded.S
 
-./build/bin/vm_codegen -multi-table -debugger primjs
+"$INSPECTOR_BUILD_DIR/bin/vm_codegen" -multi-table -virtual-sp primjs
+"$LLVM_PATH/build/bin/llc" -O3 -mtriple=aarch64-apple-darwin -o ./src/interpreter/primjs/interp/mac/embedded-inspector.S primjs.ll
+wrap_generated_assembly ./src/interpreter/primjs/interp/mac/embedded-inspector.S
+
+"$INSPECTOR_BUILD_DIR/bin/vm_codegen" -multi-table -virtual-sp primjs
+"$LLVM_PATH/build/bin/llc" -O3 -mtriple=aarch64-apple-ios -o ./src/interpreter/primjs/interp/ios/embedded-inspector.S primjs.ll
+wrap_generated_assembly ./src/interpreter/primjs/interp/ios/embedded-inspector.S
+
+"$INSPECTOR_BUILD_DIR/bin/vm_codegen" -multi-table primjs
 "$LLVM_PATH/build/bin/llc" -O3 -mtriple=aarch64-unknown-linux-gn -o ./src/interpreter/primjs/interp/android/embedded-inspector.S primjs.ll
 wrap_generated_assembly ./src/interpreter/primjs/interp/android/embedded-inspector.S
