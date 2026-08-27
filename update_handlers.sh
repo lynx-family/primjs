@@ -89,7 +89,9 @@ wrap_generated_assembly ./src/interpreter/primjs/interp/mac/embedded.S
 wrap_generated_assembly ./src/interpreter/primjs/interp/ios/embedded.S
 
 "$NORMAL_BUILD_DIR/bin/vm_codegen" -multi-table primjs
-"$LLVM_PATH/build/bin/llc" -O3 -mtriple=aarch64-unknown-linux-gn -o ./src/interpreter/primjs/interp/android/embedded.S primjs.ll
+"$LLVM_PATH/build/bin/llc" -O3 -relocation-model=pic \
+    -mtriple=aarch64-unknown-linux-gn \
+    -o ./src/interpreter/primjs/interp/android/embedded.S primjs.ll
 wrap_generated_assembly ./src/interpreter/primjs/interp/android/embedded.S
 
 "$INSPECTOR_BUILD_DIR/bin/vm_codegen" -multi-table -virtual-sp primjs
@@ -101,5 +103,7 @@ wrap_generated_assembly ./src/interpreter/primjs/interp/mac/embedded-inspector.S
 wrap_generated_assembly ./src/interpreter/primjs/interp/ios/embedded-inspector.S
 
 "$INSPECTOR_BUILD_DIR/bin/vm_codegen" -multi-table primjs
-"$LLVM_PATH/build/bin/llc" -O3 -mtriple=aarch64-unknown-linux-gn -o ./src/interpreter/primjs/interp/android/embedded-inspector.S primjs.ll
+"$LLVM_PATH/build/bin/llc" -O3 -relocation-model=pic \
+    -mtriple=aarch64-unknown-linux-gn \
+    -o ./src/interpreter/primjs/interp/android/embedded-inspector.S primjs.ll
 wrap_generated_assembly ./src/interpreter/primjs/interp/android/embedded-inspector.S

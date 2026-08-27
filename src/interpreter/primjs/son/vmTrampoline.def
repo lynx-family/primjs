@@ -250,7 +250,6 @@ DEF_CALL_R_DESC_4(call_setter_magic, kInt64,
 DEF_CALL_R_DESC_5(prim_call_c_function_default, kInt64,
         kRawType, kInt64, kInt64, kInt32, kRawType)
 
-DEF_CALL_DESC_1(InstallBcHandler, kStub, Throw, kNone, kRawType)
 DEF_CALL_DESC_7(_call_stub_entry, kStub, Throw, kInt64,
         kInt64, kInt64, kInt64, kRawType, kInt32, kRawType, kInt32)
 

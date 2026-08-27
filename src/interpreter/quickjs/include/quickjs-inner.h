@@ -770,10 +770,15 @@ constexpr size_t kFunctionShapeSize = 2;
 struct WeakRefData;
 struct FinalizationRegistryData;
 
+#ifdef ENABLE_PRIMJS_SNAPSHOT
+using PrimjsDispatchTableRow = address const[OP_COUNT];
+extern "C" QJS_HIDE PrimjsDispatchTableRow primjs_dispatch_table[];
+#endif
+
 struct LEPUSContext {
   // <primjs begin>
 #ifdef ENABLE_PRIMJS_SNAPSHOT
-  address (*dispatch_table)[OP_COUNT];
+  PrimjsDispatchTableRow *dispatch_table;
 #endif
   // <primjs end>
   LEPUSRuntime *rt;
@@ -2022,12 +2027,11 @@ QJS_HIDE int EnsureCoverageCounters(LEPUSContext *ctx,
                                     LEPUSFunctionBytecode *b);
 
 #ifdef ENABLE_PRIMJS_SNAPSHOT
-typedef LEPUSValue (*QuickJsCallStub)(LEPUSValue this_arg,
-                                      LEPUSValue new_target,
-                                      LEPUSValue func_obj, address entry_point,
-                                      int argc, LEPUSValue *argv, int flags);
-
-inline QuickJsCallStub entry;
+extern "C" QJS_HIDE LEPUSValue _call_stub_entry(LEPUSValue this_arg,
+                                                LEPUSValue new_target,
+                                                LEPUSValue func_obj,
+                                                LEPUSContext *ctx, int argc,
+                                                LEPUSValue *argv, int flags);
 #endif
 
 // <primjs end>

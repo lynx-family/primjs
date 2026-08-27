@@ -15,7 +15,6 @@ namespace primjs {
 class CodeStubAssembler : public CodeAssembler {
  public:
   CodeStubAssembler(son::node::NodeGraph* graph);
-  void GenerateInstanallBcHandler(son::node::NodeGraph* graph);
   void GenerateCallEntry(son::node::NodeGraph* graph);
 };
 

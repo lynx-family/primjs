@@ -118,6 +118,7 @@ class LLVMCodeGen : public base::ZoneObject {
 
   son::CompilationOptions options() const { return _assembler->options(); }
 
+  void GenerateDispatchTable();
   void Run(son::node::ScheduleResult* result, son::node::CallDescriptor desc);
 };
 

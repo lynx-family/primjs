@@ -9,10 +9,13 @@
 
 #include <iostream>
 #include <map>
+#include <vector>
 
 #include "llvm-c/Analysis.h"
 #include "llvm-c/Core.h"
 #include "llvm-c/Target.h"
+#include "primjs/codegen/bytecode.h"
+#include "primjs/codegen/interpreterAssembler.h"
 #include "primjs/codegen/llvmIRBuilder.h"
 #include "primjs/son/nodeType.h"
 
@@ -105,6 +108,73 @@ LLVMValueRef LLVMModule::AddFunction(son::node::CallDescriptorData* desc) {
   }
   _functions[desc->descriptor()] = function;
   return function;
+}
+
+void LLVMCodeGen::GenerateDispatchTable() {
+  static_assert(static_cast<int>(PrimjsOpcode::kCount) == OP_COUNT,
+                "PrimJS and QuickJS opcode counts must match");
+
+  constexpr int kNormalTableCount = 3;
+  constexpr char kDispatchTableName[] = "primjs_dispatch_table";
+  const int opcode_count = static_cast<int>(PrimjsOpcode::kCount);
+  LLVMTypeRef handler_pointer_type = _assembler->raw_type();
+  LLVMModule* llvm_module = _assembler->llvm_module();
+
+  auto make_handler_pointer = [&](son::node::CallDescriptor desc) {
+    LLVMValueRef function = llvm_module->GetFunction(desc);
+    return LLVMConstPointerCast(function, handler_pointer_type);
+  };
+
+  std::vector<LLVMValueRef> rows;
+  rows.reserve(kNormalTableCount
+#ifdef ENABLE_QUICKJS_DEBUGGER
+               * 2
+#endif
+  );
+
+  constexpr son::node::CallKind kNormalKinds[kNormalTableCount] = {
+      son::node::CallKind::kBcHandler, son::node::CallKind::kBcHandler1,
+      son::node::CallKind::kBcHandler2};
+  for (int table_index = 0; table_index < kNormalTableCount; ++table_index) {
+    // Keep the three-row dispatch table ABI even without the multi-table
+    // optimization. Only row zero is used in that configuration.
+    son::node::CallKind kind = options().SupportMultiTable()
+                                   ? kNormalKinds[table_index]
+                                   : kNormalKinds[0];
+    std::vector<LLVMValueRef> handlers;
+    handlers.reserve(opcode_count);
+    for (int opcode = 0; opcode < opcode_count; ++opcode) {
+      handlers.push_back(make_handler_pointer(
+          son::node::CallDescriptors::CallBcHandler(kind, opcode)));
+    }
+    rows.push_back(LLVMConstArray2(handler_pointer_type, handlers.data(),
+                                   handlers.size()));
+  }
+
+#ifdef ENABLE_QUICKJS_DEBUGGER
+  constexpr CallBcIndex kDebuggerHandlers[kNormalTableCount] = {
+      CallBcIndex::kcommon_call_debugger0, CallBcIndex::kcommon_call_debugger1,
+      CallBcIndex::kcommon_call_debugger2};
+  for (CallBcIndex debugger_handler : kDebuggerHandlers) {
+    LLVMValueRef handler =
+        make_handler_pointer(son::node::CallDescriptors::ExtCallBcHandler(
+            static_cast<int>(debugger_handler)));
+    std::vector<LLVMValueRef> handlers(opcode_count, handler);
+    rows.push_back(LLVMConstArray2(handler_pointer_type, handlers.data(),
+                                   handlers.size()));
+  }
+#endif
+
+  LLVMTypeRef row_type = LLVMTypeOf(rows.front());
+  LLVMValueRef initializer =
+      LLVMConstArray2(row_type, rows.data(), rows.size());
+  LLVMValueRef table = LLVMAddGlobal(
+      _assembler->module(), LLVMTypeOf(initializer), kDispatchTableName);
+  LLVMSetInitializer(table, initializer);
+  LLVMSetGlobalConstant(table, true);
+  LLVMSetLinkage(table, LLVMExternalLinkage);
+  LLVMSetVisibility(table, LLVMHiddenVisibility);
+  LLVMSetAlignment(table, _assembler->is_32bit() ? 4 : 8);
 }
 
 void LLVMCodeGen::Run(son::node::ScheduleResult* result,

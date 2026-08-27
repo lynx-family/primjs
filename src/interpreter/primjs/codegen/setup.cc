@@ -27,6 +27,7 @@ void InterpreterSetup::Setup(const char* module_name,
   LLVMCodeGen* codegen = new (&zone) LLVMCodeGen(assembler);
   assembler->Init(&zone, options);
   GenerateBytecodeHandlers(codegen);
+  codegen->GenerateDispatchTable();
   GenerateCodeStub(codegen);
   assembler->RunPasses();
   assembler->Deinit();
@@ -35,9 +36,7 @@ void InterpreterSetup::Setup(const char* module_name,
 void InterpreterSetup::GenerateCodeStub(LLVMCodeGen* codegen) {
   CodeStubGenerator generator;
   son::node::CallDescriptor desc =
-      son::node::CallDescriptors::InstallBcHandler();
-  GenerateCode(codegen, generator, desc);
-  desc = son::node::CallDescriptors::_call_stub_entry();
+      son::node::CallDescriptors::_call_stub_entry();
   GenerateCode(codegen, generator, desc);
 }
 

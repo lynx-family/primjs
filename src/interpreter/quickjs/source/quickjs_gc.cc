@@ -152,19 +152,9 @@ QJS_HIDE JSAtom js_value_to_atom(LEPUSContext *ctx, LEPUSValueConst val);
 #endif
 
 // <primjs begin>
-#if defined(ENABLE_PRIMJS_SNAPSHOT)
-static const int NUM_OF_TOS_STATES = 3;
-#endif
-
-#if defined(ENABLE_PRIMJS_SNAPSHOT)
-static pthread_mutex_t prim_init_mutex = PTHREAD_MUTEX_INITIALIZER;
-
-static bool IS_PRIM_INITIALIZED = false;
-
-#endif
-
 #if defined(ENABLE_PRIMJS_TRACE) && PRINT_LOG_TO_FILE && \
     (defined(ANDROID) || defined(__ANDROID__))
+static pthread_mutex_t prim_init_mutex = PTHREAD_MUTEX_INITIALIZER;
 FILE *log_f = nullptr;
 #endif
 
@@ -993,9 +983,7 @@ LEPUSContext *JS_NewContextRaw_GC(LEPUSRuntime *rt) {
   ctx->fg_ctx->ctx = ctx;
 
   PRIM_LOG("Use snapshot!\n");
-  pthread_mutex_lock(&prim_init_mutex);
   PrimInit_GC(ctx);
-  pthread_mutex_unlock(&prim_init_mutex);
   // <primjs end>
   return ctx;
 }
@@ -7887,8 +7875,8 @@ LEPUSValue JS_CallInternalTI_GC(LEPUSContext *caller_ctx, LEPUSValue func_obj,
 #ifdef ENABLE_PRIMJS_SNAPSHOT
   if (caller_ctx->rt->use_primjs) {
     check_and_init_thread_stack_limit(caller_ctx);
-    return entry(this_obj, new_target, func_obj, (address)caller_ctx, argc,
-                 argv, flags);
+    return _call_stub_entry(this_obj, new_target, func_obj, caller_ctx, argc,
+                            argv, flags);
   }
 #endif
   return LEPUS_UNDEFINED;
@@ -28194,19 +28182,6 @@ LEPUSValue prim_js_operator_delete_gc(LEPUSContext *ctx, LEPUSValue op1,
 #endif
 
 #ifdef ENABLE_PRIMJS_SNAPSHOT
-extern "C" void _call_stub_entry();
-
-extern "C" void _init_dispatch_table(LEPUSContext *ctx);
-
-typedef unsigned char u_char;
-typedef u_char *address;
-
-#define CAST_TO_FN_PTR(func_type, value) (reinterpret_cast<func_type>(value))
-
-static QuickJsCallStub call_stub() {
-  return CAST_TO_FN_PTR(QuickJsCallStub, &_call_stub_entry);
-}
-
 static void check_and_init_thread_stack_limit(LEPUSContext *ctx) {
   static thread_local uint8_t *cur_stack_limit = nullptr;
 
@@ -28226,8 +28201,7 @@ static void check_and_init_thread_stack_limit(LEPUSContext *ctx) {
 }
 
 void PrimInit_GC(LEPUSContext *ctx) {
-  _init_dispatch_table(ctx);
-  entry = call_stub();
+  ctx->dispatch_table = primjs_dispatch_table;
   // use fake stack limit init
   ctx->stack_limit = (uint8_t *)-1;
 }

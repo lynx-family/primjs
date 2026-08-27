@@ -24902,2179 +24902,6 @@ inc_coverage_2_asm_h:                   // @inc_coverage_2_asm_h
 .Lfunc_end749:
 	.size	inc_coverage_2_asm_h, .Lfunc_end749-inc_coverage_2_asm_h
                                         // -- End function
-	.hidden	InstallBcHandler                // -- Begin function InstallBcHandler
-	.globl	InstallBcHandler
-	.p2align	2
-	.type	InstallBcHandler,@function
-InstallBcHandler:                       // @InstallBcHandler
-	.cfi_startproc
-// %bb.0:                               // %B0
-	stp	x29, x30, [sp, #-16]!           // 16-byte Folded Spill
-	mov	x29, sp
-	.cfi_def_cfa w29, 16
-	.cfi_offset w30, -8
-	.cfi_offset w29, -16
-	adrp	x8, invalid_0_asm_h
-	add	x8, x8, :lo12:invalid_0_asm_h
-	adrp	x9, push_i32_0_asm_h
-	add	x9, x9, :lo12:push_i32_0_asm_h
-	stp	x8, x9, [x0]
-	adrp	x8, push_const_0_asm_h
-	add	x8, x8, :lo12:push_const_0_asm_h
-	adrp	x9, fclosure_0_asm_h
-	add	x9, x9, :lo12:fclosure_0_asm_h
-	stp	x8, x9, [x0, #16]
-	adrp	x8, push_atom_value_0_asm_h
-	add	x8, x8, :lo12:push_atom_value_0_asm_h
-	adrp	x9, private_symbol_0_asm_h
-	add	x9, x9, :lo12:private_symbol_0_asm_h
-	stp	x8, x9, [x0, #32]
-	adrp	x8, undefined_0_asm_h
-	add	x8, x8, :lo12:undefined_0_asm_h
-	adrp	x9, null_0_asm_h
-	add	x9, x9, :lo12:null_0_asm_h
-	stp	x8, x9, [x0, #48]
-	adrp	x8, push_this_0_asm_h
-	add	x8, x8, :lo12:push_this_0_asm_h
-	adrp	x9, push_false_0_asm_h
-	add	x9, x9, :lo12:push_false_0_asm_h
-	stp	x8, x9, [x0, #64]
-	adrp	x8, push_true_0_asm_h
-	add	x8, x8, :lo12:push_true_0_asm_h
-	adrp	x9, object_0_asm_h
-	add	x9, x9, :lo12:object_0_asm_h
-	stp	x8, x9, [x0, #80]
-	adrp	x8, special_object_0_asm_h
-	add	x8, x8, :lo12:special_object_0_asm_h
-	adrp	x9, rest_0_asm_h
-	add	x9, x9, :lo12:rest_0_asm_h
-	stp	x8, x9, [x0, #96]
-	adrp	x8, drop_0_asm_h
-	add	x8, x8, :lo12:drop_0_asm_h
-	adrp	x9, nip_0_asm_h
-	add	x9, x9, :lo12:nip_0_asm_h
-	stp	x8, x9, [x0, #112]
-	adrp	x8, nip1_0_asm_h
-	add	x8, x8, :lo12:nip1_0_asm_h
-	adrp	x9, dup_0_asm_h
-	add	x9, x9, :lo12:dup_0_asm_h
-	stp	x8, x9, [x0, #128]
-	adrp	x8, dup1_0_asm_h
-	add	x8, x8, :lo12:dup1_0_asm_h
-	adrp	x9, dup2_0_asm_h
-	add	x9, x9, :lo12:dup2_0_asm_h
-	stp	x8, x9, [x0, #144]
-	adrp	x8, dup3_0_asm_h
-	add	x8, x8, :lo12:dup3_0_asm_h
-	adrp	x9, insert2_0_asm_h
-	add	x9, x9, :lo12:insert2_0_asm_h
-	stp	x8, x9, [x0, #160]
-	adrp	x8, insert3_0_asm_h
-	add	x8, x8, :lo12:insert3_0_asm_h
-	adrp	x9, insert4_0_asm_h
-	add	x9, x9, :lo12:insert4_0_asm_h
-	stp	x8, x9, [x0, #176]
-	adrp	x8, perm3_0_asm_h
-	add	x8, x8, :lo12:perm3_0_asm_h
-	adrp	x9, perm4_0_asm_h
-	add	x9, x9, :lo12:perm4_0_asm_h
-	stp	x8, x9, [x0, #192]
-	adrp	x8, perm5_0_asm_h
-	add	x8, x8, :lo12:perm5_0_asm_h
-	adrp	x9, swap_0_asm_h
-	add	x9, x9, :lo12:swap_0_asm_h
-	stp	x8, x9, [x0, #208]
-	adrp	x8, swap2_0_asm_h
-	add	x8, x8, :lo12:swap2_0_asm_h
-	adrp	x9, rot3l_0_asm_h
-	add	x9, x9, :lo12:rot3l_0_asm_h
-	stp	x8, x9, [x0, #224]
-	adrp	x8, rot3r_0_asm_h
-	add	x8, x8, :lo12:rot3r_0_asm_h
-	adrp	x9, rot4l_0_asm_h
-	add	x9, x9, :lo12:rot4l_0_asm_h
-	stp	x8, x9, [x0, #240]
-	adrp	x8, rot5l_0_asm_h
-	add	x8, x8, :lo12:rot5l_0_asm_h
-	adrp	x9, call_constructor_0_asm_h
-	add	x9, x9, :lo12:call_constructor_0_asm_h
-	stp	x8, x9, [x0, #256]
-	adrp	x8, call_0_asm_h
-	add	x8, x8, :lo12:call_0_asm_h
-	adrp	x9, tail_call_0_asm_h
-	add	x9, x9, :lo12:tail_call_0_asm_h
-	stp	x8, x9, [x0, #272]
-	adrp	x8, call_method_0_asm_h
-	add	x8, x8, :lo12:call_method_0_asm_h
-	adrp	x9, tail_call_method_0_asm_h
-	add	x9, x9, :lo12:tail_call_method_0_asm_h
-	stp	x8, x9, [x0, #288]
-	adrp	x8, array_from_0_asm_h
-	add	x8, x8, :lo12:array_from_0_asm_h
-	adrp	x9, apply_0_asm_h
-	add	x9, x9, :lo12:apply_0_asm_h
-	stp	x8, x9, [x0, #304]
-	adrp	x8, return_0_asm_h
-	add	x8, x8, :lo12:return_0_asm_h
-	adrp	x9, return_undef_0_asm_h
-	add	x9, x9, :lo12:return_undef_0_asm_h
-	stp	x8, x9, [x0, #320]
-	adrp	x8, check_ctor_return_0_asm_h
-	add	x8, x8, :lo12:check_ctor_return_0_asm_h
-	adrp	x9, check_ctor_0_asm_h
-	add	x9, x9, :lo12:check_ctor_0_asm_h
-	stp	x8, x9, [x0, #336]
-	adrp	x8, check_brand_0_asm_h
-	add	x8, x8, :lo12:check_brand_0_asm_h
-	adrp	x9, add_brand_0_asm_h
-	add	x9, x9, :lo12:add_brand_0_asm_h
-	stp	x8, x9, [x0, #352]
-	adrp	x8, return_async_0_asm_h
-	add	x8, x8, :lo12:return_async_0_asm_h
-	adrp	x9, throw_0_asm_h
-	add	x9, x9, :lo12:throw_0_asm_h
-	stp	x8, x9, [x0, #368]
-	adrp	x8, throw_var_0_asm_h
-	add	x8, x8, :lo12:throw_var_0_asm_h
-	adrp	x9, eval_0_asm_h
-	add	x9, x9, :lo12:eval_0_asm_h
-	stp	x8, x9, [x0, #384]
-	adrp	x8, regexp_0_asm_h
-	add	x8, x8, :lo12:regexp_0_asm_h
-	adrp	x9, get_super_ctor_0_asm_h
-	add	x9, x9, :lo12:get_super_ctor_0_asm_h
-	stp	x8, x9, [x0, #400]
-	adrp	x8, get_super_0_asm_h
-	add	x8, x8, :lo12:get_super_0_asm_h
-	adrp	x9, import_0_asm_h
-	add	x9, x9, :lo12:import_0_asm_h
-	stp	x8, x9, [x0, #416]
-	adrp	x8, check_var_0_asm_h
-	add	x8, x8, :lo12:check_var_0_asm_h
-	adrp	x9, get_var_undef_0_asm_h
-	add	x9, x9, :lo12:get_var_undef_0_asm_h
-	stp	x8, x9, [x0, #432]
-	adrp	x8, get_var_0_asm_h
-	add	x8, x8, :lo12:get_var_0_asm_h
-	adrp	x9, put_var_0_asm_h
-	add	x9, x9, :lo12:put_var_0_asm_h
-	stp	x8, x9, [x0, #448]
-	adrp	x8, put_var_init_0_asm_h
-	add	x8, x8, :lo12:put_var_init_0_asm_h
-	adrp	x9, put_var_strict_0_asm_h
-	add	x9, x9, :lo12:put_var_strict_0_asm_h
-	stp	x8, x9, [x0, #464]
-	adrp	x8, get_ref_value_0_asm_h
-	add	x8, x8, :lo12:get_ref_value_0_asm_h
-	adrp	x9, put_ref_value_0_asm_h
-	add	x9, x9, :lo12:put_ref_value_0_asm_h
-	stp	x8, x9, [x0, #480]
-	adrp	x8, define_var_0_asm_h
-	add	x8, x8, :lo12:define_var_0_asm_h
-	adrp	x9, check_define_var_0_asm_h
-	add	x9, x9, :lo12:check_define_var_0_asm_h
-	stp	x8, x9, [x0, #496]
-	adrp	x8, define_func_0_asm_h
-	add	x8, x8, :lo12:define_func_0_asm_h
-	str	x8, [x0, #512]
-	adrp	x8, get_field_0_asm_h
-	add	x8, x8, :lo12:get_field_0_asm_h
-	str	x8, [x0, #520]
-	adrp	x8, get_field2_0_asm_h
-	add	x8, x8, :lo12:get_field2_0_asm_h
-	str	x8, [x0, #528]
-	adrp	x8, put_field_0_asm_h
-	add	x8, x8, :lo12:put_field_0_asm_h
-	str	x8, [x0, #536]
-	adrp	x8, get_private_field_0_asm_h
-	add	x8, x8, :lo12:get_private_field_0_asm_h
-	str	x8, [x0, #544]
-	adrp	x8, put_private_field_0_asm_h
-	add	x8, x8, :lo12:put_private_field_0_asm_h
-	str	x8, [x0, #552]
-	adrp	x8, define_private_field_0_asm_h
-	add	x8, x8, :lo12:define_private_field_0_asm_h
-	str	x8, [x0, #560]
-	adrp	x8, get_array_el_0_asm_h
-	add	x8, x8, :lo12:get_array_el_0_asm_h
-	str	x8, [x0, #568]
-	adrp	x8, get_array_el2_0_asm_h
-	add	x8, x8, :lo12:get_array_el2_0_asm_h
-	str	x8, [x0, #576]
-	adrp	x8, put_array_el_0_asm_h
-	add	x8, x8, :lo12:put_array_el_0_asm_h
-	str	x8, [x0, #584]
-	adrp	x8, get_super_value_0_asm_h
-	add	x8, x8, :lo12:get_super_value_0_asm_h
-	str	x8, [x0, #592]
-	adrp	x8, put_super_value_0_asm_h
-	add	x8, x8, :lo12:put_super_value_0_asm_h
-	str	x8, [x0, #600]
-	adrp	x8, define_field_0_asm_h
-	add	x8, x8, :lo12:define_field_0_asm_h
-	str	x8, [x0, #608]
-	adrp	x8, set_name_0_asm_h
-	add	x8, x8, :lo12:set_name_0_asm_h
-	str	x8, [x0, #616]
-	adrp	x8, set_name_computed_0_asm_h
-	add	x8, x8, :lo12:set_name_computed_0_asm_h
-	str	x8, [x0, #624]
-	adrp	x8, set_proto_0_asm_h
-	add	x8, x8, :lo12:set_proto_0_asm_h
-	str	x8, [x0, #632]
-	adrp	x8, set_home_object_0_asm_h
-	add	x8, x8, :lo12:set_home_object_0_asm_h
-	str	x8, [x0, #640]
-	adrp	x8, define_array_el_0_asm_h
-	add	x8, x8, :lo12:define_array_el_0_asm_h
-	str	x8, [x0, #648]
-	adrp	x8, append_0_asm_h
-	add	x8, x8, :lo12:append_0_asm_h
-	str	x8, [x0, #656]
-	adrp	x8, copy_data_properties_0_asm_h
-	add	x8, x8, :lo12:copy_data_properties_0_asm_h
-	str	x8, [x0, #664]
-	adrp	x8, define_method_0_asm_h
-	add	x8, x8, :lo12:define_method_0_asm_h
-	str	x8, [x0, #672]
-	adrp	x8, define_method_computed_0_asm_h
-	add	x8, x8, :lo12:define_method_computed_0_asm_h
-	str	x8, [x0, #680]
-	adrp	x8, define_class_0_asm_h
-	add	x8, x8, :lo12:define_class_0_asm_h
-	str	x8, [x0, #688]
-	adrp	x8, get_loc_0_asm_h
-	add	x8, x8, :lo12:get_loc_0_asm_h
-	str	x8, [x0, #696]
-	adrp	x8, put_loc_0_asm_h
-	add	x8, x8, :lo12:put_loc_0_asm_h
-	str	x8, [x0, #704]
-	adrp	x8, set_loc_0_asm_h
-	add	x8, x8, :lo12:set_loc_0_asm_h
-	str	x8, [x0, #712]
-	adrp	x8, get_arg_0_asm_h
-	add	x8, x8, :lo12:get_arg_0_asm_h
-	str	x8, [x0, #720]
-	adrp	x8, put_arg_0_asm_h
-	add	x8, x8, :lo12:put_arg_0_asm_h
-	str	x8, [x0, #728]
-	adrp	x8, set_arg_0_asm_h
-	add	x8, x8, :lo12:set_arg_0_asm_h
-	str	x8, [x0, #736]
-	adrp	x8, get_var_ref_0_asm_h
-	add	x8, x8, :lo12:get_var_ref_0_asm_h
-	str	x8, [x0, #744]
-	adrp	x8, put_var_ref_0_asm_h
-	add	x8, x8, :lo12:put_var_ref_0_asm_h
-	str	x8, [x0, #752]
-	adrp	x8, set_var_ref_0_asm_h
-	add	x8, x8, :lo12:set_var_ref_0_asm_h
-	str	x8, [x0, #760]
-	adrp	x8, set_loc_uninitialized_0_asm_h
-	add	x8, x8, :lo12:set_loc_uninitialized_0_asm_h
-	str	x8, [x0, #768]
-	adrp	x8, get_loc_check_0_asm_h
-	add	x8, x8, :lo12:get_loc_check_0_asm_h
-	str	x8, [x0, #776]
-	adrp	x8, put_loc_check_0_asm_h
-	add	x8, x8, :lo12:put_loc_check_0_asm_h
-	str	x8, [x0, #784]
-	adrp	x8, put_loc_check_init_0_asm_h
-	add	x8, x8, :lo12:put_loc_check_init_0_asm_h
-	str	x8, [x0, #792]
-	adrp	x8, get_var_ref_check_0_asm_h
-	add	x8, x8, :lo12:get_var_ref_check_0_asm_h
-	str	x8, [x0, #800]
-	adrp	x8, put_var_ref_check_0_asm_h
-	add	x8, x8, :lo12:put_var_ref_check_0_asm_h
-	str	x8, [x0, #808]
-	adrp	x8, put_var_ref_check_init_0_asm_h
-	add	x8, x8, :lo12:put_var_ref_check_init_0_asm_h
-	str	x8, [x0, #816]
-	adrp	x8, close_loc_0_asm_h
-	add	x8, x8, :lo12:close_loc_0_asm_h
-	str	x8, [x0, #824]
-	adrp	x8, if_false_0_asm_h
-	add	x8, x8, :lo12:if_false_0_asm_h
-	str	x8, [x0, #832]
-	adrp	x8, if_true_0_asm_h
-	add	x8, x8, :lo12:if_true_0_asm_h
-	str	x8, [x0, #840]
-	adrp	x8, goto_0_asm_h
-	add	x8, x8, :lo12:goto_0_asm_h
-	str	x8, [x0, #848]
-	adrp	x8, catch_0_asm_h
-	add	x8, x8, :lo12:catch_0_asm_h
-	str	x8, [x0, #856]
-	adrp	x8, gosub_0_asm_h
-	add	x8, x8, :lo12:gosub_0_asm_h
-	str	x8, [x0, #864]
-	adrp	x8, ret_0_asm_h
-	add	x8, x8, :lo12:ret_0_asm_h
-	str	x8, [x0, #872]
-	adrp	x8, to_object_0_asm_h
-	add	x8, x8, :lo12:to_object_0_asm_h
-	str	x8, [x0, #880]
-	adrp	x8, to_propkey_0_asm_h
-	add	x8, x8, :lo12:to_propkey_0_asm_h
-	str	x8, [x0, #888]
-	adrp	x8, to_propkey2_0_asm_h
-	add	x8, x8, :lo12:to_propkey2_0_asm_h
-	str	x8, [x0, #896]
-	adrp	x8, with_get_var_0_asm_h
-	add	x8, x8, :lo12:with_get_var_0_asm_h
-	str	x8, [x0, #904]
-	adrp	x8, with_put_var_0_asm_h
-	add	x8, x8, :lo12:with_put_var_0_asm_h
-	str	x8, [x0, #912]
-	adrp	x8, with_delete_var_0_asm_h
-	add	x8, x8, :lo12:with_delete_var_0_asm_h
-	str	x8, [x0, #920]
-	adrp	x8, with_make_ref_0_asm_h
-	add	x8, x8, :lo12:with_make_ref_0_asm_h
-	str	x8, [x0, #928]
-	adrp	x8, with_get_ref_0_asm_h
-	add	x8, x8, :lo12:with_get_ref_0_asm_h
-	str	x8, [x0, #936]
-	adrp	x8, with_get_ref_undef_0_asm_h
-	add	x8, x8, :lo12:with_get_ref_undef_0_asm_h
-	str	x8, [x0, #944]
-	adrp	x8, make_loc_ref_0_asm_h
-	add	x8, x8, :lo12:make_loc_ref_0_asm_h
-	str	x8, [x0, #952]
-	adrp	x8, make_arg_ref_0_asm_h
-	add	x8, x8, :lo12:make_arg_ref_0_asm_h
-	str	x8, [x0, #960]
-	adrp	x8, make_var_ref_ref_0_asm_h
-	add	x8, x8, :lo12:make_var_ref_ref_0_asm_h
-	str	x8, [x0, #968]
-	adrp	x8, make_var_ref_0_asm_h
-	add	x8, x8, :lo12:make_var_ref_0_asm_h
-	str	x8, [x0, #976]
-	adrp	x8, for_in_start_0_asm_h
-	add	x8, x8, :lo12:for_in_start_0_asm_h
-	str	x8, [x0, #984]
-	adrp	x8, for_of_start_0_asm_h
-	add	x8, x8, :lo12:for_of_start_0_asm_h
-	str	x8, [x0, #992]
-	adrp	x8, for_await_of_start_0_asm_h
-	add	x8, x8, :lo12:for_await_of_start_0_asm_h
-	str	x8, [x0, #1000]
-	adrp	x8, for_in_next_0_asm_h
-	add	x8, x8, :lo12:for_in_next_0_asm_h
-	str	x8, [x0, #1008]
-	adrp	x8, for_of_next_0_asm_h
-	add	x8, x8, :lo12:for_of_next_0_asm_h
-	str	x8, [x0, #1016]
-	adrp	x8, for_await_of_next_0_asm_h
-	add	x8, x8, :lo12:for_await_of_next_0_asm_h
-	str	x8, [x0, #1024]
-	adrp	x8, iterator_get_value_done_0_asm_h
-	add	x8, x8, :lo12:iterator_get_value_done_0_asm_h
-	str	x8, [x0, #1032]
-	adrp	x8, iterator_close_0_asm_h
-	add	x8, x8, :lo12:iterator_close_0_asm_h
-	str	x8, [x0, #1040]
-	adrp	x8, iterator_close_return_0_asm_h
-	add	x8, x8, :lo12:iterator_close_return_0_asm_h
-	str	x8, [x0, #1048]
-	adrp	x8, async_iterator_close_0_asm_h
-	add	x8, x8, :lo12:async_iterator_close_0_asm_h
-	str	x8, [x0, #1056]
-	adrp	x8, async_iterator_next_0_asm_h
-	add	x8, x8, :lo12:async_iterator_next_0_asm_h
-	str	x8, [x0, #1064]
-	adrp	x8, async_iterator_get_0_asm_h
-	add	x8, x8, :lo12:async_iterator_get_0_asm_h
-	str	x8, [x0, #1072]
-	adrp	x8, initial_yield_0_asm_h
-	add	x8, x8, :lo12:initial_yield_0_asm_h
-	str	x8, [x0, #1080]
-	adrp	x8, yield_0_asm_h
-	add	x8, x8, :lo12:yield_0_asm_h
-	str	x8, [x0, #1088]
-	adrp	x8, yield_star_0_asm_h
-	add	x8, x8, :lo12:yield_star_0_asm_h
-	str	x8, [x0, #1096]
-	adrp	x8, async_yield_star_0_asm_h
-	add	x8, x8, :lo12:async_yield_star_0_asm_h
-	str	x8, [x0, #1104]
-	adrp	x8, await_0_asm_h
-	add	x8, x8, :lo12:await_0_asm_h
-	str	x8, [x0, #1112]
-	adrp	x8, neg_0_asm_h
-	add	x8, x8, :lo12:neg_0_asm_h
-	str	x8, [x0, #1120]
-	adrp	x8, plus_0_asm_h
-	add	x8, x8, :lo12:plus_0_asm_h
-	str	x8, [x0, #1128]
-	adrp	x8, dec_0_asm_h
-	add	x8, x8, :lo12:dec_0_asm_h
-	str	x8, [x0, #1136]
-	adrp	x8, inc_0_asm_h
-	add	x8, x8, :lo12:inc_0_asm_h
-	str	x8, [x0, #1144]
-	adrp	x8, post_dec_0_asm_h
-	add	x8, x8, :lo12:post_dec_0_asm_h
-	str	x8, [x0, #1152]
-	adrp	x8, post_inc_0_asm_h
-	add	x8, x8, :lo12:post_inc_0_asm_h
-	str	x8, [x0, #1160]
-	adrp	x8, dec_loc_0_asm_h
-	add	x8, x8, :lo12:dec_loc_0_asm_h
-	str	x8, [x0, #1168]
-	adrp	x8, inc_loc_0_asm_h
-	add	x8, x8, :lo12:inc_loc_0_asm_h
-	str	x8, [x0, #1176]
-	adrp	x8, add_loc_0_asm_h
-	add	x8, x8, :lo12:add_loc_0_asm_h
-	str	x8, [x0, #1184]
-	adrp	x8, not_0_asm_h
-	add	x8, x8, :lo12:not_0_asm_h
-	str	x8, [x0, #1192]
-	adrp	x8, lnot_0_asm_h
-	add	x8, x8, :lo12:lnot_0_asm_h
-	str	x8, [x0, #1200]
-	adrp	x8, typeof_0_asm_h
-	add	x8, x8, :lo12:typeof_0_asm_h
-	str	x8, [x0, #1208]
-	adrp	x8, delete_0_asm_h
-	add	x8, x8, :lo12:delete_0_asm_h
-	str	x8, [x0, #1216]
-	adrp	x8, delete_var_0_asm_h
-	add	x8, x8, :lo12:delete_var_0_asm_h
-	str	x8, [x0, #1224]
-	adrp	x8, mul_0_asm_h
-	add	x8, x8, :lo12:mul_0_asm_h
-	str	x8, [x0, #1232]
-	adrp	x8, div_0_asm_h
-	add	x8, x8, :lo12:div_0_asm_h
-	str	x8, [x0, #1240]
-	adrp	x8, mod_0_asm_h
-	add	x8, x8, :lo12:mod_0_asm_h
-	str	x8, [x0, #1248]
-	adrp	x8, add_0_asm_h
-	add	x8, x8, :lo12:add_0_asm_h
-	str	x8, [x0, #1256]
-	adrp	x8, sub_0_asm_h
-	add	x8, x8, :lo12:sub_0_asm_h
-	str	x8, [x0, #1264]
-	adrp	x8, pow_0_asm_h
-	add	x8, x8, :lo12:pow_0_asm_h
-	str	x8, [x0, #1272]
-	adrp	x8, shl_0_asm_h
-	add	x8, x8, :lo12:shl_0_asm_h
-	str	x8, [x0, #1280]
-	adrp	x8, sar_0_asm_h
-	add	x8, x8, :lo12:sar_0_asm_h
-	str	x8, [x0, #1288]
-	adrp	x8, shr_0_asm_h
-	add	x8, x8, :lo12:shr_0_asm_h
-	str	x8, [x0, #1296]
-	adrp	x8, lt_0_asm_h
-	add	x8, x8, :lo12:lt_0_asm_h
-	str	x8, [x0, #1304]
-	adrp	x8, lte_0_asm_h
-	add	x8, x8, :lo12:lte_0_asm_h
-	str	x8, [x0, #1312]
-	adrp	x8, gt_0_asm_h
-	add	x8, x8, :lo12:gt_0_asm_h
-	str	x8, [x0, #1320]
-	adrp	x8, gte_0_asm_h
-	add	x8, x8, :lo12:gte_0_asm_h
-	str	x8, [x0, #1328]
-	adrp	x8, instanceof_0_asm_h
-	add	x8, x8, :lo12:instanceof_0_asm_h
-	str	x8, [x0, #1336]
-	adrp	x8, in_0_asm_h
-	add	x8, x8, :lo12:in_0_asm_h
-	str	x8, [x0, #1344]
-	adrp	x8, eq_0_asm_h
-	add	x8, x8, :lo12:eq_0_asm_h
-	str	x8, [x0, #1352]
-	adrp	x8, neq_0_asm_h
-	add	x8, x8, :lo12:neq_0_asm_h
-	str	x8, [x0, #1360]
-	adrp	x8, strict_eq_0_asm_h
-	add	x8, x8, :lo12:strict_eq_0_asm_h
-	str	x8, [x0, #1368]
-	adrp	x8, strict_neq_0_asm_h
-	add	x8, x8, :lo12:strict_neq_0_asm_h
-	str	x8, [x0, #1376]
-	adrp	x8, and_0_asm_h
-	add	x8, x8, :lo12:and_0_asm_h
-	str	x8, [x0, #1384]
-	adrp	x8, xor_0_asm_h
-	add	x8, x8, :lo12:xor_0_asm_h
-	str	x8, [x0, #1392]
-	adrp	x8, or_0_asm_h
-	add	x8, x8, :lo12:or_0_asm_h
-	str	x8, [x0, #1400]
-	adrp	x8, nop_0_asm_h
-	add	x8, x8, :lo12:nop_0_asm_h
-	str	x8, [x0, #1408]
-	adrp	x8, push_minus1_0_asm_h
-	add	x8, x8, :lo12:push_minus1_0_asm_h
-	str	x8, [x0, #1416]
-	adrp	x8, push_0_0_asm_h
-	add	x8, x8, :lo12:push_0_0_asm_h
-	str	x8, [x0, #1424]
-	adrp	x8, push_1_0_asm_h
-	add	x8, x8, :lo12:push_1_0_asm_h
-	str	x8, [x0, #1432]
-	adrp	x8, push_2_0_asm_h
-	add	x8, x8, :lo12:push_2_0_asm_h
-	str	x8, [x0, #1440]
-	adrp	x8, push_3_0_asm_h
-	add	x8, x8, :lo12:push_3_0_asm_h
-	str	x8, [x0, #1448]
-	adrp	x8, push_4_0_asm_h
-	add	x8, x8, :lo12:push_4_0_asm_h
-	str	x8, [x0, #1456]
-	adrp	x8, push_5_0_asm_h
-	add	x8, x8, :lo12:push_5_0_asm_h
-	str	x8, [x0, #1464]
-	adrp	x8, push_6_0_asm_h
-	add	x8, x8, :lo12:push_6_0_asm_h
-	str	x8, [x0, #1472]
-	adrp	x8, push_7_0_asm_h
-	add	x8, x8, :lo12:push_7_0_asm_h
-	str	x8, [x0, #1480]
-	adrp	x8, push_i8_0_asm_h
-	add	x8, x8, :lo12:push_i8_0_asm_h
-	str	x8, [x0, #1488]
-	adrp	x8, push_i16_0_asm_h
-	add	x8, x8, :lo12:push_i16_0_asm_h
-	str	x8, [x0, #1496]
-	adrp	x8, push_const8_0_asm_h
-	add	x8, x8, :lo12:push_const8_0_asm_h
-	str	x8, [x0, #1504]
-	adrp	x8, fclosure8_0_asm_h
-	add	x8, x8, :lo12:fclosure8_0_asm_h
-	str	x8, [x0, #1512]
-	adrp	x8, push_empty_string_0_asm_h
-	add	x8, x8, :lo12:push_empty_string_0_asm_h
-	str	x8, [x0, #1520]
-	adrp	x8, get_loc8_0_asm_h
-	add	x8, x8, :lo12:get_loc8_0_asm_h
-	str	x8, [x0, #1528]
-	adrp	x8, put_loc8_0_asm_h
-	add	x8, x8, :lo12:put_loc8_0_asm_h
-	str	x8, [x0, #1536]
-	adrp	x8, set_loc8_0_asm_h
-	add	x8, x8, :lo12:set_loc8_0_asm_h
-	str	x8, [x0, #1544]
-	adrp	x8, get_loc0_0_asm_h
-	add	x8, x8, :lo12:get_loc0_0_asm_h
-	str	x8, [x0, #1552]
-	adrp	x8, get_loc1_0_asm_h
-	add	x8, x8, :lo12:get_loc1_0_asm_h
-	str	x8, [x0, #1560]
-	adrp	x8, get_loc2_0_asm_h
-	add	x8, x8, :lo12:get_loc2_0_asm_h
-	str	x8, [x0, #1568]
-	adrp	x8, get_loc3_0_asm_h
-	add	x8, x8, :lo12:get_loc3_0_asm_h
-	str	x8, [x0, #1576]
-	adrp	x8, put_loc0_0_asm_h
-	add	x8, x8, :lo12:put_loc0_0_asm_h
-	str	x8, [x0, #1584]
-	adrp	x8, put_loc1_0_asm_h
-	add	x8, x8, :lo12:put_loc1_0_asm_h
-	str	x8, [x0, #1592]
-	adrp	x8, put_loc2_0_asm_h
-	add	x8, x8, :lo12:put_loc2_0_asm_h
-	str	x8, [x0, #1600]
-	adrp	x8, put_loc3_0_asm_h
-	add	x8, x8, :lo12:put_loc3_0_asm_h
-	str	x8, [x0, #1608]
-	adrp	x8, set_loc0_0_asm_h
-	add	x8, x8, :lo12:set_loc0_0_asm_h
-	str	x8, [x0, #1616]
-	adrp	x8, set_loc1_0_asm_h
-	add	x8, x8, :lo12:set_loc1_0_asm_h
-	str	x8, [x0, #1624]
-	adrp	x8, set_loc2_0_asm_h
-	add	x8, x8, :lo12:set_loc2_0_asm_h
-	str	x8, [x0, #1632]
-	adrp	x8, set_loc3_0_asm_h
-	add	x8, x8, :lo12:set_loc3_0_asm_h
-	str	x8, [x0, #1640]
-	adrp	x8, get_arg0_0_asm_h
-	add	x8, x8, :lo12:get_arg0_0_asm_h
-	str	x8, [x0, #1648]
-	adrp	x8, get_arg1_0_asm_h
-	add	x8, x8, :lo12:get_arg1_0_asm_h
-	str	x8, [x0, #1656]
-	adrp	x8, get_arg2_0_asm_h
-	add	x8, x8, :lo12:get_arg2_0_asm_h
-	str	x8, [x0, #1664]
-	adrp	x8, get_arg3_0_asm_h
-	add	x8, x8, :lo12:get_arg3_0_asm_h
-	str	x8, [x0, #1672]
-	adrp	x8, put_arg0_0_asm_h
-	add	x8, x8, :lo12:put_arg0_0_asm_h
-	str	x8, [x0, #1680]
-	adrp	x8, put_arg1_0_asm_h
-	add	x8, x8, :lo12:put_arg1_0_asm_h
-	str	x8, [x0, #1688]
-	adrp	x8, put_arg2_0_asm_h
-	add	x8, x8, :lo12:put_arg2_0_asm_h
-	str	x8, [x0, #1696]
-	adrp	x8, put_arg3_0_asm_h
-	add	x8, x8, :lo12:put_arg3_0_asm_h
-	str	x8, [x0, #1704]
-	adrp	x8, set_arg0_0_asm_h
-	add	x8, x8, :lo12:set_arg0_0_asm_h
-	str	x8, [x0, #1712]
-	adrp	x8, set_arg1_0_asm_h
-	add	x8, x8, :lo12:set_arg1_0_asm_h
-	str	x8, [x0, #1720]
-	adrp	x8, set_arg2_0_asm_h
-	add	x8, x8, :lo12:set_arg2_0_asm_h
-	str	x8, [x0, #1728]
-	adrp	x8, set_arg3_0_asm_h
-	add	x8, x8, :lo12:set_arg3_0_asm_h
-	str	x8, [x0, #1736]
-	adrp	x8, get_var_ref0_0_asm_h
-	add	x8, x8, :lo12:get_var_ref0_0_asm_h
-	str	x8, [x0, #1744]
-	adrp	x8, get_var_ref1_0_asm_h
-	add	x8, x8, :lo12:get_var_ref1_0_asm_h
-	str	x8, [x0, #1752]
-	adrp	x8, get_var_ref2_0_asm_h
-	add	x8, x8, :lo12:get_var_ref2_0_asm_h
-	str	x8, [x0, #1760]
-	adrp	x8, get_var_ref3_0_asm_h
-	add	x8, x8, :lo12:get_var_ref3_0_asm_h
-	str	x8, [x0, #1768]
-	adrp	x8, put_var_ref0_0_asm_h
-	add	x8, x8, :lo12:put_var_ref0_0_asm_h
-	str	x8, [x0, #1776]
-	adrp	x8, put_var_ref1_0_asm_h
-	add	x8, x8, :lo12:put_var_ref1_0_asm_h
-	str	x8, [x0, #1784]
-	adrp	x8, put_var_ref2_0_asm_h
-	add	x8, x8, :lo12:put_var_ref2_0_asm_h
-	str	x8, [x0, #1792]
-	adrp	x8, put_var_ref3_0_asm_h
-	add	x8, x8, :lo12:put_var_ref3_0_asm_h
-	str	x8, [x0, #1800]
-	adrp	x8, set_var_ref0_0_asm_h
-	add	x8, x8, :lo12:set_var_ref0_0_asm_h
-	str	x8, [x0, #1808]
-	adrp	x8, set_var_ref1_0_asm_h
-	add	x8, x8, :lo12:set_var_ref1_0_asm_h
-	str	x8, [x0, #1816]
-	adrp	x8, set_var_ref2_0_asm_h
-	add	x8, x8, :lo12:set_var_ref2_0_asm_h
-	str	x8, [x0, #1824]
-	adrp	x8, set_var_ref3_0_asm_h
-	add	x8, x8, :lo12:set_var_ref3_0_asm_h
-	str	x8, [x0, #1832]
-	adrp	x8, get_length_0_asm_h
-	add	x8, x8, :lo12:get_length_0_asm_h
-	str	x8, [x0, #1840]
-	adrp	x8, if_false8_0_asm_h
-	add	x8, x8, :lo12:if_false8_0_asm_h
-	str	x8, [x0, #1848]
-	adrp	x8, if_true8_0_asm_h
-	add	x8, x8, :lo12:if_true8_0_asm_h
-	str	x8, [x0, #1856]
-	adrp	x8, goto8_0_asm_h
-	add	x8, x8, :lo12:goto8_0_asm_h
-	str	x8, [x0, #1864]
-	adrp	x8, goto16_0_asm_h
-	add	x8, x8, :lo12:goto16_0_asm_h
-	str	x8, [x0, #1872]
-	adrp	x8, call0_0_asm_h
-	add	x8, x8, :lo12:call0_0_asm_h
-	str	x8, [x0, #1880]
-	adrp	x8, call1_0_asm_h
-	add	x8, x8, :lo12:call1_0_asm_h
-	str	x8, [x0, #1888]
-	adrp	x8, call2_0_asm_h
-	add	x8, x8, :lo12:call2_0_asm_h
-	str	x8, [x0, #1896]
-	adrp	x8, call3_0_asm_h
-	add	x8, x8, :lo12:call3_0_asm_h
-	str	x8, [x0, #1904]
-	adrp	x8, is_undefined_0_asm_h
-	add	x8, x8, :lo12:is_undefined_0_asm_h
-	str	x8, [x0, #1912]
-	adrp	x8, is_null_0_asm_h
-	add	x8, x8, :lo12:is_null_0_asm_h
-	str	x8, [x0, #1920]
-	adrp	x8, is_function_0_asm_h
-	add	x8, x8, :lo12:is_function_0_asm_h
-	str	x8, [x0, #1928]
-	adrp	x8, inc_coverage_0_asm_h
-	add	x8, x8, :lo12:inc_coverage_0_asm_h
-	str	x8, [x0, #1936]
-	adrp	x8, invalid_1_asm_h
-	add	x8, x8, :lo12:invalid_1_asm_h
-	str	x8, [x0, #1944]
-	adrp	x8, push_i32_1_asm_h
-	add	x8, x8, :lo12:push_i32_1_asm_h
-	str	x8, [x0, #1952]
-	adrp	x8, push_const_1_asm_h
-	add	x8, x8, :lo12:push_const_1_asm_h
-	str	x8, [x0, #1960]
-	adrp	x8, fclosure_1_asm_h
-	add	x8, x8, :lo12:fclosure_1_asm_h
-	str	x8, [x0, #1968]
-	adrp	x8, push_atom_value_1_asm_h
-	add	x8, x8, :lo12:push_atom_value_1_asm_h
-	str	x8, [x0, #1976]
-	adrp	x8, private_symbol_1_asm_h
-	add	x8, x8, :lo12:private_symbol_1_asm_h
-	str	x8, [x0, #1984]
-	adrp	x8, undefined_1_asm_h
-	add	x8, x8, :lo12:undefined_1_asm_h
-	str	x8, [x0, #1992]
-	adrp	x8, null_1_asm_h
-	add	x8, x8, :lo12:null_1_asm_h
-	str	x8, [x0, #2000]
-	adrp	x8, push_this_1_asm_h
-	add	x8, x8, :lo12:push_this_1_asm_h
-	str	x8, [x0, #2008]
-	adrp	x8, push_false_1_asm_h
-	add	x8, x8, :lo12:push_false_1_asm_h
-	str	x8, [x0, #2016]
-	adrp	x8, push_true_1_asm_h
-	add	x8, x8, :lo12:push_true_1_asm_h
-	str	x8, [x0, #2024]
-	adrp	x8, object_1_asm_h
-	add	x8, x8, :lo12:object_1_asm_h
-	str	x8, [x0, #2032]
-	adrp	x8, set_var_ref2_1_asm_h
-	add	x8, x8, :lo12:set_var_ref2_1_asm_h
-	str	x8, [x0, #3768]
-	adrp	x8, set_var_ref1_1_asm_h
-	add	x8, x8, :lo12:set_var_ref1_1_asm_h
-	str	x8, [x0, #3760]
-	adrp	x8, set_var_ref0_1_asm_h
-	add	x8, x8, :lo12:set_var_ref0_1_asm_h
-	str	x8, [x0, #3752]
-	adrp	x8, put_var_ref3_1_asm_h
-	add	x8, x8, :lo12:put_var_ref3_1_asm_h
-	str	x8, [x0, #3744]
-	adrp	x8, put_var_ref2_1_asm_h
-	add	x8, x8, :lo12:put_var_ref2_1_asm_h
-	str	x8, [x0, #3736]
-	adrp	x8, put_var_ref1_1_asm_h
-	add	x8, x8, :lo12:put_var_ref1_1_asm_h
-	str	x8, [x0, #3728]
-	adrp	x8, put_var_ref0_1_asm_h
-	add	x8, x8, :lo12:put_var_ref0_1_asm_h
-	str	x8, [x0, #3720]
-	adrp	x8, get_var_ref3_1_asm_h
-	add	x8, x8, :lo12:get_var_ref3_1_asm_h
-	str	x8, [x0, #3712]
-	adrp	x8, get_var_ref2_1_asm_h
-	add	x8, x8, :lo12:get_var_ref2_1_asm_h
-	str	x8, [x0, #3704]
-	adrp	x8, get_var_ref1_1_asm_h
-	add	x8, x8, :lo12:get_var_ref1_1_asm_h
-	str	x8, [x0, #3696]
-	adrp	x8, get_var_ref0_1_asm_h
-	add	x8, x8, :lo12:get_var_ref0_1_asm_h
-	str	x8, [x0, #3688]
-	adrp	x8, set_arg3_1_asm_h
-	add	x8, x8, :lo12:set_arg3_1_asm_h
-	str	x8, [x0, #3680]
-	adrp	x8, set_arg2_1_asm_h
-	add	x8, x8, :lo12:set_arg2_1_asm_h
-	str	x8, [x0, #3672]
-	adrp	x8, set_arg1_1_asm_h
-	add	x8, x8, :lo12:set_arg1_1_asm_h
-	str	x8, [x0, #3664]
-	adrp	x8, set_arg0_1_asm_h
-	add	x8, x8, :lo12:set_arg0_1_asm_h
-	str	x8, [x0, #3656]
-	adrp	x8, put_arg3_1_asm_h
-	add	x8, x8, :lo12:put_arg3_1_asm_h
-	str	x8, [x0, #3648]
-	adrp	x8, put_arg2_1_asm_h
-	add	x8, x8, :lo12:put_arg2_1_asm_h
-	str	x8, [x0, #3640]
-	adrp	x8, put_arg1_1_asm_h
-	add	x8, x8, :lo12:put_arg1_1_asm_h
-	str	x8, [x0, #3632]
-	adrp	x8, put_arg0_1_asm_h
-	add	x8, x8, :lo12:put_arg0_1_asm_h
-	str	x8, [x0, #3624]
-	adrp	x8, get_arg3_1_asm_h
-	add	x8, x8, :lo12:get_arg3_1_asm_h
-	str	x8, [x0, #3616]
-	adrp	x8, get_arg2_1_asm_h
-	add	x8, x8, :lo12:get_arg2_1_asm_h
-	str	x8, [x0, #3608]
-	adrp	x8, get_arg1_1_asm_h
-	add	x8, x8, :lo12:get_arg1_1_asm_h
-	str	x8, [x0, #3600]
-	adrp	x8, get_arg0_1_asm_h
-	add	x8, x8, :lo12:get_arg0_1_asm_h
-	str	x8, [x0, #3592]
-	adrp	x8, set_loc3_1_asm_h
-	add	x8, x8, :lo12:set_loc3_1_asm_h
-	str	x8, [x0, #3584]
-	adrp	x8, set_loc2_1_asm_h
-	add	x8, x8, :lo12:set_loc2_1_asm_h
-	str	x8, [x0, #3576]
-	adrp	x8, set_loc1_1_asm_h
-	add	x8, x8, :lo12:set_loc1_1_asm_h
-	str	x8, [x0, #3568]
-	adrp	x8, set_loc0_1_asm_h
-	add	x8, x8, :lo12:set_loc0_1_asm_h
-	str	x8, [x0, #3560]
-	adrp	x8, put_loc3_1_asm_h
-	add	x8, x8, :lo12:put_loc3_1_asm_h
-	str	x8, [x0, #3552]
-	adrp	x8, put_loc2_1_asm_h
-	add	x8, x8, :lo12:put_loc2_1_asm_h
-	str	x8, [x0, #3544]
-	adrp	x8, put_loc1_1_asm_h
-	add	x8, x8, :lo12:put_loc1_1_asm_h
-	str	x8, [x0, #3536]
-	adrp	x8, put_loc0_1_asm_h
-	add	x8, x8, :lo12:put_loc0_1_asm_h
-	str	x8, [x0, #3528]
-	adrp	x8, get_loc3_1_asm_h
-	add	x8, x8, :lo12:get_loc3_1_asm_h
-	str	x8, [x0, #3520]
-	adrp	x8, get_loc2_1_asm_h
-	add	x8, x8, :lo12:get_loc2_1_asm_h
-	str	x8, [x0, #3512]
-	adrp	x8, get_loc1_1_asm_h
-	add	x8, x8, :lo12:get_loc1_1_asm_h
-	str	x8, [x0, #3504]
-	adrp	x8, get_loc0_1_asm_h
-	add	x8, x8, :lo12:get_loc0_1_asm_h
-	str	x8, [x0, #3496]
-	adrp	x8, set_loc8_1_asm_h
-	add	x8, x8, :lo12:set_loc8_1_asm_h
-	str	x8, [x0, #3488]
-	adrp	x8, put_loc8_1_asm_h
-	add	x8, x8, :lo12:put_loc8_1_asm_h
-	str	x8, [x0, #3480]
-	adrp	x8, get_loc8_1_asm_h
-	add	x8, x8, :lo12:get_loc8_1_asm_h
-	str	x8, [x0, #3472]
-	adrp	x8, push_empty_string_1_asm_h
-	add	x8, x8, :lo12:push_empty_string_1_asm_h
-	str	x8, [x0, #3464]
-	adrp	x8, fclosure8_1_asm_h
-	add	x8, x8, :lo12:fclosure8_1_asm_h
-	str	x8, [x0, #3456]
-	adrp	x8, push_const8_1_asm_h
-	add	x8, x8, :lo12:push_const8_1_asm_h
-	str	x8, [x0, #3448]
-	adrp	x8, push_i16_1_asm_h
-	add	x8, x8, :lo12:push_i16_1_asm_h
-	str	x8, [x0, #3440]
-	adrp	x8, push_i8_1_asm_h
-	add	x8, x8, :lo12:push_i8_1_asm_h
-	str	x8, [x0, #3432]
-	adrp	x8, push_7_1_asm_h
-	add	x8, x8, :lo12:push_7_1_asm_h
-	str	x8, [x0, #3424]
-	adrp	x8, push_6_1_asm_h
-	add	x8, x8, :lo12:push_6_1_asm_h
-	str	x8, [x0, #3416]
-	adrp	x8, push_5_1_asm_h
-	add	x8, x8, :lo12:push_5_1_asm_h
-	str	x8, [x0, #3408]
-	adrp	x8, push_4_1_asm_h
-	add	x8, x8, :lo12:push_4_1_asm_h
-	str	x8, [x0, #3400]
-	adrp	x8, push_3_1_asm_h
-	add	x8, x8, :lo12:push_3_1_asm_h
-	str	x8, [x0, #3392]
-	adrp	x8, push_2_1_asm_h
-	add	x8, x8, :lo12:push_2_1_asm_h
-	str	x8, [x0, #3384]
-	adrp	x8, push_1_1_asm_h
-	add	x8, x8, :lo12:push_1_1_asm_h
-	str	x8, [x0, #3376]
-	adrp	x8, push_0_1_asm_h
-	add	x8, x8, :lo12:push_0_1_asm_h
-	str	x8, [x0, #3368]
-	adrp	x8, push_minus1_1_asm_h
-	add	x8, x8, :lo12:push_minus1_1_asm_h
-	str	x8, [x0, #3360]
-	adrp	x8, nop_1_asm_h
-	add	x8, x8, :lo12:nop_1_asm_h
-	str	x8, [x0, #3352]
-	adrp	x8, or_1_asm_h
-	add	x8, x8, :lo12:or_1_asm_h
-	str	x8, [x0, #3344]
-	adrp	x8, xor_1_asm_h
-	add	x8, x8, :lo12:xor_1_asm_h
-	str	x8, [x0, #3336]
-	adrp	x8, and_1_asm_h
-	add	x8, x8, :lo12:and_1_asm_h
-	str	x8, [x0, #3328]
-	adrp	x8, strict_neq_1_asm_h
-	add	x8, x8, :lo12:strict_neq_1_asm_h
-	str	x8, [x0, #3320]
-	adrp	x8, strict_eq_1_asm_h
-	add	x8, x8, :lo12:strict_eq_1_asm_h
-	str	x8, [x0, #3312]
-	adrp	x8, neq_1_asm_h
-	add	x8, x8, :lo12:neq_1_asm_h
-	str	x8, [x0, #3304]
-	adrp	x8, eq_1_asm_h
-	add	x8, x8, :lo12:eq_1_asm_h
-	str	x8, [x0, #3296]
-	adrp	x8, in_1_asm_h
-	add	x8, x8, :lo12:in_1_asm_h
-	str	x8, [x0, #3288]
-	adrp	x8, instanceof_1_asm_h
-	add	x8, x8, :lo12:instanceof_1_asm_h
-	str	x8, [x0, #3280]
-	adrp	x8, gte_1_asm_h
-	add	x8, x8, :lo12:gte_1_asm_h
-	str	x8, [x0, #3272]
-	adrp	x8, gt_1_asm_h
-	add	x8, x8, :lo12:gt_1_asm_h
-	str	x8, [x0, #3264]
-	adrp	x8, lte_1_asm_h
-	add	x8, x8, :lo12:lte_1_asm_h
-	str	x8, [x0, #3256]
-	adrp	x8, lt_1_asm_h
-	add	x8, x8, :lo12:lt_1_asm_h
-	str	x8, [x0, #3248]
-	adrp	x8, shr_1_asm_h
-	add	x8, x8, :lo12:shr_1_asm_h
-	str	x8, [x0, #3240]
-	adrp	x8, sar_1_asm_h
-	add	x8, x8, :lo12:sar_1_asm_h
-	str	x8, [x0, #3232]
-	adrp	x8, shl_1_asm_h
-	add	x8, x8, :lo12:shl_1_asm_h
-	str	x8, [x0, #3224]
-	adrp	x8, pow_1_asm_h
-	add	x8, x8, :lo12:pow_1_asm_h
-	str	x8, [x0, #3216]
-	adrp	x8, sub_1_asm_h
-	add	x8, x8, :lo12:sub_1_asm_h
-	str	x8, [x0, #3208]
-	adrp	x8, add_1_asm_h
-	add	x8, x8, :lo12:add_1_asm_h
-	str	x8, [x0, #3200]
-	adrp	x8, mod_1_asm_h
-	add	x8, x8, :lo12:mod_1_asm_h
-	str	x8, [x0, #3192]
-	adrp	x8, div_1_asm_h
-	add	x8, x8, :lo12:div_1_asm_h
-	str	x8, [x0, #3184]
-	adrp	x8, mul_1_asm_h
-	add	x8, x8, :lo12:mul_1_asm_h
-	str	x8, [x0, #3176]
-	adrp	x8, delete_var_1_asm_h
-	add	x8, x8, :lo12:delete_var_1_asm_h
-	str	x8, [x0, #3168]
-	adrp	x8, delete_1_asm_h
-	add	x8, x8, :lo12:delete_1_asm_h
-	str	x8, [x0, #3160]
-	adrp	x8, typeof_1_asm_h
-	add	x8, x8, :lo12:typeof_1_asm_h
-	str	x8, [x0, #3152]
-	adrp	x8, lnot_1_asm_h
-	add	x8, x8, :lo12:lnot_1_asm_h
-	str	x8, [x0, #3144]
-	adrp	x8, not_1_asm_h
-	add	x8, x8, :lo12:not_1_asm_h
-	str	x8, [x0, #3136]
-	adrp	x8, add_loc_1_asm_h
-	add	x8, x8, :lo12:add_loc_1_asm_h
-	str	x8, [x0, #3128]
-	adrp	x8, inc_loc_1_asm_h
-	add	x8, x8, :lo12:inc_loc_1_asm_h
-	str	x8, [x0, #3120]
-	adrp	x8, dec_loc_1_asm_h
-	add	x8, x8, :lo12:dec_loc_1_asm_h
-	str	x8, [x0, #3112]
-	adrp	x8, post_inc_1_asm_h
-	add	x8, x8, :lo12:post_inc_1_asm_h
-	str	x8, [x0, #3104]
-	adrp	x8, post_dec_1_asm_h
-	add	x8, x8, :lo12:post_dec_1_asm_h
-	str	x8, [x0, #3096]
-	adrp	x8, inc_1_asm_h
-	add	x8, x8, :lo12:inc_1_asm_h
-	str	x8, [x0, #3088]
-	adrp	x8, dec_1_asm_h
-	add	x8, x8, :lo12:dec_1_asm_h
-	str	x8, [x0, #3080]
-	adrp	x8, plus_1_asm_h
-	add	x8, x8, :lo12:plus_1_asm_h
-	str	x8, [x0, #3072]
-	adrp	x8, neg_1_asm_h
-	add	x8, x8, :lo12:neg_1_asm_h
-	str	x8, [x0, #3064]
-	adrp	x8, await_1_asm_h
-	add	x8, x8, :lo12:await_1_asm_h
-	str	x8, [x0, #3056]
-	adrp	x8, async_yield_star_1_asm_h
-	add	x8, x8, :lo12:async_yield_star_1_asm_h
-	str	x8, [x0, #3048]
-	adrp	x8, yield_star_1_asm_h
-	add	x8, x8, :lo12:yield_star_1_asm_h
-	str	x8, [x0, #3040]
-	adrp	x8, yield_1_asm_h
-	add	x8, x8, :lo12:yield_1_asm_h
-	str	x8, [x0, #3032]
-	adrp	x8, initial_yield_1_asm_h
-	add	x8, x8, :lo12:initial_yield_1_asm_h
-	str	x8, [x0, #3024]
-	adrp	x8, async_iterator_get_1_asm_h
-	add	x8, x8, :lo12:async_iterator_get_1_asm_h
-	str	x8, [x0, #3016]
-	adrp	x8, async_iterator_next_1_asm_h
-	add	x8, x8, :lo12:async_iterator_next_1_asm_h
-	str	x8, [x0, #3008]
-	adrp	x8, async_iterator_close_1_asm_h
-	add	x8, x8, :lo12:async_iterator_close_1_asm_h
-	str	x8, [x0, #3000]
-	adrp	x8, iterator_close_return_1_asm_h
-	add	x8, x8, :lo12:iterator_close_return_1_asm_h
-	str	x8, [x0, #2992]
-	adrp	x8, iterator_close_1_asm_h
-	add	x8, x8, :lo12:iterator_close_1_asm_h
-	str	x8, [x0, #2984]
-	adrp	x8, iterator_get_value_done_1_asm_h
-	add	x8, x8, :lo12:iterator_get_value_done_1_asm_h
-	str	x8, [x0, #2976]
-	adrp	x8, for_await_of_next_1_asm_h
-	add	x8, x8, :lo12:for_await_of_next_1_asm_h
-	str	x8, [x0, #2968]
-	adrp	x8, for_of_next_1_asm_h
-	add	x8, x8, :lo12:for_of_next_1_asm_h
-	str	x8, [x0, #2960]
-	adrp	x8, for_in_next_1_asm_h
-	add	x8, x8, :lo12:for_in_next_1_asm_h
-	str	x8, [x0, #2952]
-	adrp	x8, for_await_of_start_1_asm_h
-	add	x8, x8, :lo12:for_await_of_start_1_asm_h
-	str	x8, [x0, #2944]
-	adrp	x8, for_of_start_1_asm_h
-	add	x8, x8, :lo12:for_of_start_1_asm_h
-	str	x8, [x0, #2936]
-	adrp	x8, for_in_start_1_asm_h
-	add	x8, x8, :lo12:for_in_start_1_asm_h
-	str	x8, [x0, #2928]
-	adrp	x8, make_var_ref_1_asm_h
-	add	x8, x8, :lo12:make_var_ref_1_asm_h
-	str	x8, [x0, #2920]
-	adrp	x8, make_var_ref_ref_1_asm_h
-	add	x8, x8, :lo12:make_var_ref_ref_1_asm_h
-	str	x8, [x0, #2912]
-	adrp	x8, make_arg_ref_1_asm_h
-	add	x8, x8, :lo12:make_arg_ref_1_asm_h
-	str	x8, [x0, #2904]
-	adrp	x8, make_loc_ref_1_asm_h
-	add	x8, x8, :lo12:make_loc_ref_1_asm_h
-	str	x8, [x0, #2896]
-	adrp	x8, with_get_ref_undef_1_asm_h
-	add	x8, x8, :lo12:with_get_ref_undef_1_asm_h
-	str	x8, [x0, #2888]
-	adrp	x8, with_get_ref_1_asm_h
-	add	x8, x8, :lo12:with_get_ref_1_asm_h
-	str	x8, [x0, #2880]
-	adrp	x8, with_make_ref_1_asm_h
-	add	x8, x8, :lo12:with_make_ref_1_asm_h
-	str	x8, [x0, #2872]
-	adrp	x8, with_delete_var_1_asm_h
-	add	x8, x8, :lo12:with_delete_var_1_asm_h
-	str	x8, [x0, #2864]
-	adrp	x8, with_put_var_1_asm_h
-	add	x8, x8, :lo12:with_put_var_1_asm_h
-	str	x8, [x0, #2856]
-	adrp	x8, with_get_var_1_asm_h
-	add	x8, x8, :lo12:with_get_var_1_asm_h
-	str	x8, [x0, #2848]
-	adrp	x8, to_propkey2_1_asm_h
-	add	x8, x8, :lo12:to_propkey2_1_asm_h
-	str	x8, [x0, #2840]
-	adrp	x8, to_propkey_1_asm_h
-	add	x8, x8, :lo12:to_propkey_1_asm_h
-	str	x8, [x0, #2832]
-	adrp	x8, to_object_1_asm_h
-	add	x8, x8, :lo12:to_object_1_asm_h
-	str	x8, [x0, #2824]
-	adrp	x8, ret_1_asm_h
-	add	x8, x8, :lo12:ret_1_asm_h
-	str	x8, [x0, #2816]
-	adrp	x8, gosub_1_asm_h
-	add	x8, x8, :lo12:gosub_1_asm_h
-	str	x8, [x0, #2808]
-	adrp	x8, catch_1_asm_h
-	add	x8, x8, :lo12:catch_1_asm_h
-	str	x8, [x0, #2800]
-	adrp	x8, goto_1_asm_h
-	add	x8, x8, :lo12:goto_1_asm_h
-	str	x8, [x0, #2792]
-	adrp	x8, if_true_1_asm_h
-	add	x8, x8, :lo12:if_true_1_asm_h
-	str	x8, [x0, #2784]
-	adrp	x8, if_false_1_asm_h
-	add	x8, x8, :lo12:if_false_1_asm_h
-	str	x8, [x0, #2776]
-	adrp	x8, close_loc_1_asm_h
-	add	x8, x8, :lo12:close_loc_1_asm_h
-	str	x8, [x0, #2768]
-	adrp	x8, put_var_ref_check_init_1_asm_h
-	add	x8, x8, :lo12:put_var_ref_check_init_1_asm_h
-	str	x8, [x0, #2760]
-	adrp	x8, put_var_ref_check_1_asm_h
-	add	x8, x8, :lo12:put_var_ref_check_1_asm_h
-	str	x8, [x0, #2752]
-	adrp	x8, get_var_ref_check_1_asm_h
-	add	x8, x8, :lo12:get_var_ref_check_1_asm_h
-	str	x8, [x0, #2744]
-	adrp	x8, put_loc_check_init_1_asm_h
-	add	x8, x8, :lo12:put_loc_check_init_1_asm_h
-	str	x8, [x0, #2736]
-	adrp	x8, put_loc_check_1_asm_h
-	add	x8, x8, :lo12:put_loc_check_1_asm_h
-	str	x8, [x0, #2728]
-	adrp	x8, get_loc_check_1_asm_h
-	add	x8, x8, :lo12:get_loc_check_1_asm_h
-	str	x8, [x0, #2720]
-	adrp	x8, set_loc_uninitialized_1_asm_h
-	add	x8, x8, :lo12:set_loc_uninitialized_1_asm_h
-	str	x8, [x0, #2712]
-	adrp	x8, set_var_ref_1_asm_h
-	add	x8, x8, :lo12:set_var_ref_1_asm_h
-	str	x8, [x0, #2704]
-	adrp	x8, put_var_ref_1_asm_h
-	add	x8, x8, :lo12:put_var_ref_1_asm_h
-	str	x8, [x0, #2696]
-	adrp	x8, get_var_ref_1_asm_h
-	add	x8, x8, :lo12:get_var_ref_1_asm_h
-	str	x8, [x0, #2688]
-	adrp	x8, set_arg_1_asm_h
-	add	x8, x8, :lo12:set_arg_1_asm_h
-	str	x8, [x0, #2680]
-	adrp	x8, put_arg_1_asm_h
-	add	x8, x8, :lo12:put_arg_1_asm_h
-	str	x8, [x0, #2672]
-	adrp	x8, get_arg_1_asm_h
-	add	x8, x8, :lo12:get_arg_1_asm_h
-	str	x8, [x0, #2664]
-	adrp	x8, set_loc_1_asm_h
-	add	x8, x8, :lo12:set_loc_1_asm_h
-	str	x8, [x0, #2656]
-	adrp	x8, put_loc_1_asm_h
-	add	x8, x8, :lo12:put_loc_1_asm_h
-	str	x8, [x0, #2648]
-	adrp	x8, get_loc_1_asm_h
-	add	x8, x8, :lo12:get_loc_1_asm_h
-	str	x8, [x0, #2640]
-	adrp	x8, define_class_1_asm_h
-	add	x8, x8, :lo12:define_class_1_asm_h
-	str	x8, [x0, #2632]
-	adrp	x8, define_method_computed_1_asm_h
-	add	x8, x8, :lo12:define_method_computed_1_asm_h
-	str	x8, [x0, #2624]
-	adrp	x8, define_method_1_asm_h
-	add	x8, x8, :lo12:define_method_1_asm_h
-	str	x8, [x0, #2616]
-	adrp	x8, copy_data_properties_1_asm_h
-	add	x8, x8, :lo12:copy_data_properties_1_asm_h
-	str	x8, [x0, #2608]
-	adrp	x8, append_1_asm_h
-	add	x8, x8, :lo12:append_1_asm_h
-	str	x8, [x0, #2600]
-	adrp	x8, define_array_el_1_asm_h
-	add	x8, x8, :lo12:define_array_el_1_asm_h
-	str	x8, [x0, #2592]
-	adrp	x8, set_home_object_1_asm_h
-	add	x8, x8, :lo12:set_home_object_1_asm_h
-	str	x8, [x0, #2584]
-	adrp	x8, set_proto_1_asm_h
-	add	x8, x8, :lo12:set_proto_1_asm_h
-	str	x8, [x0, #2576]
-	adrp	x8, set_name_computed_1_asm_h
-	add	x8, x8, :lo12:set_name_computed_1_asm_h
-	str	x8, [x0, #2568]
-	adrp	x8, set_name_1_asm_h
-	add	x8, x8, :lo12:set_name_1_asm_h
-	str	x8, [x0, #2560]
-	adrp	x8, define_field_1_asm_h
-	add	x8, x8, :lo12:define_field_1_asm_h
-	str	x8, [x0, #2552]
-	adrp	x8, put_super_value_1_asm_h
-	add	x8, x8, :lo12:put_super_value_1_asm_h
-	str	x8, [x0, #2544]
-	adrp	x8, get_super_value_1_asm_h
-	add	x8, x8, :lo12:get_super_value_1_asm_h
-	str	x8, [x0, #2536]
-	adrp	x8, put_array_el_1_asm_h
-	add	x8, x8, :lo12:put_array_el_1_asm_h
-	str	x8, [x0, #2528]
-	adrp	x8, get_array_el2_1_asm_h
-	add	x8, x8, :lo12:get_array_el2_1_asm_h
-	str	x8, [x0, #2520]
-	adrp	x8, get_array_el_1_asm_h
-	add	x8, x8, :lo12:get_array_el_1_asm_h
-	str	x8, [x0, #2512]
-	adrp	x8, define_private_field_1_asm_h
-	add	x8, x8, :lo12:define_private_field_1_asm_h
-	str	x8, [x0, #2504]
-	adrp	x8, put_private_field_1_asm_h
-	add	x8, x8, :lo12:put_private_field_1_asm_h
-	str	x8, [x0, #2496]
-	adrp	x8, get_private_field_1_asm_h
-	add	x8, x8, :lo12:get_private_field_1_asm_h
-	str	x8, [x0, #2488]
-	adrp	x8, put_field_1_asm_h
-	add	x8, x8, :lo12:put_field_1_asm_h
-	str	x8, [x0, #2480]
-	adrp	x8, get_field2_1_asm_h
-	add	x8, x8, :lo12:get_field2_1_asm_h
-	str	x8, [x0, #2472]
-	adrp	x8, get_field_1_asm_h
-	add	x8, x8, :lo12:get_field_1_asm_h
-	str	x8, [x0, #2464]
-	adrp	x8, define_func_1_asm_h
-	add	x8, x8, :lo12:define_func_1_asm_h
-	str	x8, [x0, #2456]
-	adrp	x8, check_define_var_1_asm_h
-	add	x8, x8, :lo12:check_define_var_1_asm_h
-	str	x8, [x0, #2448]
-	adrp	x8, define_var_1_asm_h
-	add	x8, x8, :lo12:define_var_1_asm_h
-	str	x8, [x0, #2440]
-	adrp	x8, put_ref_value_1_asm_h
-	add	x8, x8, :lo12:put_ref_value_1_asm_h
-	str	x8, [x0, #2432]
-	adrp	x8, get_ref_value_1_asm_h
-	add	x8, x8, :lo12:get_ref_value_1_asm_h
-	str	x8, [x0, #2424]
-	adrp	x8, put_var_strict_1_asm_h
-	add	x8, x8, :lo12:put_var_strict_1_asm_h
-	str	x8, [x0, #2416]
-	adrp	x8, put_var_init_1_asm_h
-	add	x8, x8, :lo12:put_var_init_1_asm_h
-	str	x8, [x0, #2408]
-	adrp	x8, put_var_1_asm_h
-	add	x8, x8, :lo12:put_var_1_asm_h
-	str	x8, [x0, #2400]
-	adrp	x8, get_var_1_asm_h
-	add	x8, x8, :lo12:get_var_1_asm_h
-	str	x8, [x0, #2392]
-	adrp	x8, get_var_undef_1_asm_h
-	add	x8, x8, :lo12:get_var_undef_1_asm_h
-	str	x8, [x0, #2384]
-	adrp	x8, check_var_1_asm_h
-	add	x8, x8, :lo12:check_var_1_asm_h
-	str	x8, [x0, #2376]
-	adrp	x8, import_1_asm_h
-	add	x8, x8, :lo12:import_1_asm_h
-	str	x8, [x0, #2368]
-	adrp	x8, get_super_1_asm_h
-	add	x8, x8, :lo12:get_super_1_asm_h
-	str	x8, [x0, #2360]
-	adrp	x8, get_super_ctor_1_asm_h
-	add	x8, x8, :lo12:get_super_ctor_1_asm_h
-	str	x8, [x0, #2352]
-	adrp	x8, regexp_1_asm_h
-	add	x8, x8, :lo12:regexp_1_asm_h
-	str	x8, [x0, #2344]
-	adrp	x8, eval_1_asm_h
-	add	x8, x8, :lo12:eval_1_asm_h
-	str	x8, [x0, #2336]
-	adrp	x8, throw_var_1_asm_h
-	add	x8, x8, :lo12:throw_var_1_asm_h
-	str	x8, [x0, #2328]
-	adrp	x8, throw_1_asm_h
-	add	x8, x8, :lo12:throw_1_asm_h
-	str	x8, [x0, #2320]
-	adrp	x8, return_async_1_asm_h
-	add	x8, x8, :lo12:return_async_1_asm_h
-	str	x8, [x0, #2312]
-	adrp	x8, add_brand_1_asm_h
-	add	x8, x8, :lo12:add_brand_1_asm_h
-	str	x8, [x0, #2304]
-	adrp	x8, check_brand_1_asm_h
-	add	x8, x8, :lo12:check_brand_1_asm_h
-	str	x8, [x0, #2296]
-	adrp	x8, check_ctor_1_asm_h
-	add	x8, x8, :lo12:check_ctor_1_asm_h
-	str	x8, [x0, #2288]
-	adrp	x8, check_ctor_return_1_asm_h
-	add	x8, x8, :lo12:check_ctor_return_1_asm_h
-	str	x8, [x0, #2280]
-	adrp	x8, return_undef_1_asm_h
-	add	x8, x8, :lo12:return_undef_1_asm_h
-	str	x8, [x0, #2272]
-	adrp	x8, return_1_asm_h
-	add	x8, x8, :lo12:return_1_asm_h
-	str	x8, [x0, #2264]
-	adrp	x8, apply_1_asm_h
-	add	x8, x8, :lo12:apply_1_asm_h
-	str	x8, [x0, #2256]
-	adrp	x8, array_from_1_asm_h
-	add	x8, x8, :lo12:array_from_1_asm_h
-	str	x8, [x0, #2248]
-	adrp	x8, tail_call_method_1_asm_h
-	add	x8, x8, :lo12:tail_call_method_1_asm_h
-	str	x8, [x0, #2240]
-	adrp	x8, call_method_1_asm_h
-	add	x8, x8, :lo12:call_method_1_asm_h
-	str	x8, [x0, #2232]
-	adrp	x8, tail_call_1_asm_h
-	add	x8, x8, :lo12:tail_call_1_asm_h
-	str	x8, [x0, #2224]
-	adrp	x8, call_1_asm_h
-	add	x8, x8, :lo12:call_1_asm_h
-	str	x8, [x0, #2216]
-	adrp	x8, call_constructor_1_asm_h
-	add	x8, x8, :lo12:call_constructor_1_asm_h
-	str	x8, [x0, #2208]
-	adrp	x8, rot5l_1_asm_h
-	add	x8, x8, :lo12:rot5l_1_asm_h
-	str	x8, [x0, #2200]
-	adrp	x8, rot4l_1_asm_h
-	add	x8, x8, :lo12:rot4l_1_asm_h
-	str	x8, [x0, #2192]
-	adrp	x8, rot3r_1_asm_h
-	add	x8, x8, :lo12:rot3r_1_asm_h
-	str	x8, [x0, #2184]
-	adrp	x8, rot3l_1_asm_h
-	add	x8, x8, :lo12:rot3l_1_asm_h
-	str	x8, [x0, #2176]
-	adrp	x8, swap2_1_asm_h
-	add	x8, x8, :lo12:swap2_1_asm_h
-	str	x8, [x0, #2168]
-	adrp	x8, swap_1_asm_h
-	add	x8, x8, :lo12:swap_1_asm_h
-	str	x8, [x0, #2160]
-	adrp	x8, perm5_1_asm_h
-	add	x8, x8, :lo12:perm5_1_asm_h
-	str	x8, [x0, #2152]
-	adrp	x8, perm4_1_asm_h
-	add	x8, x8, :lo12:perm4_1_asm_h
-	str	x8, [x0, #2144]
-	adrp	x8, perm3_1_asm_h
-	add	x8, x8, :lo12:perm3_1_asm_h
-	str	x8, [x0, #2136]
-	adrp	x8, insert4_1_asm_h
-	add	x8, x8, :lo12:insert4_1_asm_h
-	str	x8, [x0, #2128]
-	adrp	x8, insert3_1_asm_h
-	add	x8, x8, :lo12:insert3_1_asm_h
-	str	x8, [x0, #2120]
-	adrp	x8, insert2_1_asm_h
-	add	x8, x8, :lo12:insert2_1_asm_h
-	str	x8, [x0, #2112]
-	adrp	x8, dup3_1_asm_h
-	add	x8, x8, :lo12:dup3_1_asm_h
-	str	x8, [x0, #2104]
-	adrp	x8, dup2_1_asm_h
-	add	x8, x8, :lo12:dup2_1_asm_h
-	str	x8, [x0, #2096]
-	adrp	x8, dup1_1_asm_h
-	add	x8, x8, :lo12:dup1_1_asm_h
-	str	x8, [x0, #2088]
-	adrp	x8, dup_1_asm_h
-	add	x8, x8, :lo12:dup_1_asm_h
-	str	x8, [x0, #2080]
-	adrp	x8, nip1_1_asm_h
-	add	x8, x8, :lo12:nip1_1_asm_h
-	str	x8, [x0, #2072]
-	adrp	x8, nip_1_asm_h
-	add	x8, x8, :lo12:nip_1_asm_h
-	str	x8, [x0, #2064]
-	adrp	x8, drop_1_asm_h
-	add	x8, x8, :lo12:drop_1_asm_h
-	str	x8, [x0, #2056]
-	adrp	x8, rest_1_asm_h
-	add	x8, x8, :lo12:rest_1_asm_h
-	str	x8, [x0, #2048]
-	adrp	x8, special_object_1_asm_h
-	add	x8, x8, :lo12:special_object_1_asm_h
-	str	x8, [x0, #2040]
-	adrp	x8, set_var_ref3_1_asm_h
-	add	x8, x8, :lo12:set_var_ref3_1_asm_h
-	str	x8, [x0, #3776]
-	adrp	x8, get_length_1_asm_h
-	add	x8, x8, :lo12:get_length_1_asm_h
-	str	x8, [x0, #3784]
-	adrp	x8, if_false8_1_asm_h
-	add	x8, x8, :lo12:if_false8_1_asm_h
-	str	x8, [x0, #3792]
-	adrp	x8, if_true8_1_asm_h
-	add	x8, x8, :lo12:if_true8_1_asm_h
-	str	x8, [x0, #3800]
-	adrp	x8, goto8_1_asm_h
-	add	x8, x8, :lo12:goto8_1_asm_h
-	str	x8, [x0, #3808]
-	adrp	x8, goto16_1_asm_h
-	add	x8, x8, :lo12:goto16_1_asm_h
-	str	x8, [x0, #3816]
-	adrp	x8, call0_1_asm_h
-	add	x8, x8, :lo12:call0_1_asm_h
-	str	x8, [x0, #3824]
-	adrp	x8, call1_1_asm_h
-	add	x8, x8, :lo12:call1_1_asm_h
-	str	x8, [x0, #3832]
-	adrp	x8, call2_1_asm_h
-	add	x8, x8, :lo12:call2_1_asm_h
-	str	x8, [x0, #3840]
-	adrp	x8, call3_1_asm_h
-	add	x8, x8, :lo12:call3_1_asm_h
-	str	x8, [x0, #3848]
-	adrp	x8, is_undefined_1_asm_h
-	add	x8, x8, :lo12:is_undefined_1_asm_h
-	str	x8, [x0, #3856]
-	adrp	x8, is_null_1_asm_h
-	add	x8, x8, :lo12:is_null_1_asm_h
-	str	x8, [x0, #3864]
-	adrp	x8, is_function_1_asm_h
-	add	x8, x8, :lo12:is_function_1_asm_h
-	str	x8, [x0, #3872]
-	adrp	x8, inc_coverage_1_asm_h
-	add	x8, x8, :lo12:inc_coverage_1_asm_h
-	str	x8, [x0, #3880]
-	adrp	x8, invalid_2_asm_h
-	add	x8, x8, :lo12:invalid_2_asm_h
-	str	x8, [x0, #3888]
-	adrp	x8, push_i32_2_asm_h
-	add	x8, x8, :lo12:push_i32_2_asm_h
-	str	x8, [x0, #3896]
-	adrp	x8, push_const_2_asm_h
-	add	x8, x8, :lo12:push_const_2_asm_h
-	str	x8, [x0, #3904]
-	adrp	x8, fclosure_2_asm_h
-	add	x8, x8, :lo12:fclosure_2_asm_h
-	str	x8, [x0, #3912]
-	adrp	x8, push_atom_value_2_asm_h
-	add	x8, x8, :lo12:push_atom_value_2_asm_h
-	str	x8, [x0, #3920]
-	adrp	x8, private_symbol_2_asm_h
-	add	x8, x8, :lo12:private_symbol_2_asm_h
-	str	x8, [x0, #3928]
-	adrp	x8, undefined_2_asm_h
-	add	x8, x8, :lo12:undefined_2_asm_h
-	str	x8, [x0, #3936]
-	adrp	x8, null_2_asm_h
-	add	x8, x8, :lo12:null_2_asm_h
-	str	x8, [x0, #3944]
-	adrp	x8, push_this_2_asm_h
-	add	x8, x8, :lo12:push_this_2_asm_h
-	str	x8, [x0, #3952]
-	adrp	x8, push_false_2_asm_h
-	add	x8, x8, :lo12:push_false_2_asm_h
-	str	x8, [x0, #3960]
-	adrp	x8, push_true_2_asm_h
-	add	x8, x8, :lo12:push_true_2_asm_h
-	str	x8, [x0, #3968]
-	adrp	x8, object_2_asm_h
-	add	x8, x8, :lo12:object_2_asm_h
-	str	x8, [x0, #3976]
-	adrp	x8, special_object_2_asm_h
-	add	x8, x8, :lo12:special_object_2_asm_h
-	str	x8, [x0, #3984]
-	adrp	x8, rest_2_asm_h
-	add	x8, x8, :lo12:rest_2_asm_h
-	str	x8, [x0, #3992]
-	adrp	x8, drop_2_asm_h
-	add	x8, x8, :lo12:drop_2_asm_h
-	str	x8, [x0, #4000]
-	adrp	x8, nip_2_asm_h
-	add	x8, x8, :lo12:nip_2_asm_h
-	str	x8, [x0, #4008]
-	adrp	x8, nip1_2_asm_h
-	add	x8, x8, :lo12:nip1_2_asm_h
-	str	x8, [x0, #4016]
-	adrp	x8, dup_2_asm_h
-	add	x8, x8, :lo12:dup_2_asm_h
-	str	x8, [x0, #4024]
-	adrp	x8, dup1_2_asm_h
-	add	x8, x8, :lo12:dup1_2_asm_h
-	str	x8, [x0, #4032]
-	adrp	x8, dup2_2_asm_h
-	add	x8, x8, :lo12:dup2_2_asm_h
-	str	x8, [x0, #4040]
-	adrp	x8, dup3_2_asm_h
-	add	x8, x8, :lo12:dup3_2_asm_h
-	str	x8, [x0, #4048]
-	adrp	x8, insert2_2_asm_h
-	add	x8, x8, :lo12:insert2_2_asm_h
-	str	x8, [x0, #4056]
-	adrp	x8, insert3_2_asm_h
-	add	x8, x8, :lo12:insert3_2_asm_h
-	str	x8, [x0, #4064]
-	adrp	x8, insert4_2_asm_h
-	add	x8, x8, :lo12:insert4_2_asm_h
-	str	x8, [x0, #4072]
-	adrp	x8, perm3_2_asm_h
-	add	x8, x8, :lo12:perm3_2_asm_h
-	str	x8, [x0, #4080]
-	adrp	x8, perm4_2_asm_h
-	add	x8, x8, :lo12:perm4_2_asm_h
-	str	x8, [x0, #4088]
-	adrp	x8, perm5_2_asm_h
-	add	x8, x8, :lo12:perm5_2_asm_h
-	str	x8, [x0, #4096]
-	adrp	x8, swap_2_asm_h
-	add	x8, x8, :lo12:swap_2_asm_h
-	str	x8, [x0, #4104]
-	adrp	x8, swap2_2_asm_h
-	add	x8, x8, :lo12:swap2_2_asm_h
-	str	x8, [x0, #4112]
-	adrp	x8, rot3l_2_asm_h
-	add	x8, x8, :lo12:rot3l_2_asm_h
-	str	x8, [x0, #4120]
-	adrp	x8, rot3r_2_asm_h
-	add	x8, x8, :lo12:rot3r_2_asm_h
-	str	x8, [x0, #4128]
-	adrp	x8, rot4l_2_asm_h
-	add	x8, x8, :lo12:rot4l_2_asm_h
-	str	x8, [x0, #4136]
-	adrp	x8, rot5l_2_asm_h
-	add	x8, x8, :lo12:rot5l_2_asm_h
-	str	x8, [x0, #4144]
-	adrp	x8, call_constructor_2_asm_h
-	add	x8, x8, :lo12:call_constructor_2_asm_h
-	str	x8, [x0, #4152]
-	adrp	x8, call_2_asm_h
-	add	x8, x8, :lo12:call_2_asm_h
-	str	x8, [x0, #4160]
-	adrp	x8, tail_call_2_asm_h
-	add	x8, x8, :lo12:tail_call_2_asm_h
-	str	x8, [x0, #4168]
-	adrp	x8, call_method_2_asm_h
-	add	x8, x8, :lo12:call_method_2_asm_h
-	str	x8, [x0, #4176]
-	adrp	x8, tail_call_method_2_asm_h
-	add	x8, x8, :lo12:tail_call_method_2_asm_h
-	str	x8, [x0, #4184]
-	adrp	x8, array_from_2_asm_h
-	add	x8, x8, :lo12:array_from_2_asm_h
-	str	x8, [x0, #4192]
-	adrp	x8, apply_2_asm_h
-	add	x8, x8, :lo12:apply_2_asm_h
-	str	x8, [x0, #4200]
-	adrp	x8, return_2_asm_h
-	add	x8, x8, :lo12:return_2_asm_h
-	str	x8, [x0, #4208]
-	adrp	x8, return_undef_2_asm_h
-	add	x8, x8, :lo12:return_undef_2_asm_h
-	str	x8, [x0, #4216]
-	adrp	x8, check_ctor_return_2_asm_h
-	add	x8, x8, :lo12:check_ctor_return_2_asm_h
-	str	x8, [x0, #4224]
-	adrp	x8, check_ctor_2_asm_h
-	add	x8, x8, :lo12:check_ctor_2_asm_h
-	str	x8, [x0, #4232]
-	adrp	x8, check_brand_2_asm_h
-	add	x8, x8, :lo12:check_brand_2_asm_h
-	str	x8, [x0, #4240]
-	adrp	x8, add_brand_2_asm_h
-	add	x8, x8, :lo12:add_brand_2_asm_h
-	str	x8, [x0, #4248]
-	adrp	x8, return_async_2_asm_h
-	add	x8, x8, :lo12:return_async_2_asm_h
-	str	x8, [x0, #4256]
-	adrp	x8, throw_2_asm_h
-	add	x8, x8, :lo12:throw_2_asm_h
-	str	x8, [x0, #4264]
-	adrp	x8, throw_var_2_asm_h
-	add	x8, x8, :lo12:throw_var_2_asm_h
-	str	x8, [x0, #4272]
-	adrp	x8, eval_2_asm_h
-	add	x8, x8, :lo12:eval_2_asm_h
-	str	x8, [x0, #4280]
-	adrp	x8, regexp_2_asm_h
-	add	x8, x8, :lo12:regexp_2_asm_h
-	str	x8, [x0, #4288]
-	adrp	x8, get_super_ctor_2_asm_h
-	add	x8, x8, :lo12:get_super_ctor_2_asm_h
-	str	x8, [x0, #4296]
-	adrp	x8, get_super_2_asm_h
-	add	x8, x8, :lo12:get_super_2_asm_h
-	str	x8, [x0, #4304]
-	adrp	x8, import_2_asm_h
-	add	x8, x8, :lo12:import_2_asm_h
-	str	x8, [x0, #4312]
-	adrp	x8, check_var_2_asm_h
-	add	x8, x8, :lo12:check_var_2_asm_h
-	str	x8, [x0, #4320]
-	adrp	x8, get_var_undef_2_asm_h
-	add	x8, x8, :lo12:get_var_undef_2_asm_h
-	str	x8, [x0, #4328]
-	adrp	x8, get_var_2_asm_h
-	add	x8, x8, :lo12:get_var_2_asm_h
-	str	x8, [x0, #4336]
-	adrp	x8, put_var_2_asm_h
-	add	x8, x8, :lo12:put_var_2_asm_h
-	str	x8, [x0, #4344]
-	adrp	x8, put_var_init_2_asm_h
-	add	x8, x8, :lo12:put_var_init_2_asm_h
-	str	x8, [x0, #4352]
-	adrp	x8, put_var_strict_2_asm_h
-	add	x8, x8, :lo12:put_var_strict_2_asm_h
-	str	x8, [x0, #4360]
-	adrp	x8, get_ref_value_2_asm_h
-	add	x8, x8, :lo12:get_ref_value_2_asm_h
-	str	x8, [x0, #4368]
-	adrp	x8, put_ref_value_2_asm_h
-	add	x8, x8, :lo12:put_ref_value_2_asm_h
-	str	x8, [x0, #4376]
-	adrp	x8, define_var_2_asm_h
-	add	x8, x8, :lo12:define_var_2_asm_h
-	str	x8, [x0, #4384]
-	adrp	x8, check_define_var_2_asm_h
-	add	x8, x8, :lo12:check_define_var_2_asm_h
-	str	x8, [x0, #4392]
-	adrp	x8, define_func_2_asm_h
-	add	x8, x8, :lo12:define_func_2_asm_h
-	str	x8, [x0, #4400]
-	adrp	x8, get_field_2_asm_h
-	add	x8, x8, :lo12:get_field_2_asm_h
-	str	x8, [x0, #4408]
-	adrp	x8, get_field2_2_asm_h
-	add	x8, x8, :lo12:get_field2_2_asm_h
-	str	x8, [x0, #4416]
-	adrp	x8, put_field_2_asm_h
-	add	x8, x8, :lo12:put_field_2_asm_h
-	str	x8, [x0, #4424]
-	adrp	x8, get_private_field_2_asm_h
-	add	x8, x8, :lo12:get_private_field_2_asm_h
-	str	x8, [x0, #4432]
-	adrp	x8, put_private_field_2_asm_h
-	add	x8, x8, :lo12:put_private_field_2_asm_h
-	str	x8, [x0, #4440]
-	adrp	x8, define_private_field_2_asm_h
-	add	x8, x8, :lo12:define_private_field_2_asm_h
-	str	x8, [x0, #4448]
-	adrp	x8, get_array_el_2_asm_h
-	add	x8, x8, :lo12:get_array_el_2_asm_h
-	str	x8, [x0, #4456]
-	adrp	x8, get_array_el2_2_asm_h
-	add	x8, x8, :lo12:get_array_el2_2_asm_h
-	str	x8, [x0, #4464]
-	adrp	x8, put_array_el_2_asm_h
-	add	x8, x8, :lo12:put_array_el_2_asm_h
-	str	x8, [x0, #4472]
-	adrp	x8, get_super_value_2_asm_h
-	add	x8, x8, :lo12:get_super_value_2_asm_h
-	str	x8, [x0, #4480]
-	adrp	x8, put_super_value_2_asm_h
-	add	x8, x8, :lo12:put_super_value_2_asm_h
-	str	x8, [x0, #4488]
-	adrp	x8, define_field_2_asm_h
-	add	x8, x8, :lo12:define_field_2_asm_h
-	str	x8, [x0, #4496]
-	adrp	x8, set_name_2_asm_h
-	add	x8, x8, :lo12:set_name_2_asm_h
-	str	x8, [x0, #4504]
-	adrp	x8, set_name_computed_2_asm_h
-	add	x8, x8, :lo12:set_name_computed_2_asm_h
-	str	x8, [x0, #4512]
-	adrp	x8, set_proto_2_asm_h
-	add	x8, x8, :lo12:set_proto_2_asm_h
-	str	x8, [x0, #4520]
-	adrp	x8, set_home_object_2_asm_h
-	add	x8, x8, :lo12:set_home_object_2_asm_h
-	str	x8, [x0, #4528]
-	adrp	x8, define_array_el_2_asm_h
-	add	x8, x8, :lo12:define_array_el_2_asm_h
-	str	x8, [x0, #4536]
-	adrp	x8, append_2_asm_h
-	add	x8, x8, :lo12:append_2_asm_h
-	str	x8, [x0, #4544]
-	adrp	x8, copy_data_properties_2_asm_h
-	add	x8, x8, :lo12:copy_data_properties_2_asm_h
-	str	x8, [x0, #4552]
-	adrp	x8, define_method_2_asm_h
-	add	x8, x8, :lo12:define_method_2_asm_h
-	str	x8, [x0, #4560]
-	adrp	x8, define_method_computed_2_asm_h
-	add	x8, x8, :lo12:define_method_computed_2_asm_h
-	str	x8, [x0, #4568]
-	adrp	x8, define_class_2_asm_h
-	add	x8, x8, :lo12:define_class_2_asm_h
-	str	x8, [x0, #4576]
-	adrp	x8, get_loc_2_asm_h
-	add	x8, x8, :lo12:get_loc_2_asm_h
-	str	x8, [x0, #4584]
-	adrp	x8, put_loc_2_asm_h
-	add	x8, x8, :lo12:put_loc_2_asm_h
-	str	x8, [x0, #4592]
-	adrp	x8, set_loc_2_asm_h
-	add	x8, x8, :lo12:set_loc_2_asm_h
-	str	x8, [x0, #4600]
-	adrp	x8, get_arg_2_asm_h
-	add	x8, x8, :lo12:get_arg_2_asm_h
-	str	x8, [x0, #4608]
-	adrp	x8, put_arg_2_asm_h
-	add	x8, x8, :lo12:put_arg_2_asm_h
-	str	x8, [x0, #4616]
-	adrp	x8, set_arg_2_asm_h
-	add	x8, x8, :lo12:set_arg_2_asm_h
-	str	x8, [x0, #4624]
-	adrp	x8, get_var_ref_2_asm_h
-	add	x8, x8, :lo12:get_var_ref_2_asm_h
-	str	x8, [x0, #4632]
-	adrp	x8, put_var_ref_2_asm_h
-	add	x8, x8, :lo12:put_var_ref_2_asm_h
-	str	x8, [x0, #4640]
-	adrp	x8, set_var_ref_2_asm_h
-	add	x8, x8, :lo12:set_var_ref_2_asm_h
-	str	x8, [x0, #4648]
-	adrp	x8, set_loc_uninitialized_2_asm_h
-	add	x8, x8, :lo12:set_loc_uninitialized_2_asm_h
-	str	x8, [x0, #4656]
-	adrp	x8, get_loc_check_2_asm_h
-	add	x8, x8, :lo12:get_loc_check_2_asm_h
-	str	x8, [x0, #4664]
-	adrp	x8, put_loc_check_2_asm_h
-	add	x8, x8, :lo12:put_loc_check_2_asm_h
-	str	x8, [x0, #4672]
-	adrp	x8, put_loc_check_init_2_asm_h
-	add	x8, x8, :lo12:put_loc_check_init_2_asm_h
-	str	x8, [x0, #4680]
-	adrp	x8, get_var_ref_check_2_asm_h
-	add	x8, x8, :lo12:get_var_ref_check_2_asm_h
-	str	x8, [x0, #4688]
-	adrp	x8, put_var_ref_check_2_asm_h
-	add	x8, x8, :lo12:put_var_ref_check_2_asm_h
-	str	x8, [x0, #4696]
-	adrp	x8, put_var_ref_check_init_2_asm_h
-	add	x8, x8, :lo12:put_var_ref_check_init_2_asm_h
-	str	x8, [x0, #4704]
-	adrp	x8, close_loc_2_asm_h
-	add	x8, x8, :lo12:close_loc_2_asm_h
-	str	x8, [x0, #4712]
-	adrp	x8, if_false_2_asm_h
-	add	x8, x8, :lo12:if_false_2_asm_h
-	str	x8, [x0, #4720]
-	adrp	x8, if_true_2_asm_h
-	add	x8, x8, :lo12:if_true_2_asm_h
-	str	x8, [x0, #4728]
-	adrp	x8, goto_2_asm_h
-	add	x8, x8, :lo12:goto_2_asm_h
-	str	x8, [x0, #4736]
-	adrp	x8, catch_2_asm_h
-	add	x8, x8, :lo12:catch_2_asm_h
-	str	x8, [x0, #4744]
-	adrp	x8, gosub_2_asm_h
-	add	x8, x8, :lo12:gosub_2_asm_h
-	str	x8, [x0, #4752]
-	adrp	x8, ret_2_asm_h
-	add	x8, x8, :lo12:ret_2_asm_h
-	str	x8, [x0, #4760]
-	adrp	x8, to_object_2_asm_h
-	add	x8, x8, :lo12:to_object_2_asm_h
-	str	x8, [x0, #4768]
-	adrp	x8, to_propkey_2_asm_h
-	add	x8, x8, :lo12:to_propkey_2_asm_h
-	str	x8, [x0, #4776]
-	adrp	x8, to_propkey2_2_asm_h
-	add	x8, x8, :lo12:to_propkey2_2_asm_h
-	str	x8, [x0, #4784]
-	adrp	x8, with_get_var_2_asm_h
-	add	x8, x8, :lo12:with_get_var_2_asm_h
-	str	x8, [x0, #4792]
-	adrp	x8, with_put_var_2_asm_h
-	add	x8, x8, :lo12:with_put_var_2_asm_h
-	str	x8, [x0, #4800]
-	adrp	x8, with_delete_var_2_asm_h
-	add	x8, x8, :lo12:with_delete_var_2_asm_h
-	str	x8, [x0, #4808]
-	adrp	x8, with_make_ref_2_asm_h
-	add	x8, x8, :lo12:with_make_ref_2_asm_h
-	str	x8, [x0, #4816]
-	adrp	x8, with_get_ref_2_asm_h
-	add	x8, x8, :lo12:with_get_ref_2_asm_h
-	str	x8, [x0, #4824]
-	adrp	x8, with_get_ref_undef_2_asm_h
-	add	x8, x8, :lo12:with_get_ref_undef_2_asm_h
-	str	x8, [x0, #4832]
-	adrp	x8, make_loc_ref_2_asm_h
-	add	x8, x8, :lo12:make_loc_ref_2_asm_h
-	str	x8, [x0, #4840]
-	adrp	x8, make_arg_ref_2_asm_h
-	add	x8, x8, :lo12:make_arg_ref_2_asm_h
-	str	x8, [x0, #4848]
-	adrp	x8, make_var_ref_ref_2_asm_h
-	add	x8, x8, :lo12:make_var_ref_ref_2_asm_h
-	str	x8, [x0, #4856]
-	adrp	x8, make_var_ref_2_asm_h
-	add	x8, x8, :lo12:make_var_ref_2_asm_h
-	str	x8, [x0, #4864]
-	adrp	x8, for_in_start_2_asm_h
-	add	x8, x8, :lo12:for_in_start_2_asm_h
-	str	x8, [x0, #4872]
-	adrp	x8, for_of_start_2_asm_h
-	add	x8, x8, :lo12:for_of_start_2_asm_h
-	str	x8, [x0, #4880]
-	adrp	x8, for_await_of_start_2_asm_h
-	add	x8, x8, :lo12:for_await_of_start_2_asm_h
-	str	x8, [x0, #4888]
-	adrp	x8, for_in_next_2_asm_h
-	add	x8, x8, :lo12:for_in_next_2_asm_h
-	str	x8, [x0, #4896]
-	adrp	x8, for_of_next_2_asm_h
-	add	x8, x8, :lo12:for_of_next_2_asm_h
-	str	x8, [x0, #4904]
-	adrp	x8, for_await_of_next_2_asm_h
-	add	x8, x8, :lo12:for_await_of_next_2_asm_h
-	str	x8, [x0, #4912]
-	adrp	x8, iterator_get_value_done_2_asm_h
-	add	x8, x8, :lo12:iterator_get_value_done_2_asm_h
-	str	x8, [x0, #4920]
-	adrp	x8, iterator_close_2_asm_h
-	add	x8, x8, :lo12:iterator_close_2_asm_h
-	str	x8, [x0, #4928]
-	adrp	x8, iterator_close_return_2_asm_h
-	add	x8, x8, :lo12:iterator_close_return_2_asm_h
-	str	x8, [x0, #4936]
-	adrp	x8, async_iterator_close_2_asm_h
-	add	x8, x8, :lo12:async_iterator_close_2_asm_h
-	str	x8, [x0, #4944]
-	adrp	x8, async_iterator_next_2_asm_h
-	add	x8, x8, :lo12:async_iterator_next_2_asm_h
-	str	x8, [x0, #4952]
-	adrp	x8, async_iterator_get_2_asm_h
-	add	x8, x8, :lo12:async_iterator_get_2_asm_h
-	str	x8, [x0, #4960]
-	adrp	x8, initial_yield_2_asm_h
-	add	x8, x8, :lo12:initial_yield_2_asm_h
-	str	x8, [x0, #4968]
-	adrp	x8, yield_2_asm_h
-	add	x8, x8, :lo12:yield_2_asm_h
-	str	x8, [x0, #4976]
-	adrp	x8, yield_star_2_asm_h
-	add	x8, x8, :lo12:yield_star_2_asm_h
-	str	x8, [x0, #4984]
-	adrp	x8, async_yield_star_2_asm_h
-	add	x8, x8, :lo12:async_yield_star_2_asm_h
-	str	x8, [x0, #4992]
-	adrp	x8, await_2_asm_h
-	add	x8, x8, :lo12:await_2_asm_h
-	str	x8, [x0, #5000]
-	adrp	x8, neg_2_asm_h
-	add	x8, x8, :lo12:neg_2_asm_h
-	str	x8, [x0, #5008]
-	adrp	x8, plus_2_asm_h
-	add	x8, x8, :lo12:plus_2_asm_h
-	str	x8, [x0, #5016]
-	adrp	x8, dec_2_asm_h
-	add	x8, x8, :lo12:dec_2_asm_h
-	str	x8, [x0, #5024]
-	adrp	x8, inc_2_asm_h
-	add	x8, x8, :lo12:inc_2_asm_h
-	str	x8, [x0, #5032]
-	adrp	x8, post_dec_2_asm_h
-	add	x8, x8, :lo12:post_dec_2_asm_h
-	str	x8, [x0, #5040]
-	adrp	x8, post_inc_2_asm_h
-	add	x8, x8, :lo12:post_inc_2_asm_h
-	str	x8, [x0, #5048]
-	adrp	x8, dec_loc_2_asm_h
-	add	x8, x8, :lo12:dec_loc_2_asm_h
-	str	x8, [x0, #5056]
-	adrp	x8, inc_loc_2_asm_h
-	add	x8, x8, :lo12:inc_loc_2_asm_h
-	str	x8, [x0, #5064]
-	adrp	x8, add_loc_2_asm_h
-	add	x8, x8, :lo12:add_loc_2_asm_h
-	str	x8, [x0, #5072]
-	adrp	x8, not_2_asm_h
-	add	x8, x8, :lo12:not_2_asm_h
-	str	x8, [x0, #5080]
-	adrp	x8, lnot_2_asm_h
-	add	x8, x8, :lo12:lnot_2_asm_h
-	str	x8, [x0, #5088]
-	adrp	x8, typeof_2_asm_h
-	add	x8, x8, :lo12:typeof_2_asm_h
-	str	x8, [x0, #5096]
-	adrp	x8, delete_2_asm_h
-	add	x8, x8, :lo12:delete_2_asm_h
-	str	x8, [x0, #5104]
-	adrp	x8, delete_var_2_asm_h
-	add	x8, x8, :lo12:delete_var_2_asm_h
-	str	x8, [x0, #5112]
-	adrp	x8, mul_2_asm_h
-	add	x8, x8, :lo12:mul_2_asm_h
-	str	x8, [x0, #5120]
-	adrp	x8, div_2_asm_h
-	add	x8, x8, :lo12:div_2_asm_h
-	str	x8, [x0, #5128]
-	adrp	x8, mod_2_asm_h
-	add	x8, x8, :lo12:mod_2_asm_h
-	str	x8, [x0, #5136]
-	adrp	x8, add_2_asm_h
-	add	x8, x8, :lo12:add_2_asm_h
-	str	x8, [x0, #5144]
-	adrp	x8, sub_2_asm_h
-	add	x8, x8, :lo12:sub_2_asm_h
-	str	x8, [x0, #5152]
-	adrp	x8, pow_2_asm_h
-	add	x8, x8, :lo12:pow_2_asm_h
-	str	x8, [x0, #5160]
-	adrp	x8, shl_2_asm_h
-	add	x8, x8, :lo12:shl_2_asm_h
-	str	x8, [x0, #5168]
-	adrp	x8, sar_2_asm_h
-	add	x8, x8, :lo12:sar_2_asm_h
-	str	x8, [x0, #5176]
-	adrp	x8, shr_2_asm_h
-	add	x8, x8, :lo12:shr_2_asm_h
-	str	x8, [x0, #5184]
-	adrp	x8, lt_2_asm_h
-	add	x8, x8, :lo12:lt_2_asm_h
-	str	x8, [x0, #5192]
-	adrp	x8, lte_2_asm_h
-	add	x8, x8, :lo12:lte_2_asm_h
-	str	x8, [x0, #5200]
-	adrp	x8, gt_2_asm_h
-	add	x8, x8, :lo12:gt_2_asm_h
-	str	x8, [x0, #5208]
-	adrp	x8, gte_2_asm_h
-	add	x8, x8, :lo12:gte_2_asm_h
-	str	x8, [x0, #5216]
-	adrp	x8, instanceof_2_asm_h
-	add	x8, x8, :lo12:instanceof_2_asm_h
-	str	x8, [x0, #5224]
-	adrp	x8, in_2_asm_h
-	add	x8, x8, :lo12:in_2_asm_h
-	str	x8, [x0, #5232]
-	adrp	x8, eq_2_asm_h
-	add	x8, x8, :lo12:eq_2_asm_h
-	str	x8, [x0, #5240]
-	adrp	x8, neq_2_asm_h
-	add	x8, x8, :lo12:neq_2_asm_h
-	str	x8, [x0, #5248]
-	adrp	x8, strict_eq_2_asm_h
-	add	x8, x8, :lo12:strict_eq_2_asm_h
-	str	x8, [x0, #5256]
-	adrp	x8, strict_neq_2_asm_h
-	add	x8, x8, :lo12:strict_neq_2_asm_h
-	str	x8, [x0, #5264]
-	adrp	x8, and_2_asm_h
-	add	x8, x8, :lo12:and_2_asm_h
-	str	x8, [x0, #5272]
-	adrp	x8, xor_2_asm_h
-	add	x8, x8, :lo12:xor_2_asm_h
-	str	x8, [x0, #5280]
-	adrp	x8, or_2_asm_h
-	add	x8, x8, :lo12:or_2_asm_h
-	str	x8, [x0, #5288]
-	adrp	x8, nop_2_asm_h
-	add	x8, x8, :lo12:nop_2_asm_h
-	str	x8, [x0, #5296]
-	adrp	x8, push_minus1_2_asm_h
-	add	x8, x8, :lo12:push_minus1_2_asm_h
-	str	x8, [x0, #5304]
-	adrp	x8, push_0_2_asm_h
-	add	x8, x8, :lo12:push_0_2_asm_h
-	str	x8, [x0, #5312]
-	adrp	x8, push_1_2_asm_h
-	add	x8, x8, :lo12:push_1_2_asm_h
-	str	x8, [x0, #5320]
-	adrp	x8, push_2_2_asm_h
-	add	x8, x8, :lo12:push_2_2_asm_h
-	str	x8, [x0, #5328]
-	adrp	x8, push_3_2_asm_h
-	add	x8, x8, :lo12:push_3_2_asm_h
-	str	x8, [x0, #5336]
-	adrp	x8, push_4_2_asm_h
-	add	x8, x8, :lo12:push_4_2_asm_h
-	str	x8, [x0, #5344]
-	adrp	x8, push_5_2_asm_h
-	add	x8, x8, :lo12:push_5_2_asm_h
-	str	x8, [x0, #5352]
-	adrp	x8, push_6_2_asm_h
-	add	x8, x8, :lo12:push_6_2_asm_h
-	str	x8, [x0, #5360]
-	adrp	x8, push_7_2_asm_h
-	add	x8, x8, :lo12:push_7_2_asm_h
-	str	x8, [x0, #5368]
-	adrp	x8, push_i8_2_asm_h
-	add	x8, x8, :lo12:push_i8_2_asm_h
-	str	x8, [x0, #5376]
-	adrp	x8, push_i16_2_asm_h
-	add	x8, x8, :lo12:push_i16_2_asm_h
-	str	x8, [x0, #5384]
-	adrp	x8, push_const8_2_asm_h
-	add	x8, x8, :lo12:push_const8_2_asm_h
-	str	x8, [x0, #5392]
-	adrp	x8, fclosure8_2_asm_h
-	add	x8, x8, :lo12:fclosure8_2_asm_h
-	str	x8, [x0, #5400]
-	adrp	x8, push_empty_string_2_asm_h
-	add	x8, x8, :lo12:push_empty_string_2_asm_h
-	str	x8, [x0, #5408]
-	adrp	x8, get_loc8_2_asm_h
-	add	x8, x8, :lo12:get_loc8_2_asm_h
-	str	x8, [x0, #5416]
-	adrp	x8, put_loc8_2_asm_h
-	add	x8, x8, :lo12:put_loc8_2_asm_h
-	str	x8, [x0, #5424]
-	adrp	x8, set_loc8_2_asm_h
-	add	x8, x8, :lo12:set_loc8_2_asm_h
-	str	x8, [x0, #5432]
-	adrp	x8, get_loc0_2_asm_h
-	add	x8, x8, :lo12:get_loc0_2_asm_h
-	str	x8, [x0, #5440]
-	adrp	x8, get_loc1_2_asm_h
-	add	x8, x8, :lo12:get_loc1_2_asm_h
-	str	x8, [x0, #5448]
-	adrp	x8, get_loc2_2_asm_h
-	add	x8, x8, :lo12:get_loc2_2_asm_h
-	str	x8, [x0, #5456]
-	adrp	x8, get_loc3_2_asm_h
-	add	x8, x8, :lo12:get_loc3_2_asm_h
-	str	x8, [x0, #5464]
-	adrp	x8, put_loc0_2_asm_h
-	add	x8, x8, :lo12:put_loc0_2_asm_h
-	str	x8, [x0, #5472]
-	adrp	x8, put_loc1_2_asm_h
-	add	x8, x8, :lo12:put_loc1_2_asm_h
-	str	x8, [x0, #5480]
-	adrp	x8, put_loc2_2_asm_h
-	add	x8, x8, :lo12:put_loc2_2_asm_h
-	str	x8, [x0, #5488]
-	adrp	x8, put_loc3_2_asm_h
-	add	x8, x8, :lo12:put_loc3_2_asm_h
-	str	x8, [x0, #5496]
-	adrp	x8, set_loc0_2_asm_h
-	add	x8, x8, :lo12:set_loc0_2_asm_h
-	str	x8, [x0, #5504]
-	adrp	x8, set_loc1_2_asm_h
-	add	x8, x8, :lo12:set_loc1_2_asm_h
-	str	x8, [x0, #5512]
-	adrp	x8, set_loc2_2_asm_h
-	add	x8, x8, :lo12:set_loc2_2_asm_h
-	str	x8, [x0, #5520]
-	adrp	x8, set_loc3_2_asm_h
-	add	x8, x8, :lo12:set_loc3_2_asm_h
-	str	x8, [x0, #5528]
-	adrp	x8, get_arg0_2_asm_h
-	add	x8, x8, :lo12:get_arg0_2_asm_h
-	str	x8, [x0, #5536]
-	adrp	x8, get_arg1_2_asm_h
-	add	x8, x8, :lo12:get_arg1_2_asm_h
-	str	x8, [x0, #5544]
-	adrp	x8, get_arg2_2_asm_h
-	add	x8, x8, :lo12:get_arg2_2_asm_h
-	str	x8, [x0, #5552]
-	adrp	x8, get_arg3_2_asm_h
-	add	x8, x8, :lo12:get_arg3_2_asm_h
-	str	x8, [x0, #5560]
-	adrp	x8, put_arg0_2_asm_h
-	add	x8, x8, :lo12:put_arg0_2_asm_h
-	str	x8, [x0, #5568]
-	adrp	x8, put_arg1_2_asm_h
-	add	x8, x8, :lo12:put_arg1_2_asm_h
-	str	x8, [x0, #5576]
-	adrp	x8, put_arg2_2_asm_h
-	add	x8, x8, :lo12:put_arg2_2_asm_h
-	str	x8, [x0, #5584]
-	adrp	x8, put_arg3_2_asm_h
-	add	x8, x8, :lo12:put_arg3_2_asm_h
-	str	x8, [x0, #5592]
-	adrp	x8, set_arg0_2_asm_h
-	add	x8, x8, :lo12:set_arg0_2_asm_h
-	str	x8, [x0, #5600]
-	adrp	x8, set_arg1_2_asm_h
-	add	x8, x8, :lo12:set_arg1_2_asm_h
-	str	x8, [x0, #5608]
-	adrp	x8, set_arg2_2_asm_h
-	add	x8, x8, :lo12:set_arg2_2_asm_h
-	str	x8, [x0, #5616]
-	adrp	x8, set_arg3_2_asm_h
-	add	x8, x8, :lo12:set_arg3_2_asm_h
-	str	x8, [x0, #5624]
-	adrp	x8, get_var_ref0_2_asm_h
-	add	x8, x8, :lo12:get_var_ref0_2_asm_h
-	str	x8, [x0, #5632]
-	adrp	x8, get_var_ref1_2_asm_h
-	add	x8, x8, :lo12:get_var_ref1_2_asm_h
-	str	x8, [x0, #5640]
-	adrp	x8, get_var_ref2_2_asm_h
-	add	x8, x8, :lo12:get_var_ref2_2_asm_h
-	str	x8, [x0, #5648]
-	adrp	x8, get_var_ref3_2_asm_h
-	add	x8, x8, :lo12:get_var_ref3_2_asm_h
-	str	x8, [x0, #5656]
-	adrp	x8, put_var_ref0_2_asm_h
-	add	x8, x8, :lo12:put_var_ref0_2_asm_h
-	str	x8, [x0, #5664]
-	adrp	x8, put_var_ref1_2_asm_h
-	add	x8, x8, :lo12:put_var_ref1_2_asm_h
-	str	x8, [x0, #5672]
-	adrp	x8, put_var_ref2_2_asm_h
-	add	x8, x8, :lo12:put_var_ref2_2_asm_h
-	str	x8, [x0, #5680]
-	adrp	x8, put_var_ref3_2_asm_h
-	add	x8, x8, :lo12:put_var_ref3_2_asm_h
-	str	x8, [x0, #5688]
-	adrp	x8, set_var_ref0_2_asm_h
-	add	x8, x8, :lo12:set_var_ref0_2_asm_h
-	str	x8, [x0, #5696]
-	adrp	x8, set_var_ref1_2_asm_h
-	add	x8, x8, :lo12:set_var_ref1_2_asm_h
-	str	x8, [x0, #5704]
-	adrp	x8, set_var_ref2_2_asm_h
-	add	x8, x8, :lo12:set_var_ref2_2_asm_h
-	str	x8, [x0, #5712]
-	adrp	x8, set_var_ref3_2_asm_h
-	add	x8, x8, :lo12:set_var_ref3_2_asm_h
-	str	x8, [x0, #5720]
-	adrp	x8, get_length_2_asm_h
-	add	x8, x8, :lo12:get_length_2_asm_h
-	str	x8, [x0, #5728]
-	adrp	x8, if_false8_2_asm_h
-	add	x8, x8, :lo12:if_false8_2_asm_h
-	str	x8, [x0, #5736]
-	adrp	x8, if_true8_2_asm_h
-	add	x8, x8, :lo12:if_true8_2_asm_h
-	str	x8, [x0, #5744]
-	adrp	x8, goto8_2_asm_h
-	add	x8, x8, :lo12:goto8_2_asm_h
-	str	x8, [x0, #5752]
-	adrp	x8, goto16_2_asm_h
-	add	x8, x8, :lo12:goto16_2_asm_h
-	str	x8, [x0, #5760]
-	adrp	x8, call0_2_asm_h
-	add	x8, x8, :lo12:call0_2_asm_h
-	str	x8, [x0, #5768]
-	adrp	x8, call1_2_asm_h
-	add	x8, x8, :lo12:call1_2_asm_h
-	str	x8, [x0, #5776]
-	adrp	x8, call2_2_asm_h
-	add	x8, x8, :lo12:call2_2_asm_h
-	str	x8, [x0, #5784]
-	adrp	x8, call3_2_asm_h
-	add	x8, x8, :lo12:call3_2_asm_h
-	str	x8, [x0, #5792]
-	adrp	x8, is_undefined_2_asm_h
-	add	x8, x8, :lo12:is_undefined_2_asm_h
-	str	x8, [x0, #5800]
-	adrp	x8, is_null_2_asm_h
-	add	x8, x8, :lo12:is_null_2_asm_h
-	str	x8, [x0, #5808]
-	adrp	x8, is_function_2_asm_h
-	add	x8, x8, :lo12:is_function_2_asm_h
-	str	x8, [x0, #5816]
-	adrp	x8, inc_coverage_2_asm_h
-	add	x8, x8, :lo12:inc_coverage_2_asm_h
-	str	x8, [x0, #5824]
-	ldp	x29, x30, [sp], #16             // 16-byte Folded Reload
-	ret
-.Lfunc_end750:
-	.size	InstallBcHandler, .Lfunc_end750-InstallBcHandler
-	.cfi_endproc
-                                        // -- End function
 	.hidden	_call_stub_entry                // -- Begin function _call_stub_entry
 	.globl	_call_stub_entry
 	.p2align	2
@@ -27119,8 +24946,8 @@ _call_stub_entry:                       // @_call_stub_entry
 	ldp	x26, x25, [sp, #16]             // 16-byte Folded Reload
 	ldp	x28, x27, [sp], #96             // 16-byte Folded Reload
 	ret
-.Lfunc_end751:
-	.size	_call_stub_entry, .Lfunc_end751-_call_stub_entry
+.Lfunc_end750:
+	.size	_call_stub_entry, .Lfunc_end750-_call_stub_entry
 	.cfi_endproc
                                         // -- End function
 	.type	.L__unnamed_1,@object           // @0
@@ -27243,6 +25070,1472 @@ _call_stub_entry:                       // @_call_stub_entry
 .L__unnamed_20:
 	.asciz	"value has no property"
 	.size	.L__unnamed_20, 22
+
+	.hidden	primjs_dispatch_table           // @primjs_dispatch_table
+	.type	primjs_dispatch_table,@object
+	.section	.data.rel.ro,"aw",@progbits
+	.globl	primjs_dispatch_table
+	.p2align	3, 0x0
+primjs_dispatch_table:
+	.xword	invalid_0_asm_h
+	.xword	push_i32_0_asm_h
+	.xword	push_const_0_asm_h
+	.xword	fclosure_0_asm_h
+	.xword	push_atom_value_0_asm_h
+	.xword	private_symbol_0_asm_h
+	.xword	undefined_0_asm_h
+	.xword	null_0_asm_h
+	.xword	push_this_0_asm_h
+	.xword	push_false_0_asm_h
+	.xword	push_true_0_asm_h
+	.xword	object_0_asm_h
+	.xword	special_object_0_asm_h
+	.xword	rest_0_asm_h
+	.xword	drop_0_asm_h
+	.xword	nip_0_asm_h
+	.xword	nip1_0_asm_h
+	.xword	dup_0_asm_h
+	.xword	dup1_0_asm_h
+	.xword	dup2_0_asm_h
+	.xword	dup3_0_asm_h
+	.xword	insert2_0_asm_h
+	.xword	insert3_0_asm_h
+	.xword	insert4_0_asm_h
+	.xword	perm3_0_asm_h
+	.xword	perm4_0_asm_h
+	.xword	perm5_0_asm_h
+	.xword	swap_0_asm_h
+	.xword	swap2_0_asm_h
+	.xword	rot3l_0_asm_h
+	.xword	rot3r_0_asm_h
+	.xword	rot4l_0_asm_h
+	.xword	rot5l_0_asm_h
+	.xword	call_constructor_0_asm_h
+	.xword	call_0_asm_h
+	.xword	tail_call_0_asm_h
+	.xword	call_method_0_asm_h
+	.xword	tail_call_method_0_asm_h
+	.xword	array_from_0_asm_h
+	.xword	apply_0_asm_h
+	.xword	return_0_asm_h
+	.xword	return_undef_0_asm_h
+	.xword	check_ctor_return_0_asm_h
+	.xword	check_ctor_0_asm_h
+	.xword	check_brand_0_asm_h
+	.xword	add_brand_0_asm_h
+	.xword	return_async_0_asm_h
+	.xword	throw_0_asm_h
+	.xword	throw_var_0_asm_h
+	.xword	eval_0_asm_h
+	.xword	regexp_0_asm_h
+	.xword	get_super_ctor_0_asm_h
+	.xword	get_super_0_asm_h
+	.xword	import_0_asm_h
+	.xword	check_var_0_asm_h
+	.xword	get_var_undef_0_asm_h
+	.xword	get_var_0_asm_h
+	.xword	put_var_0_asm_h
+	.xword	put_var_init_0_asm_h
+	.xword	put_var_strict_0_asm_h
+	.xword	get_ref_value_0_asm_h
+	.xword	put_ref_value_0_asm_h
+	.xword	define_var_0_asm_h
+	.xword	check_define_var_0_asm_h
+	.xword	define_func_0_asm_h
+	.xword	get_field_0_asm_h
+	.xword	get_field2_0_asm_h
+	.xword	put_field_0_asm_h
+	.xword	get_private_field_0_asm_h
+	.xword	put_private_field_0_asm_h
+	.xword	define_private_field_0_asm_h
+	.xword	get_array_el_0_asm_h
+	.xword	get_array_el2_0_asm_h
+	.xword	put_array_el_0_asm_h
+	.xword	get_super_value_0_asm_h
+	.xword	put_super_value_0_asm_h
+	.xword	define_field_0_asm_h
+	.xword	set_name_0_asm_h
+	.xword	set_name_computed_0_asm_h
+	.xword	set_proto_0_asm_h
+	.xword	set_home_object_0_asm_h
+	.xword	define_array_el_0_asm_h
+	.xword	append_0_asm_h
+	.xword	copy_data_properties_0_asm_h
+	.xword	define_method_0_asm_h
+	.xword	define_method_computed_0_asm_h
+	.xword	define_class_0_asm_h
+	.xword	get_loc_0_asm_h
+	.xword	put_loc_0_asm_h
+	.xword	set_loc_0_asm_h
+	.xword	get_arg_0_asm_h
+	.xword	put_arg_0_asm_h
+	.xword	set_arg_0_asm_h
+	.xword	get_var_ref_0_asm_h
+	.xword	put_var_ref_0_asm_h
+	.xword	set_var_ref_0_asm_h
+	.xword	set_loc_uninitialized_0_asm_h
+	.xword	get_loc_check_0_asm_h
+	.xword	put_loc_check_0_asm_h
+	.xword	put_loc_check_init_0_asm_h
+	.xword	get_var_ref_check_0_asm_h
+	.xword	put_var_ref_check_0_asm_h
+	.xword	put_var_ref_check_init_0_asm_h
+	.xword	close_loc_0_asm_h
+	.xword	if_false_0_asm_h
+	.xword	if_true_0_asm_h
+	.xword	goto_0_asm_h
+	.xword	catch_0_asm_h
+	.xword	gosub_0_asm_h
+	.xword	ret_0_asm_h
+	.xword	to_object_0_asm_h
+	.xword	to_propkey_0_asm_h
+	.xword	to_propkey2_0_asm_h
+	.xword	with_get_var_0_asm_h
+	.xword	with_put_var_0_asm_h
+	.xword	with_delete_var_0_asm_h
+	.xword	with_make_ref_0_asm_h
+	.xword	with_get_ref_0_asm_h
+	.xword	with_get_ref_undef_0_asm_h
+	.xword	make_loc_ref_0_asm_h
+	.xword	make_arg_ref_0_asm_h
+	.xword	make_var_ref_ref_0_asm_h
+	.xword	make_var_ref_0_asm_h
+	.xword	for_in_start_0_asm_h
+	.xword	for_of_start_0_asm_h
+	.xword	for_await_of_start_0_asm_h
+	.xword	for_in_next_0_asm_h
+	.xword	for_of_next_0_asm_h
+	.xword	for_await_of_next_0_asm_h
+	.xword	iterator_get_value_done_0_asm_h
+	.xword	iterator_close_0_asm_h
+	.xword	iterator_close_return_0_asm_h
+	.xword	async_iterator_close_0_asm_h
+	.xword	async_iterator_next_0_asm_h
+	.xword	async_iterator_get_0_asm_h
+	.xword	initial_yield_0_asm_h
+	.xword	yield_0_asm_h
+	.xword	yield_star_0_asm_h
+	.xword	async_yield_star_0_asm_h
+	.xword	await_0_asm_h
+	.xword	neg_0_asm_h
+	.xword	plus_0_asm_h
+	.xword	dec_0_asm_h
+	.xword	inc_0_asm_h
+	.xword	post_dec_0_asm_h
+	.xword	post_inc_0_asm_h
+	.xword	dec_loc_0_asm_h
+	.xword	inc_loc_0_asm_h
+	.xword	add_loc_0_asm_h
+	.xword	not_0_asm_h
+	.xword	lnot_0_asm_h
+	.xword	typeof_0_asm_h
+	.xword	delete_0_asm_h
+	.xword	delete_var_0_asm_h
+	.xword	mul_0_asm_h
+	.xword	div_0_asm_h
+	.xword	mod_0_asm_h
+	.xword	add_0_asm_h
+	.xword	sub_0_asm_h
+	.xword	pow_0_asm_h
+	.xword	shl_0_asm_h
+	.xword	sar_0_asm_h
+	.xword	shr_0_asm_h
+	.xword	lt_0_asm_h
+	.xword	lte_0_asm_h
+	.xword	gt_0_asm_h
+	.xword	gte_0_asm_h
+	.xword	instanceof_0_asm_h
+	.xword	in_0_asm_h
+	.xword	eq_0_asm_h
+	.xword	neq_0_asm_h
+	.xword	strict_eq_0_asm_h
+	.xword	strict_neq_0_asm_h
+	.xword	and_0_asm_h
+	.xword	xor_0_asm_h
+	.xword	or_0_asm_h
+	.xword	nop_0_asm_h
+	.xword	push_minus1_0_asm_h
+	.xword	push_0_0_asm_h
+	.xword	push_1_0_asm_h
+	.xword	push_2_0_asm_h
+	.xword	push_3_0_asm_h
+	.xword	push_4_0_asm_h
+	.xword	push_5_0_asm_h
+	.xword	push_6_0_asm_h
+	.xword	push_7_0_asm_h
+	.xword	push_i8_0_asm_h
+	.xword	push_i16_0_asm_h
+	.xword	push_const8_0_asm_h
+	.xword	fclosure8_0_asm_h
+	.xword	push_empty_string_0_asm_h
+	.xword	get_loc8_0_asm_h
+	.xword	put_loc8_0_asm_h
+	.xword	set_loc8_0_asm_h
+	.xword	get_loc0_0_asm_h
+	.xword	get_loc1_0_asm_h
+	.xword	get_loc2_0_asm_h
+	.xword	get_loc3_0_asm_h
+	.xword	put_loc0_0_asm_h
+	.xword	put_loc1_0_asm_h
+	.xword	put_loc2_0_asm_h
+	.xword	put_loc3_0_asm_h
+	.xword	set_loc0_0_asm_h
+	.xword	set_loc1_0_asm_h
+	.xword	set_loc2_0_asm_h
+	.xword	set_loc3_0_asm_h
+	.xword	get_arg0_0_asm_h
+	.xword	get_arg1_0_asm_h
+	.xword	get_arg2_0_asm_h
+	.xword	get_arg3_0_asm_h
+	.xword	put_arg0_0_asm_h
+	.xword	put_arg1_0_asm_h
+	.xword	put_arg2_0_asm_h
+	.xword	put_arg3_0_asm_h
+	.xword	set_arg0_0_asm_h
+	.xword	set_arg1_0_asm_h
+	.xword	set_arg2_0_asm_h
+	.xword	set_arg3_0_asm_h
+	.xword	get_var_ref0_0_asm_h
+	.xword	get_var_ref1_0_asm_h
+	.xword	get_var_ref2_0_asm_h
+	.xword	get_var_ref3_0_asm_h
+	.xword	put_var_ref0_0_asm_h
+	.xword	put_var_ref1_0_asm_h
+	.xword	put_var_ref2_0_asm_h
+	.xword	put_var_ref3_0_asm_h
+	.xword	set_var_ref0_0_asm_h
+	.xword	set_var_ref1_0_asm_h
+	.xword	set_var_ref2_0_asm_h
+	.xword	set_var_ref3_0_asm_h
+	.xword	get_length_0_asm_h
+	.xword	if_false8_0_asm_h
+	.xword	if_true8_0_asm_h
+	.xword	goto8_0_asm_h
+	.xword	goto16_0_asm_h
+	.xword	call0_0_asm_h
+	.xword	call1_0_asm_h
+	.xword	call2_0_asm_h
+	.xword	call3_0_asm_h
+	.xword	is_undefined_0_asm_h
+	.xword	is_null_0_asm_h
+	.xword	is_function_0_asm_h
+	.xword	inc_coverage_0_asm_h
+	.xword	invalid_1_asm_h
+	.xword	push_i32_1_asm_h
+	.xword	push_const_1_asm_h
+	.xword	fclosure_1_asm_h
+	.xword	push_atom_value_1_asm_h
+	.xword	private_symbol_1_asm_h
+	.xword	undefined_1_asm_h
+	.xword	null_1_asm_h
+	.xword	push_this_1_asm_h
+	.xword	push_false_1_asm_h
+	.xword	push_true_1_asm_h
+	.xword	object_1_asm_h
+	.xword	special_object_1_asm_h
+	.xword	rest_1_asm_h
+	.xword	drop_1_asm_h
+	.xword	nip_1_asm_h
+	.xword	nip1_1_asm_h
+	.xword	dup_1_asm_h
+	.xword	dup1_1_asm_h
+	.xword	dup2_1_asm_h
+	.xword	dup3_1_asm_h
+	.xword	insert2_1_asm_h
+	.xword	insert3_1_asm_h
+	.xword	insert4_1_asm_h
+	.xword	perm3_1_asm_h
+	.xword	perm4_1_asm_h
+	.xword	perm5_1_asm_h
+	.xword	swap_1_asm_h
+	.xword	swap2_1_asm_h
+	.xword	rot3l_1_asm_h
+	.xword	rot3r_1_asm_h
+	.xword	rot4l_1_asm_h
+	.xword	rot5l_1_asm_h
+	.xword	call_constructor_1_asm_h
+	.xword	call_1_asm_h
+	.xword	tail_call_1_asm_h
+	.xword	call_method_1_asm_h
+	.xword	tail_call_method_1_asm_h
+	.xword	array_from_1_asm_h
+	.xword	apply_1_asm_h
+	.xword	return_1_asm_h
+	.xword	return_undef_1_asm_h
+	.xword	check_ctor_return_1_asm_h
+	.xword	check_ctor_1_asm_h
+	.xword	check_brand_1_asm_h
+	.xword	add_brand_1_asm_h
+	.xword	return_async_1_asm_h
+	.xword	throw_1_asm_h
+	.xword	throw_var_1_asm_h
+	.xword	eval_1_asm_h
+	.xword	regexp_1_asm_h
+	.xword	get_super_ctor_1_asm_h
+	.xword	get_super_1_asm_h
+	.xword	import_1_asm_h
+	.xword	check_var_1_asm_h
+	.xword	get_var_undef_1_asm_h
+	.xword	get_var_1_asm_h
+	.xword	put_var_1_asm_h
+	.xword	put_var_init_1_asm_h
+	.xword	put_var_strict_1_asm_h
+	.xword	get_ref_value_1_asm_h
+	.xword	put_ref_value_1_asm_h
+	.xword	define_var_1_asm_h
+	.xword	check_define_var_1_asm_h
+	.xword	define_func_1_asm_h
+	.xword	get_field_1_asm_h
+	.xword	get_field2_1_asm_h
+	.xword	put_field_1_asm_h
+	.xword	get_private_field_1_asm_h
+	.xword	put_private_field_1_asm_h
+	.xword	define_private_field_1_asm_h
+	.xword	get_array_el_1_asm_h
+	.xword	get_array_el2_1_asm_h
+	.xword	put_array_el_1_asm_h
+	.xword	get_super_value_1_asm_h
+	.xword	put_super_value_1_asm_h
+	.xword	define_field_1_asm_h
+	.xword	set_name_1_asm_h
+	.xword	set_name_computed_1_asm_h
+	.xword	set_proto_1_asm_h
+	.xword	set_home_object_1_asm_h
+	.xword	define_array_el_1_asm_h
+	.xword	append_1_asm_h
+	.xword	copy_data_properties_1_asm_h
+	.xword	define_method_1_asm_h
+	.xword	define_method_computed_1_asm_h
+	.xword	define_class_1_asm_h
+	.xword	get_loc_1_asm_h
+	.xword	put_loc_1_asm_h
+	.xword	set_loc_1_asm_h
+	.xword	get_arg_1_asm_h
+	.xword	put_arg_1_asm_h
+	.xword	set_arg_1_asm_h
+	.xword	get_var_ref_1_asm_h
+	.xword	put_var_ref_1_asm_h
+	.xword	set_var_ref_1_asm_h
+	.xword	set_loc_uninitialized_1_asm_h
+	.xword	get_loc_check_1_asm_h
+	.xword	put_loc_check_1_asm_h
+	.xword	put_loc_check_init_1_asm_h
+	.xword	get_var_ref_check_1_asm_h
+	.xword	put_var_ref_check_1_asm_h
+	.xword	put_var_ref_check_init_1_asm_h
+	.xword	close_loc_1_asm_h
+	.xword	if_false_1_asm_h
+	.xword	if_true_1_asm_h
+	.xword	goto_1_asm_h
+	.xword	catch_1_asm_h
+	.xword	gosub_1_asm_h
+	.xword	ret_1_asm_h
+	.xword	to_object_1_asm_h
+	.xword	to_propkey_1_asm_h
+	.xword	to_propkey2_1_asm_h
+	.xword	with_get_var_1_asm_h
+	.xword	with_put_var_1_asm_h
+	.xword	with_delete_var_1_asm_h
+	.xword	with_make_ref_1_asm_h
+	.xword	with_get_ref_1_asm_h
+	.xword	with_get_ref_undef_1_asm_h
+	.xword	make_loc_ref_1_asm_h
+	.xword	make_arg_ref_1_asm_h
+	.xword	make_var_ref_ref_1_asm_h
+	.xword	make_var_ref_1_asm_h
+	.xword	for_in_start_1_asm_h
+	.xword	for_of_start_1_asm_h
+	.xword	for_await_of_start_1_asm_h
+	.xword	for_in_next_1_asm_h
+	.xword	for_of_next_1_asm_h
+	.xword	for_await_of_next_1_asm_h
+	.xword	iterator_get_value_done_1_asm_h
+	.xword	iterator_close_1_asm_h
+	.xword	iterator_close_return_1_asm_h
+	.xword	async_iterator_close_1_asm_h
+	.xword	async_iterator_next_1_asm_h
+	.xword	async_iterator_get_1_asm_h
+	.xword	initial_yield_1_asm_h
+	.xword	yield_1_asm_h
+	.xword	yield_star_1_asm_h
+	.xword	async_yield_star_1_asm_h
+	.xword	await_1_asm_h
+	.xword	neg_1_asm_h
+	.xword	plus_1_asm_h
+	.xword	dec_1_asm_h
+	.xword	inc_1_asm_h
+	.xword	post_dec_1_asm_h
+	.xword	post_inc_1_asm_h
+	.xword	dec_loc_1_asm_h
+	.xword	inc_loc_1_asm_h
+	.xword	add_loc_1_asm_h
+	.xword	not_1_asm_h
+	.xword	lnot_1_asm_h
+	.xword	typeof_1_asm_h
+	.xword	delete_1_asm_h
+	.xword	delete_var_1_asm_h
+	.xword	mul_1_asm_h
+	.xword	div_1_asm_h
+	.xword	mod_1_asm_h
+	.xword	add_1_asm_h
+	.xword	sub_1_asm_h
+	.xword	pow_1_asm_h
+	.xword	shl_1_asm_h
+	.xword	sar_1_asm_h
+	.xword	shr_1_asm_h
+	.xword	lt_1_asm_h
+	.xword	lte_1_asm_h
+	.xword	gt_1_asm_h
+	.xword	gte_1_asm_h
+	.xword	instanceof_1_asm_h
+	.xword	in_1_asm_h
+	.xword	eq_1_asm_h
+	.xword	neq_1_asm_h
+	.xword	strict_eq_1_asm_h
+	.xword	strict_neq_1_asm_h
+	.xword	and_1_asm_h
+	.xword	xor_1_asm_h
+	.xword	or_1_asm_h
+	.xword	nop_1_asm_h
+	.xword	push_minus1_1_asm_h
+	.xword	push_0_1_asm_h
+	.xword	push_1_1_asm_h
+	.xword	push_2_1_asm_h
+	.xword	push_3_1_asm_h
+	.xword	push_4_1_asm_h
+	.xword	push_5_1_asm_h
+	.xword	push_6_1_asm_h
+	.xword	push_7_1_asm_h
+	.xword	push_i8_1_asm_h
+	.xword	push_i16_1_asm_h
+	.xword	push_const8_1_asm_h
+	.xword	fclosure8_1_asm_h
+	.xword	push_empty_string_1_asm_h
+	.xword	get_loc8_1_asm_h
+	.xword	put_loc8_1_asm_h
+	.xword	set_loc8_1_asm_h
+	.xword	get_loc0_1_asm_h
+	.xword	get_loc1_1_asm_h
+	.xword	get_loc2_1_asm_h
+	.xword	get_loc3_1_asm_h
+	.xword	put_loc0_1_asm_h
+	.xword	put_loc1_1_asm_h
+	.xword	put_loc2_1_asm_h
+	.xword	put_loc3_1_asm_h
+	.xword	set_loc0_1_asm_h
+	.xword	set_loc1_1_asm_h
+	.xword	set_loc2_1_asm_h
+	.xword	set_loc3_1_asm_h
+	.xword	get_arg0_1_asm_h
+	.xword	get_arg1_1_asm_h
+	.xword	get_arg2_1_asm_h
+	.xword	get_arg3_1_asm_h
+	.xword	put_arg0_1_asm_h
+	.xword	put_arg1_1_asm_h
+	.xword	put_arg2_1_asm_h
+	.xword	put_arg3_1_asm_h
+	.xword	set_arg0_1_asm_h
+	.xword	set_arg1_1_asm_h
+	.xword	set_arg2_1_asm_h
+	.xword	set_arg3_1_asm_h
+	.xword	get_var_ref0_1_asm_h
+	.xword	get_var_ref1_1_asm_h
+	.xword	get_var_ref2_1_asm_h
+	.xword	get_var_ref3_1_asm_h
+	.xword	put_var_ref0_1_asm_h
+	.xword	put_var_ref1_1_asm_h
+	.xword	put_var_ref2_1_asm_h
+	.xword	put_var_ref3_1_asm_h
+	.xword	set_var_ref0_1_asm_h
+	.xword	set_var_ref1_1_asm_h
+	.xword	set_var_ref2_1_asm_h
+	.xword	set_var_ref3_1_asm_h
+	.xword	get_length_1_asm_h
+	.xword	if_false8_1_asm_h
+	.xword	if_true8_1_asm_h
+	.xword	goto8_1_asm_h
+	.xword	goto16_1_asm_h
+	.xword	call0_1_asm_h
+	.xword	call1_1_asm_h
+	.xword	call2_1_asm_h
+	.xword	call3_1_asm_h
+	.xword	is_undefined_1_asm_h
+	.xword	is_null_1_asm_h
+	.xword	is_function_1_asm_h
+	.xword	inc_coverage_1_asm_h
+	.xword	invalid_2_asm_h
+	.xword	push_i32_2_asm_h
+	.xword	push_const_2_asm_h
+	.xword	fclosure_2_asm_h
+	.xword	push_atom_value_2_asm_h
+	.xword	private_symbol_2_asm_h
+	.xword	undefined_2_asm_h
+	.xword	null_2_asm_h
+	.xword	push_this_2_asm_h
+	.xword	push_false_2_asm_h
+	.xword	push_true_2_asm_h
+	.xword	object_2_asm_h
+	.xword	special_object_2_asm_h
+	.xword	rest_2_asm_h
+	.xword	drop_2_asm_h
+	.xword	nip_2_asm_h
+	.xword	nip1_2_asm_h
+	.xword	dup_2_asm_h
+	.xword	dup1_2_asm_h
+	.xword	dup2_2_asm_h
+	.xword	dup3_2_asm_h
+	.xword	insert2_2_asm_h
+	.xword	insert3_2_asm_h
+	.xword	insert4_2_asm_h
+	.xword	perm3_2_asm_h
+	.xword	perm4_2_asm_h
+	.xword	perm5_2_asm_h
+	.xword	swap_2_asm_h
+	.xword	swap2_2_asm_h
+	.xword	rot3l_2_asm_h
+	.xword	rot3r_2_asm_h
+	.xword	rot4l_2_asm_h
+	.xword	rot5l_2_asm_h
+	.xword	call_constructor_2_asm_h
+	.xword	call_2_asm_h
+	.xword	tail_call_2_asm_h
+	.xword	call_method_2_asm_h
+	.xword	tail_call_method_2_asm_h
+	.xword	array_from_2_asm_h
+	.xword	apply_2_asm_h
+	.xword	return_2_asm_h
+	.xword	return_undef_2_asm_h
+	.xword	check_ctor_return_2_asm_h
+	.xword	check_ctor_2_asm_h
+	.xword	check_brand_2_asm_h
+	.xword	add_brand_2_asm_h
+	.xword	return_async_2_asm_h
+	.xword	throw_2_asm_h
+	.xword	throw_var_2_asm_h
+	.xword	eval_2_asm_h
+	.xword	regexp_2_asm_h
+	.xword	get_super_ctor_2_asm_h
+	.xword	get_super_2_asm_h
+	.xword	import_2_asm_h
+	.xword	check_var_2_asm_h
+	.xword	get_var_undef_2_asm_h
+	.xword	get_var_2_asm_h
+	.xword	put_var_2_asm_h
+	.xword	put_var_init_2_asm_h
+	.xword	put_var_strict_2_asm_h
+	.xword	get_ref_value_2_asm_h
+	.xword	put_ref_value_2_asm_h
+	.xword	define_var_2_asm_h
+	.xword	check_define_var_2_asm_h
+	.xword	define_func_2_asm_h
+	.xword	get_field_2_asm_h
+	.xword	get_field2_2_asm_h
+	.xword	put_field_2_asm_h
+	.xword	get_private_field_2_asm_h
+	.xword	put_private_field_2_asm_h
+	.xword	define_private_field_2_asm_h
+	.xword	get_array_el_2_asm_h
+	.xword	get_array_el2_2_asm_h
+	.xword	put_array_el_2_asm_h
+	.xword	get_super_value_2_asm_h
+	.xword	put_super_value_2_asm_h
+	.xword	define_field_2_asm_h
+	.xword	set_name_2_asm_h
+	.xword	set_name_computed_2_asm_h
+	.xword	set_proto_2_asm_h
+	.xword	set_home_object_2_asm_h
+	.xword	define_array_el_2_asm_h
+	.xword	append_2_asm_h
+	.xword	copy_data_properties_2_asm_h
+	.xword	define_method_2_asm_h
+	.xword	define_method_computed_2_asm_h
+	.xword	define_class_2_asm_h
+	.xword	get_loc_2_asm_h
+	.xword	put_loc_2_asm_h
+	.xword	set_loc_2_asm_h
+	.xword	get_arg_2_asm_h
+	.xword	put_arg_2_asm_h
+	.xword	set_arg_2_asm_h
+	.xword	get_var_ref_2_asm_h
+	.xword	put_var_ref_2_asm_h
+	.xword	set_var_ref_2_asm_h
+	.xword	set_loc_uninitialized_2_asm_h
+	.xword	get_loc_check_2_asm_h
+	.xword	put_loc_check_2_asm_h
+	.xword	put_loc_check_init_2_asm_h
+	.xword	get_var_ref_check_2_asm_h
+	.xword	put_var_ref_check_2_asm_h
+	.xword	put_var_ref_check_init_2_asm_h
+	.xword	close_loc_2_asm_h
+	.xword	if_false_2_asm_h
+	.xword	if_true_2_asm_h
+	.xword	goto_2_asm_h
+	.xword	catch_2_asm_h
+	.xword	gosub_2_asm_h
+	.xword	ret_2_asm_h
+	.xword	to_object_2_asm_h
+	.xword	to_propkey_2_asm_h
+	.xword	to_propkey2_2_asm_h
+	.xword	with_get_var_2_asm_h
+	.xword	with_put_var_2_asm_h
+	.xword	with_delete_var_2_asm_h
+	.xword	with_make_ref_2_asm_h
+	.xword	with_get_ref_2_asm_h
+	.xword	with_get_ref_undef_2_asm_h
+	.xword	make_loc_ref_2_asm_h
+	.xword	make_arg_ref_2_asm_h
+	.xword	make_var_ref_ref_2_asm_h
+	.xword	make_var_ref_2_asm_h
+	.xword	for_in_start_2_asm_h
+	.xword	for_of_start_2_asm_h
+	.xword	for_await_of_start_2_asm_h
+	.xword	for_in_next_2_asm_h
+	.xword	for_of_next_2_asm_h
+	.xword	for_await_of_next_2_asm_h
+	.xword	iterator_get_value_done_2_asm_h
+	.xword	iterator_close_2_asm_h
+	.xword	iterator_close_return_2_asm_h
+	.xword	async_iterator_close_2_asm_h
+	.xword	async_iterator_next_2_asm_h
+	.xword	async_iterator_get_2_asm_h
+	.xword	initial_yield_2_asm_h
+	.xword	yield_2_asm_h
+	.xword	yield_star_2_asm_h
+	.xword	async_yield_star_2_asm_h
+	.xword	await_2_asm_h
+	.xword	neg_2_asm_h
+	.xword	plus_2_asm_h
+	.xword	dec_2_asm_h
+	.xword	inc_2_asm_h
+	.xword	post_dec_2_asm_h
+	.xword	post_inc_2_asm_h
+	.xword	dec_loc_2_asm_h
+	.xword	inc_loc_2_asm_h
+	.xword	add_loc_2_asm_h
+	.xword	not_2_asm_h
+	.xword	lnot_2_asm_h
+	.xword	typeof_2_asm_h
+	.xword	delete_2_asm_h
+	.xword	delete_var_2_asm_h
+	.xword	mul_2_asm_h
+	.xword	div_2_asm_h
+	.xword	mod_2_asm_h
+	.xword	add_2_asm_h
+	.xword	sub_2_asm_h
+	.xword	pow_2_asm_h
+	.xword	shl_2_asm_h
+	.xword	sar_2_asm_h
+	.xword	shr_2_asm_h
+	.xword	lt_2_asm_h
+	.xword	lte_2_asm_h
+	.xword	gt_2_asm_h
+	.xword	gte_2_asm_h
+	.xword	instanceof_2_asm_h
+	.xword	in_2_asm_h
+	.xword	eq_2_asm_h
+	.xword	neq_2_asm_h
+	.xword	strict_eq_2_asm_h
+	.xword	strict_neq_2_asm_h
+	.xword	and_2_asm_h
+	.xword	xor_2_asm_h
+	.xword	or_2_asm_h
+	.xword	nop_2_asm_h
+	.xword	push_minus1_2_asm_h
+	.xword	push_0_2_asm_h
+	.xword	push_1_2_asm_h
+	.xword	push_2_2_asm_h
+	.xword	push_3_2_asm_h
+	.xword	push_4_2_asm_h
+	.xword	push_5_2_asm_h
+	.xword	push_6_2_asm_h
+	.xword	push_7_2_asm_h
+	.xword	push_i8_2_asm_h
+	.xword	push_i16_2_asm_h
+	.xword	push_const8_2_asm_h
+	.xword	fclosure8_2_asm_h
+	.xword	push_empty_string_2_asm_h
+	.xword	get_loc8_2_asm_h
+	.xword	put_loc8_2_asm_h
+	.xword	set_loc8_2_asm_h
+	.xword	get_loc0_2_asm_h
+	.xword	get_loc1_2_asm_h
+	.xword	get_loc2_2_asm_h
+	.xword	get_loc3_2_asm_h
+	.xword	put_loc0_2_asm_h
+	.xword	put_loc1_2_asm_h
+	.xword	put_loc2_2_asm_h
+	.xword	put_loc3_2_asm_h
+	.xword	set_loc0_2_asm_h
+	.xword	set_loc1_2_asm_h
+	.xword	set_loc2_2_asm_h
+	.xword	set_loc3_2_asm_h
+	.xword	get_arg0_2_asm_h
+	.xword	get_arg1_2_asm_h
+	.xword	get_arg2_2_asm_h
+	.xword	get_arg3_2_asm_h
+	.xword	put_arg0_2_asm_h
+	.xword	put_arg1_2_asm_h
+	.xword	put_arg2_2_asm_h
+	.xword	put_arg3_2_asm_h
+	.xword	set_arg0_2_asm_h
+	.xword	set_arg1_2_asm_h
+	.xword	set_arg2_2_asm_h
+	.xword	set_arg3_2_asm_h
+	.xword	get_var_ref0_2_asm_h
+	.xword	get_var_ref1_2_asm_h
+	.xword	get_var_ref2_2_asm_h
+	.xword	get_var_ref3_2_asm_h
+	.xword	put_var_ref0_2_asm_h
+	.xword	put_var_ref1_2_asm_h
+	.xword	put_var_ref2_2_asm_h
+	.xword	put_var_ref3_2_asm_h
+	.xword	set_var_ref0_2_asm_h
+	.xword	set_var_ref1_2_asm_h
+	.xword	set_var_ref2_2_asm_h
+	.xword	set_var_ref3_2_asm_h
+	.xword	get_length_2_asm_h
+	.xword	if_false8_2_asm_h
+	.xword	if_true8_2_asm_h
+	.xword	goto8_2_asm_h
+	.xword	goto16_2_asm_h
+	.xword	call0_2_asm_h
+	.xword	call1_2_asm_h
+	.xword	call2_2_asm_h
+	.xword	call3_2_asm_h
+	.xword	is_undefined_2_asm_h
+	.xword	is_null_2_asm_h
+	.xword	is_function_2_asm_h
+	.xword	inc_coverage_2_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger0_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger1_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.xword	common_call_debugger2_asm_h
+	.size	primjs_dispatch_table, 11664
 
 	.section	".note.GNU-stack","",@progbits
 #endif

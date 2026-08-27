@@ -176,7 +176,8 @@ extern "C" void verify_stack(const uint8_t *pc, const uint8_t *sp,
 static uint64_t check_count = 0;
 static uint64_t op_count[255] = {0};
 
-extern "C" void prim_debug_trace(LEPUSContext *ctx, intptr_t *dispatch_table,
+extern "C" void prim_debug_trace(LEPUSContext *ctx,
+                                 const intptr_t *dispatch_table,
                                  const uint8_t *pc, const uint8_t *sp,
                                  LEPUSStackFrame *sf) {
   static int trace_id = 0;
@@ -233,8 +234,9 @@ extern "C" void prim_debug_trace(LEPUSContext *ctx, intptr_t *dispatch_table,
   if (trace) {
     auto info = short_opcode_info((OPCodeEnum)bytecode);
     const char *name = info.name;
-    auto diff =
-        (dispatch_table - (intptr_t *)ctx->dispatch_table) / (int)OP_COUNT;
+    auto diff = (dispatch_table -
+                 reinterpret_cast<const intptr_t *>(ctx->dispatch_table)) /
+                (int)OP_COUNT;
     std::cout << std::hex << (uint64_t)(pc - 1) << " TRACE: id: " << std::oct
               << trace_id << ", opcode: " << bytecode << ", name: " << name;
     std::cout << "_" << diff;
@@ -257,57 +259,18 @@ extern "C" PRIMJS_INTERNAL_SYMBOL void prim_abort0(int64_t val1, int64_t val2) {
   *reinterpret_cast<int *>(0xdeadbeef) = 101;
 }
 
-extern "C" PRIMJS_INTERNAL_SYMBOL LEPUSValue _call_stub_entry(
-    LEPUSValue this_arg, LEPUSValue new_target, LEPUSValue func_obj,
-    LEPUSContext *ctx, int argc, LEPUSValue *argv, int flags);
-
-extern "C" PRIMJS_INTERNAL_SYMBOL void InstallBcHandler(
-    intptr_t *handler_table);
-
 #ifdef ENABLE_QUICKJS_DEBUGGER
 static constexpr int NUM_OF_TOS_STATES = 3;
-static constexpr int NUM_OF_TABLE_ENTRIES = 3 * 2;
-#else
-static constexpr int NUM_OF_TABLE_ENTRIES = 3;
-#endif
-
-static address _table_gc[NUM_OF_TABLE_ENTRIES][OP_COUNT];
-
-#ifdef ENABLE_QUICKJS_DEBUGGER
-extern "C" PRIMJS_INTERNAL_SYMBOL void common_call_debugger0_asm_h(intptr_t v1,
-                                                                   intptr_t v2);
-extern "C" PRIMJS_INTERNAL_SYMBOL void common_call_debugger1_asm_h(intptr_t v1,
-                                                                   intptr_t v2);
-extern "C" PRIMJS_INTERNAL_SYMBOL void common_call_debugger2_asm_h(intptr_t v1,
-                                                                   intptr_t v2);
 #endif
 
 extern "C" PRIMJS_INTERNAL_SYMBOL void InstallDebuggerBcHandler(
     LEPUSContext *ctx, bool attach) {
   if (!attach) {
-    ctx->dispatch_table = _table_gc;
+    ctx->dispatch_table = primjs_dispatch_table;
     return;
   }
 #ifdef ENABLE_QUICKJS_DEBUGGER
-  auto _table_debugger_gc = &_table_gc[NUM_OF_TOS_STATES];
-  ctx->dispatch_table = _table_debugger_gc;
-  if (_table_debugger_gc[0][0] != 0U) {
-    return;
-  }
-  for (int j = 0; j < OP_COUNT; j++) {
-    _table_debugger_gc[0][j] = (address)&common_call_debugger0_asm_h;
-    _table_debugger_gc[1][j] = (address)&common_call_debugger1_asm_h;
-    _table_debugger_gc[2][j] = (address)&common_call_debugger2_asm_h;
-  }
-#endif
-}
-
-extern "C" PRIMJS_INTERNAL_SYMBOL void _init_dispatch_table(LEPUSContext *ctx) {
-  ctx->dispatch_table = _table_gc;
-  auto table_gc = (intptr_t *)ctx->dispatch_table;
-  InstallBcHandler(table_gc);
-#ifdef ENABLE_QUICKJS_DEBUGGER
-  _table_gc[NUM_OF_TOS_STATES][0] = 0U;
+  ctx->dispatch_table = &primjs_dispatch_table[NUM_OF_TOS_STATES];
 #endif
 }
 

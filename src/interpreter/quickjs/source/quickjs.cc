@@ -16684,8 +16684,8 @@ QJS_STATIC inline LEPUSValue JS_CallInternalTI(LEPUSContext *caller_ctx,
   CheckObjectCtx(caller_ctx, func_obj);
 #ifdef ENABLE_PRIMJS_SNAPSHOT
   if (caller_ctx->rt->use_primjs) {
-    return entry(this_obj, new_target, func_obj, (address)caller_ctx, argc,
-                 argv, flags);
+    return _call_stub_entry(this_obj, new_target, func_obj, caller_ctx, argc,
+                            argv, flags);
   }
 #endif
   return JS_CallInternal(caller_ctx, func_obj, this_obj, new_target, argc, argv,

@@ -2761,20 +2761,17 @@ DEFINE_BYTECODE_HANDLER(common_return_direct) { GenCommonReturn(); }
 
 DEFINE_BYTECODE_HANDLER(common_call_debugger0) {
   DebuggerCallEachOp();
-  int diff = _multi_table ? -3 : -1;
-  DispatchPrevPc(diff);
+  DispatchPrevPc(-3);
 }
 
 DEFINE_BYTECODE_HANDLER(common_call_debugger1) {
   DebuggerCallEachOp();
-  int diff = _multi_table ? -2 : -1;
-  DispatchPrevPc(diff);
+  DispatchPrevPc(-2);
 }
 
 DEFINE_BYTECODE_HANDLER(common_call_debugger2) {
   DebuggerCallEachOp();
-  int diff = _multi_table ? -1 : -1;
-  DispatchPrevPc(diff);
+  DispatchPrevPc(-1);
 }
 
 DEFINE_BYTECODE_HANDLER(exception_spill_top0) {

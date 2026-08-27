@@ -27,56 +27,12 @@ void CodeStubGenerator::Generate(son::node::NodeGraph* graph) {
   auto index = desc.call_index();
   CodeStubAssembler assembler(graph);
   son::node::GraphEnvironment env(&assembler);
-  if (index == static_cast<int>(son::node::CallId::kInstallBcHandler)) {
-    assembler.GenerateInstanallBcHandler(graph);
-  } else if (index == static_cast<int>(son::node::CallId::k_call_stub_entry)) {
+  if (index == static_cast<int>(son::node::CallId::k_call_stub_entry)) {
     assembler.GenerateCallEntry(graph);
   } else {
     unreachable();
   }
   assembler.End();
-}
-
-void CodeStubAssembler::GenerateInstanallBcHandler(
-    son::node::NodeGraph* graph) {
-  auto dispatch_table = graph->GetParameter(0);
-
-  int length = static_cast<int>(PrimjsOpcode::kCount);
-  for (int i = 0; i < length; i++) {
-    auto opcode = static_cast<PrimjsOpcode>(i);
-    int call_index = static_cast<int>(opcode);
-    auto kind = son::node::CallKind::kBcHandler;
-    auto desc = son::node::CallDescriptors::CallBcHandler(kind, call_index);
-    auto node = FunctionPointer(desc);
-    Store(son::node::MachineType::kIntptr, dispatch_table, IntPtrValue(i),
-          node);
-  }
-  if (!graph->options().SupportMultiTable()) {
-    Return();
-    return;
-  }
-  dispatch_table = CastRawToIntPtr(dispatch_table);
-  auto offset = IntPtrValue(length * intptr_size());
-  auto new_table1 = CastToRaw(IntPtrAdd(dispatch_table, offset));
-  for (int i = 0; i < length; i++) {
-    auto opcode = static_cast<PrimjsOpcode>(i);
-    int call_index = static_cast<int>(opcode);
-    auto kind = son::node::CallKind::kBcHandler1;
-    auto desc = son::node::CallDescriptors::CallBcHandler(kind, call_index);
-    auto node = FunctionPointer(desc);
-    Store(son::node::MachineType::kIntptr, new_table1, IntPtrValue(i), node);
-  }
-  dispatch_table = CastRawToIntPtr(new_table1);
-  auto new_table2 = CastToRaw(IntPtrAdd(dispatch_table, offset));
-  for (int i = 0; i < length; i++) {
-    auto opcode = static_cast<PrimjsOpcode>(i);
-    int call_index = static_cast<int>(opcode);
-    auto kind = son::node::CallKind::kBcHandler2;
-    auto desc = son::node::CallDescriptors::CallBcHandler(kind, call_index);
-    auto node = FunctionPointer(desc);
-    Store(son::node::MachineType::kIntptr, new_table2, IntPtrValue(i), node);
-  }
-  Return();
 }
 
 void CodeStubAssembler::GenerateCallEntry(son::node::NodeGraph* graph) {
