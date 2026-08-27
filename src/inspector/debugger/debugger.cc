@@ -275,7 +275,7 @@ void SetFunctionDebugSourceOffset(LEPUSFunctionBytecode *b,
 }
 
 void SetFunctionScript(LEPUSFunctionBytecode *b, LEPUSScriptSource *script) {
-  LEPUS_HeapObjStoreNoCtx(&b->script, script);
+  b->script = script;
 }
 
 // varinfo outside: getters
