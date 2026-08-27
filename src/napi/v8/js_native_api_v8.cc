@@ -38,7 +38,8 @@ static napi_status napi_run_script(napi_env env, const char* script,
   auto script_result = maybe_script.ToLocalChecked()->Run(context);
   CHECK_MAYBE_EMPTY(env, script_result, napi_generic_failure);
 
-  *result = v8impl::JsValueFromV8LocalValue(script_result.ToLocalChecked());
+  *result =
+      primjs::v8impl::JsValueFromV8LocalValue(script_result.ToLocalChecked());
   return GET_RETURN_STATUS(env);
 }
 
@@ -46,7 +47,8 @@ static napi_status napi_get_dataview_info(napi_env env, napi_value dataview,
                                           size_t* byte_length, void** data,
                                           napi_value* arraybuffer,
                                           size_t* byte_offset) {
-  v8::Local<v8::Value> value = v8impl::V8LocalValueFromJsValue(dataview);
+  v8::Local<v8::Value> value =
+      primjs::v8impl::V8LocalValueFromJsValue(dataview);
   RETURN_STATUS_IF_FALSE(env, value->IsDataView(), napi_invalid_arg);
 
   v8::Local<v8::DataView> array = value.As<v8::DataView>();
@@ -68,7 +70,7 @@ static napi_status napi_get_dataview_info(napi_env env, napi_value dataview,
   }
 
   if (arraybuffer != nullptr) {
-    *arraybuffer = v8impl::JsValueFromV8LocalValue(buffer);
+    *arraybuffer = primjs::v8impl::JsValueFromV8LocalValue(buffer);
   }
 
   if (byte_offset != nullptr) {
@@ -81,7 +83,8 @@ static napi_status napi_get_dataview_info(napi_env env, napi_value dataview,
 static napi_status napi_get_arraybuffer_info(napi_env env,
                                              napi_value arraybuffer,
                                              void** data, size_t* byte_length) {
-  v8::Local<v8::Value> value = v8impl::V8LocalValueFromJsValue(arraybuffer);
+  v8::Local<v8::Value> value =
+      primjs::v8impl::V8LocalValueFromJsValue(arraybuffer);
   RETURN_STATUS_IF_FALSE(env, value->IsArrayBuffer(), napi_invalid_arg);
 
   auto backing_store = value.As<v8::ArrayBuffer>()->GetBackingStore();
@@ -108,11 +111,11 @@ static napi_status napi_create_external_arraybuffer(
   if (finalize_cb != nullptr) {
     // Create a self-deleting weak reference that invokes the finalizer
     // callback.
-    v8impl::Reference::New(env, buffer, 0, true, finalize_cb, external_data,
-                           finalize_hint);
+    primjs::v8impl::Reference::New(env, buffer, 0, true, finalize_cb,
+                                   external_data, finalize_hint);
   }
 
-  *result = v8impl::JsValueFromV8LocalValue(buffer);
+  *result = primjs::v8impl::JsValueFromV8LocalValue(buffer);
   return napi_clear_last_error(env);
 }
 
@@ -129,7 +132,7 @@ static napi_status napi_create_arraybuffer(napi_env env, size_t byte_length,
     *data = backing_store->Data();
   }
 
-  *result = v8impl::JsValueFromV8LocalValue(buffer);
+  *result = primjs::v8impl::JsValueFromV8LocalValue(buffer);
   return napi_clear_last_error(env);
 }
 
@@ -137,7 +140,8 @@ napi_status napi_get_typedarray_info(napi_env env, napi_value typedarray,
                                      napi_typedarray_type* type, size_t* length,
                                      void** data, napi_value* arraybuffer,
                                      size_t* byte_offset) {
-  v8::Local<v8::Value> value = v8impl::V8LocalValueFromJsValue(typedarray);
+  v8::Local<v8::Value> value =
+      primjs::v8impl::V8LocalValueFromJsValue(typedarray);
   RETURN_STATUS_IF_FALSE(env, value->IsTypedArray(), napi_invalid_arg);
 
   v8::Local<v8::TypedArray> array = value.As<v8::TypedArray>();
@@ -185,7 +189,7 @@ napi_status napi_get_typedarray_info(napi_env env, napi_value typedarray,
   }
 
   if (arraybuffer != nullptr) {
-    *arraybuffer = v8impl::JsValueFromV8LocalValue(buffer);
+    *arraybuffer = primjs::v8impl::JsValueFromV8LocalValue(buffer);
   }
 
   if (byte_offset != nullptr) {
@@ -258,7 +262,8 @@ static napi_status napi_run_script_cache(napi_env env, const char* script,
     create_codecache(env, &pscr, iso, filename);
   }
 
-  *result = v8impl::JsValueFromV8LocalValue(script_result.ToLocalChecked());
+  *result =
+      primjs::v8impl::JsValueFromV8LocalValue(script_result.ToLocalChecked());
   return GET_RETURN_STATUS(env);
 }
 #endif

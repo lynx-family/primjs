@@ -26,7 +26,7 @@
 #ifdef USE_PRIMJS_NAPI
 #include "primjs_napi_defines.h"
 #endif
-namespace v8impl {
+namespace primjs::v8impl {
 
 class RefTracker {
  public:
@@ -66,7 +66,7 @@ class RefTracker {
   RefList* next_ = nullptr;
   RefList* prev_ = nullptr;
 };
-}  // end of namespace v8impl
+}  // end of namespace primjs::v8impl
 
 struct napi_context__v8 {
   explicit napi_context__v8(napi_env env, v8::Local<v8::Context> context)
@@ -82,8 +82,8 @@ struct napi_context__v8 {
     // which they delete during their `napi_finalizer` callbacks. If we
     // deleted such references here first, they would be doubly deleted when
     // the `napi_finalizer` deleted them subsequently.
-    v8impl::RefTracker::FinalizeAll(&finalizing_reflist);
-    v8impl::RefTracker::FinalizeAll(&reflist);
+    primjs::v8impl::RefTracker::FinalizeAll(&finalizing_reflist);
+    primjs::v8impl::RefTracker::FinalizeAll(&reflist);
 
     last_exception.Reset();
     context_persistent.Reset();
@@ -93,10 +93,10 @@ struct napi_context__v8 {
 
   napi_env env;
   v8::Isolate* const isolate;  // Shortcut for context()->GetIsolate()
-  v8impl::Persistent<v8::Context> context_persistent;
+  primjs::v8impl::Persistent<v8::Context> context_persistent;
 
   inline v8::Local<v8::Context> context() const {
-    return v8impl::PersistentToLocal::Strong(context_persistent);
+    return primjs::v8impl::PersistentToLocal::Strong(context_persistent);
   }
 
   inline void Ref() { refs++; }
@@ -138,13 +138,13 @@ struct napi_context__v8 {
     CallIntoModule([&](napi_env env) { cb(env, data, hint); });
   }
 
-  v8impl::Persistent<v8::Value> last_exception;
+  primjs::v8impl::Persistent<v8::Value> last_exception;
 
   // We store references in two different lists, depending on whether they have
   // `napi_finalizer` callbacks, because we must first finalize the ones that
   // have such a callback. See `~napi_context__v8()` above for details.
-  v8impl::RefTracker::RefList reflist;
-  v8impl::RefTracker::RefList finalizing_reflist;
+  primjs::v8impl::RefTracker::RefList reflist;
+  primjs::v8impl::RefTracker::RefList finalizing_reflist;
   int open_handle_scopes = 0;
   int open_context_scopes = 0;
   int refs = 1;
@@ -187,19 +187,20 @@ struct napi_context__v8 {
       (env)->ctx->last_exception.IsEmpty() && (env)->ctx->can_call_into_js(), \
       napi_pending_exception);                                                \
   napi_clear_last_error((env));                                               \
-  v8impl::TryCatch try_catch((env))
+  primjs::v8impl::TryCatch try_catch((env))
 
-#define CHECK_TO_TYPE(env, type, context, result, src, status)         \
-  do {                                                                 \
-    auto maybe =                                                       \
-        v8impl::V8LocalValueFromJsValue((src)) -> To##type((context)); \
-    CHECK_MAYBE_EMPTY((env), maybe, (status));                         \
-    (result) = maybe.ToLocalChecked();                                 \
+#define CHECK_TO_TYPE(env, type, context, result, src, status)                 \
+  do {                                                                         \
+    auto maybe =                                                               \
+        primjs::v8impl::V8LocalValueFromJsValue((src)) -> To##type((context)); \
+    CHECK_MAYBE_EMPTY((env), maybe, (status));                                 \
+    (result) = maybe.ToLocalChecked();                                         \
   } while (0)
 
 #define CHECK_TO_FUNCTION(env, result, src)                                 \
   do {                                                                      \
-    v8::Local<v8::Value> v8value = v8impl::V8LocalValueFromJsValue((src));  \
+    v8::Local<v8::Value> v8value =                                          \
+        primjs::v8impl::V8LocalValueFromJsValue((src));                     \
     RETURN_STATUS_IF_FALSE((env), v8value->IsFunction(), napi_invalid_arg); \
     (result) = v8value.As<v8::Function>();                                  \
   } while (0)
@@ -234,7 +235,7 @@ struct napi_context__v8 {
 #define CHECK_MAYBE_EMPTY_WITH_PREAMBLE(env, maybe, status) \
   RETURN_STATUS_IF_FALSE_WITH_PREAMBLE((env), !((maybe).IsEmpty()), (status))
 
-namespace v8impl {
+namespace primjs::v8impl {
 
 //=== Conversion between V8 Handles and napi_value ========================
 
@@ -315,7 +316,7 @@ class TryCatch : public v8::TryCatch {
   napi_env _env;
 };
 
-}  // end of namespace v8impl
+}  // end of namespace primjs::v8impl
 #ifdef USE_PRIMJS_NAPI
 #include "primjs_napi_undefs.h"
 #endif

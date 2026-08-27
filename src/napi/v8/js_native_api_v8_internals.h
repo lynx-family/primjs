@@ -30,7 +30,7 @@ inline v8::Local<v8::String> OneByteString(v8::Isolate* isolate,
 #define NAPI_FIXED_ONE_BYTE_STRING(isolate, string) \
   OneByteString((isolate), (string), sizeof(string) - 1)
 
-namespace v8impl {
+namespace primjs::v8impl {
 
 template <typename T>
 using Persistent = v8::Global<T>;
@@ -44,7 +44,7 @@ class PersistentToLocal {
         const_cast<v8::PersistentBase<TypeName>*>(&persistent));
   }
 };
-}  // end of namespace v8impl
+}  // end of namespace primjs::v8impl
 
 #ifndef CHECK
 #define CHECK(expr) assert(expr)

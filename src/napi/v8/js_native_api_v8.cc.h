@@ -75,7 +75,7 @@ FOR_EACH_NAPI_ENGINE_CALL(DECLARE_METHOD)
     (out) = v8::type::New((buffer), (byte_offset), (length));                 \
   } while (0)
 
-namespace v8impl {
+namespace primjs::v8impl {
 
 namespace {
 
@@ -86,7 +86,7 @@ inline static napi_status V8NameFromPropertyDescriptor(
     CHECK_NEW_FROM_UTF8(env, *result, p->utf8name);
   } else {
     v8::Local<v8::Value> property_value =
-        v8impl::V8LocalValueFromJsValue(p->name);
+        primjs::v8impl::V8LocalValueFromJsValue(p->name);
 
     RETURN_STATUS_IF_FALSE(env, property_value->IsName(), napi_name_expected);
     *result = property_value.As<v8::Name>();
@@ -118,13 +118,13 @@ inline static v8::PropertyAttribute V8PropertyAttributesFromDescriptor(
 }
 
 inline static napi_deferred JsDeferredFromNodePersistent(
-    v8impl::Persistent<v8::Value>* local) {
+    primjs::v8impl::Persistent<v8::Value>* local) {
   return reinterpret_cast<napi_deferred>(local);
 }
 
-inline static v8impl::Persistent<v8::Value>* NodePersistentFromJsDeferred(
-    napi_deferred local) {
-  return reinterpret_cast<v8impl::Persistent<v8::Value>*>(local);
+inline static primjs::v8impl::Persistent<v8::Value>*
+NodePersistentFromJsDeferred(napi_deferred local) {
+  return reinterpret_cast<primjs::v8impl::Persistent<v8::Value>*>(local);
 }
 
 class ContextScopeWrapper {
@@ -202,7 +202,7 @@ inline static napi_status ConcludeDeferred(napi_env env, napi_deferred deferred,
   NAPI_PREAMBLE(env);
 
   v8::Local<v8::Context> context = env->ctx->context();
-  v8impl::Persistent<v8::Value>* deferred_ref =
+  primjs::v8impl::Persistent<v8::Value>* deferred_ref =
       NodePersistentFromJsDeferred(deferred);
   v8::Local<v8::Value> v8_deferred =
       v8::Local<v8::Value>::New(env->ctx->isolate, *deferred_ref);
@@ -210,10 +210,11 @@ inline static napi_status ConcludeDeferred(napi_env env, napi_deferred deferred,
   auto v8_resolver = v8::Local<v8::Promise::Resolver>::Cast(v8_deferred);
 
   v8::Maybe<bool> success =
-      is_resolved ? v8_resolver->Resolve(
-                        context, v8impl::V8LocalValueFromJsValue(result))
-                  : v8_resolver->Reject(
-                        context, v8impl::V8LocalValueFromJsValue(result));
+      is_resolved
+          ? v8_resolver->Resolve(
+                context, primjs::v8impl::V8LocalValueFromJsValue(result))
+          : v8_resolver->Reject(
+                context, primjs::v8impl::V8LocalValueFromJsValue(result));
 
   delete deferred_ref;
 
@@ -222,7 +223,7 @@ inline static napi_status ConcludeDeferred(napi_env env, napi_deferred deferred,
   return GET_RETURN_STATUS(env);
 }
 
-// Wrapper around v8impl::Persistent that implements reference counting.
+// Wrapper around primjs::v8impl::Persistent that implements reference counting.
 class RefBase : protected Finalizer, RefTracker {
  protected:
   RefBase(napi_env env, uint32_t initial_refcount, bool delete_self,
@@ -459,7 +460,7 @@ class Reference : public RefBase {
     reference->Finalize();
   }
 
-  v8impl::Persistent<v8::Value> _persistent;
+  primjs::v8impl::Persistent<v8::Value> _persistent;
   SecondPassCallParameterRef* _secondPassParameter;
   bool _secondPassScheduled;
 };
@@ -474,7 +475,8 @@ inline static napi_status Unwrap(napi_env env, napi_value js_object,
 
   CHECK_ARG(env, js_object);
 
-  v8::Local<v8::Value> value = v8impl::V8LocalValueFromJsValue(js_object);
+  v8::Local<v8::Value> value =
+      primjs::v8impl::V8LocalValueFromJsValue(js_object);
   if (spec_compliant) {
     RETURN_STATUS_IF_FALSE(env, value->IsObject(), napi_invalid_arg);
   }
@@ -509,7 +511,7 @@ inline static napi_status Unwrap(napi_env env, napi_value js_object,
   }
 
   Reference* reference =
-      static_cast<v8impl::Reference*>(val.As<v8::External>()->Value());
+      static_cast<primjs::v8impl::Reference*>(val.As<v8::External>()->Value());
 
   if (result) {
     *result = reference->Data();
@@ -615,7 +617,7 @@ class FunctionCallbackWrapper
 
   napi_value GetNewTarget() override {
     if (_cbinfo.IsConstructCall()) {
-      return v8impl::JsValueFromV8LocalValue(_cbinfo.NewTarget());
+      return primjs::v8impl::JsValueFromV8LocalValue(_cbinfo.NewTarget());
     } else {
       return nullptr;
     }
@@ -627,12 +629,12 @@ class FunctionCallbackWrapper
     size_t min = std::min(buffer_length, _args_length);
 
     for (; i < min; i += 1) {
-      buffer[i] = v8impl::JsValueFromV8LocalValue(_cbinfo[i]);
+      buffer[i] = primjs::v8impl::JsValueFromV8LocalValue(_cbinfo[i]);
     }
 
     if (i < buffer_length) {
-      napi_value undefined =
-          v8impl::JsValueFromV8LocalValue(v8::Undefined(_cbinfo.GetIsolate()));
+      napi_value undefined = primjs::v8impl::JsValueFromV8LocalValue(
+          v8::Undefined(_cbinfo.GetIsolate()));
       for (; i < buffer_length; i += 1) {
         buffer[i] = undefined;
       }
@@ -641,7 +643,7 @@ class FunctionCallbackWrapper
 
   /*virtual*/
   void SetReturnValue(napi_value value) override {
-    v8::Local<v8::Value> val = v8impl::V8LocalValueFromJsValue(value);
+    v8::Local<v8::Value> val = primjs::v8impl::V8LocalValueFromJsValue(value);
     _cbinfo.GetReturnValue().Set(val);
   }
 };
@@ -663,8 +665,8 @@ class GetterCallbackWrapper
   /*virtual*/
   void Args(napi_value* buffer, size_t buffer_length) override {
     if (buffer_length > 0) {
-      napi_value undefined =
-          v8impl::JsValueFromV8LocalValue(v8::Undefined(_cbinfo.GetIsolate()));
+      napi_value undefined = primjs::v8impl::JsValueFromV8LocalValue(
+          v8::Undefined(_cbinfo.GetIsolate()));
       for (size_t i = 0; i < buffer_length; i += 1) {
         buffer[i] = undefined;
       }
@@ -673,7 +675,7 @@ class GetterCallbackWrapper
 
   /*virtual*/
   void SetReturnValue(napi_value value) override {
-    v8::Local<v8::Value> val = v8impl::V8LocalValueFromJsValue(value);
+    v8::Local<v8::Value> val = primjs::v8impl::V8LocalValueFromJsValue(value);
     _cbinfo.GetReturnValue().Set(val);
   }
 };
@@ -695,10 +697,10 @@ class SetterCallbackWrapper
   /*virtual*/
   void Args(napi_value* buffer, size_t buffer_length) override {
     if (buffer_length > 0) {
-      buffer[0] = v8impl::JsValueFromV8LocalValue(_value);
+      buffer[0] = primjs::v8impl::JsValueFromV8LocalValue(_value);
 
       if (buffer_length > 1) {
-        napi_value undefined = v8impl::JsValueFromV8LocalValue(
+        napi_value undefined = primjs::v8impl::JsValueFromV8LocalValue(
             v8::Undefined(_cbinfo.GetIsolate()));
         for (size_t i = 1; i < buffer_length; i += 1) {
           buffer[i] = undefined;
@@ -746,7 +748,8 @@ inline napi_status Wrap(napi_env env, napi_value js_object, void* native_object,
   // JS exceptions.
   CHECK_ARG(env, js_object);
 
-  v8::Local<v8::Value> value = v8impl::V8LocalValueFromJsValue(js_object);
+  v8::Local<v8::Value> value =
+      primjs::v8impl::V8LocalValueFromJsValue(js_object);
   RETURN_STATUS_IF_FALSE(env, value->IsObject(), napi_invalid_arg);
   v8::Local<v8::Object> obj = value.As<v8::Object>();
 
@@ -762,19 +765,19 @@ inline napi_status Wrap(napi_env env, napi_value js_object, void* native_object,
     CHECK_ARG(env, finalize_cb);
   }
 
-  v8impl::Reference* reference = nullptr;
+  primjs::v8impl::Reference* reference = nullptr;
   if (result != nullptr) {
     // The returned reference should be deleted via napi_delete_reference()
     // ONLY in response to the finalize callback invocation. (If it is deleted
     // before then, then the finalize callback will never be invoked.)
     // Therefore a finalize callback is required when returning a reference.
     CHECK_ARG(env, finalize_cb);
-    reference = v8impl::Reference::New(env, obj, 0, false, finalize_cb,
-                                       native_object, finalize_hint);
+    reference = primjs::v8impl::Reference::New(env, obj, 0, false, finalize_cb,
+                                               native_object, finalize_hint);
     *result = reinterpret_cast<napi_ref>(reference);
   } else {
     // Create a self-deleting reference.
-    reference = v8impl::Reference::New(
+    reference = primjs::v8impl::Reference::New(
         env, obj, 0, true, finalize_cb, native_object,
         finalize_cb == nullptr ? nullptr : finalize_hint);
   }
@@ -792,7 +795,7 @@ inline napi_status Wrap(napi_env env, napi_value js_object, void* native_object,
 
 }  // end of anonymous namespace
 
-}  // end of namespace v8impl
+}  // end of namespace primjs::v8impl
 
 napi_status napi_define_properties(napi_env env, napi_value object,
                                    size_t property_count,
@@ -812,7 +815,7 @@ napi_status napi_define_properties(napi_env env, napi_value object,
 
     v8::Local<v8::Name> property_name;
     napi_status status =
-        v8impl::V8NameFromPropertyDescriptor(env, p, &property_name);
+        primjs::v8impl::V8NameFromPropertyDescriptor(env, p, &property_name);
 
     if (status != napi_ok) {
       return napi_set_last_error(env, status);
@@ -824,22 +827,24 @@ napi_status napi_define_properties(napi_env env, napi_value object,
 
       if (p->getter != nullptr) {
         v8::Local<v8::Value> getter_data =
-            v8impl::CreateFunctionCallbackData(env, p->getter, p->data);
+            primjs::v8impl::CreateFunctionCallbackData(env, p->getter, p->data);
         CHECK_MAYBE_EMPTY(env, getter_data, napi_generic_failure);
 
         v8::MaybeLocal<v8::Function> maybe_getter = v8::Function::New(
-            context, v8impl::FunctionCallbackWrapper::Invoke, getter_data);
+            context, primjs::v8impl::FunctionCallbackWrapper::Invoke,
+            getter_data);
         CHECK_MAYBE_EMPTY(env, maybe_getter, napi_generic_failure);
 
         local_getter = maybe_getter.ToLocalChecked();
       }
       if (p->setter != nullptr) {
         v8::Local<v8::Value> setter_data =
-            v8impl::CreateFunctionCallbackData(env, p->setter, p->data);
+            primjs::v8impl::CreateFunctionCallbackData(env, p->setter, p->data);
         CHECK_MAYBE_EMPTY(env, setter_data, napi_generic_failure);
 
         v8::MaybeLocal<v8::Function> maybe_setter = v8::Function::New(
-            context, v8impl::FunctionCallbackWrapper::Invoke, setter_data);
+            context, primjs::v8impl::FunctionCallbackWrapper::Invoke,
+            setter_data);
         CHECK_MAYBE_EMPTY(env, maybe_setter, napi_generic_failure);
         local_setter = maybe_setter.ToLocalChecked();
       }
@@ -856,12 +861,12 @@ napi_status napi_define_properties(napi_env env, napi_value object,
       }
     } else if (p->method != nullptr) {
       v8::Local<v8::Value> cbdata =
-          v8impl::CreateFunctionCallbackData(env, p->method, p->data);
+          primjs::v8impl::CreateFunctionCallbackData(env, p->method, p->data);
 
       CHECK_MAYBE_EMPTY(env, cbdata, napi_generic_failure);
 
       v8::MaybeLocal<v8::Function> maybe_fn = v8::Function::New(
-          context, v8impl::FunctionCallbackWrapper::Invoke, cbdata);
+          context, primjs::v8impl::FunctionCallbackWrapper::Invoke, cbdata);
 
       CHECK_MAYBE_EMPTY(env, maybe_fn, napi_generic_failure);
 
@@ -877,7 +882,8 @@ napi_status napi_define_properties(napi_env env, napi_value object,
         return napi_set_last_error(env, napi_generic_failure);
       }
     } else {
-      v8::Local<v8::Value> value = v8impl::V8LocalValueFromJsValue(p->value);
+      v8::Local<v8::Value> value =
+          primjs::v8impl::V8LocalValueFromJsValue(p->value);
 
       v8::PropertyDescriptor descriptor(value,
                                         (p->attributes & napi_writable) != 0);
@@ -911,13 +917,13 @@ napi_status napi_create_function(napi_env env, const char* utf8name,
   v8::Local<v8::Function> return_value;
   v8::EscapableHandleScope scope(isolate);
   v8::Local<v8::Value> cbdata =
-      v8impl::CreateFunctionCallbackData(env, cb, callback_data);
+      primjs::v8impl::CreateFunctionCallbackData(env, cb, callback_data);
 
   RETURN_STATUS_IF_FALSE(env, !cbdata.IsEmpty(), napi_generic_failure);
 
   v8::Local<v8::Context> context = env->ctx->context();
   v8::MaybeLocal<v8::Function> maybe_function = v8::Function::New(
-      context, v8impl::FunctionCallbackWrapper::Invoke, cbdata);
+      context, primjs::v8impl::FunctionCallbackWrapper::Invoke, cbdata);
   CHECK_MAYBE_EMPTY(env, maybe_function, napi_generic_failure);
 
   return_value = scope.Escape(maybe_function.ToLocalChecked());
@@ -928,12 +934,12 @@ napi_status napi_create_function(napi_env env, const char* utf8name,
     return_value->SetName(name_string);
   }
 
-  *result = v8impl::JsValueFromV8LocalValue(return_value);
+  *result = primjs::v8impl::JsValueFromV8LocalValue(return_value);
 
   return GET_RETURN_STATUS(env);
 }
 
-namespace v8impl {
+namespace primjs::v8impl {
 // DO NOT use napi_class__ type alias
 // Xcode will link its destructor to napi_class__ in JSC implementation
 // What a strange bug!
@@ -944,10 +950,10 @@ struct Clazz {
       : function_template_persistent(isolate, function_template),
         function_persistent(isolate, function) {}
 
-  v8impl::Persistent<v8::FunctionTemplate> function_template_persistent;
-  v8impl::Persistent<v8::Function> function_persistent;
+  primjs::v8impl::Persistent<v8::FunctionTemplate> function_template_persistent;
+  primjs::v8impl::Persistent<v8::Function> function_persistent;
 };
-}  // namespace v8impl
+}  // namespace primjs::v8impl
 
 napi_status napi_define_class_spec_compliant(
     napi_env env, const char* utf8name, size_t length, napi_callback cb,
@@ -968,16 +974,16 @@ napi_status napi_define_class(napi_env env, const char* utf8name, size_t length,
   v8::Isolate* isolate = env->ctx->isolate;
 
   v8::HandleScope scope(isolate);
-  v8::Local<v8::Value> cbdata =
-      v8impl::CreateFunctionCallbackData(env, constructor, callback_data);
+  v8::Local<v8::Value> cbdata = primjs::v8impl::CreateFunctionCallbackData(
+      env, constructor, callback_data);
 
   RETURN_STATUS_IF_FALSE(env, !cbdata.IsEmpty(), napi_generic_failure);
 
   v8::Local<v8::FunctionTemplate> tpl = v8::FunctionTemplate::New(
-      isolate, v8impl::FunctionCallbackWrapper::Invoke, cbdata);
+      isolate, primjs::v8impl::FunctionCallbackWrapper::Invoke, cbdata);
 
   if (super_class != nullptr) {
-    tpl->Inherit(reinterpret_cast<v8impl::Clazz*>(super_class)
+    tpl->Inherit(reinterpret_cast<primjs::v8impl::Clazz*>(super_class)
                      ->function_template_persistent.Get(isolate));
   }
 
@@ -999,14 +1005,14 @@ napi_status napi_define_class(napi_env env, const char* utf8name, size_t length,
 
     v8::Local<v8::Name> property_name;
     napi_status status =
-        v8impl::V8NameFromPropertyDescriptor(env, p, &property_name);
+        primjs::v8impl::V8NameFromPropertyDescriptor(env, p, &property_name);
 
     if (status != napi_ok) {
       return napi_set_last_error(env, status);
     }
 
     v8::PropertyAttribute attributes =
-        v8impl::V8PropertyAttributesFromDescriptor(p);
+        primjs::v8impl::V8PropertyAttributesFromDescriptor(p);
 
     // This code is similar to that in napi_define_properties(); the
     // difference is it applies to a template instead of an object,
@@ -1017,17 +1023,19 @@ napi_status napi_define_class(napi_env env, const char* utf8name, size_t length,
       v8::Local<v8::FunctionTemplate> setter_tpl;
       if (p->getter != nullptr) {
         v8::Local<v8::Value> getter_data =
-            v8impl::CreateFunctionCallbackData(env, p->getter, p->data);
+            primjs::v8impl::CreateFunctionCallbackData(env, p->getter, p->data);
 
         getter_tpl = v8::FunctionTemplate::New(
-            isolate, v8impl::FunctionCallbackWrapper::Invoke, getter_data);
+            isolate, primjs::v8impl::FunctionCallbackWrapper::Invoke,
+            getter_data);
       }
       if (p->setter != nullptr) {
         v8::Local<v8::Value> setter_data =
-            v8impl::CreateFunctionCallbackData(env, p->setter, p->data);
+            primjs::v8impl::CreateFunctionCallbackData(env, p->setter, p->data);
 
         setter_tpl = v8::FunctionTemplate::New(
-            isolate, v8impl::FunctionCallbackWrapper::Invoke, setter_data);
+            isolate, primjs::v8impl::FunctionCallbackWrapper::Invoke,
+            setter_data);
       }
 
       tpl->PrototypeTemplate()->SetAccessorProperty(property_name, getter_tpl,
@@ -1035,17 +1043,18 @@ napi_status napi_define_class(napi_env env, const char* utf8name, size_t length,
                                                     v8::AccessControl::DEFAULT);
     } else if (p->method != nullptr) {
       v8::Local<v8::Value> cbdata =
-          v8impl::CreateFunctionCallbackData(env, p->method, p->data);
+          primjs::v8impl::CreateFunctionCallbackData(env, p->method, p->data);
 
       RETURN_STATUS_IF_FALSE(env, !cbdata.IsEmpty(), napi_generic_failure);
 
       v8::Local<v8::FunctionTemplate> t = v8::FunctionTemplate::New(
-          isolate, v8impl::FunctionCallbackWrapper::Invoke, cbdata,
+          isolate, primjs::v8impl::FunctionCallbackWrapper::Invoke, cbdata,
           v8::Signature::New(isolate, tpl));
 
       tpl->PrototypeTemplate()->Set(property_name, t, attributes);
     } else {
-      v8::Local<v8::Value> value = v8impl::V8LocalValueFromJsValue(p->value);
+      v8::Local<v8::Value> value =
+          primjs::v8impl::V8LocalValueFromJsValue(p->value);
       tpl->PrototypeTemplate()->Set(property_name, value, attributes);
     }
   }
@@ -1056,17 +1065,17 @@ napi_status napi_define_class(napi_env env, const char* utf8name, size_t length,
   if (super_class != nullptr) {
     CHECK_MAYBE_NOTHING(
         env,
-        function->SetPrototype(context,
-                               reinterpret_cast<v8impl::Clazz*>(super_class)
-                                   ->function_persistent.Get(isolate)),
+        function->SetPrototype(
+            context, reinterpret_cast<primjs::v8impl::Clazz*>(super_class)
+                         ->function_persistent.Get(isolate)),
         napi_generic_failure);
   }
 
-  *result =
-      reinterpret_cast<napi_class>(new v8impl::Clazz(isolate, tpl, function));
+  *result = reinterpret_cast<napi_class>(
+      new primjs::v8impl::Clazz(isolate, tpl, function));
 
   if (static_property_count > 0) {
-    napi_value value = v8impl::JsValueFromV8LocalValue(function);
+    napi_value value = primjs::v8impl::JsValueFromV8LocalValue(function);
     std::vector<napi_property_descriptor> static_descriptors;
     static_descriptors.reserve(static_property_count);
 
@@ -1086,14 +1095,14 @@ napi_status napi_define_class(napi_env env, const char* utf8name, size_t length,
 }
 
 napi_status napi_release_class(napi_env env, napi_class clazz) {
-  delete reinterpret_cast<v8impl::Clazz*>(clazz);
+  delete reinterpret_cast<primjs::v8impl::Clazz*>(clazz);
   return napi_ok;
 }
 
 napi_status napi_class_get_function(napi_env env, napi_class clazz,
                                     napi_value* result) {
-  *result = v8impl::JsValueFromV8LocalValue(
-      reinterpret_cast<v8impl::Clazz*>(clazz)->function_persistent.Get(
+  *result = primjs::v8impl::JsValueFromV8LocalValue(
+      reinterpret_cast<primjs::v8impl::Clazz*>(clazz)->function_persistent.Get(
           env->ctx->isolate));
   return napi_ok;
 }
@@ -1115,8 +1124,8 @@ napi_status napi_get_property_names(napi_env env, napi_value object,
 
   CHECK_MAYBE_EMPTY(env, maybe_propertynames, napi_generic_failure);
 
-  *result =
-      v8impl::JsValueFromV8LocalValue(maybe_propertynames.ToLocalChecked());
+  *result = primjs::v8impl::JsValueFromV8LocalValue(
+      maybe_propertynames.ToLocalChecked());
   return GET_RETURN_STATUS(env);
 }
 
@@ -1129,8 +1138,8 @@ napi_status napi_set_property(napi_env env, napi_value object, napi_value key,
 
   CHECK_TO_OBJECT(env, context, obj, object);
 
-  v8::Local<v8::Value> k = v8impl::V8LocalValueFromJsValue(key);
-  v8::Local<v8::Value> val = v8impl::V8LocalValueFromJsValue(value);
+  v8::Local<v8::Value> k = primjs::v8impl::V8LocalValueFromJsValue(key);
+  v8::Local<v8::Value> val = primjs::v8impl::V8LocalValueFromJsValue(value);
 
   v8::Maybe<bool> set_maybe = obj->Set(context, k, val);
 
@@ -1147,7 +1156,7 @@ napi_status napi_has_property(napi_env env, napi_value object, napi_value key,
 
   CHECK_TO_OBJECT(env, context, obj, object);
 
-  v8::Local<v8::Value> k = v8impl::V8LocalValueFromJsValue(key);
+  v8::Local<v8::Value> k = primjs::v8impl::V8LocalValueFromJsValue(key);
   v8::Maybe<bool> has_maybe = obj->Has(context, k);
 
   CHECK_MAYBE_NOTHING(env, has_maybe, napi_generic_failure);
@@ -1161,7 +1170,7 @@ napi_status napi_get_property(napi_env env, napi_value object, napi_value key,
   NAPI_PREAMBLE(env);
 
   v8::Local<v8::Context> context = env->ctx->context();
-  v8::Local<v8::Value> k = v8impl::V8LocalValueFromJsValue(key);
+  v8::Local<v8::Value> k = primjs::v8impl::V8LocalValueFromJsValue(key);
   v8::Local<v8::Object> obj;
 
   CHECK_TO_OBJECT(env, context, obj, object);
@@ -1171,7 +1180,7 @@ napi_status napi_get_property(napi_env env, napi_value object, napi_value key,
   CHECK_MAYBE_EMPTY(env, get_maybe, napi_generic_failure);
 
   v8::Local<v8::Value> val = get_maybe.ToLocalChecked();
-  *result = v8impl::JsValueFromV8LocalValue(val);
+  *result = primjs::v8impl::JsValueFromV8LocalValue(val);
   return GET_RETURN_STATUS(env);
 }
 
@@ -1180,7 +1189,7 @@ napi_status napi_delete_property(napi_env env, napi_value object,
   NAPI_PREAMBLE(env);
 
   v8::Local<v8::Context> context = env->ctx->context();
-  v8::Local<v8::Value> k = v8impl::V8LocalValueFromJsValue(key);
+  v8::Local<v8::Value> k = primjs::v8impl::V8LocalValueFromJsValue(key);
   v8::Local<v8::Object> obj;
 
   CHECK_TO_OBJECT(env, context, obj, object);
@@ -1200,7 +1209,7 @@ napi_status napi_has_own_property(napi_env env, napi_value object,
   v8::Local<v8::Object> obj;
 
   CHECK_TO_OBJECT(env, context, obj, object);
-  v8::Local<v8::Value> k = v8impl::V8LocalValueFromJsValue(key);
+  v8::Local<v8::Value> k = primjs::v8impl::V8LocalValueFromJsValue(key);
   RETURN_STATUS_IF_FALSE(env, k->IsName(), napi_name_expected);
   v8::Maybe<bool> has_maybe = obj->HasOwnProperty(context, k.As<v8::Name>());
   CHECK_MAYBE_NOTHING(env, has_maybe, napi_generic_failure);
@@ -1221,7 +1230,7 @@ napi_status napi_set_named_property(napi_env env, napi_value object,
   v8::Local<v8::Name> key;
   CHECK_NEW_FROM_UTF8(env, key, utf8name);
 
-  v8::Local<v8::Value> val = v8impl::V8LocalValueFromJsValue(value);
+  v8::Local<v8::Value> val = primjs::v8impl::V8LocalValueFromJsValue(value);
 
   v8::Maybe<bool> set_maybe = obj->Set(context, key, val);
 
@@ -1267,7 +1276,7 @@ napi_status napi_get_named_property(napi_env env, napi_value object,
   CHECK_MAYBE_EMPTY(env, get_maybe, napi_generic_failure);
 
   v8::Local<v8::Value> val = get_maybe.ToLocalChecked();
-  *result = v8impl::JsValueFromV8LocalValue(val);
+  *result = primjs::v8impl::JsValueFromV8LocalValue(val);
   return GET_RETURN_STATUS(env);
 }
 
@@ -1280,7 +1289,7 @@ napi_status napi_set_element(napi_env env, napi_value object, uint32_t index,
 
   CHECK_TO_OBJECT(env, context, obj, object);
 
-  v8::Local<v8::Value> val = v8impl::V8LocalValueFromJsValue(value);
+  v8::Local<v8::Value> val = primjs::v8impl::V8LocalValueFromJsValue(value);
   auto set_maybe = obj->Set(context, index, val);
 
   RETURN_STATUS_IF_FALSE(env, set_maybe.FromMaybe(false), napi_generic_failure);
@@ -1318,7 +1327,7 @@ napi_status napi_get_element(napi_env env, napi_value object, uint32_t index,
 
   CHECK_MAYBE_EMPTY(env, get_maybe, napi_generic_failure);
 
-  *result = v8impl::JsValueFromV8LocalValue(get_maybe.ToLocalChecked());
+  *result = primjs::v8impl::JsValueFromV8LocalValue(get_maybe.ToLocalChecked());
   return GET_RETURN_STATUS(env);
 }
 
@@ -1339,7 +1348,7 @@ napi_status napi_delete_element(napi_env env, napi_value object, uint32_t index,
 }
 
 napi_status napi_is_array(napi_env env, napi_value value, bool* result) {
-  v8::Local<v8::Value> val = v8impl::V8LocalValueFromJsValue(value);
+  v8::Local<v8::Value> val = primjs::v8impl::V8LocalValueFromJsValue(value);
 
   *result = val->IsArray();
   return napi_clear_last_error(env);
@@ -1347,7 +1356,7 @@ napi_status napi_is_array(napi_env env, napi_value value, bool* result) {
 
 napi_status napi_get_array_length(napi_env env, napi_value value,
                                   uint32_t* result) {
-  v8::Local<v8::Value> val = v8impl::V8LocalValueFromJsValue(value);
+  v8::Local<v8::Value> val = primjs::v8impl::V8LocalValueFromJsValue(value);
   RETURN_STATUS_IF_FALSE(env, val->IsArray(), napi_array_expected);
 
   v8::Local<v8::Array> arr = val.As<v8::Array>();
@@ -1362,8 +1371,8 @@ napi_status napi_equals(napi_env env, napi_value lhs, napi_value rhs,
 
   v8::Local<v8::Context> context = env->ctx->context();
 
-  v8::Local<v8::Value> a = v8impl::V8LocalValueFromJsValue(lhs);
-  v8::Local<v8::Value> b = v8impl::V8LocalValueFromJsValue(rhs);
+  v8::Local<v8::Value> a = primjs::v8impl::V8LocalValueFromJsValue(lhs);
+  v8::Local<v8::Value> b = primjs::v8impl::V8LocalValueFromJsValue(rhs);
 
   v8::Maybe<bool> maybe_result = a->Equals(context, b);
 
@@ -1379,8 +1388,8 @@ napi_status napi_equals(napi_env env, napi_value lhs, napi_value rhs,
 
 napi_status napi_strict_equals(napi_env env, napi_value lhs, napi_value rhs,
                                bool* result) {
-  v8::Local<v8::Value> a = v8impl::V8LocalValueFromJsValue(lhs);
-  v8::Local<v8::Value> b = v8impl::V8LocalValueFromJsValue(rhs);
+  v8::Local<v8::Value> a = primjs::v8impl::V8LocalValueFromJsValue(lhs);
+  v8::Local<v8::Value> b = primjs::v8impl::V8LocalValueFromJsValue(rhs);
 
   *result = a->StrictEquals(b);
   return napi_clear_last_error(env);
@@ -1396,25 +1405,27 @@ napi_status napi_get_prototype(napi_env env, napi_value object,
   CHECK_TO_OBJECT(env, context, obj, object);
 
   v8::Local<v8::Value> val = obj->GetPrototype();
-  *result = v8impl::JsValueFromV8LocalValue(val);
+  *result = primjs::v8impl::JsValueFromV8LocalValue(val);
   return GET_RETURN_STATUS(env);
 }
 
 napi_status napi_create_object(napi_env env, napi_value* result) {
-  *result = v8impl::JsValueFromV8LocalValue(v8::Object::New(env->ctx->isolate));
+  *result = primjs::v8impl::JsValueFromV8LocalValue(
+      v8::Object::New(env->ctx->isolate));
 
   return napi_clear_last_error(env);
 }
 
 napi_status napi_create_array(napi_env env, napi_value* result) {
-  *result = v8impl::JsValueFromV8LocalValue(v8::Array::New(env->ctx->isolate));
+  *result = primjs::v8impl::JsValueFromV8LocalValue(
+      v8::Array::New(env->ctx->isolate));
 
   return napi_clear_last_error(env);
 }
 
 napi_status napi_create_array_with_length(napi_env env, size_t length,
                                           napi_value* result) {
-  *result = v8impl::JsValueFromV8LocalValue(
+  *result = primjs::v8impl::JsValueFromV8LocalValue(
       v8::Array::New(env->ctx->isolate, length));
 
   return napi_clear_last_error(env);
@@ -1431,7 +1442,7 @@ napi_status napi_create_string_latin1(napi_env env, const char* str,
                                  v8::NewStringType::kNormal, length);
   CHECK_MAYBE_EMPTY(env, str_maybe, napi_generic_failure);
 
-  *result = v8impl::JsValueFromV8LocalValue(str_maybe.ToLocalChecked());
+  *result = primjs::v8impl::JsValueFromV8LocalValue(str_maybe.ToLocalChecked());
   return napi_clear_last_error(env);
 }
 
@@ -1444,7 +1455,7 @@ napi_status napi_create_string_utf8(napi_env env, const char* str,
   auto str_maybe = v8::String::NewFromUtf8(
       isolate, str, v8::NewStringType::kNormal, static_cast<int>(length));
   CHECK_MAYBE_EMPTY(env, str_maybe, napi_generic_failure);
-  *result = v8impl::JsValueFromV8LocalValue(str_maybe.ToLocalChecked());
+  *result = primjs::v8impl::JsValueFromV8LocalValue(str_maybe.ToLocalChecked());
   return napi_clear_last_error(env);
 }
 
@@ -1459,19 +1470,19 @@ napi_status napi_create_string_utf16(napi_env env, const char16_t* str,
       v8::NewStringType::kNormal, length);
   CHECK_MAYBE_EMPTY(env, str_maybe, napi_generic_failure);
 
-  *result = v8impl::JsValueFromV8LocalValue(str_maybe.ToLocalChecked());
+  *result = primjs::v8impl::JsValueFromV8LocalValue(str_maybe.ToLocalChecked());
   return napi_clear_last_error(env);
 }
 
 napi_status napi_create_double(napi_env env, double value, napi_value* result) {
-  *result = v8impl::JsValueFromV8LocalValue(
+  *result = primjs::v8impl::JsValueFromV8LocalValue(
       v8::Number::New(env->ctx->isolate, value));
 
   return napi_clear_last_error(env);
 }
 
 napi_status napi_create_int32(napi_env env, int32_t value, napi_value* result) {
-  *result = v8impl::JsValueFromV8LocalValue(
+  *result = primjs::v8impl::JsValueFromV8LocalValue(
       v8::Integer::New(env->ctx->isolate, value));
 
   return napi_clear_last_error(env);
@@ -1479,14 +1490,14 @@ napi_status napi_create_int32(napi_env env, int32_t value, napi_value* result) {
 
 napi_status napi_create_uint32(napi_env env, uint32_t value,
                                napi_value* result) {
-  *result = v8impl::JsValueFromV8LocalValue(
+  *result = primjs::v8impl::JsValueFromV8LocalValue(
       v8::Integer::NewFromUnsigned(env->ctx->isolate, value));
 
   return napi_clear_last_error(env);
 }
 
 napi_status napi_create_int64(napi_env env, int64_t value, napi_value* result) {
-  *result = v8impl::JsValueFromV8LocalValue(
+  *result = primjs::v8impl::JsValueFromV8LocalValue(
       v8::Number::New(env->ctx->isolate, static_cast<double>(value)));
 
   return napi_clear_last_error(env);
@@ -1496,9 +1507,9 @@ napi_status napi_get_boolean(napi_env env, bool value, napi_value* result) {
   v8::Isolate* isolate = env->ctx->isolate;
 
   if (value) {
-    *result = v8impl::JsValueFromV8LocalValue(v8::True(isolate));
+    *result = primjs::v8impl::JsValueFromV8LocalValue(v8::True(isolate));
   } else {
-    *result = v8impl::JsValueFromV8LocalValue(v8::False(isolate));
+    *result = primjs::v8impl::JsValueFromV8LocalValue(v8::False(isolate));
   }
 
   return napi_clear_last_error(env);
@@ -1509,12 +1520,13 @@ napi_status napi_create_symbol(napi_env env, napi_value description,
   v8::Isolate* isolate = env->ctx->isolate;
 
   if (description == nullptr) {
-    *result = v8impl::JsValueFromV8LocalValue(v8::Symbol::New(isolate));
+    *result = primjs::v8impl::JsValueFromV8LocalValue(v8::Symbol::New(isolate));
   } else {
-    v8::Local<v8::Value> desc = v8impl::V8LocalValueFromJsValue(description);
+    v8::Local<v8::Value> desc =
+        primjs::v8impl::V8LocalValueFromJsValue(description);
     RETURN_STATUS_IF_FALSE(env, desc->IsString(), napi_string_expected);
 
-    *result = v8impl::JsValueFromV8LocalValue(
+    *result = primjs::v8impl::JsValueFromV8LocalValue(
         v8::Symbol::New(isolate, desc.As<v8::String>()));
   }
 
@@ -1529,9 +1541,10 @@ static inline napi_status set_error_code(napi_env env,
     v8::Local<v8::Context> context = env->ctx->context();
     v8::Local<v8::Object> err_object = error.As<v8::Object>();
 
-    v8::Local<v8::Value> code_value = v8impl::V8LocalValueFromJsValue(code);
+    v8::Local<v8::Value> code_value =
+        primjs::v8impl::V8LocalValueFromJsValue(code);
     if (code != nullptr) {
-      code_value = v8impl::V8LocalValueFromJsValue(code);
+      code_value = primjs::v8impl::V8LocalValueFromJsValue(code);
       RETURN_STATUS_IF_FALSE(env, code_value->IsString(), napi_string_expected);
     } else {
       CHECK_NEW_FROM_UTF8(env, code_value, code_cstring);
@@ -1549,7 +1562,8 @@ static inline napi_status set_error_code(napi_env env,
 
 napi_status napi_create_error(napi_env env, napi_value code, napi_value msg,
                               napi_value* result) {
-  v8::Local<v8::Value> message_value = v8impl::V8LocalValueFromJsValue(msg);
+  v8::Local<v8::Value> message_value =
+      primjs::v8impl::V8LocalValueFromJsValue(msg);
   RETURN_STATUS_IF_FALSE(env, message_value->IsString(), napi_string_expected);
 
   v8::Local<v8::Value> error_obj =
@@ -1557,14 +1571,15 @@ napi_status napi_create_error(napi_env env, napi_value code, napi_value msg,
   napi_status status = set_error_code(env, error_obj, code, nullptr);
   if (status != napi_ok) return status;
 
-  *result = v8impl::JsValueFromV8LocalValue(error_obj);
+  *result = primjs::v8impl::JsValueFromV8LocalValue(error_obj);
 
   return napi_clear_last_error(env);
 }
 
 napi_status napi_create_type_error(napi_env env, napi_value code,
                                    napi_value msg, napi_value* result) {
-  v8::Local<v8::Value> message_value = v8impl::V8LocalValueFromJsValue(msg);
+  v8::Local<v8::Value> message_value =
+      primjs::v8impl::V8LocalValueFromJsValue(msg);
   RETURN_STATUS_IF_FALSE(env, message_value->IsString(), napi_string_expected);
 
   v8::Local<v8::Value> error_obj =
@@ -1572,14 +1587,15 @@ napi_status napi_create_type_error(napi_env env, napi_value code,
   napi_status status = set_error_code(env, error_obj, code, nullptr);
   if (status != napi_ok) return status;
 
-  *result = v8impl::JsValueFromV8LocalValue(error_obj);
+  *result = primjs::v8impl::JsValueFromV8LocalValue(error_obj);
 
   return napi_clear_last_error(env);
 }
 
 napi_status napi_create_range_error(napi_env env, napi_value code,
                                     napi_value msg, napi_value* result) {
-  v8::Local<v8::Value> message_value = v8impl::V8LocalValueFromJsValue(msg);
+  v8::Local<v8::Value> message_value =
+      primjs::v8impl::V8LocalValueFromJsValue(msg);
   RETURN_STATUS_IF_FALSE(env, message_value->IsString(), napi_string_expected);
 
   v8::Local<v8::Value> error_obj =
@@ -1587,7 +1603,7 @@ napi_status napi_create_range_error(napi_env env, napi_value code,
   napi_status status = set_error_code(env, error_obj, code, nullptr);
   if (status != napi_ok) return status;
 
-  *result = v8impl::JsValueFromV8LocalValue(error_obj);
+  *result = primjs::v8impl::JsValueFromV8LocalValue(error_obj);
 
   return napi_clear_last_error(env);
 }
@@ -1597,7 +1613,7 @@ napi_status napi_typeof(napi_env env, napi_value value,
   // Omit NAPI_PREAMBLE and GET_RETURN_STATUS because V8 calls here cannot throw
   // JS exceptions.
 
-  v8::Local<v8::Value> v = v8impl::V8LocalValueFromJsValue(value);
+  v8::Local<v8::Value> v = primjs::v8impl::V8LocalValueFromJsValue(value);
 
   if (v->IsNumber()) {
     *result = napi_number;
@@ -1632,13 +1648,15 @@ napi_status napi_typeof(napi_env env, napi_value value,
 }
 
 napi_status napi_get_undefined(napi_env env, napi_value* result) {
-  *result = v8impl::JsValueFromV8LocalValue(v8::Undefined(env->ctx->isolate));
+  *result =
+      primjs::v8impl::JsValueFromV8LocalValue(v8::Undefined(env->ctx->isolate));
 
   return napi_clear_last_error(env);
 }
 
 napi_status napi_get_null(napi_env env, napi_value* result) {
-  *result = v8impl::JsValueFromV8LocalValue(v8::Null(env->ctx->isolate));
+  *result =
+      primjs::v8impl::JsValueFromV8LocalValue(v8::Null(env->ctx->isolate));
 
   return napi_clear_last_error(env);
 }
@@ -1653,8 +1671,8 @@ napi_status napi_get_cb_info(
     napi_value* this_arg,  // [out] Receives the JS 'this' arg for the call
     void** data) {         // [out] Receives the data pointer for the callback.
 
-  v8impl::CallbackWrapper* info =
-      reinterpret_cast<v8impl::CallbackWrapper*>(cbinfo);
+  primjs::v8impl::CallbackWrapper* info =
+      reinterpret_cast<primjs::v8impl::CallbackWrapper*>(cbinfo);
 
   if (argv != nullptr) {
     info->Args(argv, *argc);
@@ -1674,8 +1692,8 @@ napi_status napi_get_cb_info(
 
 napi_status napi_get_new_target(napi_env env, napi_callback_info cbinfo,
                                 napi_value* result) {
-  v8impl::CallbackWrapper* info =
-      reinterpret_cast<v8impl::CallbackWrapper*>(cbinfo);
+  primjs::v8impl::CallbackWrapper* info =
+      reinterpret_cast<primjs::v8impl::CallbackWrapper*>(cbinfo);
 
   *result = info->GetNewTarget();
   return napi_clear_last_error(env);
@@ -1691,7 +1709,7 @@ napi_status napi_call_function(napi_env env, napi_value recv, napi_value func,
 
   v8::Local<v8::Context> context = env->ctx->context();
 
-  v8::Local<v8::Value> v8recv = v8impl::V8LocalValueFromJsValue(recv);
+  v8::Local<v8::Value> v8recv = primjs::v8impl::V8LocalValueFromJsValue(recv);
 
   v8::Local<v8::Function> v8func;
   CHECK_TO_FUNCTION(env, v8func, func);
@@ -1705,7 +1723,7 @@ napi_status napi_call_function(napi_env env, napi_value recv, napi_value func,
   } else {
     if (result != nullptr) {
       CHECK_MAYBE_EMPTY(env, maybe, napi_generic_failure);
-      *result = v8impl::JsValueFromV8LocalValue(maybe.ToLocalChecked());
+      *result = primjs::v8impl::JsValueFromV8LocalValue(maybe.ToLocalChecked());
     }
     return napi_clear_last_error(env);
   }
@@ -1719,7 +1737,8 @@ napi_status napi_call_function_spec_compliant(napi_env env, napi_value recv,
 }
 
 napi_status napi_get_global(napi_env env, napi_value* result) {
-  *result = v8impl::JsValueFromV8LocalValue(env->ctx->context()->Global());
+  *result =
+      primjs::v8impl::JsValueFromV8LocalValue(env->ctx->context()->Global());
 
   return napi_clear_last_error(env);
 }
@@ -1729,7 +1748,7 @@ napi_status napi_throw_(napi_env env, napi_value error) {
 
   v8::Isolate* isolate = env->ctx->isolate;
 
-  isolate->ThrowException(v8impl::V8LocalValueFromJsValue(error));
+  isolate->ThrowException(primjs::v8impl::V8LocalValueFromJsValue(error));
   // any VM calls after this point and before returning
   // to the javascript invoker will fail
   return napi_clear_last_error(env);
@@ -1792,7 +1811,7 @@ napi_status napi_is_error(napi_env env, napi_value value, bool* result) {
   // Omit NAPI_PREAMBLE and GET_RETURN_STATUS because V8 calls here cannot
   // throw JS exceptions.
 
-  v8::Local<v8::Value> val = v8impl::V8LocalValueFromJsValue(value);
+  v8::Local<v8::Value> val = primjs::v8impl::V8LocalValueFromJsValue(value);
   *result = val->IsNativeError();
 
   return napi_clear_last_error(env);
@@ -1803,8 +1822,8 @@ napi_status napi_get_value_double(napi_env env, napi_value value,
   // Omit NAPI_PREAMBLE and GET_RETURN_STATUS because V8 calls here cannot throw
   // JS exceptions.
 
-  auto val =
-      v8impl::V8LocalValueFromJsValue(value)->NumberValue(env->ctx->context());
+  auto val = primjs::v8impl::V8LocalValueFromJsValue(value)->NumberValue(
+      env->ctx->context());
   RETURN_STATUS_IF_FALSE(env, val.IsJust(), napi_number_expected);
 
   *result = val.ToChecked();
@@ -1817,8 +1836,8 @@ napi_status napi_get_value_int32(napi_env env, napi_value value,
   // Omit NAPI_PREAMBLE and GET_RETURN_STATUS because V8 calls here cannot throw
   // JS exceptions.
 
-  auto val =
-      v8impl::V8LocalValueFromJsValue(value)->Int32Value(env->ctx->context());
+  auto val = primjs::v8impl::V8LocalValueFromJsValue(value)->Int32Value(
+      env->ctx->context());
 
   RETURN_STATUS_IF_FALSE(env, val.IsJust(), napi_number_expected);
 
@@ -1832,8 +1851,8 @@ napi_status napi_get_value_uint32(napi_env env, napi_value value,
   // Omit NAPI_PREAMBLE and GET_RETURN_STATUS because V8 calls here cannot throw
   // JS exceptions.
 
-  auto val =
-      v8impl::V8LocalValueFromJsValue(value)->Uint32Value(env->ctx->context());
+  auto val = primjs::v8impl::V8LocalValueFromJsValue(value)->Uint32Value(
+      env->ctx->context());
 
   RETURN_STATUS_IF_FALSE(env, val.IsJust(), napi_number_expected);
 
@@ -1847,8 +1866,8 @@ napi_status napi_get_value_int64(napi_env env, napi_value value,
   // Omit NAPI_PREAMBLE and GET_RETURN_STATUS because V8 calls here cannot throw
   // JS exceptions.
 
-  auto val =
-      v8impl::V8LocalValueFromJsValue(value)->IntegerValue(env->ctx->context());
+  auto val = primjs::v8impl::V8LocalValueFromJsValue(value)->IntegerValue(
+      env->ctx->context());
 
   RETURN_STATUS_IF_FALSE(env, val.IsJust(), napi_number_expected);
 
@@ -1861,8 +1880,8 @@ napi_status napi_get_value_bool(napi_env env, napi_value value, bool* result) {
   // Omit NAPI_PREAMBLE and GET_RETURN_STATUS because V8 calls here cannot throw
   // JS exceptions.
 
-  *result =
-      v8impl::V8LocalValueFromJsValue(value)->BooleanValue(env->ctx->isolate);
+  *result = primjs::v8impl::V8LocalValueFromJsValue(value)->BooleanValue(
+      env->ctx->isolate);
 
   return napi_clear_last_error(env);
 }
@@ -1878,7 +1897,7 @@ napi_status napi_get_value_bool(napi_env env, napi_value value, bool* result) {
 napi_status napi_get_value_string_latin1(napi_env env, napi_value value,
                                          char* buf, size_t bufsize,
                                          size_t* result) {
-  v8::Local<v8::Value> val = v8impl::V8LocalValueFromJsValue(value);
+  v8::Local<v8::Value> val = primjs::v8impl::V8LocalValueFromJsValue(value);
   RETURN_STATUS_IF_FALSE(env, val->IsString(), napi_string_expected);
 
   if (!buf) {
@@ -1911,7 +1930,7 @@ napi_status napi_get_value_string_latin1(napi_env env, napi_value value,
 napi_status napi_get_value_string_utf8(napi_env env, napi_value value,
                                        char* buf, size_t bufsize,
                                        size_t* result) {
-  v8::Local<v8::Value> val = v8impl::V8LocalValueFromJsValue(value);
+  v8::Local<v8::Value> val = primjs::v8impl::V8LocalValueFromJsValue(value);
   RETURN_STATUS_IF_FALSE(env, val->IsString(), napi_string_expected);
 
   if (!buf) {
@@ -1944,7 +1963,7 @@ napi_status napi_get_value_string_utf8(napi_env env, napi_value value,
 napi_status napi_get_value_string_utf16(napi_env env, napi_value value,
                                         char16_t* buf, size_t bufsize,
                                         size_t* result) {
-  v8::Local<v8::Value> val = v8impl::V8LocalValueFromJsValue(value);
+  v8::Local<v8::Value> val = primjs::v8impl::V8LocalValueFromJsValue(value);
   RETURN_STATUS_IF_FALSE(env, val->IsString(), napi_string_expected);
 
   if (!buf) {
@@ -1973,8 +1992,8 @@ napi_status napi_coerce_to_bool(napi_env env, napi_value value,
   // JS exceptions.
   v8::Isolate* isolate = env->ctx->isolate;
   v8::Local<v8::Boolean> b =
-      v8impl::V8LocalValueFromJsValue(value)->ToBoolean(isolate);
-  *result = v8impl::JsValueFromV8LocalValue(b);
+      primjs::v8impl::V8LocalValueFromJsValue(value)->ToBoolean(isolate);
+  *result = primjs::v8impl::JsValueFromV8LocalValue(b);
   return napi_clear_last_error(env);
 }
 
@@ -1988,7 +2007,7 @@ napi_status napi_coerce_to_bool(napi_env env, napi_value value,
                                                                              \
     CHECK_TO_##UpperCaseName(env, context, str, value);                      \
                                                                              \
-    *result = v8impl::JsValueFromV8LocalValue(str);                          \
+    *result = primjs::v8impl::JsValueFromV8LocalValue(str);                  \
     return GET_RETURN_STATUS(env);                                           \
   }
 
@@ -2001,7 +2020,7 @@ GEN_COERCE_FUNCTION(STRING, String, string)
 napi_status napi_wrap(napi_env env, napi_value js_object, void* native_object,
                       napi_finalize finalize_cb, void* finalize_hint,
                       napi_ref* result) {
-  return v8impl::Wrap<v8impl::retrievable>(
+  return primjs::v8impl::Wrap<primjs::v8impl::retrievable>(
       env, js_object, native_object, finalize_cb, finalize_hint, result, false);
 }
 
@@ -2009,26 +2028,30 @@ napi_status napi_wrap_spec_compliant(napi_env env, napi_value js_object,
                                      void* native_object,
                                      napi_finalize finalize_cb,
                                      void* finalize_hint, napi_ref* result) {
-  return v8impl::Wrap<v8impl::retrievable>(
+  return primjs::v8impl::Wrap<primjs::v8impl::retrievable>(
       env, js_object, native_object, finalize_cb, finalize_hint, result, true);
 }
 
 napi_status napi_unwrap(napi_env env, napi_value obj, void** result) {
-  return v8impl::Unwrap(env, obj, result, v8impl::KeepWrap, false);
+  return primjs::v8impl::Unwrap(env, obj, result, primjs::v8impl::KeepWrap,
+                                false);
 }
 
 napi_status napi_unwrap_spec_compliant(napi_env env, napi_value obj,
                                        void** result) {
-  return v8impl::Unwrap(env, obj, result, v8impl::KeepWrap, true);
+  return primjs::v8impl::Unwrap(env, obj, result, primjs::v8impl::KeepWrap,
+                                true);
 }
 
 napi_status napi_remove_wrap(napi_env env, napi_value obj, void** result) {
-  return v8impl::Unwrap(env, obj, result, v8impl::RemoveWrap, false);
+  return primjs::v8impl::Unwrap(env, obj, result, primjs::v8impl::RemoveWrap,
+                                false);
 }
 
 napi_status napi_remove_wrap_spec_compliant(napi_env env, napi_value obj,
                                             void** result) {
-  return v8impl::Unwrap(env, obj, result, v8impl::RemoveWrap, true);
+  return primjs::v8impl::Unwrap(env, obj, result, primjs::v8impl::RemoveWrap,
+                                true);
 }
 
 napi_status napi_create_external(napi_env env, void* data,
@@ -2040,17 +2063,17 @@ napi_status napi_create_external(napi_env env, void* data,
 
   // The Reference object will delete itself after invoking the finalizer
   // callback.
-  v8impl::Reference::New(env, external_value, 0, true, finalize_cb, data,
-                         finalize_hint);
+  primjs::v8impl::Reference::New(env, external_value, 0, true, finalize_cb,
+                                 data, finalize_hint);
 
-  *result = v8impl::JsValueFromV8LocalValue(external_value);
+  *result = primjs::v8impl::JsValueFromV8LocalValue(external_value);
 
   return napi_clear_last_error(env);
 }
 
 napi_status napi_get_value_external(napi_env env, napi_value value,
                                     void** result) {
-  v8::Local<v8::Value> val = v8impl::V8LocalValueFromJsValue(value);
+  v8::Local<v8::Value> val = primjs::v8impl::V8LocalValueFromJsValue(value);
   RETURN_STATUS_IF_FALSE(env, val->IsExternal(), napi_invalid_arg);
 
   v8::Local<v8::External> external_value = val.As<v8::External>();
@@ -2065,14 +2088,15 @@ napi_status napi_create_reference(napi_env env, napi_value value,
   // Omit NAPI_PREAMBLE and GET_RETURN_STATUS because V8 calls here cannot throw
   // JS exceptions.
 
-  v8::Local<v8::Value> v8_value = v8impl::V8LocalValueFromJsValue(value);
+  v8::Local<v8::Value> v8_value =
+      primjs::v8impl::V8LocalValueFromJsValue(value);
 
   if (!(v8_value->IsObject() || v8_value->IsFunction())) {
     return napi_set_last_error(env, napi_object_expected);
   }
 
-  v8impl::Reference* reference =
-      v8impl::Reference::New(env, v8_value, initial_refcount, false);
+  primjs::v8impl::Reference* reference =
+      primjs::v8impl::Reference::New(env, v8_value, initial_refcount, false);
 
   *result = reinterpret_cast<napi_ref>(reference);
   return napi_clear_last_error(env);
@@ -2084,7 +2108,8 @@ napi_status napi_delete_reference(napi_env env, napi_ref ref) {
   // Omit NAPI_PREAMBLE and GET_RETURN_STATUS because V8 calls here cannot throw
   // JS exceptions.
 
-  v8impl::Reference::Delete(reinterpret_cast<v8impl::Reference*>(ref));
+  primjs::v8impl::Reference::Delete(
+      reinterpret_cast<primjs::v8impl::Reference*>(ref));
 
   return napi_clear_last_error(env);
 }
@@ -2098,7 +2123,8 @@ napi_status napi_reference_ref(napi_env env, napi_ref ref, uint32_t* result) {
   // Omit NAPI_PREAMBLE and GET_RETURN_STATUS because V8 calls here cannot throw
   // JS exceptions.
 
-  v8impl::Reference* reference = reinterpret_cast<v8impl::Reference*>(ref);
+  primjs::v8impl::Reference* reference =
+      reinterpret_cast<primjs::v8impl::Reference*>(ref);
   uint32_t count = reference->Ref();
 
   if (result != nullptr) {
@@ -2116,7 +2142,8 @@ napi_status napi_reference_unref(napi_env env, napi_ref ref, uint32_t* result) {
   // Omit NAPI_PREAMBLE and GET_RETURN_STATUS because V8 calls here cannot throw
   // JS exceptions.
 
-  v8impl::Reference* reference = reinterpret_cast<v8impl::Reference*>(ref);
+  primjs::v8impl::Reference* reference =
+      reinterpret_cast<primjs::v8impl::Reference*>(ref);
 
   if (reference->RefCount() == 0) {
     return napi_set_last_error(env, napi_generic_failure);
@@ -2139,8 +2166,9 @@ napi_status napi_get_reference_value(napi_env env, napi_ref ref,
   // Omit NAPI_PREAMBLE and GET_RETURN_STATUS because V8 calls here cannot throw
   // JS exceptions.
 
-  v8impl::Reference* reference = reinterpret_cast<v8impl::Reference*>(ref);
-  *result = v8impl::JsValueFromV8LocalValue(reference->Get());
+  primjs::v8impl::Reference* reference =
+      reinterpret_cast<primjs::v8impl::Reference*>(ref);
+  *result = primjs::v8impl::JsValueFromV8LocalValue(reference->Get());
 
   return napi_clear_last_error(env);
 }
@@ -2149,8 +2177,8 @@ napi_status napi_open_context_scope(napi_env env, napi_context_scope* result) {
   // Omit NAPI_PREAMBLE and GET_RETURN_STATUS because V8 calls here cannot throw
   // JS exceptions.
 
-  *result = v8impl::JsContextScopeFromV8ContextScope(
-      new v8impl::ContextScopeWrapper(env->ctx->context()));
+  *result = primjs::v8impl::JsContextScopeFromV8ContextScope(
+      new primjs::v8impl::ContextScopeWrapper(env->ctx->context()));
   env->ctx->open_context_scopes++;
   return napi_clear_last_error(env);
 }
@@ -2165,7 +2193,7 @@ napi_status_legacy napi_close_context_scope(napi_env env,
   }
 
   env->ctx->open_context_scopes--;
-  delete v8impl::V8ContextScopeFromJsContextScope(scope);
+  delete primjs::v8impl::V8ContextScopeFromJsContextScope(scope);
   napi_clear_last_error(env);
   return napi_ok_legacy;
 }
@@ -2174,8 +2202,8 @@ napi_status napi_open_handle_scope(napi_env env, napi_handle_scope* result) {
   // Omit NAPI_PREAMBLE and GET_RETURN_STATUS because V8 calls here cannot throw
   // JS exceptions.
 
-  *result = v8impl::JsHandleScopeFromV8HandleScope(
-      new v8impl::HandleScopeWrapper(env->ctx->isolate));
+  *result = primjs::v8impl::JsHandleScopeFromV8HandleScope(
+      new primjs::v8impl::HandleScopeWrapper(env->ctx->isolate));
   env->ctx->open_handle_scopes++;
   return napi_clear_last_error(env);
 }
@@ -2189,7 +2217,7 @@ napi_status napi_close_handle_scope(napi_env env, napi_handle_scope scope) {
   }
 
   env->ctx->open_handle_scopes--;
-  delete v8impl::V8HandleScopeFromJsHandleScope(scope);
+  delete primjs::v8impl::V8HandleScopeFromJsHandleScope(scope);
   return napi_clear_last_error(env);
 }
 
@@ -2198,8 +2226,8 @@ napi_status napi_open_escapable_handle_scope(
   // Omit NAPI_PREAMBLE and GET_RETURN_STATUS because V8 calls here cannot throw
   // JS exceptions.
 
-  *result = v8impl::JsEscapableHandleScopeFromV8EscapableHandleScope(
-      new v8impl::EscapableHandleScopeWrapper(env->ctx->isolate));
+  *result = primjs::v8impl::JsEscapableHandleScopeFromV8EscapableHandleScope(
+      new primjs::v8impl::EscapableHandleScopeWrapper(env->ctx->isolate));
   env->ctx->open_handle_scopes++;
   return napi_clear_last_error(env);
 }
@@ -2213,7 +2241,8 @@ napi_status napi_close_escapable_handle_scope(
     return napi_handle_scope_mismatch;
   }
 
-  delete v8impl::V8EscapableHandleScopeFromJsEscapableHandleScope(scope);
+  delete primjs::v8impl::V8EscapableHandleScopeFromJsEscapableHandleScope(
+      scope);
   env->ctx->open_handle_scopes--;
   return napi_clear_last_error(env);
 }
@@ -2223,11 +2252,11 @@ napi_status napi_escape_handle(napi_env env, napi_escapable_handle_scope scope,
   // Omit NAPI_PREAMBLE and GET_RETURN_STATUS because V8 calls here cannot throw
   // JS exceptions.
 
-  v8impl::EscapableHandleScopeWrapper* s =
-      v8impl::V8EscapableHandleScopeFromJsEscapableHandleScope(scope);
+  primjs::v8impl::EscapableHandleScopeWrapper* s =
+      primjs::v8impl::V8EscapableHandleScopeFromJsEscapableHandleScope(scope);
   if (!s->escape_called()) {
-    *result = v8impl::JsValueFromV8LocalValue(
-        s->Escape(v8impl::V8LocalValueFromJsValue(escapee)));
+    *result = primjs::v8impl::JsValueFromV8LocalValue(
+        s->Escape(primjs::v8impl::V8LocalValueFromJsValue(escapee)));
     return napi_clear_last_error(env);
   }
   return napi_set_last_error(env, napi_escape_called_twice);
@@ -2251,7 +2280,7 @@ napi_status napi_new_instance(napi_env env, napi_value constructor, size_t argc,
 
   CHECK_MAYBE_EMPTY(env, maybe, napi_generic_failure);
 
-  *result = v8impl::JsValueFromV8LocalValue(maybe.ToLocalChecked());
+  *result = primjs::v8impl::JsValueFromV8LocalValue(maybe.ToLocalChecked());
   return GET_RETURN_STATUS(env);
 }
 
@@ -2275,7 +2304,7 @@ napi_status napi_instanceof(napi_env env, napi_value object,
 
   napi_status status = napi_generic_failure;
 
-  v8::Local<v8::Value> val = v8impl::V8LocalValueFromJsValue(object);
+  v8::Local<v8::Value> val = primjs::v8impl::V8LocalValueFromJsValue(object);
   auto maybe_result = val->InstanceOf(context, ctor);
   CHECK_MAYBE_NOTHING(env, maybe_result, status);
   *result = maybe_result.FromJust();
@@ -2299,7 +2328,7 @@ napi_status napi_get_and_clear_last_exception(napi_env env,
   if (env->ctx->last_exception.IsEmpty()) {
     return napi_get_undefined(env, result);
   } else {
-    *result = v8impl::JsValueFromV8LocalValue(
+    *result = primjs::v8impl::JsValueFromV8LocalValue(
         v8::Local<v8::Value>::New(env->ctx->isolate, env->ctx->last_exception));
     env->ctx->last_exception.Reset();
   }
@@ -2320,25 +2349,25 @@ napi_status napi_get_own_property_descriptor(napi_env env, napi_value obj,
   v8::Local<v8::Context> context = env->ctx->context();
   v8::Local<v8::Object> v8_obj;
   CHECK_TO_OBJECT(env, context, v8_obj, obj);
-  v8::Local<v8::Value> v8_prop = v8impl::V8LocalValueFromJsValue(prop);
+  v8::Local<v8::Value> v8_prop = primjs::v8impl::V8LocalValueFromJsValue(prop);
   RETURN_STATUS_IF_FALSE(env, v8_prop->IsName(), napi_name_expected);
   v8::MaybeLocal<v8::Value> maybe_descriptor =
       v8_obj->GetOwnPropertyDescriptor(context, v8_prop.As<v8::Name>());
   CHECK_MAYBE_EMPTY(env, maybe_descriptor, napi_generic_failure);
   v8::Local<v8::Value> local_descriptor = maybe_descriptor.ToLocalChecked();
-  *result = v8impl::JsValueFromV8LocalValue(local_descriptor);
+  *result = primjs::v8impl::JsValueFromV8LocalValue(local_descriptor);
   return GET_RETURN_STATUS(env);
 }
 
 napi_status napi_is_arraybuffer(napi_env env, napi_value value, bool* result) {
-  v8::Local<v8::Value> val = v8impl::V8LocalValueFromJsValue(value);
+  v8::Local<v8::Value> val = primjs::v8impl::V8LocalValueFromJsValue(value);
   *result = val->IsArrayBuffer();
 
   return napi_clear_last_error(env);
 }
 
 napi_status napi_is_typedarray(napi_env env, napi_value value, bool* result) {
-  v8::Local<v8::Value> val = v8impl::V8LocalValueFromJsValue(value);
+  v8::Local<v8::Value> val = primjs::v8impl::V8LocalValueFromJsValue(value);
   *result = val->IsTypedArray();
 
   return napi_clear_last_error(env);
@@ -2347,7 +2376,8 @@ napi_status napi_is_typedarray(napi_env env, napi_value value, bool* result) {
 napi_status napi_create_typedarray(napi_env env, napi_typedarray_type type,
                                    size_t length, napi_value arraybuffer,
                                    size_t byte_offset, napi_value* result) {
-  v8::Local<v8::Value> value = v8impl::V8LocalValueFromJsValue(arraybuffer);
+  v8::Local<v8::Value> value =
+      primjs::v8impl::V8LocalValueFromJsValue(arraybuffer);
   RETURN_STATUS_IF_FALSE(env, value->IsArrayBuffer(), napi_invalid_arg);
 
   v8::Local<v8::ArrayBuffer> buffer = value.As<v8::ArrayBuffer>();
@@ -2402,13 +2432,14 @@ napi_status napi_create_typedarray(napi_env env, napi_typedarray_type type,
       return napi_set_last_error(env, napi_invalid_arg);
   }
 
-  *result = v8impl::JsValueFromV8LocalValue(typedArray);
+  *result = primjs::v8impl::JsValueFromV8LocalValue(typedArray);
   return napi_clear_last_error(env);
 }
 
 napi_status napi_is_typedarray_of(napi_env env, napi_value typedarray,
                                   napi_typedarray_type type, bool* result) {
-  v8::Local<v8::Value> value = v8impl::V8LocalValueFromJsValue(typedarray);
+  v8::Local<v8::Value> value =
+      primjs::v8impl::V8LocalValueFromJsValue(typedarray);
 
   switch (type) {
     case napi_int8_array:
@@ -2454,7 +2485,8 @@ napi_status napi_create_dataview(napi_env env, size_t byte_length,
                                  napi_value* result) {
   NAPI_PREAMBLE(env);
 
-  v8::Local<v8::Value> value = v8impl::V8LocalValueFromJsValue(arraybuffer);
+  v8::Local<v8::Value> value =
+      primjs::v8impl::V8LocalValueFromJsValue(arraybuffer);
   RETURN_STATUS_IF_FALSE(env, value->IsArrayBuffer(), napi_invalid_arg);
 
   v8::Local<v8::ArrayBuffer> buffer = value.As<v8::ArrayBuffer>();
@@ -2467,12 +2499,12 @@ napi_status napi_create_dataview(napi_env env, size_t byte_length,
   v8::Local<v8::DataView> DataView =
       v8::DataView::New(buffer, byte_offset, byte_length);
 
-  *result = v8impl::JsValueFromV8LocalValue(DataView);
+  *result = primjs::v8impl::JsValueFromV8LocalValue(DataView);
   return GET_RETURN_STATUS(env);
 }
 
 napi_status napi_is_dataview(napi_env env, napi_value value, bool* result) {
-  v8::Local<v8::Value> val = v8impl::V8LocalValueFromJsValue(value);
+  v8::Local<v8::Value> val = primjs::v8impl::V8LocalValueFromJsValue(value);
   *result = val->IsDataView();
 
   return napi_clear_last_error(env);
@@ -2484,11 +2516,11 @@ napi_status napi_create_promise(napi_env env, napi_deferred* deferred,
   CHECK_MAYBE_EMPTY(env, maybe, napi_generic_failure);
 
   auto v8_resolver = maybe.ToLocalChecked();
-  auto v8_deferred = new v8impl::Persistent<v8::Value>();
+  auto v8_deferred = new primjs::v8impl::Persistent<v8::Value>();
   v8_deferred->Reset(env->ctx->isolate, v8_resolver);
 
-  *deferred = v8impl::JsDeferredFromNodePersistent(v8_deferred);
-  *promise = v8impl::JsValueFromV8LocalValue(v8_resolver->GetPromise());
+  *deferred = primjs::v8impl::JsDeferredFromNodePersistent(v8_deferred);
+  *promise = primjs::v8impl::JsValueFromV8LocalValue(v8_resolver->GetPromise());
   return napi_clear_last_error(env);
 }
 
@@ -2497,17 +2529,17 @@ napi_status napi_release_deferred(napi_env env, napi_deferred deferred,
                                   napi_deferred_release_mode mode) {
   switch (mode) {
     case napi_deferred_resolve:
-      return v8impl::ConcludeDeferred(env, deferred, resolution, true);
+      return primjs::v8impl::ConcludeDeferred(env, deferred, resolution, true);
     case napi_deferred_reject:
-      return v8impl::ConcludeDeferred(env, deferred, resolution, false);
+      return primjs::v8impl::ConcludeDeferred(env, deferred, resolution, false);
     case napi_deferred_delete:
-      delete v8impl::NodePersistentFromJsDeferred(deferred);
+      delete primjs::v8impl::NodePersistentFromJsDeferred(deferred);
       return napi_clear_last_error(env);
   }
 }
 
 napi_status napi_is_promise(napi_env env, napi_value value, bool* is_promise) {
-  *is_promise = v8impl::V8LocalValueFromJsValue(value)->IsPromise();
+  *is_promise = primjs::v8impl::V8LocalValueFromJsValue(value)->IsPromise();
 
   return napi_clear_last_error(env);
 }
@@ -2545,7 +2577,7 @@ napi_status napi_gen_code_cache(napi_env env, const char* script,
 napi_status napi_add_finalizer(napi_env env, napi_value js_object,
                                void* native_object, napi_finalize finalize_cb,
                                void* finalize_hint, napi_ref* result) {
-  return v8impl::Wrap<v8impl::anonymous>(
+  return primjs::v8impl::Wrap<primjs::v8impl::anonymous>(
       env, js_object, native_object, finalize_cb, finalize_hint, result, true);
 }
 
@@ -2565,8 +2597,8 @@ napi_status_legacy napi_set_instance_data(napi_env env, uint64_t key,
     return napi_conflict_instance_data_legacy;
   }
 
-  env->ctx->instance_data_registry[key] =
-      v8impl::RefBase::New(env, 0, true, finalize_cb, data, finalize_hint);
+  env->ctx->instance_data_registry[key] = primjs::v8impl::RefBase::New(
+      env, 0, true, finalize_cb, data, finalize_hint);
 
   napi_clear_last_error(env);
   return napi_ok_legacy;
@@ -2578,13 +2610,14 @@ napi_status napi_set_instance_data_spec_compliant(napi_env env, uint64_t key,
                                                   void* finalize_hint) {
   auto it = env->ctx->instance_data_registry.find(key);
   if (it != env->ctx->instance_data_registry.end()) {
-    v8impl::RefBase* idata = static_cast<v8impl::RefBase*>(it->second);
+    primjs::v8impl::RefBase* idata =
+        static_cast<primjs::v8impl::RefBase*>(it->second);
     env->ctx->instance_data_registry.erase(it);
     idata->Finalize(false);
   }
 
-  env->ctx->instance_data_registry[key] =
-      v8impl::RefBase::New(env, 0, true, finalize_cb, data, finalize_hint);
+  env->ctx->instance_data_registry[key] = primjs::v8impl::RefBase::New(
+      env, 0, true, finalize_cb, data, finalize_hint);
 
   return napi_clear_last_error(env);
 }
@@ -2594,7 +2627,8 @@ napi_status napi_get_instance_data(napi_env env, uint64_t key, void** data) {
   if (it == env->ctx->instance_data_registry.end()) {
     *data = nullptr;
   } else {
-    v8impl::RefBase* idata = static_cast<v8impl::RefBase*>(it->second);
+    primjs::v8impl::RefBase* idata =
+        static_cast<primjs::v8impl::RefBase*>(it->second);
 
     *data = idata->Data();
   }
@@ -2603,11 +2637,11 @@ napi_status napi_get_instance_data(napi_env env, uint64_t key, void** data) {
 }
 
 v8::Local<v8::Value> napi_js_value_to_v8_value(napi_env env, napi_value value) {
-  return v8impl::V8LocalValueFromJsValue(value);
+  return primjs::v8impl::V8LocalValueFromJsValue(value);
 }
 
 napi_value napi_v8_value_to_js_value(napi_env env, v8::Local<v8::Value> value) {
-  return v8impl::JsValueFromV8LocalValue(value);
+  return primjs::v8impl::JsValueFromV8LocalValue(value);
 }
 
 napi_status napi_create_date(napi_env env, double time, napi_value* result) {
@@ -2618,7 +2652,8 @@ napi_status napi_create_date(napi_env env, double time, napi_value* result) {
       v8::Date::New(env->ctx->context(), time);
   CHECK_MAYBE_EMPTY(env, maybe_date, napi_generic_failure);
 
-  *result = v8impl::JsValueFromV8LocalValue(maybe_date.ToLocalChecked());
+  *result =
+      primjs::v8impl::JsValueFromV8LocalValue(maybe_date.ToLocalChecked());
 
   return GET_RETURN_STATUS(env);
 }
@@ -2627,7 +2662,7 @@ napi_status napi_is_date(napi_env env, napi_value value, bool* is_date) {
   CHECK_ARG(env, value);
   CHECK_ARG(env, is_date);
 
-  *is_date = v8impl::V8LocalValueFromJsValue(value)->IsDate();
+  *is_date = primjs::v8impl::V8LocalValueFromJsValue(value)->IsDate();
 
   return napi_clear_last_error(env);
 }
@@ -2638,7 +2673,7 @@ napi_status napi_get_date_value(napi_env env, napi_value value,
   CHECK_ARG(env, value);
   CHECK_ARG(env, result);
 
-  v8::Local<v8::Value> val = v8impl::V8LocalValueFromJsValue(value);
+  v8::Local<v8::Value> val = primjs::v8impl::V8LocalValueFromJsValue(value);
   RETURN_STATUS_IF_FALSE(env, val->IsDate(), napi_date_expected);
 
   v8::Local<v8::Date> date = val.As<v8::Date>();
@@ -2713,14 +2748,14 @@ napi_status napi_get_all_property_names(napi_env env, napi_value object,
   CHECK_MAYBE_EMPTY_WITH_PREAMBLE(env, maybe_all_propertynames,
                                   napi_generic_failure);
 
-  *result =
-      v8impl::JsValueFromV8LocalValue(maybe_all_propertynames.ToLocalChecked());
+  *result = primjs::v8impl::JsValueFromV8LocalValue(
+      maybe_all_propertynames.ToLocalChecked());
   return GET_RETURN_STATUS(env);
 }
 
 napi_status napi_create_bigint_int64(napi_env env, int64_t value,
                                      napi_value* result) {
-  *result = v8impl::JsValueFromV8LocalValue(
+  *result = primjs::v8impl::JsValueFromV8LocalValue(
       v8::BigInt::New(env->ctx->isolate, value));
 
   return napi_clear_last_error(env);
@@ -2728,7 +2763,7 @@ napi_status napi_create_bigint_int64(napi_env env, int64_t value,
 
 napi_status napi_create_bigint_uint64(napi_env env, uint64_t value,
                                       napi_value* result) {
-  *result = v8impl::JsValueFromV8LocalValue(
+  *result = primjs::v8impl::JsValueFromV8LocalValue(
       v8::BigInt::NewFromUnsigned(env->ctx->isolate, value));
 
   return napi_clear_last_error(env);
@@ -2736,7 +2771,7 @@ napi_status napi_create_bigint_uint64(napi_env env, uint64_t value,
 
 napi_status napi_get_value_bigint_int64(napi_env env, napi_value value,
                                         int64_t* result, bool* lossless) {
-  v8::Local<v8::Value> val = v8impl::V8LocalValueFromJsValue(value);
+  v8::Local<v8::Value> val = primjs::v8impl::V8LocalValueFromJsValue(value);
 
   RETURN_STATUS_IF_FALSE(env, val->IsBigInt(), napi_bigint_expected);
 
@@ -2747,7 +2782,7 @@ napi_status napi_get_value_bigint_int64(napi_env env, napi_value value,
 
 napi_status napi_get_value_bigint_uint64(napi_env env, napi_value value,
                                          uint64_t* result, bool* lossless) {
-  v8::Local<v8::Value> val = v8impl::V8LocalValueFromJsValue(value);
+  v8::Local<v8::Value> val = primjs::v8impl::V8LocalValueFromJsValue(value);
 
   RETURN_STATUS_IF_FALSE(env, val->IsBigInt(), napi_bigint_expected);
 
@@ -2772,7 +2807,7 @@ napi_status napi_create_bigint_words(napi_env env, int sign_bit,
 
   CHECK_MAYBE_EMPTY_WITH_PREAMBLE(env, b, napi_generic_failure);
 
-  *result = v8impl::JsValueFromV8LocalValue(b.ToLocalChecked());
+  *result = primjs::v8impl::JsValueFromV8LocalValue(b.ToLocalChecked());
   return GET_RETURN_STATUS(env);
 }
 
@@ -2782,7 +2817,7 @@ napi_status napi_get_value_bigint_words(napi_env env, napi_value value,
   CHECK_ARG(env, value);
   CHECK_ARG(env, word_count);
 
-  v8::Local<v8::Value> val = v8impl::V8LocalValueFromJsValue(value);
+  v8::Local<v8::Value> val = primjs::v8impl::V8LocalValueFromJsValue(value);
 
   RETURN_STATUS_IF_FALSE(env, val->IsBigInt(), napi_bigint_expected);
 
