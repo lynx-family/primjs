@@ -113,24 +113,6 @@ inline uint32_t get_obj_size(void *ptr) {
          0x7FFFFFFF;
 }
 
-// hash size
-inline void set_hash_size(void *ptr, int hash_size) {  // with tag
-  if (hash_size > (1 << 25) - 1) {
-    *(int *)(0xdead) = 0;
-  }
-  auto atomic_ptr = to_std_atomic32(reinterpret_cast<uint32_t *>(ptr) - 2);
-  int tag =
-      std::atomic_load_explicit(atomic_ptr, std::memory_order_acquire) & 0x3F;
-  std::atomic_store_explicit(atomic_ptr,
-                             (static_cast<uint32_t>(hash_size) << 6) | tag,
-                             std::memory_order_release);
-}
-
-inline int get_hash_size(void *ptr) {
-  auto atomic_ptr = to_std_atomic32(reinterpret_cast<uint32_t *>(ptr) - 2);
-  return std::atomic_load_explicit(atomic_ptr, std::memory_order_acquire) >> 6;
-}
-
 #ifdef ENABLE_QUICKJS_DEBUGGER
 #include "inspector/debugger_inner.h"
 #include "inspector/interface.h"
@@ -1410,8 +1392,6 @@ typedef struct JSShapeProperty {
 } JSShapeProperty;
 
 struct JSShape {
-  uint32_t prop_hash_end[0];  /* hash table of size hash_mask + 1
-                                 before the start of the structure. */
   LEPUSRefCountHeader header; /* must come first, 32-bit */
   JSGCHeader gc_header;       /* must come after LEPUSRefCountHeader, 8-bit */
   /* true if the shape is inserted in the shape hash table. If not,
@@ -1427,7 +1407,8 @@ struct JSShape {
   int prop_count;
   JSShape *shape_hash_next; /* in LEPUSRuntime.shape_hash[h] list */
   LEPUSObject *proto;
-  JSShapeProperty prop[0]; /* prop_size elements */
+  uint32_t hash_table[0]; /* prop_hash_mask + 1 elements, followed by
+                             JSShapeProperty prop[prop_size]. */
 };
 struct LEPUSObject {
   LEPUSRefCountHeader header; /* must come first, 32-bit */
@@ -3047,21 +3028,13 @@ LEPUSValue js_array_concat_gc(LEPUSContext *ctx, LEPUSValueConst this_val,
                               int argc, LEPUSValueConst *argv);
 /* Shape support */
 QJS_STATIC inline JSShapeProperty *get_shape_prop(JSShape *sh) {
-  return sh->prop;
+  return reinterpret_cast<JSShapeProperty *>(sh->hash_table +
+                                             sh->prop_hash_mask + 1);
 }
 
 QJS_STATIC inline size_t get_shape_size(size_t hash_size, size_t prop_size) {
-  return hash_size * sizeof(uint32_t) + sizeof(JSShape) +
+  return sizeof(JSShape) + hash_size * sizeof(uint32_t) +
          prop_size * sizeof(JSShapeProperty);
-}
-
-QJS_STATIC inline JSShape *get_shape_from_alloc(void *sh_alloc,
-                                                size_t hash_size) {
-  return (JSShape *)(void *)((uint32_t *)sh_alloc + hash_size);
-}
-
-QJS_STATIC inline void *get_alloc_from_shape(JSShape *sh) {
-  return sh->prop_hash_end - ((intptr_t)sh->prop_hash_mask + 1);
 }
 
 QJS_STATIC inline BOOL atom_is_free(const JSAtomStruct *p) {

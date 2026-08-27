@@ -207,16 +207,15 @@ class AccessBuilder {
   static constexpr int object_gc_header_offset() {
     return offsetof(LEPUSObject, gc_header);
   }
-  static constexpr int shape_prop_offset() { return offsetof(JSShape, prop); }
+  static constexpr int shape_hash_table_offset() {
+    return offsetof(JSShape, hash_table);
+  }
   static constexpr int shape_proto_offset() { return offsetof(JSShape, proto); }
   static constexpr int shape_has_small_array_index_offset() {
     return offsetof(JSShape, has_small_array_index);
   }
   static constexpr int shape_prop_hash_mask_offset() {
     return offsetof(JSShape, prop_hash_mask);
-  }
-  static constexpr int shape_prop_hash_end_offset() {
-    return offsetof(JSShape, prop_hash_end);
   }
   static constexpr int js_property_var_ref_offset() {
     return offsetof(JSPropertyGC, u.var_ref);

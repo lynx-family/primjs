@@ -1309,11 +1309,14 @@ void HandlerImpl::FindOwnProperty(
   // h = (uintptr_t)atom & sh->prop_hash_mask;
   auto hash_mask = LoadShapePropHashMask(sh);
   auto h = Int32And(atom, hash_mask);
-  // h = sh->prop_hash_end[-h - 1];
-  auto hash_end_offset = AccessBuilder::shape_prop_hash_end_offset();
-  auto hash_end = IntPtrAdd(sh, IntPtrValue(hash_end_offset));
-  auto h_offset = Int32Sub(Int32Value(0), Int32Add(h, IntValue(1)));
-  h = LoadIntVal(CastToRaw(hash_end), h_offset);
+  // h = sh->hash_table[h];
+  auto hash_table_offset = AccessBuilder::shape_hash_table_offset();
+  auto hash_table = IntPtrAdd(sh, IntPtrValue(hash_table_offset));
+  h = LoadIntVal(CastToRaw(hash_table), h);
+  // prop = get_shape_prop(sh) = hash_table + (prop_hash_mask + 1)
+  auto hash_size = Int32Add(hash_mask, Int32Value(1));
+  auto prop_offset = Int32Mul(hash_size, Int32Value(sizeof(uint32_t)));
+  auto prop = IntPtrAdd(hash_table, ZExtInt32ToIntPtr(prop_offset));
 
   son::node::Label next(this);
   son::node::Label next1(this);
@@ -1330,9 +1333,6 @@ void HandlerImpl::FindOwnProperty(
     Bind(&next);
     {
       // pr = &prop[h - 1];
-      // prop = get_shape_prop(sh);
-      auto shape_prop_offset = AccessBuilder::shape_prop_offset();
-      auto prop = IntPtrAdd(sh, IntPtrValue(shape_prop_offset));
       auto offset = Int32Mul(Int32Add(*var_h, IntValue(-1)),
                              Int32Value(sizeof(JSShapeProperty)));
       pr = CastToRaw(IntPtrAdd(prop, ZExtInt32ToIntPtr(offset)));

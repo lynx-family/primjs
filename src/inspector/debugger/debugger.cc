@@ -157,7 +157,7 @@ QJS_HIDE void AddFunctionBytecode(LEPUSContext *ctx, LEPUSValue obj,
       } else {
         sh = p->shape;
         for (pass = 0; pass < 2; pass++) {
-          for (i = 0, pr = sh->prop; i < sh->prop_count; i++, pr++) {
+          for (i = 0, pr = get_shape_prop(sh); i < sh->prop_count; i++, pr++) {
             atom = pr->atom;
             if (atom != JS_ATOM_NULL && JS_AtomIsString(ctx, atom) &&
                 (pr->flags & LEPUS_PROP_ENUMERABLE)) {

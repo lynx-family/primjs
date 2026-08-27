@@ -2056,20 +2056,15 @@ static uint32_t shape_initial_hash(LEPUSObject *proto) {
 static JSShape *js_new_shape_nohash(LEPUSContext *ctx, LEPUSObject *proto,
                                     int hash_size, int prop_size) {
   LEPUSRuntime *rt = ctx->rt;
-  void *sh_alloc;
   JSShape *sh;
 
-  sh_alloc = lepus_malloc_gc(ctx, get_shape_size(hash_size, prop_size),
-                             ALLOC_TAG_JSShape);
-  if (!sh_alloc) return NULL;
-  sh = get_shape_from_alloc(sh_alloc, hash_size);
+  sh = static_cast<JSShape *>(lepus_malloc_gc(
+      ctx, get_shape_size(hash_size, prop_size), ALLOC_TAG_JSShape));
+  if (!sh) return NULL;
   sh->header.ref_count = 1;
   HeapObjStore(ctx, &sh->proto, proto);
   sh->prop_hash_mask = hash_size - 1;
   sh->prop_size = prop_size;
-#ifndef _WIN32
-  if (ctx->gc_enable) set_hash_size(sh_alloc, hash_size);
-#endif
   return sh;
 }
 
@@ -2101,22 +2096,15 @@ static JSShape *js_new_shape(LEPUSContext *ctx, LEPUSObject *proto) {
    hash table */
 static JSShape *js_clone_shape(LEPUSContext *ctx, JSShape *sh1) {
   JSShape *sh;
-  void *sh_alloc, *sh_alloc1;
   size_t size;
-  JSShapeProperty *pr;
-  uint32_t i, hash_size;
 
-  hash_size = sh1->prop_hash_mask + 1;
-  size = get_shape_size(hash_size, sh1->prop_size);
-  sh_alloc = lepus_malloc_gc(ctx, size, ALLOC_TAG_JSShape);
-  if (!sh_alloc) return NULL;
-  sh_alloc1 = get_alloc_from_shape(sh1);
-  memcpy(sh_alloc, sh_alloc1, size);
+  size = get_shape_size(sh1->prop_hash_mask + 1, sh1->prop_size);
+  sh = static_cast<JSShape *>(lepus_malloc_gc(ctx, size, ALLOC_TAG_JSShape));
+  if (!sh) return NULL;
+  memcpy(sh, sh1, size);
   WriteBarrierNoStore(ctx, sh1->proto);
-  sh = get_shape_from_alloc(sh_alloc, hash_size);
   sh->header.ref_count = 1;
   sh->is_hashed = FALSE;
-  set_hash_size(sh_alloc, hash_size);
   return sh;
 }
 
@@ -2163,8 +2151,8 @@ static int add_shape_property(LEPUSContext *ctx, JSShape **psh, LEPUSObject *p,
   /* add in hash table */
   hash_mask = sh->prop_hash_mask;
   h = atom & hash_mask;
-  pr->hash_next = sh->prop_hash_end[-h - 1];
-  sh->prop_hash_end[-h - 1] = sh->prop_count;
+  pr->hash_next = sh->hash_table[h];
+  sh->hash_table[h] = sh->prop_count;
   return 0;
 }
 
@@ -2200,13 +2188,14 @@ static JSShape *find_hashed_shape_prop(LEPUSRuntime *rt, JSShape *sh,
        shapes really match */
     if (sh1->hash == h && sh1->proto == sh->proto &&
         sh1->prop_count == ((n = sh->prop_count) + 1)) {
+      JSShapeProperty *prop1 = get_shape_prop(sh1), *prop = get_shape_prop(sh);
       for (i = 0; i < n; i++) {
-        if (unlikely(sh1->prop[i].atom != sh->prop[i].atom) ||
-            unlikely(sh1->prop[i].flags != sh->prop[i].flags))
+        if (unlikely(prop1[i].atom != prop[i].atom) ||
+            unlikely(prop1[i].flags != prop[i].flags))
           goto next;
       }
-      if (unlikely(sh1->prop[n].atom != atom) ||
-          unlikely(sh1->prop[n].flags != prop_flags))
+      if (unlikely(prop1[n].atom != atom) ||
+          unlikely(prop1[n].flags != prop_flags))
         goto next;
       return sh1;
     }
@@ -2219,7 +2208,7 @@ static inline void HeapObjStoreShape(LEPUSContext *ctx, void *fieldAddr,
                                      void *value) {
   Release_Store(fieldAddr, value);
   if (UNLIKELY(ctx->con_mark_state)) {
-    CombinedWriteBarrier((address_t)get_alloc_from_shape((JSShape *)value));
+    CombinedWriteBarrier((address_t)value);
   }
 }
 
@@ -2240,8 +2229,7 @@ static JSPropertyAutoInit *js_alloc_property_autoinit_GC(LEPUSContext *ctx) {
 
 QJS_HIDE LEPUSValue JS_NewObjectFromShape_GC(LEPUSContext *ctx, JSShape *sh,
                                              LEPUSClassID class_id) {
-  HandleScope func_scope(ctx, get_alloc_from_shape(sh),
-                         HANDLE_TYPE_DIR_HEAP_OBJ);
+  HandleScope func_scope(ctx, sh, HANDLE_TYPE_DIR_HEAP_OBJ);
   LEPUSObject *p;
   bool use_inline_properties;
 
@@ -2634,7 +2622,7 @@ QJS_STATIC force_inline JSShapeProperty *find_own_property(
   intptr_t h;
   sh = p->shape;
   h = (uintptr_t)atom & sh->prop_hash_mask;
-  h = sh->prop_hash_end[-h - 1];
+  h = sh->hash_table[h];
   prop = get_shape_prop(sh);
   while (h) {
     pr = &prop[h - 1];
@@ -3892,8 +3880,7 @@ JSPropertyGC *add_property_gc(LEPUSContext *ctx, LEPUSObject *p, JSAtom prop,
     new_sh = find_hashed_shape_prop(ctx->rt, sh, prop, prop_flags);
     if (new_sh) {
       HandleScope block_scope(ctx->rt);
-      block_scope.PushHandle(get_alloc_from_shape(new_sh),
-                             HANDLE_TYPE_DIR_HEAP_OBJ);
+      block_scope.PushHandle(new_sh, HANDLE_TYPE_DIR_HEAP_OBJ);
       /* matching shape found: use it */
       /*  the property array may need to be resized */
       if (new_sh->prop_size != sh->prop_size) {
@@ -3989,7 +3976,7 @@ static int delete_property(LEPUSContext *ctx, LEPUSObject *p, JSAtom atom) {
 redo:
   sh = p->shape;
   h1 = atom & sh->prop_hash_mask;
-  h = sh->prop_hash_end[-h1 - 1];
+  h = sh->hash_table[h1];
   prop = get_shape_prop(sh);
   lpr = NULL;
   lpr_idx = 0; /* prevent warning */
@@ -4007,7 +3994,7 @@ redo:
         lpr = get_shape_prop(sh) + lpr_idx;
         lpr->hash_next = pr->hash_next;
       } else {
-        sh->prop_hash_end[-h1 - 1] = pr->hash_next;
+        sh->hash_table[h1] = pr->hash_next;
       }
       /* free the entry */
       pr1 = &p->gc_prop[h - 1];
@@ -7922,8 +7909,8 @@ LEPUSValue js_create_from_ctor_GC(LEPUSContext *ctx, LEPUSValueConst ctor,
     LEPUSObject *p = (LEPUSObject *)LEPUS_VALUE_GET_OBJ(ctor);
     JSShape *shape = p->shape;
     if (likely(shape->prop_count >= 3 &&
-               shape->prop[2].atom == JS_ATOM_prototype &&
-               !(shape->prop[2].flags & LEPUS_PROP_TMASK))) {
+               get_shape_prop(shape)[2].atom == JS_ATOM_prototype &&
+               !(get_shape_prop(shape)[2].flags & LEPUS_PROP_TMASK))) {
       proto = p->gc_prop[2].u.value;
     } else {
       proto = JS_GetPropertyInternal_GC(ctx, ctor, JS_ATOM_prototype, ctor, 0);
@@ -26953,7 +26940,7 @@ static LEPUSValue JS_StructuredClone(LEPUSContext *ctx, LEPUSValue src,
         // clone property
         LEPUSValue cloned_prop = LEPUS_UNDEFINED;
         HandleScope block_scope(ctx, &cloned_prop, HANDLE_TYPE_LEPUS_VALUE);
-        JSShapeProperty *prs = sh->prop;
+        JSShapeProperty *prs = get_shape_prop(sh);
         for (uint32_t i = 0; i < sh->prop_count; ++i, ++prs) {
           int32_t flags = prs->flags;
           if (prs->atom != JS_ATOM_NULL && (flags & LEPUS_PROP_TMASK) == 0) {
@@ -28423,8 +28410,7 @@ void Visitor::ScanShapeArray(GCWorkStack &workStack) noexcept {
   for (int i = 0; i < rt_->shape_hash_size; i++) {
     for (JSShape *sh = rt_->shape_hash[i]; sh != NULL;
          sh = sh->shape_hash_next) {
-      address_t shape_addr = (address_t)get_alloc_from_shape(sh);
-      workStack.push_back(shape_addr);
+      workStack.push_back((address_t)sh);
     }
   }
 }
@@ -28474,13 +28460,12 @@ void Visitor::ScanContext(GCWorkStack &workStack, bool isFinalRemark) noexcept {
     PushObjLEPUSValue(ctx->regexp_ctor, workStack);
     PushObjLEPUSValue(ctx->function_ctor, workStack);
     PushObjLEPUSValue(ctx->function_proto, workStack);
-    if (ctx->array_shape)
-      workStack.push_back((address_t)get_alloc_from_shape(ctx->array_shape));
+    if (ctx->array_shape) workStack.push_back((address_t)ctx->array_shape);
 
     for (int32_t i = 0; i < kFunctionShapeSize; ++i) {
       JSShape *shape = ctx->function_shape[i];
       if (shape) {
-        workStack.push_back((address_t)get_alloc_from_shape(shape));
+        workStack.push_back((address_t)shape);
       }
     }
 
@@ -28759,9 +28744,7 @@ void Visitor::VisitLEPUSObject(void *ptr, GCWorkStack &workStack) noexcept {
   // captured by write-barrier.
   sh = (JSShape *)Acquire_Load(&obj->shape);
   if (sh) {
-    if (LIKELY(sh->prop_hash_mask != 0)) {
-      workStack.push_back((address_t)get_alloc_from_shape(sh));
-    }
+    workStack.push_back((address_t)sh);
     JSPropertyGC *prop = obj->gc_prop;
     bool isInObject = IS_IN_OBJECT_PROP(obj, prop);
     if (isInObject) {
@@ -29440,8 +29423,7 @@ void Finalizer::JSShapeArrayFinalizer() noexcept {
     if (!rt_->shape_hash[i]) continue;
     JSShape **psh = &rt_->shape_hash[i];
     while (*psh != nullptr) {
-      address_t shape_addr = (address_t)get_alloc_from_shape(*psh);
-      if (!rt_->ros_->IsObjectMarked(shape_addr - kHeaderSize)) {
+      if (!rt_->ros_->IsObjectMarked((address_t)*psh - kHeaderSize)) {
         *psh = (*psh)->shape_hash_next;
         rt_->shape_hash_count--;
       } else {

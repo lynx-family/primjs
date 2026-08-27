@@ -100,8 +100,7 @@ void Visitor::PushObjAtom(LEPUSAtom atom, GCWorkStack &workStack) noexcept {
 }
 
 void Visitor::VisitJSShape(void *ptr, GCWorkStack &workStack) noexcept {
-  int hash_size = get_hash_size(ptr);
-  JSShape *sh = get_shape_from_alloc(ptr, hash_size);
+  JSShape *sh = static_cast<JSShape *>(ptr);
   workStack.push_back((address_t)(sh->proto));
   JSShapeProperty *pr = get_shape_prop(sh);
   for (int i = 0; i < sh->prop_count; i++) {

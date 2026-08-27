@@ -2352,21 +2352,24 @@ get_var_undef_0_asm_h:                  // @get_var_undef_0_asm_h
 	ldr	w9, [x19]
 	ldr	x10, [x8, #8]
 	ldr	w11, [x10, #12]
+	add	x10, x10, #40
+	lsl	w12, w11, #2
 	and	w11, w9, w11
-	mvn	w11, w11
 	ldr	w11, [x10, w11, sxtw #2]
+	add	w12, w12, #4
+	add	x10, x10, x12
 	cbz	w11, .LBB76_3
 .LBB76_1:                               // %B5
                                         // =>This Inner Loop Header: Depth=1
 	lsl	w12, w11, #3
 	sub	w12, w12, #8
 	add	x12, x10, x12
-	ldr	w13, [x12, #44]
+	ldr	w13, [x12, #4]
 	cmp	w13, w9
 	b.eq	.LBB76_10
 // %bb.2:                               // %B8
                                         //   in Loop: Header=BB76_1 Depth=1
-	ldur	w11, [x12, #40]
+	ldr	w11, [x12]
 	and	w11, w11, #0x3ffffff
 	cbnz	w11, .LBB76_1
 .LBB76_3:                               // %B11
@@ -2375,11 +2378,14 @@ get_var_undef_0_asm_h:                  // @get_var_undef_0_asm_h
 .LBB76_4:                               // %B33
                                         // =>This Loop Header: Depth=1
                                         //     Child Loop BB76_5 Depth 2
-	ldr	x12, [x8, #8]
-	ldr	w11, [x12, #12]
-	and	w11, w9, w11
-	mvn	w11, w11
-	ldr	w11, [x12, w11, sxtw #2]
+	ldr	x11, [x8, #8]
+	ldr	w12, [x11, #12]
+	add	x14, x11, #40
+	lsl	w13, w12, #2
+	and	w11, w9, w12
+	ldr	w11, [x14, w11, sxtw #2]
+	add	w12, w13, #4
+	add	x12, x14, x12
 	cbz	w11, .LBB76_7
 .LBB76_5:                               // %B22
                                         //   Parent Loop BB76_4 Depth=1
@@ -2387,7 +2393,7 @@ get_var_undef_0_asm_h:                  // @get_var_undef_0_asm_h
 	lsl	w13, w11, #3
 	sub	w13, w13, #8
 	add	x13, x12, x13
-	ldp	w13, w14, [x13, #40]
+	ldp	w13, w14, [x13]
 	cmp	w14, w9
 	b.eq	.LBB76_9
 // %bb.6:                               // %B24
@@ -2454,23 +2460,26 @@ get_var_0_asm_h:                        // @get_var_0_asm_h
 // %bb.0:                               // %B0
 	ldr	x8, [x24, #216]
 	ldr	w9, [x19]
-	ldr	x11, [x8, #8]
-	ldr	w10, [x11, #12]
-	and	w10, w9, w10
-	mvn	w10, w10
-	ldr	w10, [x11, w10, sxtw #2]
+	ldr	x10, [x8, #8]
+	ldr	w11, [x10, #12]
+	add	x13, x10, #40
+	lsl	w12, w11, #2
+	and	w10, w9, w11
+	ldr	w10, [x13, w10, sxtw #2]
+	add	w11, w12, #4
+	add	x11, x13, x11
 	cbz	w10, .LBB77_3
 .LBB77_1:                               // %B5
                                         // =>This Inner Loop Header: Depth=1
 	lsl	w12, w10, #3
 	sub	w12, w12, #8
 	add	x12, x11, x12
-	ldr	w13, [x12, #44]
+	ldr	w13, [x12, #4]
 	cmp	w13, w9
 	b.eq	.LBB77_10
 // %bb.2:                               // %B8
                                         //   in Loop: Header=BB77_1 Depth=1
-	ldur	w10, [x12, #40]
+	ldr	w10, [x12]
 	and	w10, w10, #0x3ffffff
 	cbnz	w10, .LBB77_1
 .LBB77_3:                               // %B11
@@ -2478,11 +2487,14 @@ get_var_0_asm_h:                        // @get_var_0_asm_h
 .LBB77_4:                               // %B32
                                         // =>This Loop Header: Depth=1
                                         //     Child Loop BB77_5 Depth 2
-	ldr	x11, [x8, #8]
-	ldr	w10, [x11, #12]
-	and	w10, w9, w10
-	mvn	w10, w10
-	ldr	w10, [x11, w10, sxtw #2]
+	ldr	x10, [x8, #8]
+	ldr	w11, [x10, #12]
+	add	x13, x10, #40
+	lsl	w12, w11, #2
+	and	w10, w9, w11
+	ldr	w10, [x13, w10, sxtw #2]
+	add	w11, w12, #4
+	add	x11, x13, x11
 	cbz	w10, .LBB77_7
 .LBB77_5:                               // %B21
                                         //   Parent Loop BB77_4 Depth=1
@@ -2490,7 +2502,7 @@ get_var_0_asm_h:                        // @get_var_0_asm_h
 	lsl	w12, w10, #3
 	sub	w12, w12, #8
 	add	x12, x11, x12
-	ldp	w12, w13, [x12, #40]
+	ldp	w12, w13, [x12]
 	cmp	w13, w9
 	b.eq	.LBB77_9
 // %bb.6:                               // %B23
@@ -2802,11 +2814,14 @@ get_field_0_asm_h:                      // @get_field_0_asm_h
 .LBB86_2:                               // %B19
                                         // =>This Loop Header: Depth=1
                                         //     Child Loop BB86_3 Depth 2
-	ldr	x11, [x9, #8]
-	ldr	w10, [x11, #12]
-	and	w10, w2, w10
-	mvn	w10, w10
-	ldr	w10, [x11, w10, sxtw #2]
+	ldr	x10, [x9, #8]
+	ldr	w11, [x10, #12]
+	add	x13, x10, #40
+	lsl	w12, w11, #2
+	and	w10, w2, w11
+	ldr	w10, [x13, w10, sxtw #2]
+	add	w11, w12, #4
+	add	x11, x13, x11
 	cbz	w10, .LBB86_5
 .LBB86_3:                               // %B1
                                         //   Parent Loop BB86_2 Depth=1
@@ -2814,7 +2829,7 @@ get_field_0_asm_h:                      // @get_field_0_asm_h
 	lsl	w12, w10, #3
 	sub	w12, w12, #8
 	add	x12, x11, x12
-	ldp	w12, w13, [x12, #40]
+	ldp	w12, w13, [x12]
 	cmp	w13, w2
 	b.eq	.LBB86_7
 // %bb.4:                               // %B9
@@ -2889,11 +2904,14 @@ get_field2_0_asm_h:                     // @get_field2_0_asm_h
 .LBB87_2:                               // %B19
                                         // =>This Loop Header: Depth=1
                                         //     Child Loop BB87_3 Depth 2
-	ldr	x11, [x9, #8]
-	ldr	w10, [x11, #12]
-	and	w10, w2, w10
-	mvn	w10, w10
-	ldr	w10, [x11, w10, sxtw #2]
+	ldr	x10, [x9, #8]
+	ldr	w11, [x10, #12]
+	add	x13, x10, #40
+	lsl	w12, w11, #2
+	and	w10, w2, w11
+	ldr	w10, [x13, w10, sxtw #2]
+	add	w11, w12, #4
+	add	x11, x13, x11
 	cbz	w10, .LBB87_5
 .LBB87_3:                               // %B1
                                         //   Parent Loop BB87_2 Depth=1
@@ -2901,7 +2919,7 @@ get_field2_0_asm_h:                     // @get_field2_0_asm_h
 	lsl	w12, w10, #3
 	sub	w12, w12, #8
 	add	x12, x11, x12
-	ldp	w12, w13, [x12, #40]
+	ldp	w12, w13, [x12]
 	cmp	w13, w2
 	b.eq	.LBB87_7
 // %bb.4:                               // %B9
@@ -2971,18 +2989,21 @@ put_field_0_asm_h:                      // @put_field_0_asm_h
 	tst	x22, x8
 	b.ne	.LBB88_17
 // %bb.1:                               // %B45
-	ldr	x9, [x22, #8]
-	ldr	w8, [x9, #12]
-	and	w8, w2, w8
-	mvn	w8, w8
-	ldr	w8, [x9, w8, sxtw #2]
+	ldr	x8, [x22, #8]
+	ldr	w9, [x8, #12]
+	add	x11, x8, #40
+	lsl	w10, w9, #2
+	and	w8, w2, w9
+	ldr	w8, [x11, w8, sxtw #2]
+	add	w9, w10, #4
+	add	x9, x11, x9
 	cbz	w8, .LBB88_4
 .LBB88_2:                               // %B1
                                         // =>This Inner Loop Header: Depth=1
 	lsl	w10, w8, #3
 	sub	w10, w10, #8
 	add	x10, x9, x10
-	ldp	w10, w11, [x10, #40]
+	ldp	w10, w11, [x10]
 	cmp	w11, w2
 	b.eq	.LBB88_13
 // %bb.3:                               // %B12
@@ -2996,9 +3017,12 @@ put_field_0_asm_h:                      // @put_field_0_asm_h
                                         //     Child Loop BB88_6 Depth 2
 	ldr	x9, [x8, #8]
 	ldr	w10, [x9, #12]
+	add	x9, x9, #40
+	lsl	w11, w10, #2
 	and	w10, w2, w10
-	mvn	w10, w10
 	ldr	w10, [x9, w10, sxtw #2]
+	add	w11, w11, #4
+	add	x9, x9, x11
 	cbz	w10, .LBB88_8
 .LBB88_6:                               // %B18
                                         //   Parent Loop BB88_5 Depth=1
@@ -3006,12 +3030,12 @@ put_field_0_asm_h:                      // @put_field_0_asm_h
 	lsl	w10, w10, #3
 	sub	w10, w10, #8
 	add	x10, x9, x10
-	ldr	w11, [x10, #44]
+	ldr	w11, [x10, #4]
 	cmp	w11, w2
 	b.eq	.LBB88_17
 // %bb.7:                               // %B20
                                         //   in Loop: Header=BB88_6 Depth=2
-	ldur	w10, [x10, #40]
+	ldr	w10, [x10]
 	and	w10, w10, #0x3ffffff
 	cbnz	w10, .LBB88_6
 .LBB88_8:                               // %B30
@@ -3194,24 +3218,27 @@ get_array_el_0_asm_h:                   // @get_array_el_0_asm_h
 // %bb.6:                               // %B9.preheader
 	mov	x9, x22
 	mov	w8, #18                         // =0x12
-	orr	w12, w21, #0x80000000
 .LBB92_7:                               // %B9
                                         // =>This Loop Header: Depth=1
                                         //     Child Loop BB92_8 Depth 2
-	ldr	x10, [x9, #8]
-	ldr	w11, [x10, #12]
-	and	w11, w12, w11
-	mvn	w11, w11
-	ldr	w11, [x10, w11, sxtw #2]
+	ldr	x11, [x9, #8]
+	orr	w10, w21, #0x80000000
+	ldr	w12, [x11, #12]
+	add	x14, x11, #40
+	lsl	w13, w12, #2
+	and	w11, w10, w12
+	ldr	w11, [x14, w11, sxtw #2]
+	add	w12, w13, #4
+	add	x12, x14, x12
 	cbz	w11, .LBB92_10
 .LBB92_8:                               // %B10
                                         //   Parent Loop BB92_7 Depth=1
                                         // =>  This Inner Loop Header: Depth=2
 	lsl	w13, w11, #3
 	sub	w13, w13, #8
-	add	x13, x10, x13
-	ldp	w13, w14, [x13, #40]
-	cmp	w14, w12
+	add	x13, x12, x13
+	ldp	w13, w14, [x13]
+	cmp	w14, w10
 	b.eq	.LBB92_12
 // %bb.9:                               // %B17
                                         //   in Loop: Header=BB92_8 Depth=2
@@ -3301,24 +3328,27 @@ get_array_el2_0_asm_h:                  // @get_array_el2_0_asm_h
 // %bb.6:                               // %B9.preheader
 	mov	x9, x22
 	mov	w8, #18                         // =0x12
-	orr	w12, w21, #0x80000000
 .LBB93_7:                               // %B9
                                         // =>This Loop Header: Depth=1
                                         //     Child Loop BB93_8 Depth 2
-	ldr	x10, [x9, #8]
-	ldr	w11, [x10, #12]
-	and	w11, w12, w11
-	mvn	w11, w11
-	ldr	w11, [x10, w11, sxtw #2]
+	ldr	x11, [x9, #8]
+	orr	w10, w21, #0x80000000
+	ldr	w12, [x11, #12]
+	add	x14, x11, #40
+	lsl	w13, w12, #2
+	and	w11, w10, w12
+	ldr	w11, [x14, w11, sxtw #2]
+	add	w12, w13, #4
+	add	x12, x14, x12
 	cbz	w11, .LBB93_10
 .LBB93_8:                               // %B10
                                         //   Parent Loop BB93_7 Depth=1
                                         // =>  This Inner Loop Header: Depth=2
 	lsl	w13, w11, #3
 	sub	w13, w13, #8
-	add	x13, x10, x13
-	ldp	w13, w14, [x13, #40]
-	cmp	w14, w12
+	add	x13, x12, x13
+	ldp	w13, w14, [x13]
+	cmp	w14, w10
 	b.eq	.LBB93_12
 // %bb.9:                               // %B17
                                         //   in Loop: Header=BB93_8 Depth=2
@@ -9017,11 +9047,14 @@ get_length_0_asm_h:                     // @get_length_0_asm_h
 .LBB251_2:                              // %B19
                                         // =>This Loop Header: Depth=1
                                         //     Child Loop BB251_3 Depth 2
-	ldr	x11, [x9, #8]
-	ldr	w10, [x11, #12]
-	mvn	w10, w10
-	orr	w10, w10, #0xffffffcf
-	ldr	w10, [x11, w10, sxtw #2]
+	ldr	x10, [x9, #8]
+	ldr	w11, [x10, #12]
+	add	x13, x10, #40
+	lsl	w12, w11, #2
+	and	w10, w11, #0x30
+	ldr	w10, [x13, w10, uxtw #2]
+	add	w11, w12, #4
+	add	x11, x13, x11
 	cbz	w10, .LBB251_5
 .LBB251_3:                              // %B1
                                         //   Parent Loop BB251_2 Depth=1
@@ -9029,7 +9062,7 @@ get_length_0_asm_h:                     // @get_length_0_asm_h
 	lsl	w12, w10, #3
 	sub	w12, w12, #8
 	add	x12, x11, x12
-	ldp	w12, w13, [x12, #40]
+	ldp	w12, w13, [x12]
 	cmp	w13, #48
 	b.eq	.LBB251_7
 // %bb.4:                               // %B9
@@ -10624,21 +10657,24 @@ get_var_undef_1_asm_h:                  // @get_var_undef_1_asm_h
 	ldr	w9, [x19]
 	ldr	x10, [x8, #8]
 	ldr	w11, [x10, #12]
+	add	x10, x10, #40
+	lsl	w12, w11, #2
 	and	w11, w9, w11
-	mvn	w11, w11
 	ldr	w11, [x10, w11, sxtw #2]
+	add	w12, w12, #4
+	add	x10, x10, x12
 	cbz	w11, .LBB319_3
 .LBB319_1:                              // %B5
                                         // =>This Inner Loop Header: Depth=1
 	lsl	w12, w11, #3
 	sub	w12, w12, #8
 	add	x12, x10, x12
-	ldr	w13, [x12, #44]
+	ldr	w13, [x12, #4]
 	cmp	w13, w9
 	b.eq	.LBB319_10
 // %bb.2:                               // %B8
                                         //   in Loop: Header=BB319_1 Depth=1
-	ldur	w11, [x12, #40]
+	ldr	w11, [x12]
 	and	w11, w11, #0x3ffffff
 	cbnz	w11, .LBB319_1
 .LBB319_3:                              // %B11
@@ -10647,11 +10683,14 @@ get_var_undef_1_asm_h:                  // @get_var_undef_1_asm_h
 .LBB319_4:                              // %B33
                                         // =>This Loop Header: Depth=1
                                         //     Child Loop BB319_5 Depth 2
-	ldr	x12, [x8, #8]
-	ldr	w11, [x12, #12]
-	and	w11, w9, w11
-	mvn	w11, w11
-	ldr	w11, [x12, w11, sxtw #2]
+	ldr	x11, [x8, #8]
+	ldr	w12, [x11, #12]
+	add	x14, x11, #40
+	lsl	w13, w12, #2
+	and	w11, w9, w12
+	ldr	w11, [x14, w11, sxtw #2]
+	add	w12, w13, #4
+	add	x12, x14, x12
 	cbz	w11, .LBB319_7
 .LBB319_5:                              // %B22
                                         //   Parent Loop BB319_4 Depth=1
@@ -10659,7 +10698,7 @@ get_var_undef_1_asm_h:                  // @get_var_undef_1_asm_h
 	lsl	w13, w11, #3
 	sub	w13, w13, #8
 	add	x13, x12, x13
-	ldp	w13, w14, [x13, #40]
+	ldp	w13, w14, [x13]
 	cmp	w14, w9
 	b.eq	.LBB319_9
 // %bb.6:                               // %B24
@@ -10729,23 +10768,26 @@ get_var_1_asm_h:                        // @get_var_1_asm_h
 // %bb.0:                               // %B0
 	ldr	x8, [x24, #216]
 	ldr	w9, [x19]
-	ldr	x11, [x8, #8]
-	ldr	w10, [x11, #12]
-	and	w10, w9, w10
-	mvn	w10, w10
-	ldr	w10, [x11, w10, sxtw #2]
+	ldr	x10, [x8, #8]
+	ldr	w11, [x10, #12]
+	add	x13, x10, #40
+	lsl	w12, w11, #2
+	and	w10, w9, w11
+	ldr	w10, [x13, w10, sxtw #2]
+	add	w11, w12, #4
+	add	x11, x13, x11
 	cbz	w10, .LBB320_3
 .LBB320_1:                              // %B5
                                         // =>This Inner Loop Header: Depth=1
 	lsl	w12, w10, #3
 	sub	w12, w12, #8
 	add	x12, x11, x12
-	ldr	w13, [x12, #44]
+	ldr	w13, [x12, #4]
 	cmp	w13, w9
 	b.eq	.LBB320_10
 // %bb.2:                               // %B8
                                         //   in Loop: Header=BB320_1 Depth=1
-	ldur	w10, [x12, #40]
+	ldr	w10, [x12]
 	and	w10, w10, #0x3ffffff
 	cbnz	w10, .LBB320_1
 .LBB320_3:                              // %B11
@@ -10753,11 +10795,14 @@ get_var_1_asm_h:                        // @get_var_1_asm_h
 .LBB320_4:                              // %B32
                                         // =>This Loop Header: Depth=1
                                         //     Child Loop BB320_5 Depth 2
-	ldr	x11, [x8, #8]
-	ldr	w10, [x11, #12]
-	and	w10, w9, w10
-	mvn	w10, w10
-	ldr	w10, [x11, w10, sxtw #2]
+	ldr	x10, [x8, #8]
+	ldr	w11, [x10, #12]
+	add	x13, x10, #40
+	lsl	w12, w11, #2
+	and	w10, w9, w11
+	ldr	w10, [x13, w10, sxtw #2]
+	add	w11, w12, #4
+	add	x11, x13, x11
 	cbz	w10, .LBB320_7
 .LBB320_5:                              // %B21
                                         //   Parent Loop BB320_4 Depth=1
@@ -10765,7 +10810,7 @@ get_var_1_asm_h:                        // @get_var_1_asm_h
 	lsl	w12, w10, #3
 	sub	w12, w12, #8
 	add	x12, x11, x12
-	ldp	w12, w13, [x12, #40]
+	ldp	w12, w13, [x12]
 	cmp	w13, w9
 	b.eq	.LBB320_9
 // %bb.6:                               // %B23
@@ -11099,11 +11144,14 @@ get_field_1_asm_h:                      // @get_field_1_asm_h
 .LBB329_2:                              // %B19
                                         // =>This Loop Header: Depth=1
                                         //     Child Loop BB329_3 Depth 2
-	ldr	x11, [x9, #8]
-	ldr	w10, [x11, #12]
-	and	w10, w2, w10
-	mvn	w10, w10
-	ldr	w10, [x11, w10, sxtw #2]
+	ldr	x10, [x9, #8]
+	ldr	w11, [x10, #12]
+	add	x13, x10, #40
+	lsl	w12, w11, #2
+	and	w10, w2, w11
+	ldr	w10, [x13, w10, sxtw #2]
+	add	w11, w12, #4
+	add	x11, x13, x11
 	cbz	w10, .LBB329_5
 .LBB329_3:                              // %B1
                                         //   Parent Loop BB329_2 Depth=1
@@ -11111,7 +11159,7 @@ get_field_1_asm_h:                      // @get_field_1_asm_h
 	lsl	w12, w10, #3
 	sub	w12, w12, #8
 	add	x12, x11, x12
-	ldp	w12, w13, [x12, #40]
+	ldp	w12, w13, [x12]
 	cmp	w13, w2
 	b.eq	.LBB329_7
 // %bb.4:                               // %B9
@@ -11185,11 +11233,14 @@ get_field2_1_asm_h:                     // @get_field2_1_asm_h
 .LBB330_2:                              // %B19
                                         // =>This Loop Header: Depth=1
                                         //     Child Loop BB330_3 Depth 2
-	ldr	x11, [x9, #8]
-	ldr	w10, [x11, #12]
-	and	w10, w2, w10
-	mvn	w10, w10
-	ldr	w10, [x11, w10, sxtw #2]
+	ldr	x10, [x9, #8]
+	ldr	w11, [x10, #12]
+	add	x13, x10, #40
+	lsl	w12, w11, #2
+	and	w10, w2, w11
+	ldr	w10, [x13, w10, sxtw #2]
+	add	w11, w12, #4
+	add	x11, x13, x11
 	cbz	w10, .LBB330_5
 .LBB330_3:                              // %B1
                                         //   Parent Loop BB330_2 Depth=1
@@ -11197,7 +11248,7 @@ get_field2_1_asm_h:                     // @get_field2_1_asm_h
 	lsl	w12, w10, #3
 	sub	w12, w12, #8
 	add	x12, x11, x12
-	ldp	w12, w13, [x12, #40]
+	ldp	w12, w13, [x12]
 	cmp	w13, w2
 	b.eq	.LBB330_7
 // %bb.4:                               // %B9
@@ -11268,18 +11319,21 @@ put_field_1_asm_h:                      // @put_field_1_asm_h
 	tst	x22, x8
 	b.ne	.LBB331_17
 // %bb.1:                               // %B45
-	ldr	x9, [x22, #8]
-	ldr	w8, [x9, #12]
-	and	w8, w2, w8
-	mvn	w8, w8
-	ldr	w8, [x9, w8, sxtw #2]
+	ldr	x8, [x22, #8]
+	ldr	w9, [x8, #12]
+	add	x11, x8, #40
+	lsl	w10, w9, #2
+	and	w8, w2, w9
+	ldr	w8, [x11, w8, sxtw #2]
+	add	w9, w10, #4
+	add	x9, x11, x9
 	cbz	w8, .LBB331_4
 .LBB331_2:                              // %B1
                                         // =>This Inner Loop Header: Depth=1
 	lsl	w10, w8, #3
 	sub	w10, w10, #8
 	add	x10, x9, x10
-	ldp	w10, w11, [x10, #40]
+	ldp	w10, w11, [x10]
 	cmp	w11, w2
 	b.eq	.LBB331_13
 // %bb.3:                               // %B12
@@ -11293,9 +11347,12 @@ put_field_1_asm_h:                      // @put_field_1_asm_h
                                         //     Child Loop BB331_6 Depth 2
 	ldr	x9, [x8, #8]
 	ldr	w10, [x9, #12]
+	add	x9, x9, #40
+	lsl	w11, w10, #2
 	and	w10, w2, w10
-	mvn	w10, w10
 	ldr	w10, [x9, w10, sxtw #2]
+	add	w11, w11, #4
+	add	x9, x9, x11
 	cbz	w10, .LBB331_8
 .LBB331_6:                              // %B18
                                         //   Parent Loop BB331_5 Depth=1
@@ -11303,12 +11360,12 @@ put_field_1_asm_h:                      // @put_field_1_asm_h
 	lsl	w10, w10, #3
 	sub	w10, w10, #8
 	add	x10, x9, x10
-	ldr	w11, [x10, #44]
+	ldr	w11, [x10, #4]
 	cmp	w11, w2
 	b.eq	.LBB331_17
 // %bb.7:                               // %B20
                                         //   in Loop: Header=BB331_6 Depth=2
-	ldur	w10, [x10, #40]
+	ldr	w10, [x10]
 	and	w10, w10, #0x3ffffff
 	cbnz	w10, .LBB331_6
 .LBB331_8:                              // %B30
@@ -11503,24 +11560,27 @@ get_array_el_1_asm_h:                   // @get_array_el_1_asm_h
 // %bb.6:                               // %B9.preheader
 	mov	x9, x22
 	mov	w8, #18                         // =0x12
-	orr	w12, w21, #0x80000000
 .LBB335_7:                              // %B9
                                         // =>This Loop Header: Depth=1
                                         //     Child Loop BB335_8 Depth 2
-	ldr	x10, [x9, #8]
-	ldr	w11, [x10, #12]
-	and	w11, w12, w11
-	mvn	w11, w11
-	ldr	w11, [x10, w11, sxtw #2]
+	ldr	x11, [x9, #8]
+	orr	w10, w21, #0x80000000
+	ldr	w12, [x11, #12]
+	add	x14, x11, #40
+	lsl	w13, w12, #2
+	and	w11, w10, w12
+	ldr	w11, [x14, w11, sxtw #2]
+	add	w12, w13, #4
+	add	x12, x14, x12
 	cbz	w11, .LBB335_10
 .LBB335_8:                              // %B10
                                         //   Parent Loop BB335_7 Depth=1
                                         // =>  This Inner Loop Header: Depth=2
 	lsl	w13, w11, #3
 	sub	w13, w13, #8
-	add	x13, x10, x13
-	ldp	w13, w14, [x13, #40]
-	cmp	w14, w12
+	add	x13, x12, x13
+	ldp	w13, w14, [x13]
+	cmp	w14, w10
 	b.eq	.LBB335_12
 // %bb.9:                               // %B17
                                         //   in Loop: Header=BB335_8 Depth=2
@@ -11613,24 +11673,27 @@ get_array_el2_1_asm_h:                  // @get_array_el2_1_asm_h
 // %bb.6:                               // %B9.preheader
 	mov	x9, x22
 	mov	w8, #18                         // =0x12
-	orr	w12, w21, #0x80000000
 .LBB336_7:                              // %B9
                                         // =>This Loop Header: Depth=1
                                         //     Child Loop BB336_8 Depth 2
-	ldr	x10, [x9, #8]
-	ldr	w11, [x10, #12]
-	and	w11, w12, w11
-	mvn	w11, w11
-	ldr	w11, [x10, w11, sxtw #2]
+	ldr	x11, [x9, #8]
+	orr	w10, w21, #0x80000000
+	ldr	w12, [x11, #12]
+	add	x14, x11, #40
+	lsl	w13, w12, #2
+	and	w11, w10, w12
+	ldr	w11, [x14, w11, sxtw #2]
+	add	w12, w13, #4
+	add	x12, x14, x12
 	cbz	w11, .LBB336_10
 .LBB336_8:                              // %B10
                                         //   Parent Loop BB336_7 Depth=1
                                         // =>  This Inner Loop Header: Depth=2
 	lsl	w13, w11, #3
 	sub	w13, w13, #8
-	add	x13, x10, x13
-	ldp	w13, w14, [x13, #40]
-	cmp	w14, w12
+	add	x13, x12, x13
+	ldp	w13, w14, [x13]
+	cmp	w14, w10
 	b.eq	.LBB336_12
 // %bb.9:                               // %B17
                                         //   in Loop: Header=BB336_8 Depth=2
@@ -16695,11 +16758,14 @@ get_length_1_asm_h:                     // @get_length_1_asm_h
 .LBB494_2:                              // %B19
                                         // =>This Loop Header: Depth=1
                                         //     Child Loop BB494_3 Depth 2
-	ldr	x11, [x9, #8]
-	ldr	w10, [x11, #12]
-	mvn	w10, w10
-	orr	w10, w10, #0xffffffcf
-	ldr	w10, [x11, w10, sxtw #2]
+	ldr	x10, [x9, #8]
+	ldr	w11, [x10, #12]
+	add	x13, x10, #40
+	lsl	w12, w11, #2
+	and	w10, w11, #0x30
+	ldr	w10, [x13, w10, uxtw #2]
+	add	w11, w12, #4
+	add	x11, x13, x11
 	cbz	w10, .LBB494_5
 .LBB494_3:                              // %B1
                                         //   Parent Loop BB494_2 Depth=1
@@ -16707,7 +16773,7 @@ get_length_1_asm_h:                     // @get_length_1_asm_h
 	lsl	w12, w10, #3
 	sub	w12, w12, #8
 	add	x12, x11, x12
-	ldp	w12, w13, [x12, #40]
+	ldp	w12, w13, [x12]
 	cmp	w13, #48
 	b.eq	.LBB494_7
 // %bb.4:                               // %B9
@@ -18227,21 +18293,24 @@ get_var_undef_2_asm_h:                  // @get_var_undef_2_asm_h
 	ldr	w9, [x19]
 	ldr	x10, [x8, #8]
 	ldr	w11, [x10, #12]
+	add	x10, x10, #40
+	lsl	w12, w11, #2
 	and	w11, w9, w11
-	mvn	w11, w11
 	ldr	w11, [x10, w11, sxtw #2]
+	add	w12, w12, #4
+	add	x10, x10, x12
 	cbz	w11, .LBB562_3
 .LBB562_1:                              // %B5
                                         // =>This Inner Loop Header: Depth=1
 	lsl	w12, w11, #3
 	sub	w12, w12, #8
 	add	x12, x10, x12
-	ldr	w13, [x12, #44]
+	ldr	w13, [x12, #4]
 	cmp	w13, w9
 	b.eq	.LBB562_10
 // %bb.2:                               // %B8
                                         //   in Loop: Header=BB562_1 Depth=1
-	ldur	w11, [x12, #40]
+	ldr	w11, [x12]
 	and	w11, w11, #0x3ffffff
 	cbnz	w11, .LBB562_1
 .LBB562_3:                              // %B11
@@ -18250,11 +18319,14 @@ get_var_undef_2_asm_h:                  // @get_var_undef_2_asm_h
 .LBB562_4:                              // %B33
                                         // =>This Loop Header: Depth=1
                                         //     Child Loop BB562_5 Depth 2
-	ldr	x12, [x8, #8]
-	ldr	w11, [x12, #12]
-	and	w11, w9, w11
-	mvn	w11, w11
-	ldr	w11, [x12, w11, sxtw #2]
+	ldr	x11, [x8, #8]
+	ldr	w12, [x11, #12]
+	add	x14, x11, #40
+	lsl	w13, w12, #2
+	and	w11, w9, w12
+	ldr	w11, [x14, w11, sxtw #2]
+	add	w12, w13, #4
+	add	x12, x14, x12
 	cbz	w11, .LBB562_7
 .LBB562_5:                              // %B22
                                         //   Parent Loop BB562_4 Depth=1
@@ -18262,7 +18334,7 @@ get_var_undef_2_asm_h:                  // @get_var_undef_2_asm_h
 	lsl	w13, w11, #3
 	sub	w13, w13, #8
 	add	x13, x12, x13
-	ldp	w13, w14, [x13, #40]
+	ldp	w13, w14, [x13]
 	cmp	w14, w9
 	b.eq	.LBB562_9
 // %bb.6:                               // %B24
@@ -18335,23 +18407,26 @@ get_var_2_asm_h:                        // @get_var_2_asm_h
 	str	x22, [x20], #8
 	ldr	x8, [x24, #216]
 	ldr	w9, [x19]
-	ldr	x11, [x8, #8]
-	ldr	w10, [x11, #12]
-	and	w10, w9, w10
-	mvn	w10, w10
-	ldr	w10, [x11, w10, sxtw #2]
+	ldr	x10, [x8, #8]
+	ldr	w11, [x10, #12]
+	add	x13, x10, #40
+	lsl	w12, w11, #2
+	and	w10, w9, w11
+	ldr	w10, [x13, w10, sxtw #2]
+	add	w11, w12, #4
+	add	x11, x13, x11
 	cbz	w10, .LBB563_3
 .LBB563_1:                              // %B5
                                         // =>This Inner Loop Header: Depth=1
 	lsl	w12, w10, #3
 	sub	w12, w12, #8
 	add	x12, x11, x12
-	ldr	w13, [x12, #44]
+	ldr	w13, [x12, #4]
 	cmp	w13, w9
 	b.eq	.LBB563_10
 // %bb.2:                               // %B8
                                         //   in Loop: Header=BB563_1 Depth=1
-	ldur	w10, [x12, #40]
+	ldr	w10, [x12]
 	and	w10, w10, #0x3ffffff
 	cbnz	w10, .LBB563_1
 .LBB563_3:                              // %B11
@@ -18359,11 +18434,14 @@ get_var_2_asm_h:                        // @get_var_2_asm_h
 .LBB563_4:                              // %B32
                                         // =>This Loop Header: Depth=1
                                         //     Child Loop BB563_5 Depth 2
-	ldr	x11, [x8, #8]
-	ldr	w10, [x11, #12]
-	and	w10, w9, w10
-	mvn	w10, w10
-	ldr	w10, [x11, w10, sxtw #2]
+	ldr	x10, [x8, #8]
+	ldr	w11, [x10, #12]
+	add	x13, x10, #40
+	lsl	w12, w11, #2
+	and	w10, w9, w11
+	ldr	w10, [x13, w10, sxtw #2]
+	add	w11, w12, #4
+	add	x11, x13, x11
 	cbz	w10, .LBB563_7
 .LBB563_5:                              // %B21
                                         //   Parent Loop BB563_4 Depth=1
@@ -18371,7 +18449,7 @@ get_var_2_asm_h:                        // @get_var_2_asm_h
 	lsl	w12, w10, #3
 	sub	w12, w12, #8
 	add	x12, x11, x12
-	ldp	w12, w13, [x12, #40]
+	ldp	w12, w13, [x12]
 	cmp	w13, w9
 	b.eq	.LBB563_9
 // %bb.6:                               // %B23
@@ -18710,11 +18788,14 @@ get_field_2_asm_h:                      // @get_field_2_asm_h
 .LBB572_2:                              // %B19
                                         // =>This Loop Header: Depth=1
                                         //     Child Loop BB572_3 Depth 2
-	ldr	x11, [x9, #8]
-	ldr	w10, [x11, #12]
-	and	w10, w2, w10
-	mvn	w10, w10
-	ldr	w10, [x11, w10, sxtw #2]
+	ldr	x10, [x9, #8]
+	ldr	w11, [x10, #12]
+	add	x13, x10, #40
+	lsl	w12, w11, #2
+	and	w10, w2, w11
+	ldr	w10, [x13, w10, sxtw #2]
+	add	w11, w12, #4
+	add	x11, x13, x11
 	cbz	w10, .LBB572_5
 .LBB572_3:                              // %B1
                                         //   Parent Loop BB572_2 Depth=1
@@ -18722,7 +18803,7 @@ get_field_2_asm_h:                      // @get_field_2_asm_h
 	lsl	w12, w10, #3
 	sub	w12, w12, #8
 	add	x12, x11, x12
-	ldp	w12, w13, [x12, #40]
+	ldp	w12, w13, [x12]
 	cmp	w13, w2
 	b.eq	.LBB572_7
 // %bb.4:                               // %B9
@@ -18797,11 +18878,14 @@ get_field2_2_asm_h:                     // @get_field2_2_asm_h
 .LBB573_2:                              // %B19
                                         // =>This Loop Header: Depth=1
                                         //     Child Loop BB573_3 Depth 2
-	ldr	x11, [x9, #8]
-	ldr	w10, [x11, #12]
-	and	w10, w2, w10
-	mvn	w10, w10
-	ldr	w10, [x11, w10, sxtw #2]
+	ldr	x10, [x9, #8]
+	ldr	w11, [x10, #12]
+	add	x13, x10, #40
+	lsl	w12, w11, #2
+	and	w10, w2, w11
+	ldr	w10, [x13, w10, sxtw #2]
+	add	w11, w12, #4
+	add	x11, x13, x11
 	cbz	w10, .LBB573_5
 .LBB573_3:                              // %B1
                                         //   Parent Loop BB573_2 Depth=1
@@ -18809,7 +18893,7 @@ get_field2_2_asm_h:                     // @get_field2_2_asm_h
 	lsl	w12, w10, #3
 	sub	w12, w12, #8
 	add	x12, x11, x12
-	ldp	w12, w13, [x12, #40]
+	ldp	w12, w13, [x12]
 	cmp	w13, w2
 	b.eq	.LBB573_7
 // %bb.4:                               // %B9
@@ -18880,18 +18964,21 @@ put_field_2_asm_h:                      // @put_field_2_asm_h
 	tst	x22, x8
 	b.ne	.LBB574_17
 // %bb.1:                               // %B45
-	ldr	x9, [x22, #8]
-	ldr	w8, [x9, #12]
-	and	w8, w2, w8
-	mvn	w8, w8
-	ldr	w8, [x9, w8, sxtw #2]
+	ldr	x8, [x22, #8]
+	ldr	w9, [x8, #12]
+	add	x11, x8, #40
+	lsl	w10, w9, #2
+	and	w8, w2, w9
+	ldr	w8, [x11, w8, sxtw #2]
+	add	w9, w10, #4
+	add	x9, x11, x9
 	cbz	w8, .LBB574_4
 .LBB574_2:                              // %B1
                                         // =>This Inner Loop Header: Depth=1
 	lsl	w10, w8, #3
 	sub	w10, w10, #8
 	add	x10, x9, x10
-	ldp	w10, w11, [x10, #40]
+	ldp	w10, w11, [x10]
 	cmp	w11, w2
 	b.eq	.LBB574_13
 // %bb.3:                               // %B12
@@ -18905,9 +18992,12 @@ put_field_2_asm_h:                      // @put_field_2_asm_h
                                         //     Child Loop BB574_6 Depth 2
 	ldr	x9, [x8, #8]
 	ldr	w10, [x9, #12]
+	add	x9, x9, #40
+	lsl	w11, w10, #2
 	and	w10, w2, w10
-	mvn	w10, w10
 	ldr	w10, [x9, w10, sxtw #2]
+	add	w11, w11, #4
+	add	x9, x9, x11
 	cbz	w10, .LBB574_8
 .LBB574_6:                              // %B18
                                         //   Parent Loop BB574_5 Depth=1
@@ -18915,12 +19005,12 @@ put_field_2_asm_h:                      // @put_field_2_asm_h
 	lsl	w10, w10, #3
 	sub	w10, w10, #8
 	add	x10, x9, x10
-	ldr	w11, [x10, #44]
+	ldr	w11, [x10, #4]
 	cmp	w11, w2
 	b.eq	.LBB574_17
 // %bb.7:                               // %B20
                                         //   in Loop: Header=BB574_6 Depth=2
-	ldur	w10, [x10, #40]
+	ldr	w10, [x10]
 	and	w10, w10, #0x3ffffff
 	cbnz	w10, .LBB574_6
 .LBB574_8:                              // %B30
@@ -19101,24 +19191,27 @@ get_array_el_2_asm_h:                   // @get_array_el_2_asm_h
 // %bb.6:                               // %B9.preheader
 	mov	x9, x22
 	mov	w8, #18                         // =0x12
-	orr	w12, w21, #0x80000000
 .LBB578_7:                              // %B9
                                         // =>This Loop Header: Depth=1
                                         //     Child Loop BB578_8 Depth 2
-	ldr	x10, [x9, #8]
-	ldr	w11, [x10, #12]
-	and	w11, w12, w11
-	mvn	w11, w11
-	ldr	w11, [x10, w11, sxtw #2]
+	ldr	x11, [x9, #8]
+	orr	w10, w21, #0x80000000
+	ldr	w12, [x11, #12]
+	add	x14, x11, #40
+	lsl	w13, w12, #2
+	and	w11, w10, w12
+	ldr	w11, [x14, w11, sxtw #2]
+	add	w12, w13, #4
+	add	x12, x14, x12
 	cbz	w11, .LBB578_10
 .LBB578_8:                              // %B10
                                         //   Parent Loop BB578_7 Depth=1
                                         // =>  This Inner Loop Header: Depth=2
 	lsl	w13, w11, #3
 	sub	w13, w13, #8
-	add	x13, x10, x13
-	ldp	w13, w14, [x13, #40]
-	cmp	w14, w12
+	add	x13, x12, x13
+	ldp	w13, w14, [x13]
+	cmp	w14, w10
 	b.eq	.LBB578_12
 // %bb.9:                               // %B17
                                         //   in Loop: Header=BB578_8 Depth=2
@@ -19206,24 +19299,27 @@ get_array_el2_2_asm_h:                  // @get_array_el2_2_asm_h
 // %bb.6:                               // %B9.preheader
 	mov	x9, x22
 	mov	w8, #18                         // =0x12
-	orr	w12, w21, #0x80000000
 .LBB579_7:                              // %B9
                                         // =>This Loop Header: Depth=1
                                         //     Child Loop BB579_8 Depth 2
-	ldr	x10, [x9, #8]
-	ldr	w11, [x10, #12]
-	and	w11, w12, w11
-	mvn	w11, w11
-	ldr	w11, [x10, w11, sxtw #2]
+	ldr	x11, [x9, #8]
+	orr	w10, w21, #0x80000000
+	ldr	w12, [x11, #12]
+	add	x14, x11, #40
+	lsl	w13, w12, #2
+	and	w11, w10, w12
+	ldr	w11, [x14, w11, sxtw #2]
+	add	w12, w13, #4
+	add	x12, x14, x12
 	cbz	w11, .LBB579_10
 .LBB579_8:                              // %B10
                                         //   Parent Loop BB579_7 Depth=1
                                         // =>  This Inner Loop Header: Depth=2
 	lsl	w13, w11, #3
 	sub	w13, w13, #8
-	add	x13, x10, x13
-	ldp	w13, w14, [x13, #40]
-	cmp	w14, w12
+	add	x13, x12, x13
+	ldp	w13, w14, [x13]
+	cmp	w14, w10
 	b.eq	.LBB579_12
 // %bb.9:                               // %B17
                                         //   in Loop: Header=BB579_8 Depth=2
@@ -24350,11 +24446,14 @@ get_length_2_asm_h:                     // @get_length_2_asm_h
 .LBB737_2:                              // %B19
                                         // =>This Loop Header: Depth=1
                                         //     Child Loop BB737_3 Depth 2
-	ldr	x11, [x9, #8]
-	ldr	w10, [x11, #12]
-	mvn	w10, w10
-	orr	w10, w10, #0xffffffcf
-	ldr	w10, [x11, w10, sxtw #2]
+	ldr	x10, [x9, #8]
+	ldr	w11, [x10, #12]
+	add	x13, x10, #40
+	lsl	w12, w11, #2
+	and	w10, w11, #0x30
+	ldr	w10, [x13, w10, uxtw #2]
+	add	w11, w12, #4
+	add	x11, x13, x11
 	cbz	w10, .LBB737_5
 .LBB737_3:                              // %B1
                                         //   Parent Loop BB737_2 Depth=1
@@ -24362,7 +24461,7 @@ get_length_2_asm_h:                     // @get_length_2_asm_h
 	lsl	w12, w10, #3
 	sub	w12, w12, #8
 	add	x12, x11, x12
-	ldp	w12, w13, [x12, #40]
+	ldp	w12, w13, [x12]
 	cmp	w13, #48
 	b.eq	.LBB737_7
 // %bb.4:                               // %B9
