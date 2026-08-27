@@ -720,7 +720,6 @@ typedef LEPUSValue LEPUSCFunctionData(LEPUSContext *ctx,
                                       LEPUSValueConst *argv, int magic,
                                       LEPUSValue *func_data);
 
-struct LEPUSMallocFunctions;
 // <Primjs begin>
 typedef void LEPUS_MarkFunc(LEPUSRuntime *rt, LEPUSValueConst val,
                             uint64_t trace_tool);
@@ -791,8 +790,6 @@ int LEPUS_SetGCMemoryPolicyLevel(LEPUSRuntime *rt,
                                  LEPUSGCMemoryPolicyLevel level);
 LEPUSGCMemoryPolicyLevel LEPUS_GetGCMemoryPolicyLevel(LEPUSRuntime *rt);
 void LEPUS_SetGCThreshold(LEPUSRuntime *rt, size_t gc_threshold);
-LEPUSRuntime *LEPUS_NewRuntime2(const struct LEPUSMallocFunctions *mf,
-                                void *opaque, uint32_t mode);
 void LEPUS_FreeRuntime(LEPUSRuntime *rt);
 void LEPUS_MarkValue(LEPUSRuntime *rt, LEPUSValueConst val,
                      LEPUS_MarkFunc *mark_func, uint64_t trace_tool);

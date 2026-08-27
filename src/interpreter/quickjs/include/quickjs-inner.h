@@ -2069,6 +2069,9 @@ LEPUSValue *js_get_virtual_sp(size_t alloc_size);
 
 void js_pop_virtual_sp(size_t size);
 
+LEPUSRuntime *LEPUS_NewRuntime2(const LEPUSMallocFunctions *mf, void *opaque,
+                                uint32_t mode);
+
 #ifdef __cplusplus
 }
 #endif
