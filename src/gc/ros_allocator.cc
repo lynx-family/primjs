@@ -1388,18 +1388,6 @@ address_t RosAllocImpl::ReallocateObj(LEPUSRuntime *rt, void *ptr, size_t size,
   return (address_t)new_ptr;
 }
 
-void RosAllocImpl::FreeObj(address_t objAddr) {
-  // release monitor
-  ROS_GC::Allocator::ReleaseResource(objAddr);
-
-  size_t objSize = PreObjFree(objAddr);
-  size_t freedBytes = FreeInternal(objAddr);
-  if (freedBytes) {
-    PostObjFree(objAddr, objSize, freedBytes);
-  }
-  allocatedInternalSize -= freedBytes;
-}
-
 // used for concurrent step2
 bool RosAllocImpl::SweepHugeObjs(
     std::function<bool(address_t, ROS_GC::Bitmap *)> shouldFree) {

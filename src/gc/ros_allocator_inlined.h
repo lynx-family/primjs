@@ -130,25 +130,6 @@ __attribute__((always_inline)) address_t RosAllocImpl::AllocFromRun(
                                                    eagerness);
 }
 
-// return internal size
-inline size_t RosAllocImpl::FreeFromRun(RunSlots &run, address_t internalAddr) {
-  size_t internalSize = run.GetRunSize();
-  ROSIMPL_ASSERT(!run.IsEmpty(), "free from an empty run");
-
-  // must free to global run
-  bool needRemove = false;
-  {
-    bool wasFull = run.IsFull();
-    run.FreeSlot(internalAddr);
-    needRemove = UpdateGlobalsAfterFree(run, wasFull);
-  }
-  if (UNLIKELY(needRemove)) {
-    ROSIMPL_ASSERT(run.IsEmpty(), "free a non-empty run");
-    FreeRun(run);
-  }
-  return internalSize;
-}
-
 inline bool RosAllocImpl::UpdateGlobalsAfterFree(RunSlots &run, bool wasFull) {
   // local runs must be globalised before they are passed in here
   if (LIKELY(run.IsLocal())) {
@@ -309,43 +290,6 @@ __attribute__((always_inline)) address_t RosAllocImpl::NewObjInternal(
   }
   allocatedInternalSize.fetch_add(allocSize, std::memory_order_relaxed);
   return allocAddr;
-}
-
-inline size_t RosAllocImpl::FreeInternal(address_t objAddr) {
-  ROSIMPL_ASSERT(allocSpace.page_groups.ContainsAddr(objAddr),
-                 "free objAddr out of range");
-
-  size_t internalSize = 0U;
-  address_t pageAddr = 0U;
-  auto group_idx = allocSpace.page_groups.GetGroupIdx(objAddr);
-  PageGroup &group = allocSpace.page_groups.GetGroupByIdx(group_idx);
-  if (group.IsHugeObj()) {
-    FreeHugeObj(group, internalSize);
-    return internalSize;
-  }
-  PageLabel pageType =
-      allocSpace.page_groups.GetTypeForAddr(objAddr, group_idx);
-  RunSlots *run = nullptr;
-  if (LIKELY(pageType == kPRun)) {
-    pageAddr = ALLOCUTIL_PAGE_ADDR(objAddr);
-    run = reinterpret_cast<RunSlots *>(pageAddr);
-  } else if (LIKELY(pageType == kPLargeObj)) {
-    size_t pageIdxInGroup = group.GetPageMap()->GetPageIndex(objAddr);
-    size_t pageIdx = ROSIMPL_GET_PAGE_IDX(group_idx, pageIdxInGroup);
-    FreeLargeObj(objAddr, internalSize, pageIdx);
-    return internalSize;
-  } else if (pageType == kPRunRem) {
-    pageAddr = allocSpace.page_groups.GetrunStartFromAddr(objAddr, group_idx);
-    run = reinterpret_cast<RunSlots *>(pageAddr);
-  } else {
-    return 0U;
-  }
-
-  ROSIMPL_ASSERT(run != nullptr, "run cannot be null");
-  ROSIMPL_DEBUG(CheckRunMagic(*run));
-
-  address_t memAddr = ROSIMPL_GET_ADDR_FROM_OBJ(objAddr);
-  return FreeFromRun(*run, memAddr);
 }
 
 inline void RosAllocImpl::ForEachObjInRun(RunSlots &run,

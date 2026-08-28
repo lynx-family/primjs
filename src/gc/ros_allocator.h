@@ -366,7 +366,6 @@ class RosAllocImpl : public Allocator {
     *((int *)0xdeadbeef) = 0;
     return 0;
   }
-  void FreeObj(address_t objAddr);
   bool ParallelFreeAllIf(MplThreadPool &threadPool);
   void ReleaseAllPageGroups();
   bool ConcurrentSweep(MplThreadPool &threadPool);
@@ -670,7 +669,6 @@ class RosAllocImpl : public Allocator {
   inline address_t AllocFromGlobalRun(int idx, int eagerness);
   inline address_t AllocFromRun(size_t &internalSize, int eagerness);
   // inline void RevokeLocalRun(RosBasedMutator &mutator, RunSlots &run);
-  inline size_t FreeFromRun(RunSlots &run, address_t internalAddr);
   inline bool UpdateGlobalsAfterFree(RunSlots &run, bool wasFull);
   inline void SweepSlot(RunSlots &run, address_t slotAddr);
   inline bool LocalRunIsEmpty(RunSlots &run);
@@ -678,8 +676,6 @@ class RosAllocImpl : public Allocator {
   inline void ConcurrentSweepRun(RunSlots &run, Bitmap *markBitmap);
   // tries to allocate an object given the size
   inline address_t AllocInternal(size_t &allocSize);
-  // returns the number of bytes freed including overhead.
-  inline size_t FreeInternal(address_t objAddr);
 #ifndef _WIN32
   inline void ForEachObjInRun(
       RunSlots &run, HeapAliveObjsVisitor &visitor,
