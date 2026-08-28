@@ -519,6 +519,21 @@ static size_t GetRosGCInitialHeapPageGroups() {
   }
 }
 
+constexpr int GC_MEMORY_POLICY_LEVEL_MASK = GC_MEMORY_POLICY_LEVEL_BIT0 |
+                                            GC_MEMORY_POLICY_LEVEL_BIT1 |
+                                            GC_MEMORY_POLICY_LEVEL_BIT2;
+
+static void ApplyGCMemoryPolicyLevelFromSettings(LEPUSRuntime *rt) {
+  // Dividing by BIT0 shifts the masked field down to its lowest bit.
+  const int encoded = (settingsFlag & GC_MEMORY_POLICY_LEVEL_MASK) /
+                      GC_MEMORY_POLICY_LEVEL_BIT0;
+  if (encoded == 0) {
+    return;
+  }
+  LEPUS_SetGCMemoryPolicyLevel(
+      rt, static_cast<LEPUSGCMemoryPolicyLevel>(encoded - 1));
+}
+
 void InitRosGC(LEPUSRuntime *rt) {
   rt->ros_ = new ROS_GC::RosAllocImpl(rt, !concurrent_disabled());
   rt->collector_ = new ROS_GC::MarkSweepCollector(rt->ros_);
@@ -527,6 +542,7 @@ void InitRosGC(LEPUSRuntime *rt) {
       GetRosGCInitialHeapPageGroups() * ROS_GC::kRosDefaultPageGroupSize,
       static_cast<size_t>(8192) * MB};
   rt->ros_->Init(param);
+  ApplyGCMemoryPolicyLevelFromSettings(rt);
 }
 
 static inline uint8_t *js_get_stack_pointer(void);
