@@ -29898,9 +29898,9 @@ LEPUSValue js_create_function(LEPUSContext *ctx, JSFunctionDef *fd) {
       }
     } else {
       b->vardefs = (JSVarDef *)((uint8_t *)b + vardefs_offset);
-      memcpy(b->vardefs, fd->args, fd->arg_count * sizeof(fd->args[0]));
-      memcpy(b->vardefs + fd->arg_count, fd->vars,
-             fd->var_count * sizeof(fd->vars[0]));
+      memcpy_no_ub(b->vardefs, fd->args, fd->arg_count * sizeof(fd->args[0]));
+      memcpy_no_ub(b->vardefs + fd->arg_count, fd->vars,
+                   fd->var_count * sizeof(fd->vars[0]));
     }
     b->var_count = fd->var_count;
     b->arg_count = fd->arg_count;
