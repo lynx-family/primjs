@@ -55,7 +55,7 @@ static inline int next_valid_op(const uint8_t *buf, int len, int *pos,
                                 int64_t *out_line) {
   while (*pos < len) {
     int op = buf[*pos];
-    int op_len = opcode_info[op].size;
+    int op_len = compiler_opcode_info(op).size;
     if (*pos + op_len > len) return -1;
     if (op == OP_line_num) {
       if (out_line) *out_line = get_u64(buf + *pos + 1);
@@ -183,7 +183,7 @@ void opt_prescan_tdz_dse(BytecodeOptCtx *opt_ctx, const uint8_t *bc_buf,
 
   for (pos = 0; pos < bc_len;) {
     int scan_op = bc_buf[pos];
-    int scan_size = opcode_info[scan_op].size;
+    int scan_size = compiler_opcode_info(scan_op).size;
     if (scan_size <= 0) break;
     if (scan_op == OP_set_loc_uninitialized) {
       int idx = get_u16(bc_buf + pos + 1);
@@ -343,7 +343,7 @@ void opt_reorder_local_vars(BytecodeOptCtx *opt_ctx, const uint8_t *bc_buf,
   /* Count accesses in bytecode */
   for (pos = 0; pos < bc_len;) {
     int scan_op = bc_buf[pos];
-    int scan_size = opcode_info[scan_op].size;
+    int scan_size = compiler_opcode_info(scan_op).size;
     if (scan_size <= 0) break;
     if (scan_op == OP_get_loc || scan_op == OP_put_loc ||
         scan_op == OP_set_loc || scan_op == OP_get_loc_check ||
@@ -453,7 +453,7 @@ void opt_reorder_local_vars(BytecodeOptCtx *opt_ctx, const uint8_t *bc_buf,
   uint8_t *bc_buf_w = s->byte_code.buf;
   for (pos = 0; pos < bc_len;) {
     int rewrite_op = bc_buf[pos];
-    int rewrite_size = opcode_info[rewrite_op].size;
+    int rewrite_size = compiler_opcode_info(rewrite_op).size;
     if (rewrite_size <= 0) break;
     if (rewrite_op == OP_get_loc || rewrite_op == OP_put_loc ||
         rewrite_op == OP_set_loc || rewrite_op == OP_get_loc_check ||
@@ -507,7 +507,7 @@ void opt_reorder_closure_vars(BytecodeOptCtx *opt_ctx, const uint8_t *bc_buf,
   /* Count accesses in bytecode */
   for (pos = 0; pos < bc_len;) {
     int scan_op = bc_buf[pos];
-    int scan_size = opcode_info[scan_op].size;
+    int scan_size = compiler_opcode_info(scan_op).size;
     if (scan_size <= 0) break;
     if (scan_op == OP_get_var_ref || scan_op == OP_put_var_ref ||
         scan_op == OP_set_var_ref || scan_op == OP_get_var_ref_check ||
@@ -568,7 +568,7 @@ void opt_reorder_closure_vars(BytecodeOptCtx *opt_ctx, const uint8_t *bc_buf,
   uint8_t *bc_buf_w = s->byte_code.buf;
   for (pos = 0; pos < bc_len;) {
     int rewrite_op = bc_buf[pos];
-    int rewrite_size = opcode_info[rewrite_op].size;
+    int rewrite_size = compiler_opcode_info(rewrite_op).size;
     if (rewrite_size <= 0) break;
     if (rewrite_op == OP_get_var_ref || rewrite_op == OP_put_var_ref ||
         rewrite_op == OP_set_var_ref || rewrite_op == OP_get_var_ref_check ||
@@ -637,7 +637,7 @@ void opt_reorder_cpool(BytecodeOptCtx *opt_ctx, const uint8_t *bc_buf,
 
   for (pos = 0; pos < bc_len;) {
     int scan_op = bc_buf[pos];
-    int scan_size = opcode_info[scan_op].size;
+    int scan_size = compiler_opcode_info(scan_op).size;
     if (scan_size <= 0) break;
     if (scan_op == OP_push_const || scan_op == OP_fclosure) {
       int idx = get_u32(bc_buf + pos + 1);
@@ -668,7 +668,7 @@ void opt_reorder_cpool(BytecodeOptCtx *opt_ctx, const uint8_t *bc_buf,
     uint8_t *bc_buf_w = s->byte_code.buf;
     for (pos = 0; pos < bc_len;) {
       int rewrite_op = bc_buf[pos];
-      int rewrite_size = opcode_info[rewrite_op].size;
+      int rewrite_size = compiler_opcode_info(rewrite_op).size;
       if (rewrite_size <= 0) break;
       if (rewrite_op == OP_push_const || rewrite_op == OP_fclosure) {
         int old_idx = get_u32(bc_buf + pos + 1);
@@ -888,11 +888,11 @@ int opt_preamble_emit_this(LEPUSContext *ctx, JSFunctionDef *s, DynBuf *bc_out,
   int peek = 0;
   while (peek + 1 < bc_len) {
     if (bc_buf[peek] == OP_line_num &&
-        peek + (int)opcode_info[OP_line_num].size <= bc_len) {
-      peek += opcode_info[OP_line_num].size;
+        peek + (int)compiler_opcode_info(OP_line_num).size <= bc_len) {
+      peek += compiler_opcode_info(OP_line_num).size;
     } else if (bc_buf[peek] == OP_set_loc_uninitialized && peek + 3 <= bc_len &&
                get_u16(bc_buf + peek + 1) != (uint16_t)s->this_var_idx) {
-      peek += opcode_info[OP_set_loc_uninitialized].size;
+      peek += compiler_opcode_info(OP_set_loc_uninitialized).size;
     } else {
       break;
     }
@@ -2814,7 +2814,7 @@ BOOL opt_tdz_inline_can_eliminate(JSFunctionDef *s, const uint8_t *bc_buf,
   while (scan_pos < scan_end) {
     int scan_op = next_valid_op(bc_buf, scan_end, &scan_pos, NULL);
     if (scan_op < 0) break;
-    int scan_len = opcode_info[scan_op].size;
+    int scan_len = compiler_opcode_info(scan_op).size;
     /* Found write to our variable: marker is dead */
     if ((scan_op == OP_put_loc || scan_op == OP_set_loc) &&
         get_u16(bc_buf + scan_pos + 1) == idx) {
@@ -2872,10 +2872,10 @@ BOOL goto_inline_push_return(LEPUSContext *ctx, JSFunctionDef *s,
     if (tgt_pos >= bc_len) return FALSE;
     tgt_op = bc_buf[tgt_pos];
     if (tgt_op != OP_label && tgt_op != OP_line_num) break;
-    tgt_pos += opcode_info[tgt_op].size;
+    tgt_pos += compiler_opcode_info(tgt_op).size;
   }
 
-  int tgt_size = opcode_info[tgt_op].size;
+  int tgt_size = compiler_opcode_info(tgt_op).size;
   int after_pos = tgt_pos + tgt_size;
   int after_op;
 
@@ -2884,7 +2884,7 @@ BOOL goto_inline_push_return(LEPUSContext *ctx, JSFunctionDef *s,
     if (after_pos >= bc_len) return FALSE;
     after_op = bc_buf[after_pos];
     if (after_op != OP_label && after_op != OP_line_num) break;
-    after_pos += opcode_info[after_op].size;
+    after_pos += compiler_opcode_info(after_op).size;
   }
 
   if (after_op != OP_return && after_op != OP_return_undef) return FALSE;
@@ -3161,7 +3161,7 @@ int scan_drop_chain_before_return_undef(const uint8_t *bc_buf, int bc_len,
       continue;
     }
     if (scan_op == OP_line_num) {
-      scan += opcode_info[OP_line_num].size;
+      scan += compiler_opcode_info(OP_line_num).size;
       continue;
     }
     break;

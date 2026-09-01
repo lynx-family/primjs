@@ -746,6 +746,26 @@ void LLVMIRBuilder::BuildStore(son::node::Node const* node) {
   LLVMBuildStore(_builder, value, object_value);
 }
 
+void LLVMIRBuilder::BuildReleaseStore(son::node::Node const* node) {
+  auto object = node->value_at(0);
+  auto offset_node = node->value_at(1);
+  auto value = GetNodeValue(node->value_at(2));
+  auto object_value = GetNodeValue(object);
+  auto offset_value = GetNodeValue(offset_node);
+
+  auto result_type = GetLLVMTypeFromNode(node);
+  son::node::Int32Matcher matcher(offset_node);
+  if (!matcher.Is(0)) {
+    object_value = LLVMBuildGEP2(_builder, result_type, object_value,
+                                 &offset_value, 1, "");
+  }
+  unsigned address_space = GetAddressSpace(object_value);
+  LLVMTypeRef mem_type = LLVMPointerType(result_type, address_space);
+  object_value = CastToPtr(object_value, mem_type);
+  auto store = LLVMBuildStore(_builder, value, object_value);
+  LLVMSetOrdering(store, LLVMAtomicOrderingRelease);
+}
+
 void LLVMIRBuilder::BuildBranch(son::node::Node const* node) {
   auto cond = node->value_at(0);
   auto cond_value = GetNodeValue(cond);

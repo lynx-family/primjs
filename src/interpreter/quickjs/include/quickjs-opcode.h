@@ -379,7 +379,12 @@ DEF(is_null, 1, 1, 1, none)
 DEF(is_function, 1, 1, 1, none)
 #endif
 
+/* Runtime-only opcodes are appended after all shipped opcodes. */
 DEF_NON_SHIPPABLE(inc_coverage, 5, 0, 0, u32)
+DEF_NON_SHIPPABLE(get_global_ref_undef, 3, 0, 1, var_ref)
+DEF_NON_SHIPPABLE(get_global_ref, 3, 0, 1, var_ref)
+DEF_NON_SHIPPABLE(put_global_ref, 3, 1, 0, var_ref)
+DEF_NON_SHIPPABLE(put_global_ref_init, 3, 1, 0, var_ref)
 
 #undef DEF_NON_SHIPPABLE
 #undef DEF

@@ -2465,4 +2465,25 @@ TEST_F(BytecodeOptUnit, Combined_AllPassesInteraction) {
   EXPECT_EQ(result, 55);
 }
 
+TEST_F(BytecodeOptUnit, RuntimeGlobalRefsSurviveOptimizationPipeline) {
+  LEPUSFunctionBytecode* fb = nullptr;
+  ASSERT_TRUE(CompileFunction(
+      "globalThis.optimizedGlobal = 10; "
+      "(function() { optimizedGlobal += 2; return optimizedGlobal; })",
+      &fb));
+
+  EXPECT_GT(
+      CountOpcode(fb->byte_code_buf, fb->byte_code_len, OP_get_global_ref) +
+          CountOpcode(fb->byte_code_buf, fb->byte_code_len, OP_put_global_ref),
+      0);
+
+  LEPUSValue function = pinned_functions_.back();
+  LEPUSValue result = LEPUS_Call(ctx_, function, LEPUS_UNDEFINED, 0, nullptr);
+  ASSERT_FALSE(LEPUS_IsException(result));
+  int32_t value = 0;
+  ASSERT_EQ(LEPUS_ToInt32(ctx_, &value, result), 0);
+  EXPECT_EQ(value, 12);
+  LEPUS_FreeValue(ctx_, result);
+}
+
 }  // namespace

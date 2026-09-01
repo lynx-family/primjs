@@ -144,7 +144,7 @@ enum {
   ALLOC_TAG_JSSTDFile,
   ALLOC_TAG_JSSymbol,
   ALLOC_TAG_JSValueArray,
-  ALLOC_TAG_JSConstString,
+  ALLOC_TAG_JSStringWithAux,
   ALLOC_TAG_JsonStrArray,
   ALLOC_TAG_LabelSlotArray,
   ALLOC_TAG_CallerStrSlotArray,
@@ -156,10 +156,10 @@ enum {
   ALLOC_TAG_JSResolveEntryArray,
   ALLOC_TAG_LEPUSBreakpointArray,
   ALLOC_TAG_JSPropertyArray,
-  ALLOC_TAG_ValueSlotArray,
   ALLOC_TAG_AtomArray,
   ALLOC_TAG_JSAsyncGeneratorRequest,
   ALLOC_TAG_JSAsyncVarRef,
+  ALLOC_TAG_JSLinkedHashMap,
   ALLOC_TAG_END,
 };
 // <Primjs begin>
