@@ -13,10 +13,15 @@ config("quickjs_public_config") {
 
   defines = [
     "PRIMJS_MIN_LOG_LEVEL=5",  # disable alog in unittests
-    "ENABLE_BUILTIN_SERIALIZE=1",
     "CONFIG_VERSION=\"2019-09-10\"",
     "LYNX_SIMPLIFY=1",
   ]
+
+  if (disable_nanbox) {
+    defines += [ "DISABLE_NANBOX=1" ]
+  } else {
+    defines += [ "DISABLE_NANBOX=0" ]
+  }
 
   if (enable_quickjs_debugger) {
     defines += [ "ENABLE_QUICKJS_DEBUGGER=1" ]
@@ -160,7 +165,7 @@ config("wasm_public_config") {
       "LOG_LEVEL=LOG_LEVEL_VERBOSE",
       "d_m3HasTracer",
     ]
-  } 
+  }
 }
 
 group("all") {

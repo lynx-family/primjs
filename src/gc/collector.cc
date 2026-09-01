@@ -24,7 +24,8 @@ void Finalizer::DoFinalizer2(void *ptr) noexcept {
       JSLepusRefFinalizer(ptr);
       break;
     case ALLOC_TAG_JSString:
-      if (!(static_cast<JSString *>(ptr)->atom_type)) {
+    case ALLOC_TAG_JSStringWithAux:
+      if (!js_string_meta(static_cast<JSString *>(ptr))->atom_type) {
         JSStringOnlyFinalizer(ptr);
       }
       break;
@@ -47,12 +48,12 @@ void Visitor::VisitLEPUSLepusRef(void *ptr, GCWorkStack &workStack) noexcept {
 }
 
 void Visitor::VisitJSVarRef(void *ptr, GCWorkStack &workStack) noexcept {
-  JSVarRef *var_ref = static_cast<JSVarRef *>(ptr);
+  JSVarRefGC *var_ref = static_cast<JSVarRefGC *>(ptr);
   PushObjLEPUSValue(var_ref->value, workStack);
 }
 
 void Visitor::VisitJSAsyncVarRef(void *ptr, GCWorkStack &workStack) noexcept {
-  JSVarRef *var_ref = static_cast<JSVarRef *>(ptr);
+  JSVarRefGC *var_ref = static_cast<JSVarRefGC *>(ptr);
   PushObjLEPUSValue(*var_ref->pvalue, workStack);
 }
 
@@ -102,6 +103,9 @@ void Visitor::PushObjAtom(LEPUSAtom atom, GCWorkStack &workStack) noexcept {
 void Visitor::VisitJSShape(void *ptr, GCWorkStack &workStack) noexcept {
   JSShape *sh = static_cast<JSShape *>(ptr);
   workStack.push_back((address_t)(sh->proto));
+  if (sh->parent) {
+    workStack.push_back((address_t)sh->parent);
+  }
   JSShapeProperty *pr = get_shape_prop(sh);
   for (int i = 0; i < sh->prop_count; i++) {
     PushObjAtom(pr->atom, workStack);
@@ -191,12 +195,16 @@ void Visitor::VisitLEPUSFunctionBytecode(void *ptr,
 void Visitor::VisitJSSeparableString(void *ptr,
                                      GCWorkStack &workStack) noexcept {
   auto *separable_string = reinterpret_cast<JSSeparableString *>(ptr);
-  if (!LEPUS_IsUndefined(separable_string->flat_content)) {
-    PushObjLEPUSValue(separable_string->flat_content, workStack);
+  PushObjLEPUSValue(separable_string->left_op, workStack);
+  if (JS_IsSeparableStringFlat(separable_string)) {
     return;
   }
-  PushObjLEPUSValue(separable_string->left_op, workStack);
   PushObjLEPUSValue(separable_string->right_op, workStack);
+}
+
+void Visitor::VisitJSString(void *ptr, GCWorkStack &workStack) noexcept {
+  auto *str = static_cast<JSString *>(ptr);
+  if (str->has_aux) workStack.push_back(reinterpret_cast<address_t>(str->aux));
 }
 
 void Visitor::VisitLEPUSDebuggerInfo(void *ptr,

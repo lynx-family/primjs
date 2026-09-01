@@ -314,7 +314,6 @@ test/built-ins/RegExp/match-indices/indices-groups-object-unmatched.js:17: Synta
 test/built-ins/RegExp/match-indices/indices-groups-object.js:24: SyntaxError: invalid regular expression flags
 test/built-ins/RegExp/match-indices/indices-groups-properties.js:18: SyntaxError: invalid regular expression flags
 test/built-ins/RegExp/match-indices/indices-property.js:24: SyntaxError: invalid regular expression flags
-test/built-ins/RegExp/named-groups/non-unicode-property-names-valid.js:46: SyntaxError: invalid group name
 test/built-ins/RegExp/property-escapes/generated/Alphabetic.js:16: Test262Error: `\p{Alphabetic}` should match U+000C5D (`ౝ`)
 test/built-ins/RegExp/property-escapes/generated/Assigned.js:16: Test262Error: `\p{Assigned}` should match U+000C5D (`ౝ`)
 test/built-ins/RegExp/property-escapes/generated/Bidi_Mirrored.js:16: Test262Error: `\p{Bidi_Mirrored}` should match U+002E55 (`⹕`)

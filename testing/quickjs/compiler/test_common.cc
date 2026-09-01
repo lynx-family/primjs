@@ -450,6 +450,16 @@ TEST_F(CommonQjsTest, StructuredClone) {
   ASSERT_TRUE(!LEPUS_IsException(val));
 }
 
+TEST_F(CommonQjsTest, MapIteratorAfterTableRebuild) {
+  const char* filename = TEST_CASE_DIR "unit_test/map_iterator_rebuild.js";
+  LEPUSValue val;
+  ASSERT_TRUE(js_run(ctx_, filename, val));
+  if (LEPUS_IsException(val)) {
+    ADD_FAILURE() << js_get_exception_string(ctx_);
+  }
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, val);
+}
+
 extern LEPUSValue js_dtoa(LEPUSContext* ctx, double d, int radix, int n_digits,
                           int flags);
 
@@ -667,6 +677,45 @@ TEST_F(CommonQjsTest, YieldInForOfHeadDoesNotUnderflowStack) {
     const second = iter.next({ foo: 1, bar: 2 });
     Assert(second.done === true);
     Assert(second.value.size === 0);
+  )";
+
+  auto ret = LEPUS_Eval(ctx_, src.c_str(), src.length(), "test.js",
+                        LEPUS_EVAL_TYPE_GLOBAL);
+  ASSERT_TRUE(!LEPUS_IsException(ret));
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+}
+
+TEST_F(CommonQjsTest, SetIteratorSkipsDeletedPrefix) {
+  std::string src = R"(
+    const values = new Set();
+    const count = 20000;
+    for (let index = 0; index < count; index++) {
+      values.add(index);
+    }
+
+    let checksum = 0;
+    while (values.size > 0) {
+      let value;
+      [value] = values;
+      checksum += value;
+      values.delete(value);
+    }
+    Assert(checksum === count * (count - 1) / 2);
+
+    const set = new Set(["a", "b"]);
+    const oldIterator = set.values();
+    Assert(oldIterator.next().value === "a");
+
+    set.delete("a");
+    Assert(set.values().next().value === "b");
+
+    set.clear();
+    set.add("c");
+    Assert(oldIterator.next().value === "c");
+
+    set.delete("c");
+    set.add("c");
+    Assert(set.values().next().value === "c");
   )";
 
   auto ret = LEPUS_Eval(ctx_, src.c_str(), src.length(), "test.js",

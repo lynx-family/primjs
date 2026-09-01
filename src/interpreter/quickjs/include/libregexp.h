@@ -22,76 +22,75 @@
  * THE SOFTWARE.
  */
 
-// Copyright 2024 The Lynx Authors. All rights reserved.
+// Copyright 2026 The Lynx Authors. All rights reserved.
 // Licensed under the Apache License Version 2.0 that can be found in the
 // LICENSE file in the root directory of this source tree.
 #ifndef SRC_INTERPRETER_QUICKJS_INCLUDE_LIBREGEXP_H_
 #define SRC_INTERPRETER_QUICKJS_INCLUDE_LIBREGEXP_H_
 
 #include <stddef.h>
+#include <stdint.h>
 
 #include "base_export.h"
-#include "libunicode.h"
-
-#define LRE_BOOL int /* for documentation purposes */
+#include "quickjs/include/libunicode.h"
 
 #define LRE_FLAG_GLOBAL (1 << 0)
 #define LRE_FLAG_IGNORECASE (1 << 1)
 #define LRE_FLAG_MULTILINE (1 << 2)
 #define LRE_FLAG_DOTALL (1 << 3)
-#define LRE_FLAG_UTF16 (1 << 4)
+#define LRE_FLAG_UNICODE (1 << 4)
+#define LRE_FLAG_UTF16 LRE_FLAG_UNICODE
 #define LRE_FLAG_STICKY (1 << 5)
+#define LRE_FLAG_INDICES (1 << 6)
+#define LRE_FLAG_NAMED_GROUPS (1 << 7)
+#define LRE_FLAG_UNICODE_SETS (1 << 8)
 
-#define LRE_FLAG_NAMED_GROUPS \
-  (1 << 7) /* named groups are present in the regexp */
+#define LRE_RET_MEMORY_ERROR (-1)
+#define LRE_RET_TIMEOUT (-2)
+
+/* Includes the terminating NUL and duplicate-name scope byte. */
+#define LRE_GROUP_NAME_TRAILER_LEN 2
 
 uint8_t *lre_compile(int *plen, char *error_msg, int error_msg_size,
                      const char *buf, size_t buf_len, int re_flags,
                      void *opaque);
+int lre_get_alloc_count(const uint8_t *bc_buf);
 int lre_get_capture_count(const uint8_t *bc_buf);
 QJS_HIDE int lre_get_flags(const uint8_t *bc_buf);
+const char *lre_get_groupnames(const uint8_t *bc_buf);
 int lre_exec(uint8_t **capture, const uint8_t *bc_buf, const uint8_t *cbuf,
              int cindex, int clen, int cbuf_type, void *opaque);
+QJS_HIDE void lre_free(void *ptr);
 
 QJS_HIDE int lre_parse_escape(const uint8_t **pp, int allow_utf16);
-QJS_HIDE LRE_BOOL lre_is_space(int c);
+QJS_HIDE int lre_is_space(int c);
 
-/* must be provided by the user */
-QJS_HIDE LRE_BOOL lre_check_stack_overflow(void *opaque, size_t alloca_size);
-void *lre_realloc(__attribute__((unused)) void *opaque, void *ptr, size_t size,
-                  __attribute__((unused)) int alloc_tag);
-
-/* LEPUS identifier test */
 extern uint32_t const lre_id_start_table_ascii[4];
 extern uint32_t const lre_id_continue_table_ascii[4];
 
 static inline int lre_js_is_ident_first(int c) {
   if ((uint32_t)c < 128) {
     return (lre_id_start_table_ascii[c >> 5] >> (c & 31)) & 1;
-  } else {
-#ifdef CONFIG_ALL_UNICODE
-    return lre_is_id_start(c);
-#else
-    return !lre_is_space(c);
-#endif
   }
+#ifdef CONFIG_ALL_UNICODE
+  return lre_is_id_start(c);
+#else
+  return !lre_is_space(c);
+#endif
 }
-
-void lre_free(void *);
 
 static inline int lre_js_is_ident_next(int c) {
   if ((uint32_t)c < 128) {
     return (lre_id_continue_table_ascii[c >> 5] >> (c & 31)) & 1;
-  } else {
-    /* ZWNJ and ZWJ are accepted in identifiers */
-#ifdef CONFIG_ALL_UNICODE
-    return lre_is_id_continue(c) || c == 0x200C || c == 0x200D;
-#else
-    return !lre_is_space(c) || c == 0x200C || c == 0x200D;
-#endif
   }
+#ifdef CONFIG_ALL_UNICODE
+  return lre_is_id_continue(c) || c == 0x200c || c == 0x200d;
+#else
+  return !lre_is_space(c) || c == 0x200c || c == 0x200d;
+#endif
 }
 
-#undef LRE_BOOL
+QJS_HIDE int lre_check_stack_overflow(void *opaque, size_t alloca_size);
+QJS_HIDE int lre_check_timeout(void *opaque);
 
 #endif  // SRC_INTERPRETER_QUICKJS_INCLUDE_LIBREGEXP_H_

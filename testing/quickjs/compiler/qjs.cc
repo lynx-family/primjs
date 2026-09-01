@@ -35,6 +35,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+
+#include <chrono>
 #if defined(__APPLE__)
 #include <malloc/malloc.h>
 #elif defined(__linux__)
@@ -52,7 +54,8 @@ extern "C" {
 #include "gc/trace-gc.h"
 #include "quickjs/include/quickjs-inner.h"
 
-static int eval_file(LEPUSContext *ctx, const char *filename) {
+static int eval_file(LEPUSContext *ctx, const char *filename,
+                     bool time_top_level) {
   uint8_t *buf;
   int ret, eval_flags;
   size_t buf_len;
@@ -63,8 +66,26 @@ static int eval_file(LEPUSContext *ctx, const char *filename) {
     exit(1);
   }
   eval_flags = LEPUS_EVAL_TYPE_GLOBAL;
+  if (time_top_level) {
+    eval_flags |= LEPUS_EVAL_FLAG_COMPILE_ONLY;
+  }
   LEPUSValue val =
       LEPUS_Eval(ctx, (const char *)buf, buf_len, filename, eval_flags);
+
+  if (time_top_level && !LEPUS_IsException(val)) {
+    LEPUSValue global_obj = LEPUS_GetGlobalObject(ctx);
+    HandleScope func_scope(ctx, &val, HANDLE_TYPE_LEPUS_VALUE);
+    func_scope.PushHandle(&global_obj, HANDLE_TYPE_LEPUS_VALUE);
+    auto start = std::chrono::steady_clock::now();
+    val = LEPUS_EvalFunction(ctx, val, global_obj);
+    auto end = std::chrono::steady_clock::now();
+    double elapsed_ms =
+        std::chrono::duration<double, std::milli>(end - start).count();
+    fprintf(stderr, "top-level-load: %.3f ms\n", elapsed_ms);
+    if (!LEPUS_IsGCMode(ctx)) {
+      LEPUS_FreeValue(ctx, global_obj);
+    }
+  }
 
   if (LEPUS_IsException(val)) {
     lepus_std_dump_error(ctx);
@@ -161,14 +182,22 @@ int main(int argc, char **argv) {
   LEPUSRuntime *rt;
   LEPUSContext *ctx;
   int32_t dump_memory = 0;
+  bool time_top_level = false;
   const char *filename;
   if (argc == 1) {
     printf("Input the test file name\n");
     return 0;
   }
 
-  if (argc > 2 && !strcmp(argv[1], "-d")) {  // -d: dump memory
-    dump_memory = 1;
+  for (int i = 1; i < argc - 1; i++) {
+    if (!strcmp(argv[i], "-d")) {
+      dump_memory = 1;
+    } else if (!strcmp(argv[i], "-t") || !strcmp(argv[i], "--time-top-level")) {
+      time_top_level = true;
+    } else {
+      fprintf(stderr, "qjs: unknown option: %s\n", argv[i]);
+      return 1;
+    }
   }
   filename = argv[argc - 1];
 
@@ -205,7 +234,7 @@ int main(int argc, char **argv) {
     }
     JS_AddIntrinsicAssert(ctx);
 
-    if (eval_file(ctx, filename)) goto fail;
+    if (eval_file(ctx, filename, time_top_level)) goto fail;
     lepus_std_loop(ctx);
     js_dump_unhandled_rejection(ctx);
 

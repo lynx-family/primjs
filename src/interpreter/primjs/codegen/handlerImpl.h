@@ -79,6 +79,7 @@ class HandlerImpl : public InterpreterAssembler {
   void GenDefineMethod(PrimjsOpcode opcode);
 
   void GenCallOp(PrimjsOpcode opcode);
+  void GenFastCallConstructor(bool is_derived);
   void GenCallNative(bool from_entry);
   void GenCallCFunction(son::node::Label* call_fail);
   void GenCallCFunctionData(son::node::Label* call_fail);
@@ -103,11 +104,15 @@ class HandlerImpl : public InterpreterAssembler {
   son::node::Node* FindPropertyForGet(son::node::Node* obj,
                                       son::node::Node* atom,
                                       son::node::Label* slow_get,
-                                      son::node::Label* not_found);
+                                      son::node::Label* not_found,
+                                      bool own_only = false);
 
   void FindPropertyForSet(son::node::Node* obj, son::node::Node* atom,
                           son::node::Node* val, son::node::Label* slow_set,
                           son::node::Label* not_found);
+  void FastAddProperty(son::node::Node* obj, son::node::Node* atom,
+                       son::node::Node* val, son::node::Label* success,
+                       son::node::Label* slow);
 
   using FindOwnPropertyOperation =
       std::function<void(son::node::Node*, son::node::Node*)>;
@@ -125,9 +130,20 @@ class HandlerImpl : public InterpreterAssembler {
   void GenSetPropertyValue();
   void GenGetPropertyValue(PrimjsOpcode opcode, son::node::Node* obj,
                            son::node::Node* prop, son::node::Label* slow_get);
+  void GenGetTypedArrayElement(PrimjsOpcode opcode, son::node::Node* obj,
+                               son::node::Node* index,
+                               son::node::Node* class_id,
+                               son::node::Label* slow_get);
+  void GenSetTypedArrayElement(PrimjsOpcode opcode, son::node::Node* obj,
+                               son::node::Node* index, son::node::Node* val,
+                               son::node::Node* class_id,
+                               son::node::Label* slow_set);
   void GenGetArrayEl(PrimjsOpcode opcode);
   void GenPutArrayEl(PrimjsOpcode opcode);
   void GenArrayFrom(PrimjsOpcode opcode);
+  son::node::Node* FastBuildArguments(son::node::Node* argc,
+                                      son::node::Node* argv,
+                                      son::node::Label* fallback);
   void GenInsert(PrimjsOpcode opcode);
   void GenDup(PrimjsOpcode opcode);
   void GenSwap(PrimjsOpcode opcode);
@@ -136,6 +152,7 @@ class HandlerImpl : public InterpreterAssembler {
   void GenDrop(PrimjsOpcode opcode);
   void GenPushConst(PrimjsOpcode opcode);
   void GenFclosure(PrimjsOpcode opcode);
+  void GenForInNext(PrimjsOpcode opcode);
 };
 
 }  // namespace primjs

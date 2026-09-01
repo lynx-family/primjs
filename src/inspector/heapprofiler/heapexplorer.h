@@ -141,6 +141,7 @@ class QjsHeapExplorer : public HeapEntriesAllocator {
   void ExtractClassSpecificReference(LEPUSContext*, HeapEntry*,
                                      const LEPUSObject*);
   void ExtractMapReference(LEPUSContext*, HeapEntry*, const JSMapState*);
+  void ExtractMapReference(LEPUSContext*, HeapEntry*, const JSLinkedHashMap*);
   void ExtractMapRecordReference(LEPUSContext*, HeapEntry*, const JSMapRecord*,
                                  bool weak_key);
   void ExtractPromiseReference(LEPUSContext*, HeapEntry*, const JSPromiseData*);
