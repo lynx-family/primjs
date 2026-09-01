@@ -577,12 +577,6 @@ class InterpreterAssembler : public CodeAssembler {
     return;
   }
 
-  son::node::Node* GetVarRefListAddress() {
-    auto frame = GetFrame();
-    auto offset = AccessBuilder::js_stack_frame_var_ref_list_offset();
-    return CastToRaw(IntPtrAdd(frame, IntPtrValue(offset)));
-  }
-
   son::node::Node* RestoreCurPc() {
     auto frame = GetFrame();
     auto offset = AccessBuilder::js_stack_frame_cur_pc_offset();
@@ -688,6 +682,13 @@ class InterpreterAssembler : public CodeAssembler {
     }
   }
   void CallRuntimeEpilogue() {}
+
+  son::node::Node* TryMalloc(son::node::Node* ctx, son::node::Node* size,
+                             int alloc_tag, son::node::Label* fail);
+  son::node::Node* TryAllocateObject(son::node::Node* ctx,
+                                     son::node::Node* shape,
+                                     LEPUSClassID class_id, uint8_t flags,
+                                     son::node::Label* fail);
 
   template <class... Args>
   son::node::Node* CallRuntime(const son::node::CallDescriptor& desc,

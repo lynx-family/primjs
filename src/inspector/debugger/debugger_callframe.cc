@@ -92,7 +92,17 @@ QJS_HIDE int32_t GetClosureSize(LEPUSContext *ctx, int32_t stack_index) {
     LEPUSObject *f = LEPUS_VALUE_GET_OBJ(sf->cur_func);
     if (!f || !lepus_class_has_bytecode(f->class_id)) return size;
     struct LEPUSFunctionBytecode *b = f->u.func.function_bytecode;
-    if (b->closure_var_count > 0) {
+    bool has_lexical_closure = false;
+    for (uint32_t i = 0; i < b->closure_var_count; ++i) {
+      JSClosureTypeEnum type =
+          static_cast<JSClosureTypeEnum>(b->closure_var[i].closure_type);
+      if (type != JS_CLOSURE_GLOBAL && type != JS_CLOSURE_GLOBAL_DECL &&
+          type != JS_CLOSURE_GLOBAL_REF) {
+        has_lexical_closure = true;
+        break;
+      }
+    }
+    if (has_lexical_closure) {
       size++;
     } else {
       break;

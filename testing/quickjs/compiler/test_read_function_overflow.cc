@@ -502,6 +502,11 @@ TEST_F(ReadFunctionOverflowTest, InvalidOpcodeIsRejectedBeforeFormatLookup) {
                             0, 0, "invalid opcode", OP_invalid);
 }
 
+TEST_F(ReadFunctionOverflowTest, RuntimeOnlyOpcodeIsRejectedDuringDecode) {
+  ExpectInvalidOperandIndex("function f(value) { return value; }", OP_get_arg0,
+                            0, 0, "invalid opcode", OP_get_global_ref);
+}
+
 TEST_F(ReadFunctionOverflowTest, TruncatedOperandIsRejectedBeforeIndexRead) {
   ExpectInvalidOperandIndex("function f(value) {}", OP_return_undef, 0, 0,
                             "read after the end of the buffer", OP_get_arg);

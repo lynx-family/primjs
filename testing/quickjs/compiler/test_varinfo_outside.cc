@@ -20,6 +20,9 @@ extern "C" {
 #include "inspector/interface.h"
 #include "quickjs/include/quickjs-inner.h"
 
+static_assert(sizeof(JSBytecodeVarDef) == 12);
+static_assert(sizeof(JSBytecodeVarDef) < sizeof(JSVarDef));
+
 class VarInfoOutsideTest : public ::testing::Test {
  protected:
   void SetUp() override {
@@ -457,7 +460,7 @@ TEST_F(VarInfoOutsideTest, SetVarDefsNoOpWhenAlreadyExists) {
   ASSERT_NE(foo_b->vardefs, nullptr);
 
   // Try to overwrite — should be no-op
-  JSVarDef *original_ptr = foo_b->vardefs;
+  JSBytecodeVarDef *original_ptr = foo_b->vardefs;
   const char *names[] = {"fake"};
   int32_t levels[] = {0};
   int32_t nexts[] = {-1};

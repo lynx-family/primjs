@@ -33,8 +33,7 @@ bool is_call_bc_index(int call_index);
 int get_npush(PrimjsOpcode opCode);
 int get_npop(PrimjsOpcode opCode);
 
-bool is_handler1_bc_index(int call_index);
-bool is_handler2_bc_index(int call_index);
+bool is_multi_table_opcode(PrimjsOpcode opcode);
 
 }  // namespace primjs
 

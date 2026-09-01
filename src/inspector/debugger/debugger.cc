@@ -302,7 +302,7 @@ int32_t GetFunctionVarDefScopeNext(LEPUSFunctionBytecode *b, uint32_t idx) {
 
 uint8_t GetFunctionVarDefFlags(LEPUSFunctionBytecode *b, uint32_t idx) {
   if (!b->vardefs || idx >= b->arg_count + b->var_count) return 0;
-  JSVarDef *vd = &b->vardefs[idx];
+  JSBytecodeVarDef *vd = &b->vardefs[idx];
   return (vd->var_kind & 0x0F) | ((vd->is_const & 1) << 4) |
          ((vd->is_lexical & 1) << 5) | ((vd->is_captured & 1) << 6);
 }
@@ -314,17 +314,23 @@ void SetFunctionVarDefs(LEPUSContext *ctx, LEPUSFunctionBytecode *b,
   if (b->vardefs) return;  // already has vardefs, no-op
   if (!var_names || count == 0 || count != b->arg_count + b->var_count) return;
 
-  JSVarDef *vardefs = static_cast<JSVarDef *>(
-      // JSVarDef contains only JSAtom (ref-counted integer) and scalar fields,
-      // no GC-traced pointer fields, so ALLOC_TAG_WITHOUT_PTR is correct.
-      lepus_mallocz(ctx, count * sizeof(JSVarDef), ALLOC_TAG_WITHOUT_PTR));
+  JSBytecodeVarDef *vardefs = static_cast<JSBytecodeVarDef *>(lepus_mallocz(
+      ctx, count * sizeof(JSBytecodeVarDef), ALLOC_TAG_WITHOUT_PTR));
   if (!vardefs) return;
 
   for (uint32_t i = 0; i < count; i++) {
     vardefs[i].var_name =
         var_names[i] ? LEPUS_NewAtom(ctx, var_names[i]) : JS_ATOM_NULL;
-    vardefs[i].scope_level = scope_levels ? scope_levels[i] : 0;
-    vardefs[i].scope_next = scope_nexts ? scope_nexts[i] : -1;
+    int32_t scope_level = scope_levels ? scope_levels[i] : 0;
+    int32_t scope_next = scope_nexts ? scope_nexts[i] : -1;
+    if (scope_level < 0 || scope_level > 0xffffff) {
+      for (uint32_t j = 0; j <= i; ++j)
+        LEPUS_FreeAtom(ctx, vardefs[j].var_name);
+      lepus_free(ctx, vardefs);
+      return;
+    }
+    vardefs[i].scope_level = static_cast<uint32_t>(scope_level);
+    vardefs[i].scope_next = scope_next;
     if (flags) {
       vardefs[i].var_kind = flags[i] & 0x0F;
       vardefs[i].is_const = (flags[i] >> 4) & 1;
