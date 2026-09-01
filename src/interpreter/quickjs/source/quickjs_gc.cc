@@ -7868,16 +7868,12 @@ QJS_STATIC inline __exception int js_poll_interrupts(LEPUSContext *ctx) {
   }
 }
 
-#ifdef ENABLE_PRIMJS_SNAPSHOT
-static void check_and_init_thread_stack_limit(LEPUSContext *ctx);
-#endif
-
 LEPUSValue JS_CallInternalTI_GC(LEPUSContext *caller_ctx, LEPUSValue func_obj,
                                 LEPUSValue this_obj, LEPUSValue new_target,
                                 int argc, LEPUSValue *argv, int flags) {
 #ifdef ENABLE_PRIMJS_SNAPSHOT
   if (caller_ctx->rt->use_primjs) {
-    check_and_init_thread_stack_limit(caller_ctx);
+    js_init_thread_stack_state(caller_ctx);
     return _call_stub_entry(this_obj, new_target, func_obj, caller_ctx, argc,
                             argv, flags);
   }
@@ -28185,28 +28181,9 @@ LEPUSValue prim_js_operator_delete_gc(LEPUSContext *ctx, LEPUSValue op1,
 #endif
 
 #ifdef ENABLE_PRIMJS_SNAPSHOT
-static void check_and_init_thread_stack_limit(LEPUSContext *ctx) {
-  static thread_local uint8_t *cur_stack_limit = nullptr;
-
-  if (UNLIKELY(ctx->stack_limit != cur_stack_limit)) {
-#ifdef ENABLE_VIRTUAL_STACK
-    VirtualStack::GetThreadLocalInstance().InitVirtualStack(ctx);
-    if (UNLIKELY(cur_stack_limit == nullptr)) {
-      cur_stack_limit = ctx->stack_limit;
-    }
-#else
-    if (UNLIKELY(cur_stack_limit == nullptr)) {
-      cur_stack_limit = (uint8_t *)get_thread_stack_limit();
-    }
-    ctx->stack_limit = cur_stack_limit;
-#endif
-  }
-}
-
 void PrimInit_GC(LEPUSContext *ctx) {
   ctx->dispatch_table = primjs_dispatch_table;
-  // use fake stack limit init
-  ctx->stack_limit = (uint8_t *)-1;
+  ctx->stack_state = nullptr;
 }
 
 #endif

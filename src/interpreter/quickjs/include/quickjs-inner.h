@@ -757,6 +757,14 @@ using PrimjsDispatchTableRow = address const[OP_COUNT];
 extern "C" QJS_HIDE PrimjsDispatchTableRow primjs_dispatch_table[];
 #endif
 
+#if defined(ENABLE_VIRTUAL_STACK) || defined(ENABLE_PRIMJS_SNAPSHOT)
+struct LEPUSStackState {
+  uint8_t *stack_limit;
+  uint8_t *stack_pos;
+  uint8_t *stack_top;
+};
+#endif
+
 struct LEPUSContext {
   // <primjs begin>
 #ifdef ENABLE_PRIMJS_SNAPSHOT
@@ -809,8 +817,7 @@ struct LEPUSContext {
   int64_t napi_env;
   BOOL no_lepus_strict_mode;
 #if defined(ENABLE_VIRTUAL_STACK) || defined(ENABLE_PRIMJS_SNAPSHOT)
-  uint8_t *stack_limit;
-  uint8_t *stack_pos;
+  LEPUSStackState *stack_state;
 #endif
 #ifdef ENABLE_QUICKJS_DEBUGGER
   LEPUSDebuggerInfo *debugger_info;  // structure for quickjs debugger
@@ -2048,10 +2055,11 @@ typedef struct JSToken {
 LEPUSValue js_dynamic_import(LEPUSContext *ctx, LEPUSValueConst specifier);
 #endif
 
-LEPUSValue *js_get_stack_gc(LEPUSContext *ctx, size_t alloca_size);
-LEPUSValue *js_get_virtual_sp(size_t alloc_size);
+void js_pop_virtual_sp(LEPUSContext *ctx, size_t size);
 
-void js_pop_virtual_sp(size_t size);
+#ifdef ENABLE_PRIMJS_SNAPSHOT
+void js_init_thread_stack_state(LEPUSContext *ctx);
+#endif
 
 LEPUSRuntime *LEPUS_NewRuntime2(const LEPUSMallocFunctions *mf, void *opaque,
                                 uint32_t mode);
@@ -3367,37 +3375,52 @@ class VirtualStack {
   }
 
   explicit VirtualStack() {
-    stack_limit_ = reinterpret_cast<uint8_t *>(
+    state_.stack_limit = reinterpret_cast<uint8_t *>(
         new uint64_t[kDefaultStackSize / sizeof(uint64_t)]);
-    stack_ = stack_limit_ + kDefaultStackSize;
+    state_.stack_top = state_.stack_limit + kDefaultStackSize;
+    state_.stack_pos = state_.stack_top;
   }
 
-  ~VirtualStack() { delete[] (reinterpret_cast<uint64_t *>(stack_limit_)); }
-
-  void InitVirtualStack(LEPUSContext *ctx) {
-    ctx->stack_limit = stack_limit_;
-    ctx->stack_pos = stack_;
+  ~VirtualStack() {
+    delete[] (reinterpret_cast<uint64_t *>(state_.stack_limit));
   }
 
-  uint8_t *PushVirtualSp(size_t stack_size) {
+  void InitVirtualStack(LEPUSContext *ctx) { AttachContext(ctx); }
+
+  uint8_t *PushVirtualSp(LEPUSContext *ctx, size_t stack_size) {
+    AttachContext(ctx);
     size_t alloc_size = alignment(stack_size);
-    if (stack_ - alloc_size < stack_limit_) {
+    size_t available_size =
+        static_cast<size_t>(state_.stack_pos - state_.stack_limit);
+    if (alloc_size > available_size) {
       // stack overflow
       return nullptr;
     }
-    return stack_ -= alloc_size;
+    state_.stack_pos -= alloc_size;
+    return state_.stack_pos;
   }
 
-  void PopVirtualSp(size_t stack_size) { stack_ += alignment(stack_size); }
+  void PopVirtualSp(LEPUSContext *ctx, size_t stack_size) {
+    AttachContext(ctx);
+    size_t alloc_size = alignment(stack_size);
+    size_t allocated_size =
+        static_cast<size_t>(state_.stack_top - state_.stack_pos);
+    if (alloc_size > allocated_size) {
+      DCHECK(false);
+      return;
+    }
+    state_.stack_pos += alloc_size;
+  }
 
  private:
+  void AttachContext(LEPUSContext *ctx) { ctx->stack_state = &state_; }
+
   size_t alignment(size_t stack_size) {
     return (stack_size + kAlignSize - 1) & ~(kAlignSize - 1);
   }
   static constexpr size_t kDefaultStackSize = 2 * 1024 * 1024;  // 2MB
   static constexpr size_t kAlignSize = 8;
-  uint8_t *stack_{nullptr};
-  uint8_t *stack_limit_{nullptr};
+  LEPUSStackState state_{};
 };
 
 #endif

@@ -27,7 +27,8 @@ call_native_entry_asm_h:                // @call_native_entry_asm_h
 	cmp	w3, w9
 	b.lt	.LBB0_31
 // %bb.2:                               // %B26
-	ldr	x9, [x24, #296]
+	ldr	x8, [x24, #296]
+	ldr	x9, [x8]
 	sub	x8, sp, #160
 	cmp	x8, x9
 	b.ls	.LBB0_29
@@ -240,7 +241,8 @@ call_native_asm_h:                      // @call_native_asm_h
 	cmp	w3, w9
 	b.lt	.LBB3_31
 // %bb.2:                               // %B26
-	ldr	x9, [x24, #296]
+	ldr	x8, [x24, #296]
+	ldr	x9, [x8]
 	sub	x8, sp, #160
 	cmp	x8, x9
 	b.ls	.LBB3_29
@@ -436,42 +438,43 @@ common_call_from_entry_asm_h:           // @common_call_from_entry_asm_h
 	cmp	w8, #13
 	b.ne	.LBB4_13
 // %bb.5:                               // %B1
-	ldr	x11, [x22, #32]
-	ldr	x14, [x24, #296]
+	ldr	x10, [x22, #32]
+	ldr	x11, [x24, #296]
 	mov	x12, x23
 	mov	x13, sp
-	ldrh	w9, [x11, #40]
-	ldrh	w8, [x11, #42]
-	ldrh	w10, [x11, #46]
+	ldrh	w9, [x10, #40]
+	ldrh	w8, [x10, #42]
+	ldrh	w15, [x10, #46]
+	ldr	x14, [x11]
 	cmp	w0, w9
-	add	w10, w8, w10
+	add	w11, w8, w15
 	b.lt	.LBB4_14
 // %bb.6:                               // %B28
-	add	w9, w10, w0
+	add	w9, w11, w0
 	lsl	w9, w9, #3
 	add	w9, w9, #160
-	and	w10, w9, #0x8
-	add	w9, w9, w10
+	and	w11, w9, #0x8
+	add	w9, w9, w11
 	sub	x9, x13, x9
 	cmp	x9, x14
 	b.ls	.LBB4_21
 // %bb.7:                               // %B30
 	mov	sp, x9
 	stp	x13, x30, [x9, #144]
-	add	x10, x9, #32
+	add	x11, x9, #32
 	mov	x23, x9
 	stp	x12, x22, [x9]
 	stp	x21, x27, [x9, #96]
 	ldr	x13, [x22, #40]
-	stp	x10, x10, [x9, #32]
+	stp	x11, x11, [x9, #32]
 	str	x13, [x9, #112]
 	mov	x26, x13
-	ldrb	w10, [x11, #5]
-	str	w10, [x9, #60]
-	ldr	x19, [x11, #8]
-	str	w0, [x9, #128]
-	ldr	x12, [x11, #48]
+	ldrb	w11, [x10, #5]
+	str	w11, [x9, #60]
 	add	x11, x9, #160
+	ldr	x19, [x10, #8]
+	str	w0, [x9, #128]
+	ldr	x12, [x10, #48]
 	add	x10, x11, w0, uxtw #3
 	str	x12, [x9, #120]
 	mov	x12, x11
@@ -510,37 +513,37 @@ common_call_from_entry_asm_h:           // @common_call_from_entry_asm_h
 .LBB4_13:                               // %B37
 	b	call_native_entry_asm_h
 .LBB4_14:                               // %B16
-	add	w10, w10, w9
-	lsl	w10, w10, #3
-	add	w10, w10, #160
-	and	w15, w10, #0x8
-	add	w10, w10, w15
-	sub	x10, x13, x10
-	cmp	x10, x14
+	add	w11, w11, w9
+	lsl	w11, w11, #3
+	add	w11, w11, #160
+	and	w15, w11, #0x8
+	add	w11, w11, w15
+	sub	x11, x13, x11
+	cmp	x11, x14
 	b.ls	.LBB4_21
 // %bb.15:                              // %B18
-	mov	sp, x10
-	stp	x13, x30, [x10, #144]
-	mov	x23, x10
-	stp	x12, x22, [x10]
-	add	x12, x10, #32
-	stp	x21, x27, [x10, #96]
+	mov	sp, x11
+	stp	x13, x30, [x11, #144]
+	mov	x23, x11
+	stp	x12, x22, [x11]
+	add	x12, x11, #32
+	stp	x21, x27, [x11, #96]
 	ldr	x13, [x22, #40]
-	stp	x12, x12, [x10, #32]
-	str	x13, [x10, #112]
+	stp	x12, x12, [x11, #32]
+	str	x13, [x11, #112]
 	mov	x26, x13
-	ldrb	w12, [x11, #5]
-	str	w12, [x10, #60]
-	ldr	x19, [x11, #8]
-	str	w0, [x10, #128]
-	ldr	x12, [x11, #48]
-	add	x11, x10, #160
-	str	x12, [x10, #120]
-	mov	x12, x11
+	ldrb	w12, [x10, #5]
+	str	w12, [x11, #60]
+	ldr	x19, [x10, #8]
+	str	w0, [x11, #128]
+	ldr	x12, [x10, #48]
+	add	x10, x11, #160
+	str	x12, [x11, #120]
+	mov	x12, x10
 	cmp	w0, w9
 	csel	w13, w0, w9, lt
-	add	x13, x11, w13, uxtw #3
-	cmp	x11, x13
+	add	x13, x10, w13, uxtw #3
+	cmp	x10, x13
 	b.ge	.LBB4_17
 .LBB4_16:                               // %B5
                                         // =>This Inner Loop Header: Depth=1
@@ -548,11 +551,11 @@ common_call_from_entry_asm_h:           // @common_call_from_entry_asm_h
 	str	x13, [x12], #8
 	cmp	w0, w9
 	csel	w13, w0, w9, lt
-	add	x13, x11, w13, uxtw #3
+	add	x13, x10, w13, uxtw #3
 	cmp	x12, x13
 	b.lt	.LBB4_16
 .LBB4_17:                               // %B9.preheader
-	add	x12, x11, x9, lsl #3
+	add	x12, x10, x9, lsl #3
 	mov	w14, #18                        // =0x12
 	cmp	x13, x12
 	b.ge	.LBB4_19
@@ -562,17 +565,17 @@ common_call_from_entry_asm_h:           // @common_call_from_entry_asm_h
 	cmp	x13, x12
 	b.lt	.LBB4_18
 .LBB4_19:                               // %B11
-	str	w9, [x10, #56]
+	str	w9, [x11, #56]
 	add	w9, w9, w8
 	add	x20, x12, x8, lsl #3
-	stp	x11, x12, [x10, #16]
+	stp	x10, x12, [x11, #16]
 	mov	w8, #18                         // =0x12
-	mov	x28, x11
-	str	xzr, [x10, #80]
+	mov	x28, x10
+	str	xzr, [x11, #80]
 	mov	x27, x12
-	str	w9, [x10, #88]
+	str	w9, [x11, #88]
 	ldr	x9, [x24, #8]
-	str	x10, [x9, #256]
+	str	x11, [x9, #256]
 	cmp	x12, x20
 	b.ge	.LBB4_2
 .LBB4_20:                               // %B14
@@ -686,42 +689,43 @@ common_call_asm_h:                      // @common_call_asm_h
 	cmp	w8, #13
 	b.ne	.LBB6_8
 // %bb.2:                               // %B1
-	ldr	x11, [x22, #32]
-	ldr	x14, [x24, #296]
+	ldr	x10, [x22, #32]
+	ldr	x11, [x24, #296]
 	mov	x12, x23
 	mov	x13, sp
-	ldrh	w9, [x11, #40]
-	ldrh	w8, [x11, #42]
-	ldrh	w10, [x11, #46]
+	ldrh	w9, [x10, #40]
+	ldrh	w8, [x10, #42]
+	ldrh	w15, [x10, #46]
+	ldr	x14, [x11]
 	cmp	w0, w9
-	add	w10, w8, w10
+	add	w11, w8, w15
 	b.lt	.LBB6_9
 // %bb.3:                               // %B24
-	lsl	w9, w10, #3
+	lsl	w9, w11, #3
 	add	w9, w9, #160
-	and	w10, w9, #0x8
-	add	w9, w9, w10
+	and	w11, w9, #0x8
+	add	w9, w9, w11
 	sub	x9, x13, x9
 	cmp	x9, x14
 	b.ls	.LBB6_17
 // %bb.4:                               // %B26
 	mov	sp, x9
 	stp	x13, x30, [x9, #144]
-	add	x10, x9, #32
+	add	x11, x9, #32
 	mov	x23, x9
 	stp	x12, x22, [x9]
 	mov	x28, x20
 	stp	x21, x27, [x9, #96]
 	ldr	x12, [x22, #40]
-	stp	x10, x10, [x9, #32]
+	stp	x11, x11, [x9, #32]
 	str	x12, [x9, #112]
 	mov	x26, x12
-	ldrb	w10, [x11, #5]
-	str	w10, [x9, #60]
-	ldr	x19, [x11, #8]
-	str	w0, [x9, #128]
-	ldr	x10, [x11, #48]
+	ldrb	w11, [x10, #5]
+	str	w11, [x9, #60]
 	add	w11, w0, w8
+	ldr	x19, [x10, #8]
+	str	w0, [x9, #128]
+	ldr	x10, [x10, #48]
 	str	w0, [x9, #56]
 	str	xzr, [x9, #80]
 	str	x10, [x9, #120]
@@ -750,37 +754,37 @@ common_call_asm_h:                      // @common_call_asm_h
 .LBB6_8:                                // %B28
 	b	call_native_asm_h
 .LBB6_9:                                // %B16
-	add	w10, w10, w9
-	lsl	w10, w10, #3
-	add	w10, w10, #160
-	and	w15, w10, #0x8
-	add	w10, w10, w15
-	sub	x10, x13, x10
-	cmp	x10, x14
+	add	w11, w11, w9
+	lsl	w11, w11, #3
+	add	w11, w11, #160
+	and	w15, w11, #0x8
+	add	w11, w11, w15
+	sub	x11, x13, x11
+	cmp	x11, x14
 	b.ls	.LBB6_17
 // %bb.10:                              // %B18
-	mov	sp, x10
-	stp	x13, x30, [x10, #144]
-	mov	x23, x10
-	stp	x12, x22, [x10]
-	add	x12, x10, #32
-	stp	x21, x27, [x10, #96]
+	mov	sp, x11
+	stp	x13, x30, [x11, #144]
+	mov	x23, x11
+	stp	x12, x22, [x11]
+	add	x12, x11, #32
+	stp	x21, x27, [x11, #96]
 	ldr	x13, [x22, #40]
-	stp	x12, x12, [x10, #32]
-	str	x13, [x10, #112]
+	stp	x12, x12, [x11, #32]
+	str	x13, [x11, #112]
 	mov	x26, x13
-	ldrb	w12, [x11, #5]
-	str	w12, [x10, #60]
-	ldr	x19, [x11, #8]
-	str	w0, [x10, #128]
-	ldr	x12, [x11, #48]
-	add	x11, x10, #160
-	str	x12, [x10, #120]
-	mov	x12, x11
+	ldrb	w12, [x10, #5]
+	str	w12, [x11, #60]
+	ldr	x19, [x10, #8]
+	str	w0, [x11, #128]
+	ldr	x12, [x10, #48]
+	add	x10, x11, #160
+	str	x12, [x11, #120]
+	mov	x12, x10
 	cmp	w0, w9
 	csel	w13, w0, w9, lt
-	add	x13, x11, w13, uxtw #3
-	cmp	x11, x13
+	add	x13, x10, w13, uxtw #3
+	cmp	x10, x13
 	b.ge	.LBB6_12
 .LBB6_11:                               // %B5
                                         // =>This Inner Loop Header: Depth=1
@@ -788,11 +792,11 @@ common_call_asm_h:                      // @common_call_asm_h
 	str	x13, [x12], #8
 	cmp	w0, w9
 	csel	w13, w0, w9, lt
-	add	x13, x11, w13, uxtw #3
+	add	x13, x10, w13, uxtw #3
 	cmp	x12, x13
 	b.lt	.LBB6_11
 .LBB6_12:                               // %B9.preheader
-	add	x12, x11, x9, lsl #3
+	add	x12, x10, x9, lsl #3
 	mov	w14, #18                        // =0x12
 	cmp	x13, x12
 	b.ge	.LBB6_14
@@ -802,17 +806,17 @@ common_call_asm_h:                      // @common_call_asm_h
 	cmp	x13, x12
 	b.lt	.LBB6_13
 .LBB6_14:                               // %B11
-	str	w9, [x10, #56]
+	str	w9, [x11, #56]
 	add	w9, w9, w8
 	add	x20, x12, x8, lsl #3
-	stp	x11, x12, [x10, #16]
+	stp	x10, x12, [x11, #16]
 	mov	w8, #18                         // =0x12
-	mov	x28, x11
-	str	xzr, [x10, #80]
+	mov	x28, x10
+	str	xzr, [x11, #80]
 	mov	x27, x12
-	str	w9, [x10, #88]
+	str	w9, [x11, #88]
 	ldr	x9, [x24, #8]
-	str	x10, [x9, #256]
+	str	x11, [x9, #256]
 	cmp	x12, x20
 	b.ge	.LBB6_16
 .LBB6_15:                               // %B14
@@ -909,7 +913,7 @@ common_return_asm_h:                    // @common_return_asm_h
 	ldr	x8, [x23, #80]
 	cbnz	x8, .LBB12_3
 // %bb.1:                               // %B1
-	ldrb	w8, [x24, #384]
+	ldrb	w8, [x24, #376]
 	cbz	w8, .LBB12_4
 // %bb.2:                               // %B1
 	cbz	x26, .LBB12_4
@@ -3074,7 +3078,7 @@ put_field_0_asm_h:                      // @put_field_0_asm_h
 	sub	w8, w8, #1
 	str	x21, [x9, w8, sxtw #3]
 .LBB88_15:                              // %B38
-	ldrb	w8, [x24, #384]
+	ldrb	w8, [x24, #376]
 	cbnz	w8, .LBB88_20
 .LBB88_16:                              // %B37
 	ldrb	w8, [x19, #4]
@@ -3428,7 +3432,7 @@ put_array_el_0_asm_h:                   // @put_array_el_0_asm_h
 // %bb.4:                               // %B3
 	ldr	x8, [x1, #40]
 	str	x21, [x8, w22, sxtw #3]
-	ldrb	w8, [x24, #384]
+	ldrb	w8, [x24, #376]
 	cbnz	w8, .LBB94_23
 .LBB94_5:                               // %B56
 	ldrb	w8, [x19], #1
@@ -3508,7 +3512,7 @@ put_array_el_0_asm_h:                   // @put_array_el_0_asm_h
 	ldr	x10, [x1, #40]
 	str	w9, [x1, #48]
 	str	x21, [x10, w8, sxtw #3]
-	ldrb	w8, [x24, #384]
+	ldrb	w8, [x24, #376]
 	cbz	w8, .LBB94_5
 .LBB94_23:                              // %B29
 	mov	x0, x21
@@ -4954,7 +4958,7 @@ make_loc_ref_0_asm_h:                   // @make_loc_ref_0_asm_h
 	cbz	x0, .LBB140_6
 // %bb.3:                               // %B9
 	str	x9, [x0]
-	ldrb	w8, [x24, #384]
+	ldrb	w8, [x24, #376]
 	cbnz	w8, .LBB140_7
 .LBB140_4:                              // %B13
 	ldr	w1, [x19]
@@ -5018,7 +5022,7 @@ make_arg_ref_0_asm_h:                   // @make_arg_ref_0_asm_h
 	cbz	x0, .LBB141_6
 // %bb.3:                               // %B9
 	str	x9, [x0]
-	ldrb	w8, [x24, #384]
+	ldrb	w8, [x24, #376]
 	cbnz	w8, .LBB141_7
 .LBB141_4:                              // %B13
 	ldr	w1, [x19]
@@ -5072,7 +5076,7 @@ make_var_ref_ref_0_asm_h:               // @make_var_ref_ref_0_asm_h
 	ldrh	w8, [x19, #4]
 	ldr	x8, [x26, x8, lsl #3]
 	str	x8, [x0]
-	ldrb	w9, [x24, #384]
+	ldrb	w9, [x24, #376]
 	cbnz	w9, .LBB142_6
 .LBB142_3:                              // %B9
 	ldr	w1, [x19]
@@ -11406,7 +11410,7 @@ put_field_1_asm_h:                      // @put_field_1_asm_h
 	sub	w8, w8, #1
 	str	x21, [x9, w8, sxtw #3]
 .LBB331_15:                             // %B38
-	ldrb	w8, [x24, #384]
+	ldrb	w8, [x24, #376]
 	cbnz	w8, .LBB331_20
 .LBB331_16:                             // %B37
 	ldrb	w8, [x19, #4]
@@ -11775,7 +11779,7 @@ put_array_el_1_asm_h:                   // @put_array_el_1_asm_h
 // %bb.4:                               // %B3
 	ldr	x8, [x1, #40]
 	str	x21, [x8, w22, sxtw #3]
-	ldrb	w8, [x24, #384]
+	ldrb	w8, [x24, #376]
 	cbnz	w8, .LBB337_23
 .LBB337_5:                              // %B56
 	ldrb	w8, [x19], #1
@@ -11857,7 +11861,7 @@ put_array_el_1_asm_h:                   // @put_array_el_1_asm_h
 	ldr	x10, [x1, #40]
 	str	w9, [x1, #48]
 	str	x21, [x10, w8, sxtw #3]
-	ldrb	w8, [x24, #384]
+	ldrb	w8, [x24, #376]
 	cbz	w8, .LBB337_5
 .LBB337_23:                             // %B29
 	mov	x0, x21
@@ -19051,7 +19055,7 @@ put_field_2_asm_h:                      // @put_field_2_asm_h
 	sub	w8, w8, #1
 	str	x21, [x9, w8, sxtw #3]
 .LBB574_15:                             // %B38
-	ldrb	w8, [x24, #384]
+	ldrb	w8, [x24, #376]
 	cbz	w8, .LBB574_18
 // %bb.16:                              // %B40
 	mov	x0, x21
@@ -19398,7 +19402,7 @@ put_array_el_2_asm_h:                   // @put_array_el_2_asm_h
 // %bb.4:                               // %B3
 	ldr	x8, [x1, #40]
 	str	x21, [x8, w22, sxtw #3]
-	ldrb	w8, [x24, #384]
+	ldrb	w8, [x24, #376]
 	cbnz	w8, .LBB580_23
 .LBB580_5:                              // %B56
 	ldrb	w8, [x19], #1
@@ -19480,7 +19484,7 @@ put_array_el_2_asm_h:                   // @put_array_el_2_asm_h
 	ldr	x10, [x1, #40]
 	str	w9, [x1, #48]
 	str	x21, [x10, w8, sxtw #3]
-	ldrb	w8, [x24, #384]
+	ldrb	w8, [x24, #376]
 	cbz	w8, .LBB580_5
 .LBB580_23:                             // %B29
 	mov	x0, x21

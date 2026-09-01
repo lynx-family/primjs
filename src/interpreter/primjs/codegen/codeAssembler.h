@@ -450,19 +450,28 @@ class CodeAssembler : public son::node::GraphBuilder {
     auto offset = AccessBuilder::list_next_offset();
     return LoadByteOffset(son::node::MachineType::kRawType, val, offset);
   }
-  son::node::Node* LoadJSStackLimit(son::node::Node* obj) {
-    auto offset = AccessBuilder::js_stack_limit_offset();
-    return LoadByteOffset(son::node::MachineType::kIntptr, obj, offset);
-  }
-
-  son::node::Node* LoadJSStack(son::node::Node* obj) {
-    auto offset = AccessBuilder::js_stack_offset();
+  son::node::Node* LoadJSStackState(son::node::Node* obj) {
+    auto offset = AccessBuilder::js_stack_state_offset();
     return LoadByteOffset(son::node::MachineType::kRawType, obj, offset);
   }
 
+  son::node::Node* LoadJSStackLimit(son::node::Node* obj) {
+    auto state = LoadJSStackState(obj);
+    auto offset = AccessBuilder::stack_state_limit_offset();
+    return LoadByteOffset(son::node::MachineType::kIntptr, state, offset);
+  }
+
+  son::node::Node* LoadJSStack(son::node::Node* obj) {
+    auto state = LoadJSStackState(obj);
+    auto offset = AccessBuilder::stack_state_pos_offset();
+    return LoadByteOffset(son::node::MachineType::kRawType, state, offset);
+  }
+
   void StoreJSStack(son::node::Node* obj, son::node::Node* new_stack) {
-    auto offset = AccessBuilder::js_stack_offset();
-    StoreByteOffset(son::node::MachineType::kRawType, obj, offset, new_stack);
+    auto state = LoadJSStackState(obj);
+    auto state_offset = AccessBuilder::stack_state_pos_offset();
+    StoreByteOffset(son::node::MachineType::kRawType, state, state_offset,
+                    new_stack);
   }
 
   son::node::Node* LoadLepusVal(son::node::Node* sp, son::node::Node* index) {

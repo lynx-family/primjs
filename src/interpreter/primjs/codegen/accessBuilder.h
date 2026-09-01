@@ -271,12 +271,16 @@ class AccessBuilder {
   static constexpr int list_next_offset() {
     return offsetof(struct list_head, next);
   }
-  static constexpr int js_stack_limit_offset() {
-    return offsetof(LEPUSContext, stack_limit);
+  static constexpr int js_stack_state_offset() {
+    return offsetof(LEPUSContext, stack_state);
   }
 
-  static constexpr int js_stack_offset() {
-    return offsetof(LEPUSContext, stack_pos);
+  static constexpr int stack_state_limit_offset() {
+    return offsetof(LEPUSStackState, stack_limit);
+  }
+
+  static constexpr int stack_state_pos_offset() {
+    return offsetof(LEPUSStackState, stack_pos);
   }
   static constexpr int con_mark_state_offset() {
     return offsetof(LEPUSContext, con_mark_state);
