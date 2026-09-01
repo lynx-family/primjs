@@ -110,6 +110,7 @@ class CallDescriptorData : public base::ZoneObject {
   MachineType _return_type;
   base::ZoneVector<MachineType> _machine_types;
   const char* _func_name;
+  bool _external_linkage{false};
 
  public:
   explicit CallDescriptorData(const CallDescriptor& desc,
@@ -144,6 +145,9 @@ class CallDescriptorData : public base::ZoneObject {
 
   void set_func_name(const char* name) { _func_name = name; }
   const char* func_name() const { return _func_name; }
+
+  void set_external_linkage() { _external_linkage = true; }
+  bool has_external_linkage() const { return _external_linkage; }
 };
 
 class CallDescriptors {

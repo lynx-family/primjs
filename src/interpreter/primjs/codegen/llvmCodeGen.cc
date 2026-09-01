@@ -103,8 +103,11 @@ LLVMValueRef LLVMModule::AddFunction(son::node::CallDescriptorData* desc) {
   if (desc->kind() == son::node::CallKind::kRuntime) {
     LLVMSetLinkage(function, LLVMExternalLinkage);
     LLVMSetFunctionCallConv(function, LLVMCCallConv);
-  } else {
+  } else if (desc->kind() == son::node::CallKind::kStub ||
+             desc->has_external_linkage()) {
     LLVMSetVisibility(function, LLVMHiddenVisibility);
+  } else {
+    LLVMSetLinkage(function, LLVMPrivateLinkage);
   }
   _functions[desc->descriptor()] = function;
   return function;
@@ -144,8 +147,19 @@ void LLVMCodeGen::GenerateDispatchTable() {
     std::vector<LLVMValueRef> handlers;
     handlers.reserve(opcode_count);
     for (int opcode = 0; opcode < opcode_count; ++opcode) {
-      handlers.push_back(make_handler_pointer(
-          son::node::CallDescriptors::CallBcHandler(kind, opcode)));
+      son::node::CallDescriptor desc;
+      if (table_index == 0 || !options().SupportMultiTable() ||
+          !options().ShareMultiTableFallback() ||
+          is_multi_table_opcode(static_cast<PrimjsOpcode>(opcode))) {
+        desc = son::node::CallDescriptors::CallBcHandler(kind, opcode);
+      } else {
+        CallBcIndex fallback = table_index == 1
+                                   ? CallBcIndex::kspill_table1_to_table0
+                                   : CallBcIndex::kspill_table2_to_table0;
+        desc = son::node::CallDescriptors::ExtCallBcHandler(
+            static_cast<int>(fallback));
+      }
+      handlers.push_back(make_handler_pointer(desc));
     }
     rows.push_back(LLVMConstArray2(handler_pointer_type, handlers.data(),
                                    handlers.size()));

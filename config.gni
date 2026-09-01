@@ -52,6 +52,9 @@ declare_args() {
   enable_gc_log = false
   enable_asan = false
 
+  # Use the non-NaN-boxed 16-byte LEPUSValue representation (for example MTE).
+  disable_nanbox = false
+
   # Enable force tracing gc
   enable_force_gc = false
 
@@ -84,3 +87,8 @@ if (!enable_compatible_mm) {
   enable_tracing_gc = false
   enable_primjs_trace = false
 }
+
+assert(
+    !(enable_primjs_snapshot && disable_nanbox),
+    "enable_primjs_snapshot requires the 8-byte LEPUSValue representation; " +
+        "disable_nanbox uses 16-byte LEPUSValue slots")

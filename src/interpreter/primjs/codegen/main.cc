@@ -49,6 +49,7 @@ static void PrintHelper() {
   printf("-h|--help Print available options\n");
   printf("-trace trace asm debug trace\n");
   printf("-multi-table support mutil-table opt\n");
+  printf("-share-multi-table-fallback share fallback handlers\n");
   printf("-virtual-sp support virtual sp\n");
   printf("-no-fast-path not support fast path\n");
 }
@@ -71,6 +72,8 @@ int main(int argc, char **argv) {
       options.SetFlag(son::CompilationOptions::Flag::kDebugTrace);
     } else if (arg == "-multi-table") {
       options.SetFlag(son::CompilationOptions::Flag::kSupportMutiTable);
+    } else if (arg == "-share-multi-table-fallback") {
+      options.SetFlag(son::CompilationOptions::Flag::kShareMultiTableFallback);
     } else if (arg == "-virtual-sp") {
       options.SetFlag(son::CompilationOptions::Flag::kSupportVirtualSp);
     } else if (arg == "-no-fast-path") {

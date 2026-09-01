@@ -56,6 +56,21 @@ void InterpreterSetup::InstallBcDescriptors(son::node::NodeGraph* graph) {
   graph->GetCallDescriptors()->InitCallBcHandler( \
       son::node::CallKind::kCallHandler, name_r.c_str(), i);
 #include "primjs/interp/interp.def"
+
+#ifdef ENABLE_QUICKJS_DEBUGGER
+  graph
+      ->GetCallDescriptor(son::node::CallDescriptors::ExtCallBcHandler(
+          static_cast<int>(CallBcIndex::kcommon_call_debugger0)))
+      ->set_external_linkage();
+  graph
+      ->GetCallDescriptor(son::node::CallDescriptors::ExtCallBcHandler(
+          static_cast<int>(CallBcIndex::kcommon_call_debugger1)))
+      ->set_external_linkage();
+  graph
+      ->GetCallDescriptor(son::node::CallDescriptors::ExtCallBcHandler(
+          static_cast<int>(CallBcIndex::kcommon_call_debugger2)))
+      ->set_external_linkage();
+#endif
 }
 
 void InterpreterSetup::GenerateBytecodeHandlers(LLVMCodeGen* codegen) {
@@ -83,11 +98,19 @@ void InterpreterSetup::GenerateBytecodeHandlers(LLVMCodeGen* codegen) {
   }
   kind = son::node::CallKind::kBcHandler1;
   for (int i = 0; i < size; i++) {
+    if (codegen->options().ShareMultiTableFallback() &&
+        !is_multi_table_opcode(static_cast<PrimjsOpcode>(i))) {
+      continue;
+    }
     auto desc = son::node::CallDescriptors::CallBcHandler(kind, i);
     GenerateCode(codegen, generator, desc);
   }
   kind = son::node::CallKind::kBcHandler2;
   for (int i = 0; i < size; i++) {
+    if (codegen->options().ShareMultiTableFallback() &&
+        !is_multi_table_opcode(static_cast<PrimjsOpcode>(i))) {
+      continue;
+    }
     auto desc = son::node::CallDescriptors::CallBcHandler(kind, i);
     GenerateCode(codegen, generator, desc);
   }

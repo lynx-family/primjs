@@ -9,12 +9,14 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+#include "quickjs/include/libregexp.h"
 #include "quickjs/include/quickjs-libc.h"
 #include "quickjs/include/quickjs.h"
 #ifdef __cplusplus
 }
 #endif
 #include "gc/trace-gc.h"
+#include "quickjs/include/bignum.h"
 #include "quickjs/include/quickjs-inner.h"
 
 #ifndef countof
@@ -514,6 +516,66 @@ TEST_F(CommonQjsTest, StructuredClone) {
   ASSERT_TRUE(!LEPUS_IsException(val));
 }
 
+TEST_F(CommonQjsTest, MapIteratorAfterTableRebuild) {
+  const char* filename = TEST_CASE_DIR "unit_test/map_iterator_rebuild.js";
+  LEPUSValue val;
+  ASSERT_TRUE(js_run(ctx_, filename, val));
+  if (LEPUS_IsException(val)) {
+    ADD_FAILURE() << js_get_exception_string(ctx_);
+  }
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, val);
+}
+
+TEST_F(CommonQjsTest, MapAndSetForEachSurviveGCOnTableRebuild) {
+  auto collect = LEPUS_NewCFunction(
+      ctx_,
+      [](LEPUSContext* ctx, LEPUSValue, int32_t, LEPUSValue*) {
+        LEPUS_RunGC(LEPUS_GetRuntime(ctx));
+        return LEPUS_UNDEFINED;
+      },
+      "collect", 0);
+  ASSERT_GE(LEPUS_SetPropertyStr(ctx_, ctx_->global_obj, "collect", collect),
+            0);
+  const char* source = R"(
+    for (const isSet of [false, true]) {
+      for (const mode of ['clear', 'grow', 'shrink']) {
+        const collection = isSet ? new Set() : new Map();
+        const add = key => isSet ? collection.add(key) : collection.set(key, key);
+        const initialSize = mode === 'shrink' ? 256 : 3;
+        for (let i = 0; i < initialSize; ++i) add(i);
+        const visited = [];
+        collection.forEach((value, key) => {
+          if (value !== key) throw new Error('unexpected value');
+          visited.push(key);
+          if (visited.length > 300) throw new Error('revisited entries');
+          if (key !== 0) return;
+          if (mode === 'shrink') {
+            for (let i = 1; i < 240; ++i) collection.delete(i);
+          } else {
+            if (mode === 'clear') collection.clear();
+            const start = mode === 'clear' ? 100 : 3;
+            for (let i = start; i < 200; ++i) add(i);
+          }
+          collect();
+          // Reuse reclaimed storage before forEach resumes its saved cursor.
+          const garbage = [];
+          for (let i = 0; i < 10000; ++i) garbage.push({x: i, y: 'x' + i});
+          collect();
+        });
+        const expected = mode === 'clear' ? [0] : [];
+        collection.forEach((value, key) => expected.push(key));
+        if (visited.join(',') !== expected.join(',')) {
+          throw new Error(mode + ': ' + visited.join(','));
+        }
+      }
+    }
+  )";
+  auto ret = LEPUS_Eval(ctx_, source, strlen(source), "map-foreach-gc.js",
+                        LEPUS_EVAL_TYPE_GLOBAL);
+  EXPECT_FALSE(LEPUS_IsException(ret)) << js_get_exception_string(ctx_);
+  if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, ret);
+}
+
 extern LEPUSValue js_dtoa(LEPUSContext* ctx, double d, int radix, int n_digits,
                           int flags);
 
@@ -739,6 +801,45 @@ TEST_F(CommonQjsTest, YieldInForOfHeadDoesNotUnderflowStack) {
   if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
 }
 
+TEST_F(CommonQjsTest, SetIteratorSkipsDeletedPrefix) {
+  std::string src = R"(
+    const values = new Set();
+    const count = 20000;
+    for (let index = 0; index < count; index++) {
+      values.add(index);
+    }
+
+    let checksum = 0;
+    while (values.size > 0) {
+      let value;
+      [value] = values;
+      checksum += value;
+      values.delete(value);
+    }
+    Assert(checksum === count * (count - 1) / 2);
+
+    const set = new Set(["a", "b"]);
+    const oldIterator = set.values();
+    Assert(oldIterator.next().value === "a");
+
+    set.delete("a");
+    Assert(set.values().next().value === "b");
+
+    set.clear();
+    set.add("c");
+    Assert(oldIterator.next().value === "c");
+
+    set.delete("c");
+    set.add("c");
+    Assert(set.values().next().value === "c");
+  )";
+
+  auto ret = LEPUS_Eval(ctx_, src.c_str(), src.length(), "test.js",
+                        LEPUS_EVAL_TYPE_GLOBAL);
+  ASSERT_TRUE(!LEPUS_IsException(ret));
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+}
+
 TEST_F(CommonQjsTest, js_op_dec_loc) {
   std::string src = R"(
     function test() {
@@ -777,8 +878,15 @@ TEST_F(CommonQjsTest, js_add_overflow) {
       const c = 2068185088;
       const d = a + b;
       const e = a - c;
+      const f = 100000 * 100000;
       Assert(d == -3831812432);
       Assert(e == -3831812432);
+      Assert(f === 10000000000);
+      Assert(1 / (-1 * 0) === -Infinity);
+
+      let local = 2147483647;
+      local += 1;
+      Assert(local === 2147483648);
 
 
       const a1 = 1256387435;
@@ -1283,6 +1391,257 @@ TEST_F(CommonQjsTest, TypedArrayLastIndexofOOB) {
   if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
 }
 
+TEST_F(CommonQjsTest, FastStringAndArrayBuiltins) {
+  const char* source = R"(
+    const text = "A\u4e2d\ud83d\ude00Z";
+    Assert(text[0] === "A");
+    Assert(text[1] === "\u4e2d");
+    Assert(text[2].charCodeAt(0) === 0xd83d);
+    Assert(text[3].charCodeAt(0) === 0xde00);
+    Assert(text[99] === undefined);
+
+    const numericKeyObject = { 1: "number", "01": "string" };
+    const numericKey = "1";
+    const paddedKey = "01";
+    Assert(numericKeyObject[numericKey] === "number");
+    Assert(numericKeyObject[paddedKey] === "string");
+
+    const wide = "plain\u4e2d\ud800\n\"\\tail";
+    Assert(JSON.stringify(wide) ===
+           "\"plain\u4e2d\\ud800\\n\\\"\\\\tail\"");
+    Assert(JSON.stringify({ value: wide }, null, " ") ===
+           "{\n \"value\": \"plain\u4e2d\\ud800\\n\\\"\\\\tail\"\n}");
+
+    const values = [1, 2, 3];
+    let seenInherited = false;
+    Array.prototype[1] = 42;
+    try {
+      values.every((value, index, array) => {
+        if (index === 0) delete array[1];
+        if (index === 1) seenInherited = value === 42;
+        return true;
+      });
+      Assert(seenInherited);
+    } finally {
+      delete Array.prototype[1];
+    }
+
+    Assert([1, 2, 3, 2].lastIndexOf(2) === 3);
+    Assert([1, 2, 3].reduce((sum, value) => sum + value, 0) === 6);
+    Assert([1, 2, 3].reduceRight((sum, value) => sum * 10 + value, 0) ===
+           321);
+  )";
+  auto ret = LEPUS_Eval(ctx_, source, strlen(source), "fast-builtins.js",
+                        LEPUS_EVAL_TYPE_GLOBAL);
+  ASSERT_FALSE(LEPUS_IsException(ret)) << js_get_exception_string(ctx_);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+}
+
+TEST_F(CommonQjsTest, DenseArraySliceFastPathSemantics) {
+  const char* source = R"(
+    const source = [0, 1, 2, 3, 4];
+    const sliced = source.slice(1, 4);
+    Assert(sliced.length === 3 && sliced.join(",") === "1,2,3");
+    Assert(sliced !== source);
+    sliced[0] = 99;
+    Assert(source[1] === 1);
+
+    let speciesCalls = 0;
+    class CustomArray extends Array {}
+    Object.defineProperty(source, "constructor", {
+      configurable: true,
+      value: {
+        [Symbol.species]: function(length) {
+          speciesCalls++;
+          const value = { length: length, custom: true };
+          return value;
+        }
+      }
+    });
+    const custom = source.slice(1, 3);
+    Assert(speciesCalls === 1 && custom.custom && custom.length === 2);
+    Assert(custom[0] === 1 && custom[1] === 2);
+
+    delete source.constructor;
+    const sparse = [0, , 2];
+    Array.prototype[1] = 7;
+    try {
+      const inherited = sparse.slice(0, 3);
+      Assert(inherited.length === 3 && inherited[1] === 7);
+      Assert(Object.prototype.hasOwnProperty.call(inherited, 1));
+    } finally {
+      delete Array.prototype[1];
+    }
+  )";
+  auto ret = LEPUS_Eval(ctx_, source, strlen(source), "array-slice.js",
+                        LEPUS_EVAL_TYPE_GLOBAL);
+  ASSERT_FALSE(LEPUS_IsException(ret)) << js_get_exception_string(ctx_);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+}
+
+TEST_F(CommonQjsTest, DynamicStringPropertyFastPathSemantics) {
+  const char* source = R"(
+    function read(object, key) {
+      return object[key];
+    }
+    function readAndKeepObject(object, key) {
+      return object[key] + (object.marker || 0);
+    }
+    function write(object, key, value) {
+      object[key] = value;
+      return object[key];
+    }
+
+    const object = { existing: 1, marker: 10 };
+    Assert(read(object, "existing") === 1);
+    Assert(readAndKeepObject(object, "existing") === 11);
+    Assert(write(object, "existing", 2) === 2);
+    Assert(write(object, "added", { payload: 3 }).payload === 3);
+    Assert(object.added.payload === 3);
+
+    const proto = { inherited: 4 };
+    const child = Object.create(proto);
+    Assert(write(child, "inherited", 5) === 5);
+    Assert(child.inherited === 5 && proto.inherited === 4);
+    Assert(Object.prototype.hasOwnProperty.call(child, "inherited"));
+
+    let setterReceiver;
+    let setterValue;
+    Object.defineProperty(proto, "throughSetter", {
+      set(value) {
+        setterReceiver = this;
+        setterValue = value;
+      }
+    });
+    Assert(write(child, "throughSetter", 6) === undefined);
+    Assert(setterReceiver === child && setterValue === 6);
+    Assert(!Object.prototype.hasOwnProperty.call(child, "throughSetter"));
+
+    let getterReceiver;
+    Object.defineProperty(proto, "throughGetter", {
+      get() {
+        getterReceiver = this;
+        return 7;
+      }
+    });
+    Assert(read(child, "throughGetter") === 7);
+    Assert(getterReceiver === child);
+
+    const proxiedTarget = { proxied: 8 };
+    let proxyGets = 0;
+    let proxySets = 0;
+    const proxy = new Proxy(proxiedTarget, {
+      get(target, key, receiver) {
+        proxyGets++;
+        return Reflect.get(target, key, receiver);
+      },
+      set(target, key, value, receiver) {
+        proxySets++;
+        return Reflect.set(target, key, value, receiver);
+      }
+    });
+    Assert(read(proxy, "proxied") === 8 && proxyGets === 1);
+    Assert(write(proxy, "proxied", 9) === 9 && proxySets === 1);
+
+    const numeric = { 1: "one", "01": "padded" };
+    Assert(read(numeric, "1") === "one");
+    Assert(read(numeric, "01") === "padded");
+    Assert(write(numeric, "1", "ONE") === "ONE");
+    Assert(write(numeric, "01", "PADDED") === "PADDED");
+
+    const nonExtensible = Object.preventExtensions({ existing: 10 });
+    Assert(write(nonExtensible, "existing", 11) === 11);
+    Assert(write(nonExtensible, "newProperty", 12) === undefined);
+    Assert(!Object.prototype.hasOwnProperty.call(nonExtensible, "newProperty"));
+
+    const frozen = Object.freeze({ locked: 13 });
+    Assert(write(frozen, "locked", 14) === 13);
+    Assert(frozen.locked === 13);
+
+    let strictFailed = false;
+    try {
+      (function(object, key) {
+        "use strict";
+        object[key] = 15;
+      })(frozen, "locked");
+    } catch (error) {
+      strictFailed = error instanceof TypeError;
+    }
+    Assert(strictFailed);
+  )";
+  auto ret = LEPUS_Eval(ctx_, source, strlen(source),
+                        "dynamic-string-property.js", LEPUS_EVAL_TYPE_GLOBAL);
+  ASSERT_FALSE(LEPUS_IsException(ret)) << js_get_exception_string(ctx_);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+}
+
+TEST_F(CommonQjsTest, DynamicStringReferenceFastPathSemantics) {
+  const char* source = R"(
+    function updateThroughReference(scope) {
+      with (scope) {
+        value += 2;
+        return value;
+      }
+    }
+
+    const direct = { value: 20 };
+    Assert(updateThroughReference(direct) === 22);
+    Assert(direct.value === 22);
+
+    const proto = { value: 30 };
+    const inherited = Object.create(proto);
+    Assert(updateThroughReference(inherited) === 32);
+    Assert(inherited.value === 32 && proto.value === 30);
+
+    let getterCalls = 0;
+    let setterCalls = 0;
+    let stored = 40;
+    const accessor = {};
+    Object.defineProperty(accessor, "value", {
+      get() {
+        getterCalls++;
+        return stored;
+      },
+      set(value) {
+        setterCalls++;
+        stored = value;
+      }
+    });
+    Assert(updateThroughReference(accessor) === 42);
+    Assert(stored === 42 && getterCalls === 2 && setterCalls === 1);
+
+    let proxyGets = 0;
+    let proxySets = 0;
+    const proxy = new Proxy({ value: 50 }, {
+      get(target, key, receiver) {
+        proxyGets++;
+        return Reflect.get(target, key, receiver);
+      },
+      set(target, key, value, receiver) {
+        proxySets++;
+        return Reflect.set(target, key, value, receiver);
+      }
+    });
+    Assert(updateThroughReference(proxy) === 52);
+    Assert(proxyGets >= 2 && proxySets === 1);
+
+    let strictReferenceError = false;
+    try {
+      (function() {
+        "use strict";
+        missingReference += 1;
+      })();
+    } catch (error) {
+      strictReferenceError = error instanceof ReferenceError;
+    }
+    Assert(strictReferenceError);
+  )";
+  auto ret = LEPUS_Eval(ctx_, source, strlen(source),
+                        "dynamic-string-reference.js", LEPUS_EVAL_TYPE_GLOBAL);
+  ASSERT_FALSE(LEPUS_IsException(ret)) << js_get_exception_string(ctx_);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+}
+
 TEST_F(CommonQjsTest, TypedArraySliceMemOverlap) {
   std::string src = R"(
     var ab = new Int8Array(20).buffer;
@@ -1697,6 +2056,576 @@ TEST_F(CommonQjsTest, TestClosureProp) {
   }
 }
 
+TEST_F(CommonQjsTest, ClosureExistingFrameCaptures) {
+  const char* source = R"(
+    function makeCaptures(first, second) {
+      let left = { value: first };
+      let right = { value: second };
+      const readLeft = () => left.value;
+      Assert(readLeft() === first);
+      const readRight = () => right.value;
+      const readFirst = () => first;
+      const readSecond = () => second;
+      const update = (value) => {
+        left.value = value;
+        right.value = value + 1;
+        first = value + 2;
+        second = value + 3;
+      };
+      const nested = () => () => right.value + first;
+      return { readLeft, readRight, readFirst, readSecond, update, nested };
+    }
+    var captures = [makeCaptures(10, 20), makeCaptures(30, 40)];
+    var nestedCapture = captures[0].nested();
+  )";
+  auto ret = LEPUS_Eval(ctx_, source, strlen(source), "closures.js",
+                        LEPUS_EVAL_TYPE_GLOBAL);
+  ASSERT_FALSE(LEPUS_IsException(ret));
+  if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, ret);
+  LEPUS_RunGC(rt_);
+
+  const char* verify = R"(
+    Assert(captures[0].readLeft() === 10);
+    Assert(captures[0].readRight() === 20);
+    Assert(captures[0].readFirst() === 10);
+    Assert(captures[0].readSecond() === 20);
+    captures[0].update(50);
+    Assert(captures[0].readLeft() === 50);
+    Assert(captures[0].readRight() === 51);
+    Assert(captures[0].readFirst() === 52);
+    Assert(captures[0].readSecond() === 53);
+    Assert(nestedCapture() === 103);
+    Assert(captures[1].readLeft() === 30);
+    Assert(captures[1].readRight() === 40);
+    Assert(captures[1].readFirst() === 30);
+    Assert(captures[1].readSecond() === 40);
+  )";
+  ret = LEPUS_Eval(ctx_, verify, strlen(verify), "closures-verify.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  ASSERT_FALSE(LEPUS_IsException(ret));
+  if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, ret);
+}
+
+TEST_F(CommonQjsTest, ClosureSnapshotPropertiesAndScopes) {
+  const char* source = R"(
+    var scopedClosures = [];
+    let globalFirst = 10;
+    let globalSecond = 20;
+    var readGlobalFirst = () => globalFirst;
+    var readGlobalSecond = () => globalSecond;
+    (function(first, second) {
+      const args = arguments;
+      const readFirst = () => first;
+      const readSecond = () => second;
+      args[0] = 7;
+      args[1] = 8;
+      Assert(readFirst() === 7 && readSecond() === 8);
+      let captured = 9;
+      const arrow = () => captured;
+      const ctor = function Captured(value, optional = 1) {
+        this.value = captured + value + optional;
+      };
+      Assert(ctor.name === 'Captured' && ctor.length === 1);
+      Assert(Object.getOwnPropertyNames(ctor).join(',') === 'length,name,prototype');
+      const name = Object.getOwnPropertyDescriptor(ctor, 'name');
+      const length = Object.getOwnPropertyDescriptor(ctor, 'length');
+      Assert(name.configurable && !name.enumerable && !name.writable);
+      Assert(length.configurable && !length.enumerable && !length.writable);
+      const prototype = Object.getOwnPropertyDescriptor(ctor, 'prototype');
+      Assert(prototype.writable && !prototype.configurable && !prototype.enumerable);
+      Assert(ctor.prototype.constructor === ctor);
+      Assert(new ctor(2).value === 12);
+      Assert(!Object.prototype.hasOwnProperty.call(arrow, 'prototype'));
+      ctor.prototype.extra = 3;
+      Assert(new ctor(0).extra === 3);
+      for (let i = 0; i < 64; ++i) {
+        let value = { n: i };
+        scopedClosures.push(() => value.n + i);
+      }
+      let early = () => uninitialized;
+      let threw = false;
+      try { early(); } catch (e) { threw = e instanceof ReferenceError; }
+      Assert(threw);
+      let uninitialized = 42;
+      Assert(early() === 42);
+    })(1, 2);
+    globalFirst = 11;
+    globalSecond = 21;
+    Assert(readGlobalFirst() === 11 && readGlobalSecond() === 21);
+    for (let i = 0; i < scopedClosures.length; ++i) {
+      Assert(scopedClosures[i]() === 2 * i);
+    }
+  )";
+  auto bytecode =
+      LEPUS_Eval(ctx_, source, strlen(source), "closures-snapshot.js",
+                 LEPUS_EVAL_TYPE_GLOBAL | LEPUS_EVAL_FLAG_COMPILE_ONLY);
+  ASSERT_FALSE(LEPUS_IsException(bytecode));
+  HandleScope scope(ctx_, &bytecode, HANDLE_TYPE_LEPUS_VALUE);
+  size_t size;
+  auto* snapshot =
+      LEPUS_WriteObject(ctx_, &size, bytecode, LEPUS_WRITE_OBJ_BYTECODE);
+  ASSERT_NE(snapshot, nullptr);
+  scope.PushHandle(&snapshot, HANDLE_TYPE_HEAP_OBJ);
+  auto loaded = LEPUS_ReadObject(ctx_, snapshot, size, LEPUS_READ_OBJ_BYTECODE);
+  ASSERT_FALSE(LEPUS_IsException(loaded));
+  scope.PushHandle(&loaded, HANDLE_TYPE_LEPUS_VALUE);
+  auto ret = LEPUS_EvalFunction(ctx_, loaded, ctx_->global_obj);
+  ASSERT_FALSE(LEPUS_IsException(ret));
+  if (!ctx_->gc_enable) {
+    LEPUS_FreeValue(ctx_, bytecode);
+    LEPUS_FreeValue(ctx_, ret);
+    lepus_free(ctx_, snapshot);
+  }
+}
+
+TEST_F(CommonQjsTest, GlobalClosureReferencesPreservePropertySemantics) {
+  const char* source = R"(
+    globalThis.dynamicData = 1;
+    function readDynamicData() { return dynamicData; }
+    function writeDynamicData(value) { dynamicData = value; }
+    Assert(readDynamicData() === 1);
+    globalThis.dynamicData = 2;
+    Assert(readDynamicData() === 2);
+    writeDynamicData(3);
+    Assert(globalThis.dynamicData === 3);
+
+    Assert(delete globalThis.dynamicData);
+    let deletedReadFailed = false;
+    try { readDynamicData(); } catch (e) {
+      deletedReadFailed = e instanceof ReferenceError;
+    }
+    Assert(deletedReadFailed);
+    globalThis.dynamicData = 4;
+    Assert(readDynamicData() === 4);
+
+    let accessorValue = 10;
+    Object.defineProperty(globalThis, "dynamicData", {
+      configurable: true,
+      enumerable: true,
+      get() { return accessorValue; },
+      set(value) { accessorValue = value + 1; },
+    });
+    Assert(readDynamicData() === 10);
+    writeDynamicData(20);
+    Assert(accessorValue === 21);
+    Object.defineProperty(globalThis, "dynamicData", {
+      configurable: true, enumerable: true, writable: true, value: 30,
+    });
+    Assert(readDynamicData() === 30);
+
+    Object.defineProperty(globalThis, "readOnlyGlobal", {
+      configurable: true, writable: true, value: 50,
+    });
+    function strictWriteReadOnly() {
+      "use strict";
+      readOnlyGlobal = 51;
+    }
+    Object.defineProperty(globalThis, "readOnlyGlobal", { writable: false });
+    let readOnlyWriteFailed = false;
+    try { strictWriteReadOnly(); } catch (e) {
+      readOnlyWriteFailed = e instanceof TypeError;
+    }
+    Assert(readOnlyWriteFailed);
+    Assert(readOnlyGlobal === 50);
+    Object.defineProperty(globalThis, "readOnlyGlobal", { writable: true });
+    strictWriteReadOnly();
+    Assert(readOnlyGlobal === 51);
+
+    let lexicalValue = 60;
+    const lexicalConst = 61;
+    function readLexicals() { return lexicalValue + lexicalConst; }
+    Assert(readLexicals() === 121);
+    [lexicalValue] = [62];
+    Assert(readLexicals() === 123);
+    let constWriteFailed = false;
+    try { lexicalConst = 0; } catch (e) {
+      constWriteFailed = e instanceof TypeError;
+    }
+    Assert(constWriteFailed);
+    function directEval() {
+      let local = 70;
+      return eval("local + lexicalValue");
+    }
+    Assert(directEval() === 132);
+
+    let proxyGets = 0;
+    const proxyScope = new Proxy({ scopedValue: 90 }, {
+      has(target, key) { return key === "scopedValue"; },
+      get(target, key) { proxyGets++; return target[key]; },
+    });
+    function readThroughWith() {
+      with (proxyScope) { return scopedValue; }
+    }
+    Assert(readThroughWith() === 90 && proxyGets > 0);
+
+    (0, eval)("var evalVar = 80; function evalFn() { return evalVar; }");
+    Assert(evalFn() === 80);
+    Assert(delete globalThis.evalVar);
+    let evalReadFailed = false;
+    try { evalFn(); } catch (e) { evalReadFailed = e instanceof ReferenceError; }
+    Assert(evalReadFailed);
+
+    Object.defineProperty(globalThis, "evalFunctionTarget", {
+      configurable: true, get() { return 0; },
+    });
+    (0, eval)("function evalFunctionTarget() { return 91; }");
+    Assert(evalFunctionTarget() === 91);
+
+    globalThis.shadowedGlobal = 100;
+    function readPropertyBinding() { return shadowedGlobal; }
+    (0, eval)(
+        "let shadowedGlobal = 200; " +
+        "globalThis.readLexicalBinding = () => shadowedGlobal;");
+    Assert(readPropertyBinding() === 100);
+    Assert(readLexicalBinding() === 200);
+    globalThis.shadowedGlobal = 101;
+    Assert(readPropertyBinding() === 101);
+    Assert(readLexicalBinding() === 200);
+  )";
+  auto ret = LEPUS_Eval(ctx_, source, strlen(source), "global-refs.js",
+                        LEPUS_EVAL_TYPE_GLOBAL);
+  ASSERT_FALSE(LEPUS_IsException(ret)) << js_get_exception_string(ctx_);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+  LEPUS_RunGC(rt_);
+  constexpr char kVerify[] = R"(
+    Assert(readDynamicData() === 30);
+    Assert(readLexicals() === 123);
+    Assert(evalFunctionTarget() === 91);
+    Assert(readPropertyBinding() === 101);
+    Assert(readLexicalBinding() === 200);
+  )";
+  ret = LEPUS_Eval(ctx_, kVerify, strlen(kVerify), "global-refs-after-gc.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  ASSERT_FALSE(LEPUS_IsException(ret)) << js_get_exception_string(ctx_);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+}
+
+TEST_F(CommonQjsTest, StrippedGlobalClosureReferencesRetainBindingNames) {
+  constexpr char kSource[] = R"(
+    function StrippedGlobal(value) { this.value = value; }
+    StrippedGlobal.prototype.read = function() { return this.value; };
+    Assert(new StrippedGlobal(42).read() === 42);
+
+    let strictAssignmentFailed = false;
+    try {
+      (function() {
+        "use strict";
+        StrippedCreatedDuringRhs =
+            (globalThis.StrippedCreatedDuringRhs = 1);
+      })();
+    } catch (error) {
+      strictAssignmentFailed = error instanceof ReferenceError;
+    }
+    Assert(strictAssignmentFailed);
+    delete globalThis.StrippedCreatedDuringRhs;
+
+    Object.defineProperty(globalThis, "StrippedDeletedBeforePut", {
+      configurable: true,
+      get() {
+        delete globalThis.StrippedDeletedBeforePut;
+        return 2;
+      },
+    });
+    let strictCompoundAssignmentFailed = false;
+    try {
+      (function() {
+        "use strict";
+        StrippedDeletedBeforePut ^= 3;
+      })();
+    } catch (error) {
+      strictCompoundAssignmentFailed = error instanceof ReferenceError;
+    }
+    Assert(strictCompoundAssignmentFailed);
+
+    function directEvalKeepsDynamicScope() {
+      let directEvalLexical;
+      try {
+        eval("var directEvalLexical;");
+      } catch (error) {
+        return error instanceof SyntaxError;
+      }
+      return false;
+    }
+    Assert(directEvalKeepsDynamicScope());
+
+    let indirectEvalLexical;
+    let indirectEvalFailed = false;
+    try {
+      (0, eval)("var indirectEvalLexical;");
+    } catch (error) {
+      indirectEvalFailed = error instanceof SyntaxError;
+    }
+    Assert(indirectEvalFailed);
+  )";
+  auto ret = LEPUS_Eval(ctx_, kSource, strlen(kSource), "stripped-global.js",
+                        LEPUS_EVAL_TYPE_GLOBAL | LEPUS_EVAL_FLAG_STRIP);
+  ASSERT_FALSE(LEPUS_IsException(ret)) << js_get_exception_string(ctx_);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+  constexpr char kLexicalDeclaration[] = "let StrippedLexical;";
+  ret = LEPUS_Eval(ctx_, kLexicalDeclaration, strlen(kLexicalDeclaration),
+                   "stripped-global-lexical.js",
+                   LEPUS_EVAL_TYPE_GLOBAL | LEPUS_EVAL_FLAG_STRIP);
+  ASSERT_FALSE(LEPUS_IsException(ret)) << js_get_exception_string(ctx_);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+  ret = LEPUS_Eval(ctx_, kLexicalDeclaration, strlen(kLexicalDeclaration),
+                   "stripped-global-lexical-redeclaration.js",
+                   LEPUS_EVAL_TYPE_GLOBAL | LEPUS_EVAL_FLAG_STRIP);
+  ASSERT_TRUE(LEPUS_IsException(ret));
+  EXPECT_EQ(js_get_exception_string(ctx_).find("SyntaxError: redeclaration"),
+            0);
+}
+
+TEST_F(CommonQjsTest, GlobalClosureReferencesStayOutOfSnapshots) {
+  const char* runtime_source =
+      "function runtimeGlobalRead() { return Math; } runtimeGlobalRead;";
+  auto runtime_function =
+      LEPUS_Eval(ctx_, runtime_source, strlen(runtime_source),
+                 "runtime-global-ref.js", LEPUS_EVAL_TYPE_GLOBAL);
+  ASSERT_FALSE(LEPUS_IsException(runtime_function));
+  HandleScope scope(ctx_);
+  scope.PushHandle(&runtime_function, HANDLE_TYPE_LEPUS_VALUE);
+  size_t runtime_size = 0;
+  auto* runtime_snapshot = LEPUS_WriteObject(
+      ctx_, &runtime_size, runtime_function, LEPUS_WRITE_OBJ_BYTECODE);
+  ASSERT_EQ(runtime_snapshot, nullptr);
+  auto exception = LEPUS_GetException(ctx_);
+  scope.PushHandle(&exception, HANDLE_TYPE_LEPUS_VALUE);
+  ASSERT_TRUE(LEPUS_IsError(ctx_, exception));
+
+  const char* snapshot_source = R"(
+    let snapshotGlobal = 41;
+    function snapshotRead() { return snapshotGlobal + 1; }
+    Assert(snapshotRead() === 42);
+  )";
+  auto bytecode = LEPUS_Eval(
+      ctx_, snapshot_source, strlen(snapshot_source), "snapshot-global.js",
+      LEPUS_EVAL_TYPE_GLOBAL | LEPUS_EVAL_FLAG_COMPILE_ONLY);
+  ASSERT_FALSE(LEPUS_IsException(bytecode));
+  scope.PushHandle(&bytecode, HANDLE_TYPE_LEPUS_VALUE);
+  size_t snapshot_size = 0;
+  auto* snapshot = LEPUS_WriteObject(ctx_, &snapshot_size, bytecode,
+                                     LEPUS_WRITE_OBJ_BYTECODE);
+  ASSERT_NE(snapshot, nullptr);
+  scope.PushHandle(&snapshot, HANDLE_TYPE_HEAP_OBJ);
+  auto loaded =
+      LEPUS_ReadObject(ctx_, snapshot, snapshot_size, LEPUS_READ_OBJ_BYTECODE);
+  ASSERT_FALSE(LEPUS_IsException(loaded));
+  scope.PushHandle(&loaded, HANDLE_TYPE_LEPUS_VALUE);
+  auto ret = LEPUS_EvalFunction(ctx_, loaded, ctx_->global_obj);
+  ASSERT_FALSE(LEPUS_IsException(ret)) << js_get_exception_string(ctx_);
+  if (!ctx_->rt->gc_enable) {
+    LEPUS_FreeValue(ctx_, runtime_function);
+    LEPUS_FreeValue(ctx_, exception);
+    LEPUS_FreeValue(ctx_, bytecode);
+    LEPUS_FreeValue(ctx_, ret);
+    lepus_free(ctx_, snapshot);
+  }
+}
+
+TEST_F(CommonQjsTest, ClosureExistingFrameSurvivesGC) {
+  auto collect = LEPUS_NewCFunction(
+      ctx_,
+      [](LEPUSContext* ctx, LEPUSValue, int32_t, LEPUSValue*) {
+        LEPUS_RunGC(LEPUS_GetRuntime(ctx));
+        return LEPUS_UNDEFINED;
+      },
+      "collect", 0);
+  ASSERT_GE(LEPUS_SetPropertyStr(ctx_, ctx_->global_obj, "collect", collect),
+            0);
+  const char* source = R"(
+    var retainedClosures = [];
+    function captureAcrossGC(first, second) {
+      let left = { value: first };
+      let right = { value: second };
+      const readLeft = () => left.value;
+      if (first % 16 === 0) collect();
+      const readRight = () => right.value;
+      const readSecond = () => second;
+      retainedClosures.push([readLeft, readRight, readSecond]);
+      if (first % 16 === 0) collect();
+      Assert(readLeft() === first && readRight() === second);
+      Assert(readSecond() === second);
+    }
+    for (let i = 0; i < 512; ++i) captureAcrossGC(i, i + 1);
+    collect();
+    for (let i = 0; i < retainedClosures.length; ++i) {
+      Assert(retainedClosures[i][0]() === i);
+      Assert(retainedClosures[i][1]() === i + 1);
+      Assert(retainedClosures[i][2]() === i + 1);
+    }
+  )";
+  auto ret = LEPUS_Eval(ctx_, source, strlen(source), "closures-gc.js",
+                        LEPUS_EVAL_TYPE_GLOBAL);
+  ASSERT_FALSE(LEPUS_IsException(ret));
+  if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, ret);
+}
+
+TEST_F(CommonQjsTest, ClosurePrototypeDescriptorSharing) {
+  const char* source = R"(
+    function makeConstructor(value) {
+      return function Constructor() { this.value = value; };
+    }
+    var firstConstructor = makeConstructor(1);
+    var secondConstructor = makeConstructor(2);
+    var replacedConstructor = makeConstructor(3);
+    var frozenConstructor = makeConstructor(4);
+  )";
+  auto ret = LEPUS_Eval(ctx_, source, strlen(source), "prototype-sharing.js",
+                        LEPUS_EVAL_TYPE_GLOBAL);
+  ASSERT_FALSE(LEPUS_IsException(ret));
+  if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, ret);
+  if (ctx_->gc_enable) {
+    auto first =
+        LEPUS_GetPropertyStr(ctx_, ctx_->global_obj, "firstConstructor");
+    HandleScope scope(ctx_, &first, HANDLE_TYPE_LEPUS_VALUE);
+    auto second =
+        LEPUS_GetPropertyStr(ctx_, ctx_->global_obj, "secondConstructor");
+    auto* first_obj = LEPUS_VALUE_GET_OBJ(first);
+    auto* second_obj = LEPUS_VALUE_GET_OBJ(second);
+    ASSERT_EQ(get_shape_prop(first_obj->shape)[2].flags & LEPUS_PROP_TMASK,
+              LEPUS_PROP_AUTOINIT);
+    ASSERT_EQ(get_shape_prop(second_obj->shape)[2].flags & LEPUS_PROP_TMASK,
+              LEPUS_PROP_AUTOINIT);
+    EXPECT_EQ(js_property_gc_get_autoinit(&first_obj->gc_prop[2]),
+              ctx_->function_proto_autoinit);
+    EXPECT_EQ(js_property_gc_get_autoinit(&second_obj->gc_prop[2]),
+              ctx_->function_proto_autoinit);
+  }
+  LEPUS_RunGC(rt_);
+  const char* verify = R"(
+    Assert(firstConstructor !== secondConstructor);
+    Assert(firstConstructor.prototype !== secondConstructor.prototype);
+    Assert(firstConstructor.prototype.constructor === firstConstructor);
+    Assert(secondConstructor.prototype.constructor === secondConstructor);
+    firstConstructor.prototype.onlyFirst = 9;
+    Assert(secondConstructor.prototype.onlyFirst === undefined);
+    Assert(new firstConstructor().value === 1);
+    Assert(new secondConstructor().value === 2);
+    const replacement = { replacement: true };
+    replacedConstructor.prototype = replacement;
+    Assert(Object.getPrototypeOf(new replacedConstructor()) === replacement);
+    Assert(secondConstructor.prototype.replacement === undefined);
+    Object.freeze(frozenConstructor);
+    Assert(new frozenConstructor().value === 4);
+    Assert(frozenConstructor.prototype.constructor === frozenConstructor);
+    Assert(!Object.getOwnPropertyDescriptor(frozenConstructor, 'prototype').writable);
+    const descriptor = Object.getOwnPropertyDescriptor(secondConstructor, 'prototype');
+    Assert(descriptor.writable && !descriptor.configurable && !descriptor.enumerable);
+  )";
+  ret = LEPUS_Eval(ctx_, verify, strlen(verify), "prototype-sharing-verify.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  ASSERT_FALSE(LEPUS_IsException(ret));
+  if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, ret);
+}
+
+TEST_F(CommonQjsTest, ClosurePrototypeDescriptorSlowPath) {
+#ifdef ENABLE_COMPATIBLE_MM
+  if (!ctx_->gc_enable) GTEST_SKIP();
+  const char* source = "(function SlowConstructor() {})";
+  auto original = LEPUS_Eval(ctx_, source, strlen(source), "slow-prototype.js",
+                             LEPUS_EVAL_TYPE_GLOBAL);
+  ASSERT_FALSE(LEPUS_IsException(original));
+  HandleScope scope(ctx_, &original, HANDLE_TYPE_LEPUS_VALUE);
+  auto* bytecode = LEPUS_VALUE_GET_OBJ(original)->u.func.function_bytecode;
+  auto function = js_closure_gc_slowpath(ctx_, bytecode, nullptr, nullptr);
+  ASSERT_FALSE(LEPUS_IsException(function));
+  scope.PushHandle(&function, HANDLE_TYPE_LEPUS_VALUE);
+  EXPECT_EQ(
+      js_property_gc_get_autoinit(&LEPUS_VALUE_GET_OBJ(function)->gc_prop[2]),
+      ctx_->function_proto_autoinit);
+  LEPUS_RunGC(rt_);
+  auto prototype = LEPUS_GetProperty(ctx_, function, JS_ATOM_prototype);
+  ASSERT_FALSE(LEPUS_IsException(prototype));
+  scope.PushHandle(&prototype, HANDLE_TYPE_LEPUS_VALUE);
+  auto constructor = LEPUS_GetProperty(ctx_, prototype, JS_ATOM_constructor);
+  ASSERT_FALSE(LEPUS_IsException(constructor));
+  EXPECT_EQ(LEPUS_VALUE_GET_OBJ(constructor), LEPUS_VALUE_GET_OBJ(function));
+#endif
+}
+
+TEST_F(CommonQjsTest, ClosurePrototypeDescriptorRootedAcrossContexts) {
+  for (int i = 0; i < 3; ++i) {
+    SCOPED_TRACE(i);
+    LEPUS_RunGC(rt_);
+    const char* source = R"(
+      (function() {
+        const first = function First() {};
+        const second = function Second() {};
+        if (first.prototype === second.prototype) throw new Error('shared prototype');
+        if (first.prototype.constructor !== first) throw new Error('first constructor');
+        if (second.prototype.constructor !== second) throw new Error('second constructor');
+        return true;
+      })()
+    )";
+    auto ret = LEPUS_Eval(ctx_, source, strlen(source), "prototype-gc.js",
+                          LEPUS_EVAL_TYPE_GLOBAL);
+    ASSERT_FALSE(LEPUS_IsException(ret));
+    ASSERT_EQ(LEPUS_ToBool(ctx_, ret), 1);
+    if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, ret);
+
+    auto* other = LEPUS_NewContext(rt_);
+    ASSERT_NE(other, nullptr);
+    if (ctx_->gc_enable) {
+      EXPECT_NE(ctx_->function_proto_autoinit, other->function_proto_autoinit);
+    }
+    LEPUS_RunGC(rt_);
+    ret = LEPUS_Eval(other, source, strlen(source), "other-prototype-gc.js",
+                     LEPUS_EVAL_TYPE_GLOBAL);
+    EXPECT_FALSE(LEPUS_IsException(ret));
+    if (!LEPUS_IsException(ret)) EXPECT_EQ(LEPUS_ToBool(other, ret), 1);
+    if (!other->gc_enable) LEPUS_FreeValue(other, ret);
+    LEPUS_FreeContext(other);
+  }
+}
+
+TEST_F(CommonQjsTest, ClosureAsyncFrameCaptures) {
+  const char* source = R"(
+    var asyncCaptures;
+    var asyncFinished = false;
+    var asyncFailure;
+    async function makeAsyncCaptures(first, second) {
+      let left = { value: first };
+      let right = { value: second };
+      const readLeft = () => left.value;
+      const readRight = () => right.value;
+      const readSecond = () => second;
+      await Promise.resolve();
+      const write = (value) => { right.value = value; second = value + 1; };
+      return { readLeft, readRight, readSecond, write };
+    }
+    makeAsyncCaptures(10, 20).then(value => {
+      asyncCaptures = value;
+      asyncFinished = true;
+    }, error => { asyncFailure = error; });
+  )";
+  auto ret = LEPUS_Eval(ctx_, source, strlen(source), "closures-async.js",
+                        LEPUS_EVAL_TYPE_GLOBAL);
+  ASSERT_FALSE(LEPUS_IsException(ret));
+  if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, ret);
+  LEPUS_RunGC(rt_);
+  LEPUSContext* job_ctx;
+  int result;
+  while ((result = LEPUS_ExecutePendingJob(rt_, &job_ctx)) > 0) {
+    LEPUS_RunGC(rt_);
+  }
+  ASSERT_EQ(result, 0);
+  LEPUS_RunGC(rt_);
+  const char* verify = R"(
+    Assert(asyncFinished && asyncFailure === undefined);
+    Assert(asyncCaptures.readLeft() === 10);
+    Assert(asyncCaptures.readRight() === 20);
+    Assert(asyncCaptures.readSecond() === 20);
+    asyncCaptures.write(30);
+    Assert(asyncCaptures.readRight() === 30);
+    Assert(asyncCaptures.readSecond() === 31);
+  )";
+  ret = LEPUS_Eval(ctx_, verify, strlen(verify), "closures-async-verify.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  ASSERT_FALSE(LEPUS_IsException(ret));
+  if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, ret);
+}
+
 TEST_F(CommonQjsTest, TestSetFunctionFilename) {
   if (ctx_->gc_enable) {
     return;
@@ -2050,6 +2979,67 @@ TEST_F(CommonQjsTest, GeneratorYieldStarNormalOperation) {
     std::string err = js_get_exception_string(ctx_);
     FAIL() << err;
   }
+  if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, ret);
+}
+
+TEST_F(CommonQjsTest, JsonStringifyBigIntPreservesSignedness) {
+#if JS_LIMB_BITS != 64
+  GTEST_SKIP() << "JSON int64 extension requires 64-bit BigInt limbs";
+#endif
+  const char* source = R"(
+    const values = [
+      -1n, -123n, -9007199254740993n, -9223372036854775808n,
+      0n, 1n, 9007199254740993n, 9223372036854775807n,
+      9223372036854775808n, 18446744073709551615n
+    ];
+    for (const value of values) {
+      const expected = JSON.stringify(Number(value));
+      if (JSON.stringify(value) !== expected ||
+          JSON.stringify([value]) !== '[' + expected + ']' ||
+          JSON.stringify({value}) !== '{"value":' + expected + '}') {
+        throw new Error('incorrect BigInt serialization: ' + value);
+      }
+    }
+    for (const value of [-9223372036854775809n, 18446744073709551616n]) {
+      let rejected = false;
+      try { JSON.stringify(value); } catch (e) { rejected = e instanceof TypeError; }
+      if (!rejected) throw new Error('accepted out-of-range BigInt: ' + value);
+    }
+  )";
+  auto ret = LEPUS_Eval(ctx_, source, strlen(source), "json-bigint-sign.js",
+                        LEPUS_EVAL_TYPE_GLOBAL);
+  EXPECT_FALSE(LEPUS_IsException(ret)) << js_get_exception_string(ctx_);
+  if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, ret);
+}
+
+TEST_F(CommonQjsTest, JsonStringifyOrdersLargeArrayIndices) {
+  const char* source = R"(
+    function check(object, expected) {
+      if (JSON.stringify(object) !== expected) {
+        throw new Error('incorrect key order: ' + JSON.stringify(object));
+      }
+      if (JSON.stringify(object, (key, value) => value) !== expected) {
+        throw new Error('inconsistent replacer key order');
+      }
+    }
+    for (const key of ['2147483647', '2147483648', '4294967294']) {
+      const object = {a: 1};
+      object[key] = 2;
+      check(object, '{"' + key + '":2,"a":1}');
+    }
+    const object = {a: 1};
+    object['4294967294'] = 2;
+    object['2147483648'] = 3;
+    check(object, '{"2147483648":3,"4294967294":2,"a":1}');
+    for (const key of ['4294967295', '4294967296', '02147483648', '-0']) {
+      const object = {a: 1};
+      object[key] = 2;
+      check(object, '{"a":1,"' + key + '":2}');
+    }
+  )";
+  auto ret = LEPUS_Eval(ctx_, source, strlen(source), "json-index-order.js",
+                        LEPUS_EVAL_TYPE_GLOBAL);
+  EXPECT_FALSE(LEPUS_IsException(ret)) << js_get_exception_string(ctx_);
   if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, ret);
 }
 
@@ -2654,6 +3644,67 @@ TEST_F(CommonQjsTest, SeparableStringWideFlattenOverflowRejected) {
     FAIL() << err;
   }
   if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, ret);
+}
+
+// Regexp bytecode from templates compiled before the regexp engine upgrade
+// (7-byte header, old opcode set) must be recompiled instead of executed.
+TEST_F(CommonQjsTest, LegacyRegExpBytecodeIsRecompiled) {
+  // /abc/gi in the legacy encoding: header {flags = g|i, capture_count = 1,
+  // stack_size = 0, bytecode_len = 14}; body: save_start 0, char 'a' 'b' 'c',
+  // save_end 0, match.
+  static const uint8_t kLegacyBytecode[] = {
+      0x03, 0x01, 0x00, 0x0e, 0x00, 0x00, 0x00, 0x0b, 0x00, 0x01, 0x61,
+      0x00, 0x01, 0x62, 0x00, 0x01, 0x63, 0x00, 0x0c, 0x00, 0x0a,
+  };
+  LEPUSValue pattern = LEPUS_NewString(ctx_, "abc");
+  HandleScope scope(ctx_, &pattern, HANDLE_TYPE_LEPUS_VALUE);
+  LEPUSValue bc =
+      LEPUS_NewStringLen(ctx_, reinterpret_cast<const char*>(kLegacyBytecode),
+                         sizeof(kLegacyBytecode));
+  scope.PushHandle(&bc, HANDLE_TYPE_LEPUS_VALUE);
+  ASSERT_TRUE(js_regexp_is_legacy_bytecode(bc));
+
+#ifdef ENABLE_COMPATIBLE_MM
+  LEPUSValue re = ctx_->gc_enable ? js_regexp_constructor_internal_gc(
+                                        ctx_, LEPUS_UNDEFINED, pattern, bc)
+                                  : js_regexp_constructor_internal(
+                                        ctx_, LEPUS_UNDEFINED, pattern, bc);
+#else
+  LEPUSValue re =
+      js_regexp_constructor_internal(ctx_, LEPUS_UNDEFINED, pattern, bc);
+#endif
+  ASSERT_FALSE(LEPUS_IsException(re)) << js_get_exception_string(ctx_);
+  scope.PushHandle(&re, HANDLE_TYPE_LEPUS_VALUE);
+  JSString* recompiled = LEPUS_VALUE_GET_OBJ(re)->u.regexp.bytecode;
+  EXPECT_FALSE(lre_is_legacy_bytecode(recompiled->u.str8, recompiled->len));
+  EXPECT_EQ(lre_get_flags(recompiled->u.str8) & LRE_LEGACY_USER_FLAGS_MASK,
+            LRE_FLAG_GLOBAL | LRE_FLAG_IGNORECASE);
+
+  LEPUSValue global = LEPUS_GetGlobalObject(ctx_);
+  LEPUS_SetPropertyStr(ctx_, global, "legacyRe", re);
+  if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, global);
+  std::string src = R"(
+    var m = legacyRe.exec("xxABCxx");
+    if (!m || m[0] !== "ABC" || m.index !== 2 || legacyRe.flags !== "gi" ||
+        legacyRe.source !== "abc") {
+      throw new Error("legacy regexp was not recompiled correctly");
+    }
+  )";
+  LEPUSValue ret = LEPUS_Eval(ctx_, src.c_str(), src.size(), "test.js",
+                              LEPUS_EVAL_TYPE_GLOBAL);
+  ASSERT_FALSE(LEPUS_IsException(ret)) << js_get_exception_string(ctx_);
+  if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, ret);
+}
+
+TEST_F(CommonQjsTest, CurrentRegExpBytecodeIsNotTreatedAsLegacy) {
+  std::string src = "/abc/gi";
+  LEPUSValue re = LEPUS_Eval(ctx_, src.c_str(), src.size(), "test.js",
+                             LEPUS_EVAL_TYPE_GLOBAL);
+  ASSERT_FALSE(LEPUS_IsException(re)) << js_get_exception_string(ctx_);
+  HandleScope scope(ctx_, &re, HANDLE_TYPE_LEPUS_VALUE);
+  JSString* bytecode = LEPUS_VALUE_GET_OBJ(re)->u.regexp.bytecode;
+  EXPECT_FALSE(lre_is_legacy_bytecode(bytecode->u.str8, bytecode->len));
+  if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, re);
 }
 
 }  // namespace common_qjs_test
