@@ -29825,25 +29825,31 @@ bool CheckTools::IsValidTid(int tid) {
   return false;
 }
 
-void JS_UpdateGCInfo(LEPUSRuntime *rt, size_t size, bool force) {
-  if (rt == nullptr || rt->gc_info_threshold == 0) return;
-  rt->gc_info_interval_size += size;
-  if ((rt->gc_info_interval_size > rt->gc_info_threshold &&
-       LEPUS_GetHeapSize(rt) > rt->gc_info_threshold) ||
-      force) {
-    GCObserver *observer = static_cast<GCObserver *>(rt->gc_observer);
-    if (observer) {
-      std::stringstream gc_info;
-      gc_info << "{\n"
-              << "  \"gc_info\": [\n"
-              << "    {\n"
-              << "      \"heapsize_after\": " << LEPUS_GetHeapSize(rt) / KB
-              << "    }\n"
-              << "  ]\n"
-              << "}\n";
-      std::string gc_info_str = gc_info.str();
-      observer->OnGC(std::move(gc_info_str));
-    }
-    rt->gc_info_interval_size = 0;
+void JS_UpdateGCInfo(LEPUSRuntime *rt, size_t size, GCInfoUpdateReason reason) {
+  if (unlikely(rt == nullptr)) return;
+  bool force_report = reason != GCInfoUpdateReason::kAllocation;
+  if (likely(!force_report)) {
+    if (rt->gc_info_threshold == 0) return;
+    rt->gc_info_interval_size += size;
+    if (likely(rt->gc_info_interval_size < rt->gc_info_threshold)) return;
   }
+  GCObserver *observer = static_cast<GCObserver *>(rt->gc_observer);
+  if (likely(observer)) {
+    std::stringstream gc_info;
+    gc_info << "{\n"
+            << "  \"gc_info\": [\n"
+            << "    {\n"
+            << "      \"heapsize_after\": " << LEPUS_GetHeapSize(rt) / KB;
+    if (reason == GCInfoUpdateReason::kFullGC) {
+      gc_info << ",\n"
+              << "      \"is_full_gc\": true";
+    }
+    gc_info << "\n"
+            << "    }\n"
+            << "  ]\n"
+            << "}\n";
+    std::string gc_info_str = gc_info.str();
+    observer->OnGC(std::move(gc_info_str));
+  }
+  rt->gc_info_interval_size = 0;
 }

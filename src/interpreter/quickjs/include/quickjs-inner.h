@@ -3290,7 +3290,14 @@ int64_t NapiAdjustExternalMemory(LEPUSRuntime *rt, int64_t size);
 
 void trig_gc(JSMallocState *s, size_t size, bool is_outer = false);
 void set_gc_info_threshold(LEPUSRuntime *rt, uint32_t mode);
-void JS_UpdateGCInfo(LEPUSRuntime *rt, size_t size, bool from_gc = false);
+enum class GCInfoUpdateReason {
+  kAllocation,
+  kForcedReport,
+  kFullGC,
+};
+void JS_UpdateGCInfo(
+    LEPUSRuntime *rt, size_t size,
+    GCInfoUpdateReason reason = GCInfoUpdateReason::kAllocation);
 
 QJS_HIDE pid_t get_tid();
 

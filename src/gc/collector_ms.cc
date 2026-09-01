@@ -517,7 +517,7 @@ void MarkSweepCollector::RunFullCollection(size_t alloc_size, int eager,
     ros->ReleasePageGroups();
     // parallel will also compact pss metrics
     ros->ReleaseFreePages(true);
-    JS_UpdateGCInfo(ros->GetRuntime(), 0, true);
+    JS_UpdateGCInfo(ros->GetRuntime(), 0, GCInfoUpdateReason::kFullGC);
   }
   lastGCIsConcurrent = false;
 }

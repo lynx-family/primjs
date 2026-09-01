@@ -45962,7 +45962,9 @@ size_t LEPUS_GetHeapSize(LEPUSRuntime *rt) {
   }
 }
 
-void LEPUS_ReportGCInfo(LEPUSRuntime *rt) { JS_UpdateGCInfo(rt, 0, true); }
+void LEPUS_ReportGCInfo(LEPUSRuntime *rt) {
+  JS_UpdateGCInfo(rt, 0, GCInfoUpdateReason::kForcedReport);
+}
 
 void LEPUS_SetGCInfoThreshold(LEPUSRuntime *rt, size_t threshold_bytes) {
   if (threshold_bytes < 64 * KB) {
