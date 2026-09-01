@@ -1581,7 +1581,7 @@ LEPUSValue js_dtoa2(LEPUSContext *ctx, double d, int32_t radix,
     buf = static_buf;
   }
   len = js_dtoa(buf, d, radix, n_digits, flags, &dtoa_mem);
-  res = js_new_string8(ctx, buf, len);
+  res = js_new_string8_len(ctx, buf, len);
   if (!ctx->gc_enable) lepus_free(ctx, tmp_buf);
   return res;
 }

@@ -93,7 +93,11 @@ void GCTracer::StopCmsGC() {
 }
 
 bool GCTracer::CanTriggerConcurrentMarking() {
-  static constexpr int kCmsGCReachLimitCountLimit = 8;
+  // A high-allocation burst can outrun concurrent marking and repeatedly hit
+  // the heap limit before any cycle meaningfully reduces the live set. After
+  // one such cycle, grow the heap instead of spending the rest of the burst
+  // rescanning the same roots.
+  static constexpr int kCmsGCReachLimitCountLimit = 1;
   auto heapSize = space_->heapSize;
   return (heapCompactCounter_ < kHeapCompactThreshold) &&
          (heapSize <= kConcurrentThreshold * kGCPolicyThreshold) &&

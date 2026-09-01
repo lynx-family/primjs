@@ -55,7 +55,7 @@ const GCMarking::VisitEntry0 GCMarking::VisitEntryPtrs[0x41] = {
     Visitor::VisitJSShape,
     Visitor::VisitLEPUSFunctionBytecode,
     Visitor::VisitJSTypedArray,
-    Visitor::VisitJSMapState,
+    0,  // obsolete ALLOC_TAG_JSMapState
     Visitor::VisitJSMapIteratorData,
     Visitor::VisitJSFunctionDef,
     Visitor::VisitJSArrayBuffer,
@@ -77,7 +77,7 @@ const GCMarking::VisitEntry0 GCMarking::VisitEntryPtrs[0x41] = {
     Visitor::VisitJSAsyncFromSyncIteratorData,
     Visitor::VisitJSAsyncGeneratorData,
     0,  // ALLOC_TAG_LEPUSPropertyEnum
-    Visitor::VisitJSMapRecord,
+    0,  // obsolete ALLOC_TAG_JSMapRecord
     Visitor::VisitFinalizationRegistryData,
     0,  // ALLOC_TAG_WeakRefData
     Visitor::VisitFinalizationRegistryEntry,
@@ -90,7 +90,7 @@ const GCMarking::VisitEntry0 GCMarking::VisitEntryPtrs[0x41] = {
     0,  // ALLOC_TAG_JSSTDFile
     0,  // ALLOC_TAG_JSSymbol
     Visitor::VisitJSValueArray,
-    0,  // ALLOC_TAG_JSConstString
+    Visitor::VisitJSString,  // ALLOC_TAG_JSStringWithAux
     Visitor::VisitJsonStrArray,
     Visitor::VisitLabelSlotArray,
     Visitor::VisitCallerStrSlotArray,
@@ -102,11 +102,10 @@ const GCMarking::VisitEntry0 GCMarking::VisitEntryPtrs[0x41] = {
     Visitor::VisitJSResolveEntryArray,
     Visitor::VisitLEPUSBreakpointArray,
     Visitor::VisitJSPropertyArray,
-    Visitor::VisitValueSlotArray,
     Visitor::VisitAtomArray,
     Visitor::VisitJSAsyncGeneratorRequest,
     Visitor::VisitJSAsyncVarRef,
-    0,  // 58
+    Visitor::VisitJSLinkedHashMap,
     0,  // 59
     0,  // 60
     0,  // 61

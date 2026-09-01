@@ -362,6 +362,7 @@ class RosAllocImpl : public Allocator {
   static address_t AllocateObj(LEPUSRuntime *rt, size_t size, int alloc_tag);
   static address_t AllocateObjWithMemorySlot(LEPUSRuntime *rt, size_t size,
                                              int alloc_tag);
+  static address_t TryAllocateObj(LEPUSRuntime *rt, size_t size, int alloc_tag);
   static address_t ReallocateObj(LEPUSRuntime *rt, void *ptr, size_t size,
                                  int alloc_tag);
   static address_t ReallocateObjWithMemorySlot(LEPUSRuntime *rt, void *ptr,
