@@ -52,6 +52,7 @@ force_inline void *StaticVisitRootLEPUSValue(LEPUSValue val) {
       return ptr;
     case LEPUS_TAG_SEPARABLE_STRING:
     case LEPUS_TAG_FUNCTION_BYTECODE:
+    case LEPUS_TAG_VAR_REF:
     case LEPUS_TAG_LEPUS_REF:
     case LEPUS_TAG_SYMBOL:
     case LEPUS_TAG_BIG_INT:
@@ -225,6 +226,7 @@ class Visitor {
   static void VisitLEPUSFunctionBytecode(void *ptr,
                                          GCWorkStack &workStack) noexcept;
   static void VisitLEPUSObject(void *ptr, GCWorkStack &workStack) noexcept;
+  static void VisitJSString(void *ptr, GCWorkStack &workStack) noexcept;
   /* LEPUSValue with tag -> end */
   // LEPUS_TAG_BIG_INT
   /* LEPUSObject with class_id -> begin */
@@ -239,8 +241,7 @@ class Visitor {
       GCWorkStack &workStack) noexcept;  // normal_free
   static void VisitJSArrayBuffer(void *ptr, GCWorkStack &workStack) noexcept;
   static void VisitJSTypedArray(void *ptr, GCWorkStack &workStack) noexcept;
-  static void VisitJSMapState(void *ptr, GCWorkStack &workStack) noexcept;
-  static void VisitJSMapRecord(void *ptr, GCWorkStack &workStack) noexcept;
+  static void VisitJSLinkedHashMap(void *ptr, GCWorkStack &workStack) noexcept;
   static void VisitJSMapIteratorData(void *ptr,
                                      GCWorkStack &workStack) noexcept;
   static void VisitJSArrayIteratorData(
@@ -301,7 +302,6 @@ class Visitor {
                                       GCWorkStack &workStack) noexcept;
   static void VisitJSImportEntryArray(void *ptr,
                                       GCWorkStack &workStack) noexcept;
-  static void VisitValueSlotArray(void *ptr, GCWorkStack &workStack) noexcept;
   static void VisitJsonStrArray(void *ptr, GCWorkStack &workStack) noexcept;
   static void VisitLEPUSBreakpointArray(void *ptr,
                                         GCWorkStack &workStack) noexcept;
@@ -324,11 +324,6 @@ class Visitor {
                               GCWorkStack &workStack) noexcept;
 
   void DoFinalizer(void *ptr);
-
-  // tools
-  static bool IsConstString(void *ptr) {
-    return get_alloc_tag(ptr) == ALLOC_TAG_JSConstString;
-  }
 
   // field
  public:
@@ -377,7 +372,7 @@ class Finalizer {
   void BytecodeListFinalizer() noexcept;
   void JSArrayBufferFinalizer(void *ptr) noexcept;
   void JSTypedArrayFinalizer(void *ptr) noexcept;
-  void JSMapStateFinalizer(void *ptr) noexcept;
+  void JSLinkedHashMapFinalizer(void *ptr) noexcept;
   void JSMapIteratorDataFinalizer(void *ptr) noexcept;
   void JSModuleDefFinalizer(void *ptr) noexcept;
   void JSSeparableStringFinalizer(void *ptr) noexcept {}

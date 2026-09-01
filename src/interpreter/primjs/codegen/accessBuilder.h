@@ -63,10 +63,6 @@ class AccessBuilder {
     return offsetof(CodegenQuickStackFrame, arg_count);
   }
 
-  static constexpr int js_stack_frame_var_ref_list_offset() {
-    return offsetof(CodegenQuickStackFrame, var_ref_list);
-  }
-
   static int js_stack_frame_var_refs_offset() {
     return offsetof(CodegenQuickStackFrame, var_refs);
   }
@@ -157,6 +153,9 @@ class AccessBuilder {
   static constexpr int class_id_offset() {
     return offsetof(LEPUSObject, class_id);
   }
+  static constexpr int object_flags_offset() {
+    return class_id_offset() - sizeof(uint8_t);
+  }
   static constexpr int var_refs_offset() {
     return offsetof(LEPUSObject, u.func.var_refs);
   }
@@ -174,6 +173,33 @@ class AccessBuilder {
   }
   static constexpr int opaque_offset() {
     return offsetof(LEPUSObject, u.opaque);
+  }
+  static constexpr int for_in_iterator_offset() {
+    return offsetof(LEPUSObject, u.for_in_iterator);
+  }
+  static constexpr int for_in_iterator_obj_offset() {
+    return offsetof(JSForInIteratorGC, obj);
+  }
+  static constexpr int for_in_iterator_idx_offset() {
+    return offsetof(JSForInIteratorGC, idx);
+  }
+  static constexpr int for_in_iterator_atom_count_offset() {
+    return offsetof(JSForInIteratorGC, atom_count);
+  }
+  static constexpr int for_in_iterator_in_prototype_chain_offset() {
+    return offsetof(JSForInIteratorGC, in_prototype_chain);
+  }
+  static constexpr int for_in_iterator_is_array_offset() {
+    return offsetof(JSForInIteratorGC, is_array);
+  }
+  static constexpr int for_in_iterator_tab_atom_offset() {
+    return offsetof(JSForInIteratorGC, tab_atom);
+  }
+  static constexpr int property_enum_is_enumerable_offset() {
+    return offsetof(LEPUSPropertyEnum, is_enumerable);
+  }
+  static constexpr int property_enum_atom_offset() {
+    return offsetof(LEPUSPropertyEnum, atom);
   }
   static constexpr int cfunctiondata_length_offset() {
     return offsetof(JSCFunctionDataRecord, length);
@@ -196,10 +222,41 @@ class AccessBuilder {
   static constexpr int array_values_offset() {
     return offsetof(LEPUSObject, u.array.u.values);
   }
+  static constexpr int typed_array_data_offset() {
+    return offsetof(LEPUSObject, u.array.u.ptr);
+  }
+  static constexpr int string_length_offset() {
+    static_assert(sizeof(LEPUSRefCountHeader) == sizeof(uint32_t));
+    return sizeof(LEPUSRefCountHeader);
+  }
+  static constexpr uint32_t string_length_mask() { return 0x3fffffff; }
+  static constexpr uint32_t string_aux_mask() { return 0x40000000; }
+  static constexpr uint32_t string_wide_mask() { return 0x80000000; }
+  static constexpr int atom_type_offset() {
+    // hash and atom_type share the 32-bit word following the length word.
+    return string_length_offset() + sizeof(uint32_t);
+  }
+  static constexpr int string_aux_offset() { return offsetof(JSString, aux); }
+  static constexpr int string_aux_meta_offset() {
+    return offsetof(JSStringAux, meta);
+  }
+  static constexpr int string_data_offset() { return offsetof(JSString, u); }
+  static constexpr int separable_string_depth_offset() {
+    return offsetof(JSSeparableString, depth);
+  }
+  static constexpr int separable_string_left_offset() {
+    return offsetof(JSSeparableString, left_op);
+  }
+  static constexpr int separable_string_right_offset() {
+    return offsetof(JSSeparableString, right_op);
+  }
 
   static constexpr int shape_offset() { return offsetof(LEPUSObject, shape); }
   static constexpr int object_prop_offset() {
     return offsetof(LEPUSObject, prop);
+  }
+  static constexpr int object_first_weak_ref_offset() {
+    return offsetof(LEPUSObject, first_weak_ref);
   }
   static constexpr int object_home_object_offset() {
     return offsetof(LEPUSObject, u.func.home_object);
@@ -217,8 +274,26 @@ class AccessBuilder {
   static constexpr int shape_prop_hash_mask_offset() {
     return offsetof(JSShape, prop_hash_mask);
   }
+  static constexpr int shape_prop_size_offset() {
+    return offsetof(JSShape, prop_size);
+  }
+  static constexpr int shape_prop_count_offset() {
+    return offsetof(JSShape, prop_count);
+  }
+  static constexpr int shape_ref_count_offset() {
+    return offsetof(JSShape, header.ref_count);
+  }
+  static constexpr int shape_transition_target_offset() {
+    return offsetof(JSShape, transition.target);
+  }
+  static constexpr int shape_transition_atom_offset() {
+    return offsetof(JSShape, transition.atom);
+  }
+  static constexpr int shape_transition_prop_flags_offset() {
+    return offsetof(JSShape, transition.prop_flags);
+  }
   static constexpr int js_property_var_ref_offset() {
-    return offsetof(JSPropertyGC, u.var_ref);
+    return offsetof(JSPropertyGC, u.value);
   }
 
   static constexpr int js_shape_property_atom_offset() {
@@ -231,10 +306,32 @@ class AccessBuilder {
   }
 
   static constexpr int var_ref_pvalue_off() {
-    return offsetof(JSVarRef, pvalue);
+    return offsetof(JSVarRefGC, pvalue);
+  }
+  static constexpr int var_ref_value_offset() {
+    return offsetof(JSVarRefGC, value);
   }
   static constexpr int function_bytecode_offset() {
     return offsetof(LEPUSObject, u.func.function_bytecode);
+  }
+  static constexpr int function_bytecode_flags_offset() {
+    return offsetof(LEPUSFunctionBytecode, js_mode) + sizeof(uint8_t);
+  }
+  static constexpr int function_bytecode_func_name_offset() {
+    return offsetof(LEPUSFunctionBytecode, func_name);
+  }
+  static constexpr int function_bytecode_closure_var_offset() {
+    return offsetof(LEPUSFunctionBytecode, closure_var);
+  }
+  static constexpr int function_bytecode_defined_arg_count_offset() {
+    return offsetof(LEPUSFunctionBytecode, defined_arg_count);
+  }
+  static constexpr int function_bytecode_closure_var_count_offset() {
+    return offsetof(LEPUSFunctionBytecode, closure_var_count);
+  }
+  static constexpr int closure_var_flags_offset() { return 0; }
+  static constexpr int closure_var_index_offset() {
+    return offsetof(LEPUSClosureVar, var_idx);
   }
   static constexpr int bytecode_len_offset() {
     return offsetof(LEPUSFunctionBytecode, byte_code_len);
@@ -247,6 +344,9 @@ class AccessBuilder {
   }
   static constexpr int js_mode_offset() {
     return offsetof(LEPUSFunctionBytecode, js_mode);
+  }
+  static constexpr int function_flags_offset() {
+    return js_mode_offset() + sizeof(uint8_t);
   }
   static constexpr int arg_count_offset() {
     return offsetof(LEPUSFunctionBytecode, arg_count);
@@ -293,7 +393,31 @@ class AccessBuilder {
   static constexpr int rt_class_array_offset() {
     return offsetof(LEPUSRuntime, class_array);
   }
+  static constexpr int rt_atom_array_offset() {
+    return offsetof(LEPUSRuntime, atom_array);
+  }
   static constexpr int rt_offset() { return offsetof(LEPUSContext, rt); }
+  static constexpr int object_shape_offset() {
+    return offsetof(LEPUSContext, object_shape);
+  }
+  static constexpr int array_shape_offset() {
+    return offsetof(LEPUSContext, array_shape);
+  }
+  static constexpr int arguments_shape_offset() {
+    return offsetof(LEPUSContext, arguments_shape);
+  }
+  static constexpr int function_shape_offset(int index) {
+    return offsetof(LEPUSContext, function_shape) + index * sizeof(JSShape *);
+  }
+  static constexpr int array_proto_values_offset() {
+    return offsetof(LEPUSContext, array_proto_values);
+  }
+  static constexpr int throw_type_error_offset() {
+    return offsetof(LEPUSContext, throw_type_error);
+  }
+  static constexpr int object_ctx_check_offset() {
+    return offsetof(LEPUSContext, object_ctx_check);
+  }
   static constexpr int dispatch_table_offset() {
     return offsetof(LEPUSContext, dispatch_table);
   }

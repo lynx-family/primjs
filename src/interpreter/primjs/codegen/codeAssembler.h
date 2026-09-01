@@ -202,6 +202,121 @@ class CodeAssembler : public son::node::GraphBuilder {
     auto offset = AccessBuilder::array_values_offset();
     return LoadByteOffset(son::node::MachineType::kRawType, obj, offset);
   }
+  son::node::Node* LoadForInIterator(son::node::Node* obj) {
+    return LoadByteOffset(son::node::MachineType::kRawType, obj,
+                          AccessBuilder::for_in_iterator_offset());
+  }
+  son::node::Node* LoadForInIteratorObject(son::node::Node* iterator) {
+    return LoadByteOffset(son::node::MachineType::kInt64, iterator,
+                          AccessBuilder::for_in_iterator_obj_offset());
+  }
+  son::node::Node* LoadForInIteratorIndex(son::node::Node* iterator) {
+    return LoadByteOffset(son::node::MachineType::kInt32, iterator,
+                          AccessBuilder::for_in_iterator_idx_offset());
+  }
+  void StoreForInIteratorIndex(son::node::Node* iterator,
+                               son::node::Node* index) {
+    StoreByteOffset(son::node::MachineType::kInt32, iterator,
+                    AccessBuilder::for_in_iterator_idx_offset(), index);
+  }
+  son::node::Node* LoadForInIteratorAtomCount(son::node::Node* iterator) {
+    return LoadByteOffset(son::node::MachineType::kInt32, iterator,
+                          AccessBuilder::for_in_iterator_atom_count_offset());
+  }
+  son::node::Node* LoadForInIteratorInPrototypeChain(
+      son::node::Node* iterator) {
+    return LoadByteOffset(
+        son::node::MachineType::kInt8, iterator,
+        AccessBuilder::for_in_iterator_in_prototype_chain_offset());
+  }
+  son::node::Node* LoadForInIteratorIsArray(son::node::Node* iterator) {
+    return LoadByteOffset(son::node::MachineType::kInt8, iterator,
+                          AccessBuilder::for_in_iterator_is_array_offset());
+  }
+  son::node::Node* LoadForInIteratorTabAtom(son::node::Node* iterator) {
+    return LoadByteOffset(son::node::MachineType::kRawType, iterator,
+                          AccessBuilder::for_in_iterator_tab_atom_offset());
+  }
+  son::node::Node* GetPropertyEnum(son::node::Node* tab_atom,
+                                   son::node::Node* index) {
+    auto offset = Int32Mul(index, IntValue(sizeof(LEPUSPropertyEnum)));
+    return CastToRaw(IntPtrAdd(tab_atom, ZExtInt32ToIntPtr(offset)));
+  }
+  son::node::Node* LoadPropertyEnumIsEnumerable(son::node::Node* entry) {
+    return LoadByteOffset(son::node::MachineType::kInt32, entry,
+                          AccessBuilder::property_enum_is_enumerable_offset());
+  }
+  son::node::Node* LoadPropertyEnumAtom(son::node::Node* entry) {
+    return LoadByteOffset(son::node::MachineType::kInt32, entry,
+                          AccessBuilder::property_enum_atom_offset());
+  }
+  void StoreArraySize(son::node::Node* obj, son::node::Node* value) {
+    StoreByteOffset(son::node::MachineType::kInt32, obj,
+                    AccessBuilder::array_size_offset(), value);
+  }
+  void StoreArrayValues_NoBarrier(son::node::Node* obj,
+                                  son::node::Node* value) {
+    StoreByteOffset(son::node::MachineType::kRawType, obj,
+                    AccessBuilder::array_values_offset(), value);
+  }
+  son::node::Node* LoadTypedArrayData(son::node::Node* obj) {
+    auto offset = AccessBuilder::typed_array_data_offset();
+    return LoadByteOffset(son::node::MachineType::kRawType, obj, offset);
+  }
+  son::node::Node* LoadStringLength(son::node::Node* str) {
+    auto offset = AccessBuilder::string_length_offset();
+    auto length_and_wide_flag =
+        LoadByteOffset(son::node::MachineType::kInt32, str, offset);
+    return Int32And(length_and_wide_flag,
+                    Int32Value(AccessBuilder::string_length_mask()));
+  }
+  son::node::Node* LoadStringLengthAndWideFlag(son::node::Node* str) {
+    auto length_and_flags =
+        LoadByteOffset(son::node::MachineType::kInt32, str,
+                       AccessBuilder::string_length_offset());
+    return Int32And(length_and_flags,
+                    Int32Value(AccessBuilder::string_length_mask() |
+                               AccessBuilder::string_wide_mask()));
+  }
+  son::node::Node* LoadStringHasAux(son::node::Node* str) {
+    auto length_and_flags =
+        LoadByteOffset(son::node::MachineType::kInt32, str,
+                       AccessBuilder::string_length_offset());
+    return NotEqual(Int32And(length_and_flags,
+                             Int32Value(AccessBuilder::string_aux_mask())),
+                    Int32Value(0));
+  }
+  son::node::Node* LoadAtomType(son::node::Node* atom) {
+    son::node::Label inline_meta(this);
+    son::node::Label aux_meta(this);
+    son::node::Label done(this);
+    son::node::Variable hash_and_atom_type(this, son::node::NodeType::IntType(),
+                                           IntValue(0));
+    Branch(LoadStringHasAux(atom), &aux_meta, &inline_meta,
+           son::node::BranchHint::kFalse);
+    Bind(&inline_meta);
+    hash_and_atom_type = LoadByteOffset(son::node::MachineType::kInt32, atom,
+                                        AccessBuilder::atom_type_offset());
+    Jump(&done);
+    Bind(&aux_meta);
+    auto aux = LoadByteOffset(son::node::MachineType::kRawType, atom,
+                              AccessBuilder::string_aux_offset());
+    hash_and_atom_type =
+        LoadByteOffset(son::node::MachineType::kInt32, aux,
+                       AccessBuilder::string_aux_meta_offset());
+    Jump(&done);
+    Bind(&done);
+    return Int32LSR(*hash_and_atom_type, Int32Value(30));
+  }
+  void StoreSeparableStringHeader(son::node::Node* str,
+                                  son::node::Node* length_and_wide,
+                                  son::node::Node* depth) {
+    StoreByteOffset(son::node::MachineType::kInt32, str, 0, IntValue(1));
+    StoreByteOffset(son::node::MachineType::kInt32, str,
+                    AccessBuilder::string_length_offset(), length_and_wide);
+    StoreByteOffset(son::node::MachineType::kInt32, str,
+                    AccessBuilder::separable_string_depth_offset(), depth);
+  }
   son::node::Node* LoadObjectShape(son::node::Node* obj) {
     auto offset = AccessBuilder::shape_offset();
     return LoadByteOffset(son::node::MachineType::kRawType, obj, offset);
@@ -245,6 +360,16 @@ class CodeAssembler : public son::node::GraphBuilder {
     return Equal(and_val, Int32Value(1));
   }
 
+  son::node::Node* LoadObjectIsStdArrayPrototype(son::node::Node* obj) {
+    auto offset = AccessBuilder::object_gc_header_offset();
+    auto val = LoadByteOffset(son::node::MachineType::kInt32, obj, offset);
+    auto kShift = 13;
+    uint32_t mask = getMark(kShift, 1);
+    auto and_val =
+        Int32LSR(Int32And(val, Int32Value(mask)), Int32Value(kShift));
+    return Equal(and_val, Int32Value(1));
+  }
+
   son::node::Node* LoadObjectProp(son::node::Node* obj) {
     auto offset = AccessBuilder::object_prop_offset();
     return LoadByteOffset(son::node::MachineType::kRawType, obj, offset);
@@ -268,7 +393,8 @@ class CodeAssembler : public son::node::GraphBuilder {
   void StoreJsPropertyVarRef(son::node::Node* ctx, son::node::Node* obj,
                              son::node::Node* val) {
     auto offset = AccessBuilder::js_property_var_ref_offset();
-    StoreHeapObject(ctx, obj, offset, CastRawToInt64(val));
+    StoreHeapObject(ctx, obj, offset,
+                    MakeValue(LEPUS_TAG_VAR_REF, CastRawToInt64(val)));
   }
 
   son::node::Node* LoadJsShapePropertyAtom(son::node::Node* obj) {
@@ -343,9 +469,41 @@ class CodeAssembler : public son::node::GraphBuilder {
     auto offset = AccessBuilder::rt_offset();
     return LoadByteOffset(son::node::MachineType::kRawType, obj, offset);
   }
+  son::node::Node* LoadArrayShape(son::node::Node* ctx) {
+    return LoadByteOffset(son::node::MachineType::kRawType, ctx,
+                          AccessBuilder::array_shape_offset());
+  }
+  son::node::Node* LoadArgumentsShape(son::node::Node* ctx) {
+    return LoadByteOffset(son::node::MachineType::kRawType, ctx,
+                          AccessBuilder::arguments_shape_offset());
+  }
+  son::node::Node* LoadFunctionShape(son::node::Node* ctx, int index) {
+    return LoadByteOffset(son::node::MachineType::kRawType, ctx,
+                          AccessBuilder::function_shape_offset(index));
+  }
+  son::node::Node* LoadArrayProtoValues(son::node::Node* ctx) {
+    return LoadByteOffset(son::node::MachineType::kInt64, ctx,
+                          AccessBuilder::array_proto_values_offset());
+  }
+  son::node::Node* LoadThrowTypeError(son::node::Node* ctx) {
+    return LoadByteOffset(son::node::MachineType::kInt64, ctx,
+                          AccessBuilder::throw_type_error_offset());
+  }
+  son::node::Node* LoadInitialObjectShape(son::node::Node* ctx) {
+    return LoadByteOffset(son::node::MachineType::kRawType, ctx,
+                          AccessBuilder::object_shape_offset());
+  }
+  son::node::Node* LoadObjectCtxCheck(son::node::Node* ctx) {
+    return LoadByteOffset(son::node::MachineType::kInt8, ctx,
+                          AccessBuilder::object_ctx_check_offset());
+  }
   son::node::Node* LoadRtClassArray(son::node::Node* obj) {
     auto offset = AccessBuilder::rt_class_array_offset();
     return LoadByteOffset(son::node::MachineType::kRawType, obj, offset);
+  }
+  son::node::Node* LoadRtAtomArray(son::node::Node* rt) {
+    return LoadByteOffset(son::node::MachineType::kRawType, rt,
+                          AccessBuilder::rt_atom_array_offset());
   }
   son::node::Node* LoadDispatchTable(son::node::Node* obj) {
     auto offset = AccessBuilder::dispatch_table_offset();
@@ -430,6 +588,10 @@ class CodeAssembler : public son::node::GraphBuilder {
     auto offset = AccessBuilder::js_mode_offset();
     return LoadByteOffset(son::node::MachineType::kInt8, obj, offset);
   }
+  son::node::Node* LoadFunctionFlags(son::node::Node* obj) {
+    auto offset = AccessBuilder::function_flags_offset();
+    return LoadByteOffset(son::node::MachineType::kInt8, obj, offset);
+  }
   son::node::Node* LoadBytecodeBuf(son::node::Node* obj) {
     auto offset = AccessBuilder::codes_offset();
     return LoadByteOffset(son::node::MachineType::kRawType, obj, offset);
@@ -498,6 +660,8 @@ class CodeAssembler : public son::node::GraphBuilder {
 
   void CopyArgs(son::node::Node* local_buf, son::node::Node* buf_end,
                 son::node::Node* argv);
+  void CopyHeapArgs(son::node::Node* ctx, son::node::Node* local_buf,
+                    son::node::Node* buf_end, son::node::Node* argv);
   void CopyArgsUndefined(son::node::Node* local_buf, son::node::Node* buf_end);
 
   son::node::Node* LoadByteOffset(son::node::MachineType type,
@@ -546,6 +710,8 @@ class CodeAssembler : public son::node::GraphBuilder {
              son::node::Node* offset, son::node::Node* value);
   void StoreHeapObject(son::node::Node* ctx, son::node::Node* object,
                        son::node::Node* offset, son::node::Node* value);
+  void StoreShapeRef(son::node::Node* ctx, son::node::Node* object,
+                     son::node::Node* shape);
   void StoreHeapObject(son::node::Node* ctx, son::node::Node* object,
                        int byte_offset, son::node::Node* value) {
     FieldAccess access(son::node::MachineType::kObject, byte_offset, Is32Bit());

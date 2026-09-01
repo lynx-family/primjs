@@ -355,6 +355,7 @@ class RosAllocImpl : public Allocator {
   RosAllocImpl(LEPUSRuntime *rt, bool enable_concurrent);
   ~RosAllocImpl();
   static address_t AllocateObj(LEPUSRuntime *rt, size_t size, int alloc_tag);
+  static address_t TryAllocateObj(LEPUSRuntime *rt, size_t size, int alloc_tag);
   static address_t ReallocateObj(LEPUSRuntime *rt, void *ptr, size_t size,
                                  int alloc_tag);
 

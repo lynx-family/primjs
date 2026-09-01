@@ -99,6 +99,16 @@ void GraphBuilder::StoreImpl(MachineType type, Node* object, Node* offset,
   set_depend(res);
 }
 
+void GraphBuilder::ReleaseStoreImpl(MachineType type, Node* object,
+                                    Node* offset, Node* value) {
+  auto meta = graph()->ReleaseStore_meta();
+  auto node_type = NodeType::GetNodeType(type);
+  if (offset == nullptr) offset = IntValue(0);
+  auto res = graph()->NewNode(meta, node_type, control(), depend(), object,
+                              offset, value);
+  set_depend(res);
+}
+
 Node* GraphBuilder::Return(Node* value) {
   auto type = NodeType::NoneType();
   Node* res = nullptr;

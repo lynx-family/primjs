@@ -88,6 +88,7 @@ DEF_CALL_OPERATOR2(prim_js_operator_in_gc)
 DEF_CALL_OPERATOR2(prim_js_operator_delete_gc)
 DEF_CALL_OPERATOR2(JS_GetPrivateField_GC)
 DEF_CALL_OPERATOR2(JS_ConcatString_GC)
+DEF_CALL_R_DESC_3(prim_try_malloc_gc, kRawType, kRawType, kIntptr, kInt32)
 
 DEF_CALL_OPERATOR2_OPCODE(prim_js_relation_slow_gc)
 DEF_CALL_OPERATOR2_OPCODE(prim_js_binary_arith_slow_gc)
@@ -111,6 +112,9 @@ DEF_CALL_R_DESC_1(PRIM_JS_NewObject_GC, kInt64, kRawType)
 DEF_CALL_R_DESC_6(JS_CallConstructorInternal_GC, kInt64,
     kRawType, kInt64, kInt64, kInt32, kRawType, kInt32)
 
+DEF_CALL_R_DESC_2(js_create_ordinary_constructor_this_GC, kInt64,
+    kRawType, kRawType)
+
 DEF_CALL_R_DESC_3(JS_NewArrayWithArgs_GC, kInt64, kRawType, kInt32, kRawType)
 
 DEF_CALL_R_DESC_3(JS_GetGlobalVarImpl_GC, kInt64, kRawType, kInt32, kInt32)
@@ -129,6 +133,8 @@ DEF_CALL_R_DESC_5(JS_SetPropertyInternalImpl_GC, kInt32, kRawType, kInt64, kInt3
 
 DEF_CALL_R_DESC_5(JS_SetPropertyValue_GC, kInt32, kRawType, kInt64, kInt64, kInt64, kInt32)
 
+DEF_CALL_R_DESC_5(JS_SetArrayIntPropertyValue_GC, kInt32, kRawType, kRawType, kInt32, kInt64, kInt32)
+
 DEF_CALL_R_DESC_5(JS_DefinePropertyValue_GC,
     kInt32, kRawType, kInt64, kInt32, kInt64, kInt32)
 
@@ -144,7 +150,10 @@ DEF_CALL_R_DESC_3(prim_js_unary_arith_slow_gc, kInt64, kRawType, kInt64, kInt8)
 DEF_CALL_R_DESC_3(js_post_inc_slow_gc, kInt32, kRawType, kRawType, kInt8)
 
 DEF_CALL_R_DESC_2(js_operator_typeof_gc, kInt32, kRawType, kInt64)
-DEF_CALL_R_DESC_4(js_closure_gc, kInt64, kRawType, kInt64, kRawType, kRawType)
+DEF_CALL_R_DESC_4(js_closure_gc_slowpath, kInt64, kRawType, kRawType, kRawType,
+                  kRawType)
+DEF_CALL_R_DESC_4(js_instantiate_prototype_gc, kInt64, kRawType, kRawType,
+                  kInt32, kRawType)
 
 DEF_CALL_R_DESC_2(prim_js_not_slow_gc, kInt64, kRawType, kInt64)
 
@@ -157,7 +166,9 @@ DEF_CALL_R_DESC_5(js_build_mapped_arguments_gc, kInt64, kRawType, kInt32, kRawTy
 
 DEF_CALL_R_DESC_2(JS_NewObjectProto_GC, kInt64, kRawType, kInt64)
 DEF_CALL_R_DESC_4(add_property_gc, kRawType, kRawType, kRawType, kInt32, kInt32)
-DEF_CALL_R_DESC_4(get_var_ref, kRawType, kRawType, kRawType, kInt32, kInt32)
+DEF_CALL_R_DESC_4(find_hashed_shape_prop_gc, kRawType, kRawType, kRawType,
+                  kInt32, kInt32)
+DEF_CALL_R_DESC_4(get_var_ref_gc, kRawType, kRawType, kRawType, kInt32, kInt32)
 
 DEF_CALL_R_DESC_2(prim_js_for_in_start_gc, kInt64, kRawType, kInt64)
 DEF_CALL_R_DESC_2(js_for_in_next_gc, kInt32, kRawType, kRawType)

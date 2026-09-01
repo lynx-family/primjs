@@ -1347,6 +1347,29 @@ address_t RosAllocImpl::AllocateObj(LEPUSRuntime *rt, size_t size,
   return (address_t)ptr;
 }
 
+address_t RosAllocImpl::TryAllocateObj(LEPUSRuntime *rt, size_t size,
+                                       int alloc_tag) {
+  auto ros = rt->ros_;
+  size_t alloc_size = AllocUtilRndUp(size + kHeaderSize, kAllocAlign);
+  if (UNLIKELY(alloc_size > kLargeObjSize)) return 0;
+
+  NewObjPrologueForAsan();
+  address_t ret = ros->AllocFromRun(alloc_size, kEagerLevelMin);
+  if (UNLIKELY(ret == 0)) return 0;
+  NewObjEpilogueForAsan();
+
+  if (UNLIKELY(ros->should_mark_new_obj)) {
+    ros->MarkObjectNoInline(ret);
+  }
+  ros->allocatedInternalSize.fetch_add(alloc_size, std::memory_order_relaxed);
+  JS_UpdateGCInfo(rt, size);
+
+  void *ptr = reinterpret_cast<void *>(ret + kHeaderSize);
+  memset(ptr, 0, size);
+  init_obj_header(ptr, size, alloc_tag);
+  return reinterpret_cast<address_t>(ptr);
+}
+
 address_t RosAllocImpl::ReallocateObj(LEPUSRuntime *rt, void *ptr, size_t size,
                                       int alloc_tag) {
   if (size == 0) return 0;

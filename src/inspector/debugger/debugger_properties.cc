@@ -251,24 +251,6 @@ LEPUSValue DebuggerGetProxyProperties(LEPUSContext* ctx, LEPUSValue val) {
   return debugger_proxy;
 }
 
-QJS_HIDE JSMapRecord* DebuggerMapFindIndex(LEPUSContext* ctx,
-                                           LEPUSValue this_val, int32_t index,
-                                           int32_t magic) {
-  auto* s = static_cast<JSMapState*>(
-      LEPUS_GetOpaque2(ctx, this_val, JS_CLASS_MAP + magic));
-  struct list_head* el;
-  int32_t num = 0;
-  for (size_t i = 0; i < s->hash_size; ++i) {
-    list_for_each(el, &s->hash_table[i]) {
-      if (num == index) {
-        return list_entry(el, JSMapRecord, hash_link);
-      }
-      ++num;
-    }
-  }
-  return NULL;
-}
-
 QJS_HIDE LEPUSValue GetGeneratorState(LEPUSContext* ctx, LEPUSValue obj) {
   auto* s =
       static_cast<JSGeneratorData*>(LEPUS_GetOpaque(obj, JS_CLASS_GENERATOR));
@@ -663,43 +645,35 @@ static LEPUSValue GetMapSetProperties(LEPUSContext* ctx, LEPUSValue obj,
                                       int32_t magic) {
   LEPUSValue result = LEPUS_NewArray(ctx);
   HandleScope func_scope(ctx, &result, HANDLE_TYPE_LEPUS_VALUE);
-  uint32_t size;
-  LEPUSValue map_size =
-      DEBUGGER_COMPATIBLE_CALL_RET(ctx, js_map_get_size, ctx, obj, magic);
-  LEPUS_ToUint32(ctx, &size, map_size);
-  if (!ctx->rt->gc_enable) LEPUS_FreeValue(ctx, map_size);
-
   LEPUSValue key_value = LEPUS_UNDEFINED;
   LEPUSValue key_ret = LEPUS_UNDEFINED;
   LEPUSValue value_ret = LEPUS_UNDEFINED;
+  LEPUSValue key = LEPUS_UNDEFINED;
+  LEPUSValue value = LEPUS_UNDEFINED;
   func_scope.PushHandle(&key_value, HANDLE_TYPE_LEPUS_VALUE);
   func_scope.PushHandle(&key_ret, HANDLE_TYPE_LEPUS_VALUE);
   func_scope.PushHandle(&value_ret, HANDLE_TYPE_LEPUS_VALUE);
-  auto* s = static_cast<JSMapState*>(
-      LEPUS_GetOpaque2(ctx, obj, JS_CLASS_MAP + magic));
+  func_scope.PushHandle(&key, HANDLE_TYPE_LEPUS_VALUE);
+  func_scope.PushHandle(&value, HANDLE_TYPE_LEPUS_VALUE);
   size_t i = 0;
-  for (auto j = 0; j < s->hash_size; ++j) {
-    list_head* el;
-    list_for_each(el, &s->hash_table[j]) {
-      auto* record = list_entry(el, JSMapRecord, hash_link);
-      key_value = LEPUS_NewObject(ctx);
-      LEPUSValue key = LEPUS_DupValue(ctx, record->key);      // dup
-      LEPUSValue value = LEPUS_DupValue(ctx, record->value);  // dup
-      key_ret = callback(ctx, key, LEPUS_PROP_WRITABLE, LEPUS_PROP_CONFIGURABLE,
-                         LEPUS_PROP_ENUMERABLE);  // free key
-      if (LEPUS_IsUndefined(value)) {
-        // set/weakset: value
-        DebuggerSetPropertyStr(ctx, key_value, "value", key_ret);
-      } else {
-        // map/weakmap: key-value
-        value_ret =
-            callback(ctx, value, LEPUS_PROP_WRITABLE, LEPUS_PROP_CONFIGURABLE,
-                     LEPUS_PROP_ENUMERABLE);  // free value
-        DebuggerSetPropertyStr(ctx, key_value, "key", key_ret);
-        DebuggerSetPropertyStr(ctx, key_value, "value", value_ret);
-      }
-      LEPUS_SetPropertyUint32(ctx, result, i++, key_value);
+  uint32_t cursor = 0;
+  for (;;) {
+    int ret = JS_MapGetNextEntry(ctx, obj, magic, &cursor, &key, &value);
+    if (ret <= 0) break;
+    key_value = LEPUS_NewObject(ctx);
+    key_ret = callback(ctx, key, LEPUS_PROP_WRITABLE, LEPUS_PROP_CONFIGURABLE,
+                       LEPUS_PROP_ENUMERABLE);
+    if (LEPUS_IsUndefined(value)) {
+      // set/weakset: value
+      DebuggerSetPropertyStr(ctx, key_value, "value", key_ret);
+    } else {
+      // map/weakmap: key-value
+      value_ret = callback(ctx, value, LEPUS_PROP_WRITABLE,
+                           LEPUS_PROP_CONFIGURABLE, LEPUS_PROP_ENUMERABLE);
+      DebuggerSetPropertyStr(ctx, key_value, "key", key_ret);
+      DebuggerSetPropertyStr(ctx, key_value, "value", value_ret);
     }
+    LEPUS_SetPropertyUint32(ctx, result, i++, key_value);
   }
 
   return result;
@@ -1871,11 +1845,23 @@ QJS_HIDE LEPUSValue GetFrameClosureVariables(LEPUSContext* ctx,
         if (var_refs) {
           JSVarRef* var_ref = var_refs[i];
           if (var_ref) {
+#ifdef ENABLE_COMPATIBLE_MM
+            if (ctx->rt->gc_enable) {
+              ret_val = *js_var_ref_gc(var_ref)->pvalue;
+            } else {
+              ret_val = LEPUS_DupValue(ctx, var_ref->value);
+            }
+#else
             ret_val = LEPUS_DupValue(ctx, var_ref->value);
+#endif
           }
         }
       } else {
+#ifdef ENABLE_COMPATIBLE_MM
+        ret_val = ctx->rt->gc_enable ? val : LEPUS_DupValue(ctx, val);
+#else
         ret_val = LEPUS_DupValue(ctx, val);
+#endif
       }
 
       LEPUS_SetPropertyInternal(ctx, ret, cvar->var_name, ret_val,

@@ -92,7 +92,6 @@ static void check_root_object(LEPUSContext *ctx, LEPUSValue val) {
 static void check_stack_object(LEPUSContext *ctx) {
   auto rt = ctx->rt;
   LEPUSStackFrame *sf = rt->current_stack_frame;
-  struct list_head *el;
   while (sf) {
     // arg_buf
     if (sf->arg_buf) {
@@ -111,13 +110,11 @@ static void check_stack_object(LEPUSContext *ctx) {
       }
     }
     check_root_object(ctx, sf->cur_func);
-    list_for_each(el, &sf->var_ref_list) {
-      JSVarRef *var_ref = list_entry(el, JSVarRef, link);
-      check_heap_object(ctx, var_ref);
-    }
-
     if (sf->var_refs) {
       check_heap_object(ctx, sf->var_refs);
+      for (uint32_t i = 0; i < sf->ref_size; i++) {
+        check_heap_object(ctx, sf->var_refs[i]);
+      }
     }
     sf = sf->prev_frame;
   }
