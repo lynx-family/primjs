@@ -22653,7 +22653,6 @@ __exception int js_parse_cond_expr(JSParseState *s, int parse_flags) {
     for (;;) {
       int coverage_slot;
       if (next_token(s)) return -1;
-
       emit_op(s, OP_dup);
       emit_op(s, OP_is_undefined);
       emit_goto(s, OP_if_false, label1);
