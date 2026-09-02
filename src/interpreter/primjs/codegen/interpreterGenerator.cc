@@ -358,6 +358,7 @@ DEFINE_BYTECODE_HANDLER(apply) {
   // if (unlikely(LEPUS_IsException(ret_val))) goto exception;
   // sp -= 3;
   // *sp++ = ret_val;
+  PollInterrupts();
   auto magic = Fetch_16(0);
   auto this_obj = LoadSp(-3);
   auto argv = LeapSp(IntValue(2));

@@ -696,6 +696,7 @@ typedef struct JSVarRef {
    enough to call the interrupt callback often. */
 #define JS_INTERRUPT_COUNTER_INIT 10000
 // <Primjs begin>
+#define PRIMJS_INTERRUPT_COUNTER_INIT 1000
 #define DEFAULT_VIRTUAL_STACK_SIZE 1024 * 1024 * 4
 #define FALLBACK_VIRTUAL_STACK_SIZE 1024 * 1024 * 1
 #define MINIFY_VIRTUAL_STACK_SIZE 1024 * 1024 * 2
@@ -1812,6 +1813,8 @@ QJS_HIDE void DebuggerCallEachOp(LEPUSContext *ctx, const uint8_t *pc,
                                  LEPUSFunctionBytecode *b);
 
 QJS_HIDE void DebuggerCallEachFunc(LEPUSContext *ctx, const uint8_t *pc);
+
+QJS_HIDE __exception int prim_js_poll_interrupts_gc(LEPUSContext *ctx);
 
 QJS_HIDE LEPUSValue __JS_AtomToValue_GC(LEPUSContext *ctx, JSAtom atom,
                                         BOOL force_string);
