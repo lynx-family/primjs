@@ -2415,6 +2415,7 @@ QJS_HIDE int js_parse_string(JSParseState *s, int sep, BOOL do_throw,
 QJS_HIDE int cpool_add(JSParseState *s, LEPUSValue val);
 QJS_HIDE int emit_push_const(JSParseState *s, LEPUSValueConst val,
                              BOOL as_atom);
+QJS_HIDE void emit_line_num(JSParseState *s, bool is_get_var);
 QJS_HIDE void emit_op(JSParseState *s, uint8_t val);
 QJS_HIDE int emit_label(JSParseState *s, int label);
 QJS_HIDE void emit_return(JSParseState *s, BOOL hasval);
