@@ -52789,7 +52789,9 @@ const char *JS_GetCoverageDumpString(LEPUSContext *ctx, int32_t runtime_id,
   struct list_head *el;
   const char *dump;
   bool has_script = false;
+  bool first_script = true;
   bool first_function = true;
+  uint32_t script_id = 0;
 
   if (length) *length = 0;
   dbuf_init(&dbuf);
@@ -52802,8 +52804,8 @@ const char *JS_GetCoverageDumpString(LEPUSContext *ctx, int32_t runtime_id,
     if (info->runtime_id != runtime_id) continue;
 
     if (!has_script) {
-      dbuf_printf(
-          &dbuf, "{\"scriptId\":\"%d\",\"url\":", static_cast<int>(runtime_id));
+      if (!first_script) dbuf_putc(&dbuf, ',');
+      dbuf_printf(&dbuf, "{\"scriptId\":\"%u\",\"url\":", ++script_id);
       if (info->filename != JS_ATOM_NULL) {
         const char *file_name = LEPUS_AtomToCString(ctx, info->filename);
         if (!file_name) goto fail;
@@ -52818,6 +52820,8 @@ const char *JS_GetCoverageDumpString(LEPUSContext *ctx, int32_t runtime_id,
       dbuf_putstr(&dbuf, ",\"functions\":[");
       if (dbuf_error(&dbuf)) goto fail;
       has_script = true;
+      first_script = false;
+      first_function = true;
     }
 
     if (!first_function) dbuf_putc(&dbuf, ',');
@@ -52826,6 +52830,14 @@ const char *JS_GetCoverageDumpString(LEPUSContext *ctx, int32_t runtime_id,
       goto fail;
     }
     first_function = false;
+
+    /* js_create_function registers child functions first and the top-level
+       <eval> function last, making it the boundary of one compiled script. */
+    if (info->func_name == JS_ATOM__eval_) {
+      dbuf_putstr(&dbuf, "]}");
+      if (dbuf_error(&dbuf)) goto fail;
+      has_script = false;
+    }
   }
 
   if (has_script) {
