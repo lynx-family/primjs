@@ -14335,6 +14335,24 @@ QJS_STATIC LEPUSValue JS_CallInternal(LEPUSContext *caller_ctx,
 #define DEFAULT case_default
 #define BREAK SWITCH(pc)
 #endif
+#define CHECK_ARG_INDEX(index)                                               \
+  do {                                                                       \
+    if (unlikely((index) >= sf->arg_count)) {                                \
+      LEPUS_ThrowInternalError(ctx,                                          \
+                               "invalid argument index (index=%d limit=%d)", \
+                               (index), sf->arg_count);                      \
+      goto exception;                                                        \
+    }                                                                        \
+  } while (0)
+#define CHECK_VAR_REF_INDEX(index)                                            \
+  do {                                                                        \
+    if (unlikely((index) >= b->closure_var_count)) {                          \
+      LEPUS_ThrowInternalError(                                               \
+          ctx, "invalid closure variable index (index=%d limit=%d)", (index), \
+          b->closure_var_count);                                              \
+      goto exception;                                                         \
+    }                                                                         \
+  } while (0)
   // <Primjs begin>
 #ifdef ENABLE_VIRTUAL_STACK
   BOOL need_free_local_buf = 0;
@@ -15073,6 +15091,7 @@ restart:
         int idx;
         idx = get_u16(pc);
         pc += 2;
+        CHECK_ARG_INDEX(idx);
         sp[0] = LEPUS_DupValue(ctx, arg_buf[idx]);
         sp++;
       }
@@ -15081,6 +15100,7 @@ restart:
         int idx;
         idx = get_u16(pc);
         pc += 2;
+        CHECK_ARG_INDEX(idx);
         set_value(ctx, &arg_buf[idx], sp[-1]);
         sp--;
       }
@@ -15089,6 +15109,7 @@ restart:
         int idx;
         idx = get_u16(pc);
         pc += 2;
+        CHECK_ARG_INDEX(idx);
         set_value(ctx, &arg_buf[idx], LEPUS_DupValue(ctx, sp[-1]));
       }
       BREAK;
@@ -15130,61 +15151,50 @@ restart:
       CASE(OP_set_loc3)
           : set_value(ctx, &var_buf[3], LEPUS_DupValue(ctx, sp[-1]));
       BREAK;
-      CASE(OP_get_arg0) : *sp++ = LEPUS_DupValue(ctx, arg_buf[0]);
+      CASE(OP_get_arg0)
+          : CASE(OP_get_arg1) : CASE(OP_get_arg2) : CASE(OP_get_arg3) : {
+        int idx = opcode - OP_get_arg0;
+        CHECK_ARG_INDEX(idx);
+        *sp++ = LEPUS_DupValue(ctx, arg_buf[idx]);
+      }
       BREAK;
-      CASE(OP_get_arg1) : *sp++ = LEPUS_DupValue(ctx, arg_buf[1]);
-      BREAK;
-      CASE(OP_get_arg2) : *sp++ = LEPUS_DupValue(ctx, arg_buf[2]);
-      BREAK;
-      CASE(OP_get_arg3) : *sp++ = LEPUS_DupValue(ctx, arg_buf[3]);
-      BREAK;
-      CASE(OP_put_arg0) : set_value(ctx, &arg_buf[0], *--sp);
-      BREAK;
-      CASE(OP_put_arg1) : set_value(ctx, &arg_buf[1], *--sp);
-      BREAK;
-      CASE(OP_put_arg2) : set_value(ctx, &arg_buf[2], *--sp);
-      BREAK;
-      CASE(OP_put_arg3) : set_value(ctx, &arg_buf[3], *--sp);
+      CASE(OP_put_arg0)
+          : CASE(OP_put_arg1) : CASE(OP_put_arg2) : CASE(OP_put_arg3) : {
+        int idx = opcode - OP_put_arg0;
+        CHECK_ARG_INDEX(idx);
+        set_value(ctx, &arg_buf[idx], *--sp);
+      }
       BREAK;
       CASE(OP_set_arg0)
-          : set_value(ctx, &arg_buf[0], LEPUS_DupValue(ctx, sp[-1]));
+          : CASE(OP_set_arg1) : CASE(OP_set_arg2) : CASE(OP_set_arg3) : {
+        int idx = opcode - OP_set_arg0;
+        CHECK_ARG_INDEX(idx);
+        set_value(ctx, &arg_buf[idx], LEPUS_DupValue(ctx, sp[-1]));
+      }
       BREAK;
-      CASE(OP_set_arg1)
-          : set_value(ctx, &arg_buf[1], LEPUS_DupValue(ctx, sp[-1]));
+      CASE(OP_get_var_ref0)
+          : CASE(OP_get_var_ref1)
+          : CASE(OP_get_var_ref2) : CASE(OP_get_var_ref3) : {
+        int idx = opcode - OP_get_var_ref0;
+        CHECK_VAR_REF_INDEX(idx);
+        *sp++ = LEPUS_DupValue(ctx, *var_refs[idx]->pvalue);
+      }
       BREAK;
-      CASE(OP_set_arg2)
-          : set_value(ctx, &arg_buf[2], LEPUS_DupValue(ctx, sp[-1]));
-      BREAK;
-      CASE(OP_set_arg3)
-          : set_value(ctx, &arg_buf[3], LEPUS_DupValue(ctx, sp[-1]));
-      BREAK;
-      CASE(OP_get_var_ref0) : *sp++ = LEPUS_DupValue(ctx, *var_refs[0]->pvalue);
-      BREAK;
-      CASE(OP_get_var_ref1) : *sp++ = LEPUS_DupValue(ctx, *var_refs[1]->pvalue);
-      BREAK;
-      CASE(OP_get_var_ref2) : *sp++ = LEPUS_DupValue(ctx, *var_refs[2]->pvalue);
-      BREAK;
-      CASE(OP_get_var_ref3) : *sp++ = LEPUS_DupValue(ctx, *var_refs[3]->pvalue);
-      BREAK;
-      CASE(OP_put_var_ref0) : set_value(ctx, var_refs[0]->pvalue, *--sp);
-      BREAK;
-      CASE(OP_put_var_ref1) : set_value(ctx, var_refs[1]->pvalue, *--sp);
-      BREAK;
-      CASE(OP_put_var_ref2) : set_value(ctx, var_refs[2]->pvalue, *--sp);
-      BREAK;
-      CASE(OP_put_var_ref3) : set_value(ctx, var_refs[3]->pvalue, *--sp);
+      CASE(OP_put_var_ref0)
+          : CASE(OP_put_var_ref1)
+          : CASE(OP_put_var_ref2) : CASE(OP_put_var_ref3) : {
+        int idx = opcode - OP_put_var_ref0;
+        CHECK_VAR_REF_INDEX(idx);
+        set_value(ctx, var_refs[idx]->pvalue, *--sp);
+      }
       BREAK;
       CASE(OP_set_var_ref0)
-          : set_value(ctx, var_refs[0]->pvalue, LEPUS_DupValue(ctx, sp[-1]));
-      BREAK;
-      CASE(OP_set_var_ref1)
-          : set_value(ctx, var_refs[1]->pvalue, LEPUS_DupValue(ctx, sp[-1]));
-      BREAK;
-      CASE(OP_set_var_ref2)
-          : set_value(ctx, var_refs[2]->pvalue, LEPUS_DupValue(ctx, sp[-1]));
-      BREAK;
-      CASE(OP_set_var_ref3)
-          : set_value(ctx, var_refs[3]->pvalue, LEPUS_DupValue(ctx, sp[-1]));
+          : CASE(OP_set_var_ref1)
+          : CASE(OP_set_var_ref2) : CASE(OP_set_var_ref3) : {
+        int idx = opcode - OP_set_var_ref0;
+        CHECK_VAR_REF_INDEX(idx);
+        set_value(ctx, var_refs[idx]->pvalue, LEPUS_DupValue(ctx, sp[-1]));
+      }
       BREAK;
 #endif
 
@@ -15193,6 +15203,7 @@ restart:
         LEPUSValue val;
         idx = get_u16(pc);
         pc += 2;
+        CHECK_VAR_REF_INDEX(idx);
         val = *var_refs[idx]->pvalue;
         sp[0] = LEPUS_DupValue(ctx, val);
         sp++;
@@ -15202,6 +15213,7 @@ restart:
         int idx;
         idx = get_u16(pc);
         pc += 2;
+        CHECK_VAR_REF_INDEX(idx);
         set_value(ctx, var_refs[idx]->pvalue, sp[-1]);
         sp--;
       }
@@ -15210,6 +15222,7 @@ restart:
         int idx;
         idx = get_u16(pc);
         pc += 2;
+        CHECK_VAR_REF_INDEX(idx);
         set_value(ctx, var_refs[idx]->pvalue, LEPUS_DupValue(ctx, sp[-1]));
       }
       BREAK;
@@ -15218,6 +15231,7 @@ restart:
         LEPUSValue val;
         idx = get_u16(pc);
         pc += 2;
+        CHECK_VAR_REF_INDEX(idx);
         val = *var_refs[idx]->pvalue;
         if (unlikely(LEPUS_IsUninitialized(val))) {
           JS_ThrowReferenceErrorUninitialized(ctx, JS_ATOM_NULL);
@@ -15231,6 +15245,7 @@ restart:
         int idx;
         idx = get_u16(pc);
         pc += 2;
+        CHECK_VAR_REF_INDEX(idx);
         if (unlikely(LEPUS_IsUninitialized(*var_refs[idx]->pvalue))) {
           JS_ThrowReferenceErrorUninitialized(ctx, JS_ATOM_NULL);
           goto exception;
@@ -15243,6 +15258,7 @@ restart:
         int idx;
         idx = get_u16(pc);
         pc += 2;
+        CHECK_VAR_REF_INDEX(idx);
         if (unlikely(!LEPUS_IsUninitialized(*var_refs[idx]->pvalue))) {
           JS_ThrowReferenceErrorUninitialized(ctx, JS_ATOM_NULL);
           goto exception;
@@ -15314,6 +15330,7 @@ restart:
         *sp++ = LEPUS_NewObjectProto(ctx, LEPUS_NULL);
         if (unlikely(LEPUS_IsException(sp[-1]))) goto exception;
         if (opcode == OP_make_var_ref_ref) {
+          CHECK_VAR_REF_INDEX(idx);
           var_ref = var_refs[idx];
           var_ref->header.ref_count++;
         } else {
@@ -16639,6 +16656,8 @@ exception:
   if (need_free_local_buf) js_pop_virtual_sp(caller_ctx, alloca_size);
 #endif
   rt->current_stack_frame = sf->prev_frame;
+#undef CHECK_VAR_REF_INDEX
+#undef CHECK_ARG_INDEX
   return ret_val;
 }
 
