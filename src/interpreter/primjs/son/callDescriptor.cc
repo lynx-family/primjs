@@ -72,19 +72,23 @@ CallDescriptorData* CallDescriptors::InitCallBcHandler(CallKind kind,
 
 CallDescriptorData* CallDescriptors::Get(const CallDescriptor& desc) {
   auto it = _call_desc_map.find(desc);
-  auto res = it->second;
-  if ((it == _call_desc_map.end()) && (desc.is_bc_handler0())) {
-    vmassert(desc.call_index() >= 0, "bc handler must have call index");
-    vmassert(desc.call_index() <= 0xFF, "call index too large");
-    bool is_handler1 = desc.kind() == CallKind::kBcHandler1;
-    bool is_handler2 = desc.kind() == CallKind::kBcHandler2;
-    std::string name;
-    primjs::get_bc_handler_name(desc.call_index(), name);
-    name += is_handler1 ? "_1_asm_h" : (is_handler2 ? "_2_asm_h" : "_0_asm_h");
-    InitCallBcHandler(desc.kind(), name.c_str(), desc.call_index());
-    res = _call_desc_map[desc];
+  if (it != _call_desc_map.end()) {
+    return it->second;
   }
-  return res;
+
+  if (!desc.is_bc_handler0()) {
+    unreachable();
+    return nullptr;
+  }
+
+  vmassert(desc.call_index() >= 0, "bc handler must have call index");
+  vmassert(desc.call_index() <= 0xFF, "call index too large");
+  bool is_handler1 = desc.kind() == CallKind::kBcHandler1;
+  bool is_handler2 = desc.kind() == CallKind::kBcHandler2;
+  std::string name;
+  primjs::get_bc_handler_name(desc.call_index(), name);
+  name += is_handler1 ? "_1_asm_h" : (is_handler2 ? "_2_asm_h" : "_0_asm_h");
+  return InitCallBcHandler(desc.kind(), name.c_str(), desc.call_index());
 }
 
 #define DEF_CALL_DESC_0(name, k, f, r)               \
