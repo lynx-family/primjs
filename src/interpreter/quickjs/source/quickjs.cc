@@ -32313,8 +32313,75 @@ QJS_STATIC int JS_ReadFunctionBytecode(LEPUSContext *ctx, BCReaderState *s,
   pos = 0;
   while (pos < bc_len) {
     op = bc_buf[pos];
-    len = short_opcode_info(op).size;
-    switch (short_opcode_info(op).fmt) {
+    if (op == OP_invalid || op >= OP_COUNT) {
+      b->byte_code_len = pos;
+      LEPUS_ThrowSyntaxError(ctx, "invalid opcode (op=%u pc=%d)", op, pos);
+      return s->error_state = -1;
+    }
+    const JSOpCode *oi = &short_opcode_info(op);
+    len = oi->size;
+    if (len == 0 || static_cast<uint32_t>(len) > bc_len - pos) {
+      b->byte_code_len = pos;
+      return bc_read_error_end(s);
+    }
+    switch (oi->fmt) {
+      case OP_FMT_none_loc:
+        idx = (op - OP_get_loc0) % 4;
+        if (idx >= b->var_count) goto invalid_index;
+        break;
+      case OP_FMT_loc8:
+        idx = get_u8(bc_buf + pos + 1);
+        if (idx >= b->var_count) goto invalid_index;
+        break;
+      case OP_FMT_loc:
+        idx = get_u16(bc_buf + pos + 1);
+        if (idx >= b->var_count) goto invalid_index;
+        break;
+      case OP_FMT_none_arg:
+        idx = (op - OP_get_arg0) % 4;
+        if (idx >= b->arg_count) goto invalid_index;
+        break;
+      case OP_FMT_arg:
+        idx = get_u16(bc_buf + pos + 1);
+        if (idx >= b->arg_count) goto invalid_index;
+        break;
+      case OP_FMT_none_var_ref:
+        idx = (op - OP_get_var_ref0) % 4;
+        if (idx >= b->closure_var_count) goto invalid_index;
+        break;
+      case OP_FMT_var_ref:
+        idx = get_u16(bc_buf + pos + 1);
+        if (idx >= b->closure_var_count) goto invalid_index;
+        break;
+      case OP_FMT_const8:
+        idx = get_u8(bc_buf + pos + 1);
+        if (idx >= b->cpool_count) goto invalid_index;
+        break;
+      case OP_FMT_const:
+        idx = get_u32(bc_buf + pos + 1);
+        if (idx >= b->cpool_count) goto invalid_index;
+        break;
+      case OP_FMT_atom_u16:
+        idx = get_u16(bc_buf + pos + 5);
+        switch (op) {
+          case OP_make_loc_ref:
+            if (idx >= b->var_count) goto invalid_index;
+            break;
+          case OP_make_arg_ref:
+            if (idx >= b->arg_count) goto invalid_index;
+            break;
+          case OP_make_var_ref_ref:
+            if (idx >= b->closure_var_count) goto invalid_index;
+            break;
+          default:
+            break;
+        }
+        break;
+      default:
+        break;
+    }
+
+    switch (oi->fmt) {
       case OP_FMT_atom:
       case OP_FMT_atom_u8:
       case OP_FMT_atom_u16:
@@ -32342,7 +32409,15 @@ QJS_STATIC int JS_ReadFunctionBytecode(LEPUSContext *ctx, BCReaderState *s,
         break;
     }
     pos += len;
+    continue;
+
+  invalid_index:
+    b->byte_code_len = pos;
+    LEPUS_ThrowSyntaxError(ctx, "invalid bytecode index (index=%u pc=%d)", idx,
+                           pos);
+    return s->error_state = -1;
   }
+  b->byte_code_len = bc_len;
   return 0;
 }
 
@@ -32373,6 +32448,20 @@ QJS_STATIC int JS_ValidateChildClosureVars(BCReaderState *s,
   return 0;
 }
 
+QJS_STATIC void JS_FreeFunctionAfterBytecodeReadError(LEPUSRuntime *rt,
+                                                      LEPUSFunctionBytecode *b,
+                                                      int local_count) {
+  free_bytecode_atoms(rt, b->byte_code_buf, b->byte_code_len, TRUE);
+  for (int i = 0; i < local_count; i++) {
+    LEPUS_FreeAtomRT(rt, b->vardefs[i].var_name);
+  }
+  for (int i = 0; i < b->closure_var_count; i++) {
+    LEPUS_FreeAtomRT(rt, b->closure_var[i].var_name);
+  }
+  LEPUS_FreeAtomRT(rt, b->func_name);
+  lepus_free_rt(rt, b);
+}
+
 QJS_STATIC LEPUSValue JS_ReadFunction(BCReaderState *s) {
   LEPUSContext *ctx = s->ctx;
   HandleScope func_scope(ctx);
@@ -32380,7 +32469,7 @@ QJS_STATIC LEPUSValue JS_ReadFunction(BCReaderState *s) {
   LEPUSFunctionBytecode bc, *b;
   uint16_t v16;
   uint8_t v8;
-  int idx, i, local_count;
+  int idx, i, local_count, byte_code_len;
   size_t function_size, cpool_offset, byte_code_offset;
   size_t closure_var_offset, vardefs_offset;
 
@@ -32420,6 +32509,7 @@ QJS_STATIC LEPUSValue JS_ReadFunction(BCReaderState *s) {
   if (bc.closure_var_count < 0 || bc.cpool_count < 0 || bc.byte_code_len < 0 ||
       local_count < 0)
     goto fail;
+  byte_code_len = bc.byte_code_len;
 
   if (bc.has_debug) {
     function_size = sizeof(*b);
@@ -32456,7 +32546,7 @@ QJS_STATIC LEPUSValue JS_ReadFunction(BCReaderState *s) {
   func_scope.PushHandle(b, HANDLE_TYPE_DIR_HEAP_OBJ);
 
   memcpy(b, &bc, offsetof(LEPUSFunctionBytecode, debug));
-  // obj = LEPUS_MKPTR(LEPUS_TAG_FUNCTION_BYTECODE, b);
+  b->byte_code_len = 0;
 
 #ifdef DUMP_READ_OBJECT
   bc_read_trace(s, "name: ");
@@ -32519,8 +32609,12 @@ QJS_STATIC LEPUSValue JS_ReadFunction(BCReaderState *s) {
   {
     bc_read_trace(s, "bytecode {\n");
     if (JS_ReadFunctionBytecode(ctx, s, b, static_cast<int>(byte_code_offset),
-                                b->byte_code_len))
+                                byte_code_len)) {
+      if (!ctx->gc_enable) {
+        JS_FreeFunctionAfterBytecodeReadError(ctx->rt, b, local_count);
+      }
       goto fail;
+    }
     obj = LEPUS_MKPTR(LEPUS_TAG_FUNCTION_BYTECODE, b);
     // < primjs end>
     bc_read_trace(s, "}\n");
