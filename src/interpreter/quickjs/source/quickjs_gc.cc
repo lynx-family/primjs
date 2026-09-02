@@ -23726,6 +23726,7 @@ static LEPUSCFunctionListEntry js_global_funcs[] = {
     LEPUS_CFUNC_MAGIC_DEF("encodeURIComponent", 1, js_global_encodeURI, 1),
     LEPUS_CFUNC_DEF("escape", 1, js_global_escape),
     LEPUS_CFUNC_DEF("unescape", 1, js_global_unescape),
+    LEPUS_CFUNC_DEF("isDirectOrDeepEqual", 2, js_is_direct_or_deep_equal),
     LEPUS_PROP_DOUBLE_DEF("Infinity", 1.0 / 0.0, 0),
     LEPUS_PROP_DOUBLE_DEF("NaN", LEPUS_FLOAT64_NAN, 0),
     LEPUS_PROP_UNDEFINED_DEF("undefined", 0),

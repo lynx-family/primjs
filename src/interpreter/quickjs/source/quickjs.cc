@@ -47674,6 +47674,232 @@ QJS_STATIC LEPUSValue js_global_unescape(LEPUSContext *ctx,
   return string_buffer_end(b);
 }
 
+static BOOL js_is_deep_comparable_object(LEPUSContext *ctx,
+                                         LEPUSValueConst value) {
+  return LEPUS_IsObject(value) && !LEPUS_IsFunction(ctx, value);
+}
+
+struct JSDeepEqualAncestor {
+  LEPUSObject *object;
+  const JSDeepEqualAncestor *parent;
+};
+
+static BOOL js_deep_equal_has_ancestor(const JSDeepEqualAncestor *ancestor,
+                                       LEPUSObject *object) {
+  for (; ancestor; ancestor = ancestor->parent) {
+    if (ancestor->object == object) return TRUE;
+  }
+  return FALSE;
+}
+
+static void js_deep_equal_free_value(LEPUSContext *ctx, LEPUSValue value) {
+  if (!ctx->gc_enable) LEPUS_FreeValue(ctx, value);
+}
+
+static void js_deep_equal_free_prop_enum(LEPUSContext *ctx,
+                                         LEPUSPropertyEnum *props,
+                                         uint32_t prop_count) {
+  if (!ctx->gc_enable) js_free_prop_enum(ctx, props, prop_count);
+}
+
+/* Return -1 when the generic strict equality implementation is required. */
+static int js_deep_equal_fast_strict_eq(LEPUSValueConst lhs,
+                                        LEPUSValueConst rhs) {
+  int64_t lhs_tag = LEPUS_VALUE_GET_NORM_TAG(lhs);
+  int64_t rhs_tag = LEPUS_VALUE_GET_NORM_TAG(rhs);
+
+  switch (lhs_tag) {
+    case LEPUS_TAG_BOOL:
+      return rhs_tag == LEPUS_TAG_BOOL &&
+             LEPUS_VALUE_GET_BOOL(lhs) == LEPUS_VALUE_GET_BOOL(rhs);
+    case LEPUS_TAG_NULL:
+    case LEPUS_TAG_UNDEFINED:
+      return lhs_tag == rhs_tag;
+    case LEPUS_TAG_OBJECT:
+      return rhs_tag == LEPUS_TAG_OBJECT &&
+             LEPUS_VALUE_GET_OBJ(lhs) == LEPUS_VALUE_GET_OBJ(rhs);
+    case LEPUS_TAG_SYMBOL:
+      return rhs_tag == LEPUS_TAG_SYMBOL &&
+             LEPUS_VALUE_GET_PTR(lhs) == LEPUS_VALUE_GET_PTR(rhs);
+#ifdef ENABLE_LEPUSNG
+    case LEPUS_TAG_LEPUS_REF:
+      return rhs_tag == LEPUS_TAG_LEPUS_REF &&
+             LEPUS_GetLepusRefPoint(lhs) == LEPUS_GetLepusRefPoint(rhs);
+    case LEPUS_TAG_LEPUS_CPOINTER:
+      return rhs_tag == LEPUS_TAG_LEPUS_CPOINTER &&
+             LEPUS_VALUE_GET_PTR(lhs) == LEPUS_VALUE_GET_PTR(rhs);
+#endif
+    case LEPUS_TAG_INT: {
+      double lhs_number = LEPUS_VALUE_GET_INT(lhs);
+      if (rhs_tag == LEPUS_TAG_INT) {
+        return LEPUS_VALUE_GET_INT(lhs) == LEPUS_VALUE_GET_INT(rhs);
+      }
+      if (rhs_tag == LEPUS_TAG_FLOAT64) {
+        return lhs_number == LEPUS_VALUE_GET_FLOAT64(rhs);
+      }
+      return FALSE;
+    }
+    case LEPUS_TAG_FLOAT64: {
+      double lhs_number = LEPUS_VALUE_GET_FLOAT64(lhs);
+      if (rhs_tag == LEPUS_TAG_FLOAT64) {
+        return lhs_number == LEPUS_VALUE_GET_FLOAT64(rhs);
+      }
+      if (rhs_tag == LEPUS_TAG_INT) {
+        return lhs_number == LEPUS_VALUE_GET_INT(rhs);
+      }
+      return FALSE;
+    }
+    case LEPUS_TAG_STRING: {
+      if (rhs_tag == LEPUS_TAG_STRING) {
+        JSString *lhs_string = LEPUS_VALUE_GET_STRING(lhs);
+        JSString *rhs_string = LEPUS_VALUE_GET_STRING(rhs);
+        if (lhs_string == rhs_string) return TRUE;
+        if (lhs_string->atom_type == JS_ATOM_TYPE_STRING &&
+            rhs_string->atom_type == JS_ATOM_TYPE_STRING) {
+          return FALSE;
+        }
+        return -1;
+      }
+      return rhs_tag == LEPUS_TAG_SEPARABLE_STRING ? -1 : FALSE;
+    }
+    case LEPUS_TAG_SEPARABLE_STRING:
+      if (rhs_tag == LEPUS_TAG_SEPARABLE_STRING) {
+        return LEPUS_VALUE_GET_PTR(lhs) == LEPUS_VALUE_GET_PTR(rhs) ? TRUE : -1;
+      }
+      return rhs_tag == LEPUS_TAG_STRING ? -1 : FALSE;
+    case LEPUS_TAG_BIG_INT:
+      if (rhs_tag != LEPUS_TAG_BIG_INT) return FALSE;
+      return LEPUS_VALUE_GET_BIGINT(lhs) == LEPUS_VALUE_GET_BIGINT(rhs) ? TRUE
+                                                                        : -1;
+    default:
+      return FALSE;
+  }
+}
+
+static BOOL js_deep_equal_strict_eq(LEPUSContext *ctx, LEPUSValueConst lhs,
+                                    LEPUSValueConst rhs) {
+  int result = js_deep_equal_fast_strict_eq(lhs, rhs);
+  if (result >= 0) return result;
+  return ctx->gc_enable ? LEPUS_StrictEq(ctx, lhs, rhs)
+                        : LEPUS_StrictEq(ctx, LEPUS_DupValue(ctx, lhs),
+                                         LEPUS_DupValue(ctx, rhs));
+}
+
+static int js_is_direct_or_deep_equal_impl(LEPUSContext *ctx,
+                                           LEPUSValueConst new_obj,
+                                           LEPUSValueConst old_obj,
+                                           const JSDeepEqualAncestor *ancestors,
+                                           BOOL *is_equal) {
+  LEPUSPropertyEnum *new_props = nullptr;
+  LEPUSPropertyEnum *old_props = nullptr;
+  uint32_t new_prop_count = 0;
+  uint32_t old_prop_count = 0;
+  LEPUSValue new_value = LEPUS_UNDEFINED;
+  LEPUSValue old_value = LEPUS_UNDEFINED;
+  HandleScope func_scope(ctx, &new_props, HANDLE_TYPE_HEAP_OBJ);
+  func_scope.PushHandle(&old_props, HANDLE_TYPE_HEAP_OBJ);
+  func_scope.PushHandle(&new_value, HANDLE_TYPE_LEPUS_VALUE);
+  func_scope.PushHandle(&old_value, HANDLE_TYPE_LEPUS_VALUE);
+
+  BOOL is_direct_equal = js_deep_equal_strict_eq(ctx, new_obj, old_obj);
+  BOOL new_is_object = js_is_deep_comparable_object(ctx, new_obj);
+  if (is_direct_equal) {
+    if (!new_is_object || !ancestors) {
+      *is_equal = TRUE;
+      return 0;
+    }
+  } else if (!new_is_object) {
+    *is_equal = FALSE;
+    return 0;
+  }
+
+  LEPUSObject *new_object = LEPUS_VALUE_GET_OBJ(new_obj);
+  if (js_deep_equal_has_ancestor(ancestors, new_object)) {
+    LEPUS_ThrowTypeError(ctx, "Cannot compare circular structures");
+    return -1;
+  }
+  const JSDeepEqualAncestor ancestor = {new_object, ancestors};
+
+  int flags = LEPUS_GPN_STRING_MASK | LEPUS_GPN_ENUM_ONLY;
+  if (LEPUS_GetOwnPropertyNames(ctx, &new_props, &new_prop_count, new_obj,
+                                flags) < 0) {
+    return -1;
+  }
+
+  BOOL old_is_object = js_is_deep_comparable_object(ctx, old_obj);
+  if (old_is_object &&
+      LEPUS_GetOwnPropertyNames(ctx, &old_props, &old_prop_count, old_obj,
+                                flags) < 0) {
+    goto fail;
+  }
+  *is_equal = old_is_object && new_prop_count == old_prop_count;
+  js_deep_equal_free_prop_enum(ctx, old_props, old_prop_count);
+  old_props = nullptr;
+
+  for (uint32_t i = 0; i < new_prop_count; ++i) {
+    JSAtom prop = new_props[i].atom;
+    new_value = LEPUS_GetProperty(ctx, new_obj, prop);
+    if (LEPUS_IsException(new_value)) goto fail;
+
+    if (!*is_equal) {
+      if (js_is_deep_comparable_object(ctx, new_value) &&
+          js_is_direct_or_deep_equal_impl(ctx, new_value, LEPUS_UNDEFINED,
+                                          &ancestor, is_equal) < 0) {
+        goto fail;
+      }
+      *is_equal = FALSE;
+    } else {
+      int has_own_property = LEPUS_GetOwnProperty(ctx, nullptr, old_obj, prop);
+      if (has_own_property < 0) goto fail;
+      if (!has_own_property) {
+        *is_equal = FALSE;
+        if (js_is_deep_comparable_object(ctx, new_value) &&
+            js_is_direct_or_deep_equal_impl(ctx, new_value, LEPUS_UNDEFINED,
+                                            &ancestor, is_equal) < 0) {
+          goto fail;
+        }
+        *is_equal = FALSE;
+      } else {
+        old_value = LEPUS_GetProperty(ctx, old_obj, prop);
+        if (LEPUS_IsException(old_value)) goto fail;
+        if (js_is_direct_or_deep_equal_impl(ctx, new_value, old_value,
+                                            &ancestor, is_equal) < 0) {
+          goto fail;
+        }
+      }
+    }
+
+    js_deep_equal_free_value(ctx, new_value);
+    js_deep_equal_free_value(ctx, old_value);
+    new_value = LEPUS_UNDEFINED;
+    old_value = LEPUS_UNDEFINED;
+  }
+
+  js_deep_equal_free_prop_enum(ctx, new_props, new_prop_count);
+  return 0;
+
+fail:
+  js_deep_equal_free_value(ctx, new_value);
+  js_deep_equal_free_value(ctx, old_value);
+  js_deep_equal_free_prop_enum(ctx, old_props, old_prop_count);
+  js_deep_equal_free_prop_enum(ctx, new_props, new_prop_count);
+  return -1;
+}
+
+QJS_HIDE LEPUSValue js_is_direct_or_deep_equal(LEPUSContext *ctx,
+                                               LEPUSValueConst this_val,
+                                               int argc,
+                                               LEPUSValueConst *argv) {
+  LEPUSValueConst new_obj = argc > 0 ? argv[0] : LEPUS_UNDEFINED;
+  LEPUSValueConst old_obj = argc > 1 ? argv[1] : LEPUS_UNDEFINED;
+  BOOL is_equal;
+  if (js_is_direct_or_deep_equal_impl(ctx, new_obj, old_obj, nullptr,
+                                      &is_equal) < 0) {
+    return LEPUS_EXCEPTION;
+  }
+  return LEPUS_NewBool(ctx, is_equal);
+}
+
 QJS_HIDE LEPUSValue js_lepus_set_gc_memory_policy(LEPUSContext *ctx,
                                                   LEPUSValueConst this_val,
                                                   int argc,
@@ -47723,6 +47949,7 @@ static LEPUSCFunctionListEntry js_global_funcs[] = {
     LEPUS_CFUNC_MAGIC_DEF("encodeURIComponent", 1, js_global_encodeURI, 1),
     LEPUS_CFUNC_DEF("escape", 1, js_global_escape),
     LEPUS_CFUNC_DEF("unescape", 1, js_global_unescape),
+    LEPUS_CFUNC_DEF("isDirectOrDeepEqual", 2, js_is_direct_or_deep_equal),
     LEPUS_PROP_DOUBLE_DEF("Infinity", 1.0 / 0.0, 0),
     LEPUS_PROP_DOUBLE_DEF("NaN", LEPUS_FLOAT64_NAN, 0),
     LEPUS_PROP_UNDEFINED_DEF("undefined", 0),
