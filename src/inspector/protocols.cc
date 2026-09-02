@@ -351,8 +351,9 @@ static ProcessMessageResult ProcessMessage(LEPUSContext *ctx,
 }
 
 #define process_messages(view_id)                                           \
-  auto *mq = GetDebuggerMessageQueue(info);                                 \
   LEPUSContext *ctx = info->ctx;                                            \
+  ScopedCommonMemorySlot common_memory_slot_scope(ctx->rt);                 \
+  auto *mq = GetDebuggerMessageQueue(info);                                 \
   auto *sf = ctx->rt->current_stack_frame;                                  \
   LEPUSValue message = LEPUS_UNDEFINED;                                     \
   HandleScope func_scope(ctx, &message, HANDLE_TYPE_LEPUS_VALUE);           \

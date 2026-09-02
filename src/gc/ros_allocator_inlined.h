@@ -156,8 +156,34 @@ inline bool RosAllocImpl::UpdateGlobalsAfterFree(RunSlots &run, bool wasFull) {
   return needRemove;
 }
 
+inline MemorySlotReleaseBatch<true>::~MemorySlotReleaseBatch() {
+  for (uint16_t i = 0; i < touched_slot_count_; ++i) {
+    uint8_t slot = touched_slots_[i];
+    allocator_.ReleaseMemorySlotBytes(slot, released_bytes_[slot]);
+  }
+}
+
+inline void MemorySlotReleaseBatch<true>::Add(address_t objAddr,
+                                              size_t internalSize) {
+  uint8_t slot = allocator_.GetObjectMemorySlot(objAddr);
+  size_t maskIndex = slot / kMemorySlotsPerMask;
+  uint64_t slotMask = static_cast<uint64_t>(1) << (slot % kMemorySlotsPerMask);
+  if (LIKELY(touched_slots_mask_[maskIndex] & slotMask)) {
+    released_bytes_[slot] += internalSize;
+    return;
+  }
+  ROSIMPL_ASSERT(touched_slot_count_ < kMemorySlotCount,
+                 "too many memory slots");
+  touched_slots_mask_[maskIndex] |= slotMask;
+  touched_slots_[touched_slot_count_++] = slot;
+  released_bytes_[slot] = internalSize;
+}
+
 // must be called in critical section, either in STW or holding lock
-inline void RosAllocImpl::SweepSlot(RunSlots &run, address_t slotAddr) {
+template <bool TrackMemory>
+inline void RosAllocImpl::SweepSlot(
+    RunSlots &run, address_t slotAddr,
+    MemorySlotReleaseBatch<TrackMemory> &releaseBatch) {
   address_t objAddr = ROSIMPL_GET_OBJ_FROM_ADDR(slotAddr);
   DCHECK_OBJ_IS_ALLOCATED_BY_ALLOCATOR(objAddr);
   CheckObjHasValidKlassForDebug(objAddr);
@@ -168,10 +194,10 @@ inline void RosAllocImpl::SweepSlot(RunSlots &run, address_t slotAddr) {
   size_t objSize = PreObjFree(objAddr);
 #endif
   size_t slotSize = run.GetRunSize();
+  releaseBatch.Add(objAddr, slotSize);
 #ifdef ROSIMPL_MEMSET_AT_FREE
   ROSALLOC_MEMSET_S(slotAddr, slotSize, 0, slotSize);
 #endif
-  // FreeSlot have already cleared allocatedBit
   run.FreeSlot(slotAddr);
 #ifdef ALLOC_USE_FAST_PATH
   PostObjFree<true>(objAddr, objSize, slotSize);
@@ -179,6 +205,7 @@ inline void RosAllocImpl::SweepSlot(RunSlots &run, address_t slotAddr) {
   PostObjFree(objAddr, objSize, slotSize);
 #endif
 }
+
 inline bool RosAllocImpl::LocalRunIsEmpty(RunSlots &run) {
   if (run.IsEmpty()) {
     return true;
@@ -196,15 +223,17 @@ inline bool RosAllocImpl::LocalRunIsEmpty(RunSlots &run) {
   }
   return true;
 }
+
+template <bool TrackMemory>
 inline void RosAllocImpl::SweepRun(RunSlots &run, Bitmap *markBitmap,
                                    size_t &releasedSize) {
+  MemorySlotReleaseBatch<TrackMemory> releaseBatch(*this);
   bool wasFull = run.IsFull();
-  run.FreeIterator([&releasedSize, &markBitmap, this, &run](
+  run.FreeIterator([&releasedSize, &markBitmap, &releaseBatch, this, &run](
                        address_t objAddr, address_t slotAddr, size_t slotSize) {
     if (!markBitmap->IsObjectMarked(objAddr)) {
       LOG(LEVEL_1) << "ros, SweepRun: " << (void *)(objAddr);
-      this->SweepSlot(run, slotAddr);
-      ClearAllocatedBit(objAddr);
+      this->SweepSlot<TrackMemory>(run, slotAddr, releaseBatch);
 #ifdef FUTURE_OPTIMIZE
       __asm __volatile("dc cvau, %0" ::"r"(slotAddr));
 #endif
@@ -217,8 +246,19 @@ inline void RosAllocImpl::SweepRun(RunSlots &run, Bitmap *markBitmap,
   }
 }
 
+inline void RosAllocImpl::SweepRun(RunSlots &run, Bitmap *markBitmap,
+                                   size_t &releasedSize) {
+  if (HasMemoryTracking()) {
+    SweepRun<true>(run, markBitmap, releasedSize);
+  } else {
+    SweepRun<false>(run, markBitmap, releasedSize);
+  }
+}
+
+template <bool TrackMemory>
 inline void RosAllocImpl::ConcurrentSweepRun(RunSlots &run,
                                              Bitmap *markBitmap) {
+  MemorySlotReleaseBatch<TrackMemory> releaseBatch(*this);
   size_t releasedBytes = 0;
   bool wasFull = run.IsFull();
   bool locked = false;
@@ -226,12 +266,11 @@ inline void RosAllocImpl::ConcurrentSweepRun(RunSlots &run,
     runLocks[run.mIdx].lock();
     locked = true;
   }
-  run.FreeIterator([&releasedBytes, markBitmap, this, &run](
+  run.FreeIterator([&releasedBytes, markBitmap, &releaseBatch, this, &run](
                        address_t objAddr, address_t slotAddr, size_t slotSize) {
     if (!markBitmap->IsObjectMarked(objAddr)) {
       LOG(LEVEL_1) << "ros, ConcurrentSweepRun: " << (void *)(objAddr);
-      this->SweepSlot(run, slotAddr);
-      ClearAllocatedBit(objAddr);
+      this->SweepSlot<TrackMemory>(run, slotAddr, releaseBatch);
       releasedBytes += slotSize;
     }
   });
@@ -254,10 +293,53 @@ inline void RosAllocImpl::ConcurrentSweepRun(RunSlots &run,
     FreeRun(run);
   }
 }
+
+inline void RosAllocImpl::ConcurrentSweepRun(RunSlots &run,
+                                             Bitmap *markBitmap) {
+  if (HasMemoryTracking()) {
+    ConcurrentSweepRun<true>(run, markBitmap);
+  } else {
+    ConcurrentSweepRun<false>(run, markBitmap);
+  }
+}
 __attribute__((always_inline)) void Allocator::PostObjAlloc(
     address_t objAddress, size_t objSize, size_t internalSize) {
   bool isLarge = internalSize > RosAllocImpl::kLargeObjSize;
   account.AtAlloc(objSize, internalSize, isLarge);
+}
+
+inline uint8_t RosAllocImpl::GetObjectMemorySlot(address_t objAddr) const {
+  return get_memory_slot(reinterpret_cast<void *>(objAddr + kHeaderSize));
+}
+
+inline void RosAllocImpl::AccumulateMemorySlotAllocation(uint8_t slot,
+                                                         size_t internalSize) {
+  ROSIMPL_ASSERT(slot <= rt_->malloc_state.max_slot_index,
+                 "invalid memory slot");
+  if (UNLIKELY(slot != pending_memory_slot_)) {
+    FlushPendingMemorySlotAllocations();
+    pending_memory_slot_ = slot;
+  }
+  pending_memory_slot_bytes_ += internalSize;
+}
+
+inline void RosAllocImpl::ReleaseMemorySlotBytes(uint8_t slot,
+                                                 size_t internalSize) {
+  ROSIMPL_ASSERT(slot <= rt_->malloc_state.max_slot_index,
+                 "invalid memory slot");
+  size_t previous =
+      __atomic_fetch_sub(&rt_->malloc_state.memory_size_slots[slot],
+                         internalSize, __ATOMIC_RELAXED);
+  ROSIMPL_ASSERT(previous >= internalSize, "memory slot underflow");
+}
+
+inline void RosAllocImpl::ReleaseObjectMemorySlotIfTracked(
+    address_t objAddr, size_t internalSize) {
+  // Large and Huge objects use this low-frequency generic entry point. Run
+  // sweep selects a template specialization once per Run instead.
+  if (HasMemoryTracking()) {
+    ReleaseMemorySlotBytes(GetObjectMemorySlot(objAddr), internalSize);
+  }
 }
 __attribute__((always_inline)) address_t RosAllocImpl::AllocInternal(
     size_t &allocSize) {

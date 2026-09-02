@@ -547,12 +547,17 @@ void InitRosGC(LEPUSRuntime *rt) {
 
 static inline uint8_t *js_get_stack_pointer(void);
 LEPUSRuntime *JS_NewRuntime2_GC(const LEPUSMallocFunctions *mf, void *opaque,
-                                uint32_t mode) {
+                                uint32_t mode, int32_t *ptr_to_current_slot) {
   LEPUSRuntime *rt;
   JSMallocState ms;
 
   memset(&ms, 0, sizeof(ms));
   ms.opaque = opaque;
+  ms.max_slot_index = LEPUS_MEMORY_CATEGORY_COMMON;
+  ms.ptr_to_current_slot = ptr_to_current_slot;
+  if (ptr_to_current_slot) {
+    *ptr_to_current_slot = LEPUS_MEMORY_CATEGORY_COMMON;
+  }
   ms.malloc_limit = -1;
 
   const char *module_name = MODULE_PRIMJS;
@@ -569,8 +574,14 @@ LEPUSRuntime *JS_NewRuntime2_GC(const LEPUSMallocFunctions *mf, void *opaque,
     rt->mf.lepus_malloc_usable_size = js_malloc_usable_size_unknown;
   }
   rt->malloc_state = ms;
-  rt->js_malloc_rt = js_malloc_rt_gc;
-  rt->js_realloc_rt = js_realloc_rt_gc;
+  // Select the specialized accounting path once at Runtime creation.
+  if (ptr_to_current_slot) {
+    rt->js_malloc_rt = js_malloc_rt_gc_with_memory_slot;
+    rt->js_realloc_rt = js_realloc_rt_gc_with_memory_slot;
+  } else {
+    rt->js_malloc_rt = js_malloc_rt_gc;
+    rt->js_realloc_rt = js_realloc_rt_gc;
+  }
   rt->malloc_gc_threshold = 256 * 1024;
   InitRosGC(rt);
   set_gc_info_threshold(rt, mode);
@@ -658,7 +669,7 @@ bool JS_GetGCPauseSuppressionMode_GC(LEPUSRuntime *rt) {
 static void lepus_def_gcfree(JSMallocState *s, void *ptr) { abort(); }
 
 size_t allocate_usable_size(void *mem) {
-  return *(reinterpret_cast<uint32_t *>(mem) - 1) & 0x7FFFFFFF;
+  return *(reinterpret_cast<uint32_t *>(mem) - 1) & ROS_GC::kPayloadSizeMask;
 }
 
 static const LEPUSMallocFunctions def_allocate_funcs = {
@@ -668,8 +679,9 @@ static const LEPUSMallocFunctions def_allocate_funcs = {
     (size_t (*)(const void *))allocate_usable_size,
 };
 
-LEPUSRuntime *JS_NewRuntime_GC(uint32_t mode) {
-  return JS_NewRuntime2_GC(&def_allocate_funcs, NULL, mode);
+LEPUSRuntime *JS_NewRuntime_GC(uint32_t mode, int32_t *ptr_to_current_slot) {
+  return JS_NewRuntime2_GC(&def_allocate_funcs, NULL, mode,
+                           ptr_to_current_slot);
 }
 
 QJS_STATIC uint8_t
@@ -783,7 +795,7 @@ QJS_STATIC inline JSAtomStruct *atom_set_free(uint32_t v) {
   return reinterpret_cast<JSAtomStruct *>(((uintptr_t)v << 1) | 1);
 }
 
-void JS_FreeRuntime_GC(LEPUSRuntime *rt) {
+void JS_FreeRuntime_GC(LEPUSRuntime *rt, size_t *memory_size_slots) {
   pthread_mutex_lock(&runtime_mutex);
   std::unordered_set<LEPUSRuntime *> *g_rt_set = js_get_rt_set();
   if (g_rt_set->find(rt) != g_rt_set->end()) g_rt_set->erase(rt);
@@ -818,7 +830,7 @@ void JS_FreeRuntime_GC(LEPUSRuntime *rt) {
   rt->atom_hash = NULL;
   rt->shape_hash = NULL;
 
-  rt->ros_->ReleaseAllPageGroups();
+  rt->ros_->ReleaseAllPageGroups(memory_size_slots != nullptr);
 
   // free trace_gc data
   if (rt->ptr_handles) {
@@ -858,6 +870,10 @@ void JS_FreeRuntime_GC(LEPUSRuntime *rt) {
     if (rt->fr_data_finalizer_recoder) {
       delete rt->fr_data_finalizer_recoder;
       rt->fr_data_finalizer_recoder = nullptr;
+    }
+    if (memory_size_slots) {
+      memcpy(memory_size_slots, rt->malloc_state.memory_size_slots,
+             sizeof(rt->malloc_state.memory_size_slots));
     }
     system_free(rt);
   }

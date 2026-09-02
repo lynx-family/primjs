@@ -37,6 +37,8 @@ namespace ROS_GC {
 constexpr auto kSweepTimeout = std::chrono::seconds(3);
 class RosAllocImpl;
 class MarkSweepCollector;
+template <bool TrackMemory>
+class MemorySlotReleaseBatch;
 
 class SweepContext {
   friend class RunSlots;
@@ -354,9 +356,16 @@ class RosAllocImpl : public Allocator {
 
   RosAllocImpl(LEPUSRuntime *rt, bool enable_concurrent);
   ~RosAllocImpl();
+  bool HasMemoryTracking() const { return UNLIKELY(has_memory_tracking_); }
+  // Publishes allocations accumulated by the Runtime's owning thread.
+  void FlushPendingMemorySlotAllocations();
   static address_t AllocateObj(LEPUSRuntime *rt, size_t size, int alloc_tag);
+  static address_t AllocateObjWithMemorySlot(LEPUSRuntime *rt, size_t size,
+                                             int alloc_tag);
   static address_t ReallocateObj(LEPUSRuntime *rt, void *ptr, size_t size,
                                  int alloc_tag);
+  static address_t ReallocateObjWithMemorySlot(LEPUSRuntime *rt, void *ptr,
+                                               size_t size, int alloc_tag);
 
   inline address_t NewObjInternal(size_t &size);
   inline bool NeedTriggerConcurrentPhases(size_t size) {
@@ -367,7 +376,7 @@ class RosAllocImpl : public Allocator {
     return 0;
   }
   bool ParallelFreeAllIf(MplThreadPool &threadPool);
-  void ReleaseAllPageGroups();
+  void ReleaseAllPageGroups(bool release_memory_slot_charges = false);
   bool ConcurrentSweep(MplThreadPool &threadPool);
   void ForEachObj(HeapAliveObjsVisitor &visitor);
   bool ParallelForEachObj(MplThreadPool &threadPool,
@@ -479,6 +488,11 @@ class RosAllocImpl : public Allocator {
       std::function<bool(address_t, ROS_GC::Bitmap *)> &shouldFree);
   void SweepNonFullRuns(
       std::function<bool(address_t, ROS_GC::Bitmap *)> &shouldFree);
+  template <bool TrackMemory>
+  void SweepRunForConSweepPrologue(
+      RunSlots &run,
+      std::function<bool(address_t, ROS_GC::Bitmap *)> &shouldFree,
+      PageGroups &groups);
   void SweepRunForConSweepPrologue(
       RunSlots &run,
       std::function<bool(address_t, ROS_GC::Bitmap *)> &shouldFree,
@@ -621,6 +635,8 @@ class RosAllocImpl : public Allocator {
   friend ConcurrentFreeTask;
   friend ForEachTask;
   friend RunSlots;
+  template <bool TrackMemory>
+  friend class MemorySlotReleaseBatch;
 
   bool concurrent_mark_is_running = false;
   bool conMarkFinished = false;
@@ -631,8 +647,11 @@ class RosAllocImpl : public Allocator {
   // The instance space associated with the allocator
   Space allocSpace;
   LEPUSRuntime *rt_;
+  bool has_memory_tracking_;
   bool enable_concurrent_;
   bool gcPauseSuppressionMode;
+  size_t pending_memory_slot_bytes_ = 0;
+  uint8_t pending_memory_slot_ = 0;
   // PtrHandles *ptr_handles = nullptr;
   ALLOC_MUTEX_TYPE runLocks[kNumberROSRuns];
   ThreeTierList<RunSlots> nonFullRuns[kNumberROSRuns];
@@ -670,12 +689,29 @@ class RosAllocImpl : public Allocator {
   inline address_t AllocFromRun(size_t &internalSize, int eagerness);
   // inline void RevokeLocalRun(RosBasedMutator &mutator, RunSlots &run);
   inline bool UpdateGlobalsAfterFree(RunSlots &run, bool wasFull);
-  inline void SweepSlot(RunSlots &run, address_t slotAddr);
+  template <bool TrackMemory>
+  inline void SweepSlot(RunSlots &run, address_t slotAddr,
+                        MemorySlotReleaseBatch<TrackMemory> &releaseBatch);
   inline bool LocalRunIsEmpty(RunSlots &run);
+  template <bool TrackMemory>
   inline void SweepRun(RunSlots &run, Bitmap *markBitmap, size_t &releasedSize);
+  inline void SweepRun(RunSlots &run, Bitmap *markBitmap, size_t &releasedSize);
+  template <bool TrackMemory>
+  inline void ConcurrentSweepRun(RunSlots &run, Bitmap *markBitmap);
   inline void ConcurrentSweepRun(RunSlots &run, Bitmap *markBitmap);
   // tries to allocate an object given the size
   inline address_t AllocInternal(size_t &allocSize);
+  template <bool TrackMemory>
+  static address_t AllocateObjInternal(LEPUSRuntime *rt, size_t size,
+                                       int alloc_tag);
+  template <bool TrackMemory>
+  static address_t ReallocateObjInternal(LEPUSRuntime *rt, void *ptr,
+                                         size_t size, int alloc_tag);
+  inline uint8_t GetObjectMemorySlot(address_t objAddr) const;
+  inline void AccumulateMemorySlotAllocation(uint8_t slot, size_t internalSize);
+  inline void ReleaseMemorySlotBytes(uint8_t slot, size_t internalSize);
+  inline void ReleaseObjectMemorySlotIfTracked(address_t objAddr,
+                                               size_t internalSize);
 #ifndef _WIN32
   inline void ForEachObjInRun(
       RunSlots &run, HeapAliveObjsVisitor &visitor,
@@ -696,6 +732,7 @@ class RosAllocImpl : public Allocator {
   void SweepLargeObj(address_t objAddr, size_t &internalSize, uint32_t pageIdx);
   void SweepHugeObj(PageGroup &group, size_t &internalSize);
   void FreeHugeObj(PageGroup &group, size_t &internalSize);
+  void ReleaseAllMemorySlotCharges();
   bool SweepPage(size_t, size_t &);
   void SweepPages(size_t, size_t);
 
@@ -746,5 +783,40 @@ class RosAllocImpl : public Allocator {
   size_t outer_heap_size = 0;
   int gc_cnt = 0;
 };  // class RosAllocImpl
+
+template <bool TrackMemory>
+class MemorySlotReleaseBatch {
+ public:
+  explicit MemorySlotReleaseBatch(RosAllocImpl &) {}
+  inline void Add(address_t, size_t) {}
+};
+
+// Aggregates releases within one Run so each touched slot needs one atomic RMW.
+template <>
+class MemorySlotReleaseBatch<true> {
+ public:
+  explicit MemorySlotReleaseBatch(RosAllocImpl &allocator)
+      : allocator_(allocator) {}
+  ~MemorySlotReleaseBatch();
+
+  MemorySlotReleaseBatch(const MemorySlotReleaseBatch &) = delete;
+  MemorySlotReleaseBatch &operator=(const MemorySlotReleaseBatch &) = delete;
+
+  inline void Add(address_t objAddr, size_t internalSize);
+
+ private:
+  static constexpr size_t kMemorySlotCount = 1ULL << kMemorySlotBits;
+  static constexpr size_t kMemorySlotsPerMask = sizeof(uint64_t) * 8;
+  static constexpr size_t kMemorySlotMaskCount =
+      (kMemorySlotCount + kMemorySlotsPerMask - 1) / kMemorySlotsPerMask;
+  static_assert(kMemorySlotCount <= UINT16_MAX,
+                "touched slot count does not fit in uint16_t");
+
+  RosAllocImpl &allocator_;
+  uint64_t touched_slots_mask_[kMemorySlotMaskCount] = {};
+  uint8_t touched_slots_[kMemorySlotCount];
+  size_t released_bytes_[kMemorySlotCount];
+  uint16_t touched_slot_count_ = 0;
+};
 }  // namespace ROS_GC
 #endif  // RTS_GC_ROSALLOCATOR_H
