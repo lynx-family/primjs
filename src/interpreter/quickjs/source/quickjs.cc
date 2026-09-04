@@ -31944,7 +31944,16 @@ fail:
  */
 uint64_t LEPUS_GetPrimjsVersion() {
   constexpr uint64_t unexpected_cnt = 16;
-  uint64_t op_num = OP_COUNT + unexpected_cnt;
+  // Opcodes that only instrumentation emits (currently OP_inc_coverage) can
+  // never reach a serialized function, so they must not move the bytecode
+  // version: bumping it makes every newly built bundle unreadable by every
+  // already shipped runtime, for a capability the bundle does not use.
+  // Raise this together with any new instrumentation-only opcode.
+  constexpr uint64_t instrumentation_op_cnt = 1;
+  static_assert(OP_COUNT - instrumentation_op_cnt == OP_inc_coverage,
+                "instrumentation-only opcodes must stay last in the opcode "
+                "list, and instrumentation_op_cnt must count all of them");
+  uint64_t op_num = (OP_COUNT - instrumentation_op_cnt) + unexpected_cnt;
   uint64_t atom_num = JS_ATOM_END - 1;
   uint64_t primjs_version = op_num + atom_num;
   primjs_version |= VERSION_PLACEHOLDER;
