@@ -33,6 +33,16 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22.14.0'
+          cache: npm
+          cache-dependency-path: primjs/packages/weak-node-api/package*.json
+
+      - name: Cache Ruby gem packages
+        uses: actions/cache@v4
+        with:
+          path: primjs/.bundle/ruby/*/cache
+          key: ${{ runner.os }}-${{ runner.arch }}-gems-v1-${{ hashFiles('primjs/Gemfile', 'primjs/Gemfile.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-${{ runner.arch }}-gems-v1-
 
       - name: Bundle Install
         run: |-
