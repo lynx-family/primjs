@@ -1,0 +1,12 @@
+# Copyright 2025 The Lynx Authors. All rights reserved.
+# Licensed under the Apache License Version 2.0 that can be found in the
+# LICENSE file in the root directory of this source tree.
+import("//Primjs.gni")
+import("//testing/test.gni")
+unittest_set("3_callbacks") {
+    configs = [ "//:napi_public_config",   "../../../../third_party/weak-node-api:weak_node_api_config" ]
+  defines = [ "NAPI_MODULE_NAME=3_callbacks" ]
+  sources = [ 
+        "binding.cc"
+    ]
+}

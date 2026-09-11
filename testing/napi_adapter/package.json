@@ -1,0 +1,21 @@
+{
+  "dependencies": {
+    "assert": "^2.1.0"
+  },
+  "devDependencies": {
+    "browserify": "^17.0.0",
+    "browserify-replace": "^1.1.0"
+  },
+  "scripts": {
+    "bootstrap-deps": "npm install --prefix ../../third_party/weak-node-api && npm run bootstrap --prefix ../../third_party/weak-node-api",
+    "build:js": "python3 build_js.py",
+    "build:native": "cd ../../ && source tools/envsetup.sh && npm install --prefix third_party/weak-node-api && npm run bootstrap --prefix third_party/weak-node-api && gn gen --args='enable_unittests = true is_asan = true use_lepusng = true enable_coverage = true use_rtti = false is_debug = true enable_quickjs_debugger = true enable_compatible_mm = true target_cpu = \"arm64\" target_os = \"mac\"' --export-compile-commands out/Default && ninja -C out/Default napi_adapter_unittest",
+    "build:native:gc": "cd ../../ && source tools/envsetup.sh && npm install --prefix third_party/weak-node-api && npm run bootstrap --prefix third_party/weak-node-api && gn gen --args='enable_unittests = true is_asan = true use_lepusng = true enable_coverage = true use_rtti = false is_debug = true enable_tracing_gc = true force_gc = true enable_quickjs_debugger = true enable_compatible_mm = true target_cpu = \"arm64\" target_os = \"mac\"' --export-compile-commands out/Default && ninja -C out/Default napi_adapter_unittest",
+    "build:all": "npm run build:js && npm run build:native",
+    "build:all:gc": "npm run build:js && npm run build:native:gc",
+    "test": "npm run bootstrap-deps && npm run build:all && cd ../../out/Default/ && ./napi_adapter_unittest",
+    "test:gc": "npm run bootstrap-deps && npm run build:all:gc && cd ../../out/Default/ && ./napi_adapter_unittest",
+    "copy": "mkdir -p ../../../harmony/entry/src/main/resources/rawfile/napi_adapter_test/ && rsync -R ./js_native_api/*/build/*.js ../../../harmony/entry/src/main/resources/rawfile/napi_adapter_test/"
+  }
+}
+

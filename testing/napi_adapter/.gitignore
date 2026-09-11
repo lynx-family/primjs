@@ -1,0 +1,4 @@
+node_modules/
+out/
+build/
+js_native_api/**/build/
