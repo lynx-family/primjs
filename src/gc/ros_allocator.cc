@@ -1306,14 +1306,18 @@ RosAllocImpl::~RosAllocImpl() {}
 
 address_t RosAllocImpl::AllocPagesInternal(size_t reqSize, size_t &actualSize,
                                            int forceLevel, uint32_t &idx) {
+  if ((forceLevel == kEagerLevelMin) &&
+      GetGCTracer()->TryTriggerConcurrentPhases()) {
+    return 0;
+  }
   actualSize = ALLOCUTIL_PAGE_RND_UP(reqSize);
   // we allow extension, assuming that concurrent gc has done
   // everything it can to reduce footprint
   if (unlikely(concurrent_sweep_is_running)) {
     ALLOC_LOCK_TYPE guard(ALLOC_CURRENT_THREAD globalLock);
-    return allocSpace.Alloc(actualSize, true, idx, forceLevel);
+    return allocSpace.Alloc(actualSize, true, idx, allocatedInternalSize);
   } else {
-    return allocSpace.Alloc(actualSize, true, idx, forceLevel);
+    return allocSpace.Alloc(actualSize, true, idx, allocatedInternalSize);
   }
 }
 
