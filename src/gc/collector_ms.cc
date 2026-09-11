@@ -422,6 +422,10 @@ void MarkSweepCollector::ConMarkPrologue(size_t threadCount) {
     ctx->con_mark_state = true;
   }
   visitor->rt_->con_mark_state = true;
+  if (ros->GetHeapSize() < kRestrictedThreadHeapThreshold)
+    GetThreadPool()->SetMaxActiveThreadNum(kThreadNumber / 2);
+  else
+    GetThreadPool()->SetMaxActiveThreadNum(GetThreadPool()->GetMaxThreadNum());
 }
 
 void MarkSweepCollector::ConcurrentSweepPhase(size_t alloc_size) {
@@ -602,6 +606,7 @@ void MarkSweepCollector::ScanStackAddr(RootSet *rootSet, address_t addr) {
 // stop the world parallel mark & sweep.
 void MarkSweepCollector::ParallelMarkAndSweep() {
   LOG(LEVEL_1) << "ros, parallel GC running";
+  GetThreadPool()->SetMaxActiveThreadNum(GetThreadPool()->GetMaxThreadNum());
   CheckLastPhaseForDebug(kInvalidPhaseForDebug | kConSweepPhaseForDebug |
                          kParallelPhaseForDebug);
   UpdatePhaseForDebug(kParallelPhaseForDebug);
