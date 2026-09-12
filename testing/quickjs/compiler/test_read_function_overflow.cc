@@ -13,9 +13,8 @@ extern "C" {
 #endif
 #include "quickjs/include/quickjs-inner.h"
 
-// Test that LEPUS_ReadObject rejects malformed bytecode with overflowing
-// count fields (cpool_count, closure_var_count, local_count) instead of
-// performing a small allocation followed by an OOB write.
+// Test that malformed bytecode metadata and operands are rejected instead of
+// accessing memory outside the decoded function.
 
 class ReadFunctionOverflowTest : public ::testing::Test {
  protected:
@@ -134,6 +133,21 @@ class ReadFunctionOverflowTest : public ::testing::Test {
     uint32_t str_len = len_field >> 1;
     bool is_wide = len_field & 1;
     *pos += is_wide ? str_len * 2 : str_len;
+  }
+
+  static LEPUSFunctionBytecode* FindFunctionWithClosureCount(
+      LEPUSFunctionBytecode* function, int closure_var_count) {
+    if (function->closure_var_count == closure_var_count) return function;
+    for (int i = 0; i < function->cpool_count; i++) {
+      if (!LEPUS_VALUE_IS_FUNCTION_BYTECODE(function->cpool[i])) continue;
+      auto* child = static_cast<LEPUSFunctionBytecode*>(
+          LEPUS_VALUE_GET_PTR(function->cpool[i]));
+      if (auto* match =
+              FindFunctionWithClosureCount(child, closure_var_count)) {
+        return match;
+      }
+    }
+    return nullptr;
   }
 
   LEPUSContext* ctx_;
@@ -357,4 +371,120 @@ TEST_F(ReadFunctionOverflowTest, ClosureVarCountOverflowIsRejected) {
 
   free(crafted_buf);
   if (!ctx_->rt->gc_enable) lepus_free(ctx_, orig_buf);
+}
+
+TEST_F(ReadFunctionOverflowTest, OutOfRangePutArgIndexFailsAtRuntime) {
+  if (LEPUS_IsPrimjsEnabled(rt_)) {
+    GTEST_SKIP() << "This test targets the regular QuickJS interpreter";
+  }
+
+  const char* source = "(function(a, b, c, d, e) { e = 1; })();";
+  LEPUSValue compiled =
+      LEPUS_Eval(ctx_, source, strlen(source), "<test>",
+                 LEPUS_EVAL_FLAG_COMPILE_ONLY | LEPUS_EVAL_TYPE_GLOBAL);
+  ASSERT_FALSE(LEPUS_IsException(compiled));
+  ASSERT_TRUE(LEPUS_VALUE_IS_FUNCTION_BYTECODE(compiled));
+
+  auto* top =
+      static_cast<LEPUSFunctionBytecode*>(LEPUS_VALUE_GET_PTR(compiled));
+  LEPUSFunctionBytecode* inner = nullptr;
+  for (int i = 0; i < top->cpool_count; i++) {
+    if (LEPUS_VALUE_IS_FUNCTION_BYTECODE(top->cpool[i])) {
+      inner = static_cast<LEPUSFunctionBytecode*>(
+          LEPUS_VALUE_GET_PTR(top->cpool[i]));
+      break;
+    }
+  }
+  ASSERT_NE(inner, nullptr);
+  ASSERT_EQ(inner->arg_count, 5);
+
+  int put_arg_offset = -1;
+  for (int pos = 0; pos < inner->byte_code_len;) {
+    int op = inner->byte_code_buf[pos];
+    ASSERT_LT(op, OP_COUNT);
+    int len = short_opcode_info(op).size;
+    ASSERT_GT(len, 0);
+    ASSERT_LE(pos + len, inner->byte_code_len);
+    if (op == OP_put_arg) {
+      uint32_t index =
+          inner->byte_code_buf[pos + 1] | (inner->byte_code_buf[pos + 2] << 8);
+      ASSERT_EQ(index, 4u);
+      put_arg_offset = pos;
+      break;
+    }
+    pos += len;
+  }
+  ASSERT_GE(put_arg_offset, 0);
+
+  inner->byte_code_buf[put_arg_offset + 1] = 0xff;
+  inner->byte_code_buf[put_arg_offset + 2] = 0xff;
+
+  LEPUSValue result = LEPUS_EvalFunction(ctx_, compiled, LEPUS_UNDEFINED);
+  EXPECT_TRUE(LEPUS_IsException(result));
+  if (LEPUS_IsException(result)) {
+    LEPUSValue exception = LEPUS_GetException(ctx_);
+    const char* message = LEPUS_ToCString(ctx_, exception);
+    ASSERT_NE(message, nullptr);
+    EXPECT_NE(strstr(message, "invalid argument index"), nullptr);
+    if (!ctx_->rt->gc_enable) {
+      LEPUS_FreeCString(ctx_, message);
+      LEPUS_FreeValue(ctx_, exception);
+    }
+  }
+}
+
+TEST_F(ReadFunctionOverflowTest, OutOfRangeGetVarRefIndexFailsAtRuntime) {
+  if (LEPUS_IsPrimjsEnabled(rt_)) {
+    GTEST_SKIP() << "This test targets the regular QuickJS interpreter";
+  }
+
+  const char* source =
+      "(function(a, b, c, d, e) {"
+      "  return function() { return a + b + c + d + e; };"
+      "})(1, 2, 3, 4, 5)();";
+  LEPUSValue compiled =
+      LEPUS_Eval(ctx_, source, strlen(source), "<test>",
+                 LEPUS_EVAL_FLAG_COMPILE_ONLY | LEPUS_EVAL_TYPE_GLOBAL);
+  ASSERT_FALSE(LEPUS_IsException(compiled));
+  ASSERT_TRUE(LEPUS_VALUE_IS_FUNCTION_BYTECODE(compiled));
+
+  auto* top =
+      static_cast<LEPUSFunctionBytecode*>(LEPUS_VALUE_GET_PTR(compiled));
+  LEPUSFunctionBytecode* inner = FindFunctionWithClosureCount(top, 5);
+  ASSERT_NE(inner, nullptr);
+
+  int get_var_ref_offset = -1;
+  for (int pos = 0; pos < inner->byte_code_len;) {
+    int op = inner->byte_code_buf[pos];
+    ASSERT_LT(op, OP_COUNT);
+    int len = short_opcode_info(op).size;
+    ASSERT_GT(len, 0);
+    ASSERT_LE(pos + len, inner->byte_code_len);
+    if (op == OP_get_var_ref) {
+      uint32_t index =
+          inner->byte_code_buf[pos + 1] | (inner->byte_code_buf[pos + 2] << 8);
+      if (index == 4) {
+        get_var_ref_offset = pos;
+        break;
+      }
+    }
+    pos += len;
+  }
+  ASSERT_GE(get_var_ref_offset, 0);
+
+  inner->byte_code_buf[get_var_ref_offset + 1] = 0xff;
+  inner->byte_code_buf[get_var_ref_offset + 2] = 0xff;
+
+  LEPUSValue result = LEPUS_EvalFunction(ctx_, compiled, LEPUS_UNDEFINED);
+  EXPECT_TRUE(LEPUS_IsException(result));
+  if (LEPUS_IsException(result)) {
+    LEPUSValue exception = LEPUS_GetException(ctx_);
+    const char* message = LEPUS_ToCString(ctx_, exception);
+    ASSERT_NE(message, nullptr);
+    EXPECT_NE(strstr(message, "invalid closure variable index"), nullptr);
+    if (!ctx_->rt->gc_enable) {
+      LEPUS_FreeCString(ctx_, message);
+      LEPUS_FreeValue(ctx_, exception);
+    }
+  }
 }
