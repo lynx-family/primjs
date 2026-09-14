@@ -2412,6 +2412,7 @@ void HandlerImpl::GenCallOp(PrimjsOpcode opcode) {
   IncPc(size - 1);
   SavePc();
   SaveSp();
+  PollInterrupts();
   // call_argv = sp - call_argc;
   son::node::Node* call_argv = nullptr;
   if (call_argc == 0) {

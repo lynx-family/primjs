@@ -7848,7 +7848,8 @@ QJS_STATIC LEPUSValue js_call_bound_function(LEPUSContext *ctx,
 
 static no_inline __exception int __js_poll_interrupts(LEPUSContext *ctx) {
   LEPUSRuntime *rt = ctx->rt;
-  ctx->interrupt_counter = JS_INTERRUPT_COUNTER_INIT;
+  ctx->interrupt_counter = rt->use_primjs ? PRIMJS_INTERRUPT_COUNTER_INIT
+                                          : JS_INTERRUPT_COUNTER_INIT;
   if (rt->interrupt_handler) {
     if (rt->interrupt_handler(rt, rt->interrupt_opaque)) {
       /* XXX: should set a specific flag to avoid catching */
@@ -7866,6 +7867,10 @@ QJS_STATIC inline __exception int js_poll_interrupts(LEPUSContext *ctx) {
   } else {
     return 0;
   }
+}
+
+__exception int prim_js_poll_interrupts_gc(LEPUSContext *ctx) {
+  return __js_poll_interrupts(ctx);
 }
 
 LEPUSValue JS_CallInternalTI_GC(LEPUSContext *caller_ctx, LEPUSValue func_obj,
