@@ -2266,6 +2266,9 @@ LEPUS_BOOL JS_StrictEq_GC(LEPUSContext *ctx, LEPUSValueConst op1,
                           LEPUSValueConst op2);
 LEPUS_BOOL JS_SameValue_GC(LEPUSContext *ctx, LEPUSValueConst op1,
                            LEPUSValueConst op2);
+QJS_HIDE LEPUSValue js_is_direct_or_deep_equal(LEPUSContext *ctx,
+                                               LEPUSValueConst this_val,
+                                               int argc, LEPUSValueConst *argv);
 LEPUSValue JS_NewPromiseCapability_GC(LEPUSContext *ctx,
                                       LEPUSValue *resolving_funcs);
 int JS_EnqueueJob_GC(LEPUSContext *ctx, LEPUSJobFunc *job_func, int argc,

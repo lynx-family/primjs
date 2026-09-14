@@ -225,6 +225,18 @@ TEST_F(CommonQjsTest, ShortStringCachePreservesWideStringBufferContents) {
   if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
 }
 
+TEST_F(CommonQjsTest, IsDirectOrDeepEqual) {
+  const char* filename = TEST_CASE_DIR "common_test/is_direct_or_deep_equal.js";
+  LEPUSValue ret;
+  ASSERT_TRUE(js_run(ctx_, filename, ret));
+  HandleScope func_scope(ctx_, &ret, HANDLE_TYPE_LEPUS_VALUE);
+  if (LEPUS_IsException(ret)) {
+    FAIL() << js_get_exception_string(ctx_);
+  }
+  EXPECT_TRUE(LEPUS_ToBool(ctx_, ret));
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+}
+
 TEST_F(CommonQjsTest, DISABLED_libcTest) {
   const char* str =
       "import * as std from 'std';\n"
