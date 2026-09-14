@@ -22,6 +22,12 @@ unittest_set("napi_testset") {
     "async_work_unittests.cc",
     "testlib.cc",
   ]
+  if (enable_codecache) {
+    sources += [
+      "codecache_script_unittests.cc",
+      "codecache_unittests.cc",
+    ]
+  }
 }
 
 unit_test("napi_unittest") {

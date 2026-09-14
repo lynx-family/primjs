@@ -140,6 +140,9 @@ config("napi_public_config") {
   if (use_primjs_napi) {
     defines += [ "USE_PRIMJS_NAPI" ]
   }
+  if (enable_codecache) {
+    defines += [ "ENABLE_CODECACHE" ]
+  }
   if (use_rtti) {
     defines += [ "NAPI_CPP_RTTI" ]
   } else {

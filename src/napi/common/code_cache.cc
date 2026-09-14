@@ -11,10 +11,16 @@
 
 #include "code_cache.h"
 
-#include <stdio.h>
-
 #include <algorithm>
-#include <utility>
+#include <atomic>
+#include <cstring>
+
+#if defined(_WIN32)
+#include <process.h>
+#include <windows.h>
+#else
+#include <unistd.h>
+#endif
 
 #if OS_ANDROID
 #include "basic/log/logging.h"
@@ -28,234 +34,320 @@
 #define INCREASE(target)
 #endif  // PROFILE_CODECACHE
 
-constexpr double CacheBlob::MAGIC;
+namespace {
 
-bool CacheBlob::insert(const std::string& filename, const uint8_t* data,
-                       int length) {
-  // too large (more than half of MAX) cached data must be discarded
-  if (length == 0 || data == nullptr) {
-    INCREASE(expired_query_);
+// Cache file layout (integers in host order):
+//
+//   Header: | magic u32 | format version u32 |
+//   Entry:  | name length u16 | name | source hash u64 |
+//           | data length u32 | data | data checksum u64 |
+//   ... entries until EOF
+//
+// Any error invalidates the whole file: the engines' bytecode loaders are not
+// hardened against garbage.
+constexpr uint32_t kMagic = 0x43434A50;  // "PJCC"
+constexpr uint32_t kFormatVersion = 2;
+
+uint64_t Fnv1a64(const void* bytes, size_t length) {
+  const auto* p = static_cast<const uint8_t*>(bytes);
+  uint64_t hash = 14695981039346656037ULL;
+  for (size_t i = 0; i < length; ++i) {
+    hash ^= p[i];
+    hash *= 1099511628211ULL;
+  }
+  return hash;
+}
+
+template <typename T>
+bool ReadValue(FILE* file, T* value) {
+  return fread(value, sizeof(T), 1, file) == 1;
+}
+
+template <typename T>
+void AppendValue(std::string* image, const T& value) {
+  image->append(reinterpret_cast<const char*>(&value), sizeof(T));
+}
+
+// Per-process, per-call scratch names: several processes may publish the same
+// cache file.
+std::string NewTempPath(const std::string& path) {
+  static std::atomic<unsigned> counter{0};
+#if defined(_WIN32)
+  const int pid = _getpid();
+#else
+  const int pid = static_cast<int>(getpid());
+#endif
+  return path + ".tmp." + std::to_string(pid) + "." +
+         std::to_string(counter.fetch_add(1));
+}
+
+bool ReplaceFile(const std::string& from, const std::string& to) {
+#if defined(_WIN32)
+  return MoveFileExA(from.c_str(), to.c_str(), MOVEFILE_REPLACE_EXISTING) != 0;
+#else
+  return rename(from.c_str(), to.c_str()) == 0;
+#endif
+}
+
+// A crash mid-write must never leave a torn cache behind.
+bool WriteFileAtomically(const std::string& path, const std::string& image) {
+  const std::string tmp_path = NewTempPath(path);
+  FILE* file = fopen(tmp_path.c_str(), "wb");
+  if (file == nullptr) return false;
+  bool written = fwrite(image.data(), 1, image.size(), file) == image.size();
+  written = (fclose(file) == 0) && written;
+  if (!written || !ReplaceFile(tmp_path, path)) {
+    ::remove(tmp_path.c_str());
     return false;
   }
-  CachedData* target = nullptr;
-  const uint8_t* old_data = nullptr;
-  {
-    std::unique_lock<std::mutex> lock(write_mutex_);
-    auto it = cache_map_.find(filename);
-    if (it != cache_map_.end()) {
-      target = it->second;
-      current_size_ -= target->length_;
-      remove_from_ranking_list(target);
-
-      if (get_enough_space(length)) {
-        if (mode_ == kAppending) mode_ = kWriting;
-        target->length_ = length;
-      } else {
-        cache_map_.erase(it);
-        return false;
-      }
-
-    } else if (get_enough_space(length)) {
-      target = new CachedData(length, nullptr, filename);
-      cache_map_[filename] = target;
-      if (mode_ == kAppending) {
-        if (append_vec_ == nullptr) {
-          append_vec_ = new CacheVector();
-        }
-        append_vec_->push_back(target);
-      }
-    } else {
-      return false;
-    }
-
-    old_data = target->data_;
-    target->data_ = data;
-  }
-
-  heat_ranking_.push_back(target);
-  current_size_ += length;
-  if (old_data) {
-    delete[] old_data;
-  }
-  INCREASE(target->used_times_);
-
   return true;
 }
 
-// That len will be not nullptr is ensured by the context.
-const CachedData* CacheBlob::find(const std::string& filename, int* len) const {
-  if (!write_mutex_.try_lock()) {
-    INCREASE(missed_query_);
-    INCREASE(total_query_);
-    return empty_cache_.get();
-  }
-  auto it = cache_map_.find(filename);
-  write_mutex_.unlock();
-  CachedData* result = nullptr;
-  if (it != cache_map_.end()) {
-    // every time a cache is searched, its heat-ranking
-    // rises and thus the ranking list changes
-    result = it->second;
-    *len = result->length_;
-    INCREASE(result->used_times_);
-  } else {
-    *len = 0;
-    INCREASE(missed_query_);
-  }
-  INCREASE(total_query_);
+}  // namespace
 
-  // NOTE:
-  // The result cached data is safe beyond this scope,
-  // because JS engines got this data and then use it
-  // consecutively in one thread. Tasks that insert new
-  // data for the same filename will only be posted after
-  // that cached data has been already used up.
-  return result;
+uint64_t CacheBlob::HashSource(const char* script, size_t length) {
+  return Fnv1a64(script, length);
+}
+
+std::shared_ptr<CacheBlob> CacheBlob::Open(const std::string& path,
+                                           int max_capacity) {
+  // Never destroyed: blobs may still be released while static objects are
+  // torn down at process exit.
+  static auto* registry_mutex = new std::mutex();
+  static auto* registry =
+      new std::unordered_map<std::string, std::weak_ptr<CacheBlob>>();
+
+  std::lock_guard<std::mutex> lock(*registry_mutex);
+  std::weak_ptr<CacheBlob>& slot = (*registry)[path];
+  std::shared_ptr<CacheBlob> blob = slot.lock();
+  if (!blob) {
+    blob = std::make_shared<CacheBlob>(path, max_capacity);
+    slot = blob;
+  }
+  return blob;
+}
+
+CacheBlob::CacheBlob(const std::string& path, int max_capacity)
+    : path_(path), max_capacity_(max_capacity) {}
+
+bool CacheBlob::insert(const std::string& filename, uint64_t source_hash,
+                       const uint8_t* data, int length) {
+  if (data == nullptr || length <= 0) return false;
+
+  std::lock_guard<std::mutex> lock(mutex_);
+  auto it = entries_.find(filename);
+  if (it != entries_.end()) {
+    current_size_ -= static_cast<int>(it->second.data.size());
+    entries_.erase(it);
+    dirty_ = true;
+  }
+  if (!make_room(length)) return false;
+
+  entries_[filename] =
+      Entry{source_hash, std::vector<uint8_t>(data, data + length), 1};
+  current_size_ += length;
+  dirty_ = true;
+  return true;
+}
+
+bool CacheBlob::find(const std::string& filename, uint64_t source_hash,
+                     std::vector<uint8_t>* out) {
+  out->clear();
+  std::lock_guard<std::mutex> lock(mutex_);
+  INCREASE(total_query_);
+  auto it = entries_.find(filename);
+  if (it == entries_.end()) {
+    INCREASE(missed_query_);
+    return false;
+  }
+  if (it->second.source_hash != source_hash) {
+    INCREASE(expired_query_);
+    return false;
+  }
+  ++it->second.used_times;
+  out->assign(it->second.data.begin(), it->second.data.end());
+  return true;
 }
 
 void CacheBlob::remove(const std::string& filename) {
-  auto it = cache_map_.find(filename);
-  if (it != cache_map_.end()) {
-    current_size_ -= it->second->length_;
-    delete it->second;
-    cache_map_.erase(it);
-    if (mode_ == kAppending) mode_ = kWriting;
-  }
+  std::lock_guard<std::mutex> lock(mutex_);
+  auto it = entries_.find(filename);
+  if (it == entries_.end()) return;
+  current_size_ -= static_cast<int>(it->second.data.size());
+  entries_.erase(it);
+  dirty_ = true;
 }
 
-// cache file structure:
-// Header:
-// | magic number      | --> 8 bytes
-// Body  :
-// | file name size    | --> 2 bytes
-// | file name         | --> x bytes
-// | cache data length | --> 4 bytes
-// | cache data        | --> y bytes
-// ...
-void CacheBlob::output() {
-  if (mode_ == kAppending && append_vec_ == nullptr) return;
-  bool appending = mode_ == kAppending && append_vec_ != nullptr;
-
-  FILE* file_out = appending ? fopen(target_path_.c_str(), "ab")
-                             : fopen(target_path_.c_str(), "wb");
-  if (file_out) {
-    if (appending) {
-      for (auto it : *append_vec_) write_cache_unit(file_out, it);
-    } else {
-      fwrite(&MAGIC, DOUBLE_SIZE, 1, file_out);
-      for (auto& it : cache_map_) write_cache_unit(file_out, it.second);
-    }
-    fclose(file_out);
-    VLOGD("codecache: output cache file %s succeed.\n", target_path_.c_str());
-  }
-}
-
-// steps to rebuild blob:
-// 1. read and check magic number;
-// 2. read 2 bytes to get the size (x) of file name;
-// 3. read x bytes to get the file name;
-// 4. read 4 bytes to get the size (y) of cache data;
-// 5. read y bytes to get the actual content of cache data;
-// 6. go back to step 2 until EOF
 bool CacheBlob::input() {
-  FILE* file_in = fopen(target_path_.c_str(), "rb");
+  std::lock_guard<std::mutex> lock(mutex_);
+  if (loaded_) return load_result_;
+  loaded_ = true;
 
-  bool succeeded = false;
-  if (file_in) {
-    double maybe_magic;
-    fread(reinterpret_cast<char*>(&maybe_magic), DOUBLE_SIZE, 1, file_in);
-    // check whether file is valid.
-    if (maybe_magic == MAGIC) {
-      int c;
-      while ((c = fgetc(file_in)) != EOF) {
-        ungetc(c, file_in);
-        read_cache_unit(file_in);
-      }
-      mode_ = kAppending;
-      succeeded = true;
-    }
-    fclose(file_in);
+  FILE* file = fopen(path_.c_str(), "rb");
+  if (file == nullptr) return false;
+
+  EntryMap loaded;
+  int loaded_size = 0;
+  bool valid = read_entries(file, &loaded, &loaded_size);
+  fclose(file);
+  if (!valid) {
+    VLOGD("codecache: cache file %s is invalid and will be rewritten.\n",
+          path_.c_str());
+    dirty_ = true;
+    return false;
   }
-  return succeeded;
+
+  // Entries inserted before the file was read are newer than the file.
+  for (auto& it : entries_) {
+    auto stale = loaded.find(it.first);
+    if (stale != loaded.end()) {
+      loaded_size -= static_cast<int>(stale->second.data.size());
+      loaded.erase(stale);
+    }
+    loaded_size += static_cast<int>(it.second.data.size());
+    loaded[it.first] = std::move(it.second);
+  }
+  entries_ = std::move(loaded);
+  current_size_ = loaded_size;
+  load_result_ = true;
+  return true;
+}
+
+bool CacheBlob::output() {
+  // Publishes are serialized so an older snapshot never overwrites a newer
+  // one, while find() and insert() keep running during the disk write.
+  std::lock_guard<std::mutex> publish_lock(publish_mutex_);
+  std::string image;
+  {
+    std::lock_guard<std::mutex> lock(mutex_);
+    if (!dirty_) return true;
+    image = serialize();
+    dirty_ = false;
+  }
+
+  if (WriteFileAtomically(path_, image)) {
+    VLOGD("codecache: output cache file %s succeed.\n", path_.c_str());
+    return true;
+  }
+  std::lock_guard<std::mutex> lock(mutex_);
+  dirty_ = true;
+  VLOGD("codecache: output cache file %s failed.\n", path_.c_str());
+  return false;
+}
+
+int CacheBlob::size() const {
+  std::lock_guard<std::mutex> lock(mutex_);
+  return current_size_;
+}
+
+bool CacheBlob::make_room(int length) {
+  if (length > max_capacity_) return false;
+  while (current_size_ + length > max_capacity_) {
+    if (entries_.empty()) {
+      current_size_ = 0;
+      break;
+    }
+    // Evict the least used entry; among equals the largest one frees the most.
+    auto victim = entries_.begin();
+    for (auto it = entries_.begin(); it != entries_.end(); ++it) {
+      if (it->second.used_times < victim->second.used_times ||
+          (it->second.used_times == victim->second.used_times &&
+           it->second.data.size() > victim->second.data.size())) {
+        victim = it;
+      }
+    }
+    current_size_ -= static_cast<int>(victim->second.data.size());
+    entries_.erase(victim);
+    dirty_ = true;
+  }
+  return true;
+}
+
+bool CacheBlob::read_entries(FILE* file, EntryMap* entries, int* total_size) {
+  uint32_t magic = 0;
+  uint32_t version = 0;
+  if (!ReadValue(file, &magic) || !ReadValue(file, &version) ||
+      magic != kMagic || version != kFormatVersion) {
+    return false;
+  }
+
+  while (true) {
+    int next = fgetc(file);
+    if (next == EOF) return true;
+    ungetc(next, file);
+
+    uint16_t name_length = 0;
+    if (!ReadValue(file, &name_length) || name_length == 0) return false;
+    std::string name(name_length, '\0');
+    if (fread(&name[0], 1, name_length, file) != name_length ||
+        entries->count(name) != 0) {
+      return false;
+    }
+
+    uint64_t source_hash = 0;
+    uint32_t data_length = 0;
+    if (!ReadValue(file, &source_hash) || !ReadValue(file, &data_length) ||
+        data_length == 0 ||
+        data_length > static_cast<uint32_t>(max_capacity_)) {
+      return false;
+    }
+    std::vector<uint8_t> data(data_length);
+    uint64_t checksum = 0;
+    if (fread(data.data(), 1, data_length, file) != data_length ||
+        !ReadValue(file, &checksum) ||
+        checksum != Fnv1a64(data.data(), data.size())) {
+      return false;
+    }
+
+    // Dropped entries are compacted away by the next output().
+    if (*total_size + static_cast<int>(data_length) > max_capacity_) {
+      dirty_ = true;
+      continue;
+    }
+    *total_size += static_cast<int>(data_length);
+    (*entries)[name] = Entry{source_hash, std::move(data), 0};
+  }
+}
+
+std::string CacheBlob::serialize() const {
+  std::string image;
+  AppendValue(&image, kMagic);
+  AppendValue(&image, kFormatVersion);
+  for (const auto& it : entries_) {
+    const std::string& name = it.first;
+    const Entry& entry = it.second;
+    if (name.empty() || name.size() > UINT16_MAX) continue;
+    AppendValue(&image, static_cast<uint16_t>(name.size()));
+    image.append(name);
+    AppendValue(&image, entry.source_hash);
+    AppendValue(&image, static_cast<uint32_t>(entry.data.size()));
+    image.append(reinterpret_cast<const char*>(entry.data.data()),
+                 entry.data.size());
+    AppendValue(&image, Fnv1a64(entry.data.data(), entry.data.size()));
+  }
+  return image;
 }
 
 #ifdef PROFILE_CODECACHE
-void CacheBlob::dump_status(void* p) {
-  std::vector<std::pair<std::string, int> >* status_vec =
-      reinterpret_cast<std::vector<std::pair<std::string, int> >*>(p);
-  std::sort(heat_ranking_.begin(), heat_ranking_.end(), CachedData::compare);
-  status_vec->push_back(std::pair<std::string, int>("Total", total_query_));
-  status_vec->push_back(std::pair<std::string, int>("Missed", missed_query_));
-  status_vec->push_back(std::pair<std::string, int>("Expired", expired_query_));
-  status_vec->push_back(std::pair<std::string, int>(
-      "Updated", mode_ == kAppending && append_vec_ == nullptr ? 0 : 1));
-  status_vec->push_back(std::pair<std::string, int>("Size", current_size_));
-  status_vec->push_back(std::pair<std::string, int>("Heat Ranking, total ",
-                                                    heat_ranking_.size()));
-  for (size_t i = 0; i < heat_ranking_.size(); ++i) {
-    CachedData* dt = heat_ranking_[i];
-    status_vec->push_back(
-        std::pair<std::string, int>(dt->file_name_, dt->used_times_));
+void CacheBlob::dump_status(std::vector<std::pair<std::string, int>>* status) {
+  std::lock_guard<std::mutex> lock(mutex_);
+  status->emplace_back("Total", total_query_);
+  status->emplace_back("Missed", missed_query_);
+  status->emplace_back("Expired", expired_query_);
+  status->emplace_back("Updated", dirty_ ? 1 : 0);
+  status->emplace_back("Size", current_size_);
+  status->emplace_back("Heat Ranking, total ",
+                       static_cast<int>(entries_.size()));
+
+  std::vector<std::pair<std::string, int>> ranking;
+  for (const auto& it : entries_) {
+    ranking.emplace_back(it.first, it.second.used_times);
   }
+  std::sort(ranking.begin(), ranking.end(),
+            [](const std::pair<std::string, int>& left,
+               const std::pair<std::string, int>& right) {
+              return left.second > right.second;
+            });
+  status->insert(status->end(), ranking.begin(), ranking.end());
 }
 #endif  // PROFILE_CODECACHE
-
-void CacheBlob::write_cache_unit(FILE* file_out, const CachedData* unit) {
-  // write file name
-  uint16_t size = static_cast<uint16_t>(unit->file_name_.size());
-  fwrite(static_cast<void*>(&size), SHORT_SIZE, 1, file_out);
-  fwrite(unit->file_name_.c_str(), 1, unit->file_name_.size(), file_out);
-
-  uint32_t length = unit->length_;
-  fwrite(static_cast<void*>(&length), INT_SIZE, 1, file_out);
-  fwrite(unit->data_, 1, unit->length_, file_out);
-}
-
-void CacheBlob::read_cache_unit(FILE* file_in) {
-  uint16_t filename_length;
-  fread(&filename_length, SHORT_SIZE, 1, file_in);
-  std::string name(filename_length, '\0');
-  fread(&name[0], 1, filename_length, file_in);
-
-  uint32_t data_length;
-  fread(&data_length, INT_SIZE, 1, file_in);
-  uint8_t* data = new uint8_t[data_length];
-  fread(data, 1, data_length, file_in);
-
-  CachedData* cd = new CachedData(static_cast<int>(data_length), data, name);
-
-  current_size_ += data_length;
-  heat_ranking_.push_back(cd);
-  cache_map_[name] = cd;
-}
-
-void CacheBlob::remove_from_ranking_list(CachedData* target) {
-  for (size_t i = 0; i < heat_ranking_.size(); ++i) {
-    if (target == heat_ranking_[i]) {
-      heat_ranking_.erase(heat_ranking_.begin() + i);
-      break;
-    }
-  }
-}
-
-// This is a vast-time-costing function
-bool CacheBlob::get_enough_space(int data_size) {
-  // 0. check whether available space is enough
-  if (current_size_ + data_size <= max_capacity_) return true;
-  int size_needed = data_size + current_size_ - max_capacity_;
-  // 1. sort the heat_ranking_
-  std::sort(heat_ranking_.begin(), heat_ranking_.end(), CachedData::compare);
-  // 2. pick CachedDatas
-  for (int i = heat_ranking_.size() - 1; i >= 0; --i) {
-    size_needed -= heat_ranking_[i]->length_;
-    if (size_needed <= 0) {
-      for (size_t j = i; j < heat_ranking_.size(); ++j) {
-        CachedData* it = heat_ranking_[j];
-        remove(it->file_name_);
-      }
-      heat_ranking_.erase(heat_ranking_.begin() + i, heat_ranking_.end());
-      return true;
-    }
-  }
-  return false;
-}

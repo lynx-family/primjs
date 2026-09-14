@@ -1449,9 +1449,10 @@ napi_status napi_get_value_bigint_words(napi_env env, napi_value value,
 }
 
 #ifdef ENABLE_CODECACHE
-static napi_status napi_gen_code_cache(napi_env env, const char *script,
-                                       size_t script_len, const uint8_t **data,
-                                       int *length) {
+static napi_status napi_compile_code_cache(napi_env env, const char *script,
+                                           size_t script_len,
+                                           const char *filename,
+                                           const uint8_t **data, int *length) {
   JSVM_Value sourcecode;
   JSVM_Script js_script;
   CALL_JSVM(OH_JSVM_CreateStringUtf8(env->ctx->vm_env_, script, script_len,
@@ -1461,6 +1462,13 @@ static napi_status napi_gen_code_cache(napi_env env, const char *script,
   CALL_JSVM(OH_JSVM_CreateCodeCache(env->ctx->vm_env_, js_script, data,
                                     reinterpret_cast<size_t *>(length)));
   return napi_clear_last_error(env);
+}
+
+static napi_status napi_gen_code_cache(napi_env env, const char *script,
+                                       size_t script_len, const uint8_t **data,
+                                       int *length) {
+  return napi_compile_code_cache(env, script, script_len, nullptr, data,
+                                 length);
 }
 
 static napi_status napi_run_code_cache(napi_env env, const uint8_t *data,
@@ -1489,19 +1497,20 @@ static napi_status napi_run_code_cache(napi_env env, const uint8_t *data,
 static napi_status napi_run_script_cache(napi_env env, const char *script,
                                          size_t length, const char *filename,
                                          napi_value *result) {
-  int32_t len = -1;
+  std::vector<uint8_t> cache;
+  env->napi_get_script_cache(env, filename, script, length, &cache);
+  if (!cache.empty()) {
+    return napi_run_code_cache(env, cache.data(),
+                               static_cast<int32_t>(cache.size()), result);
+  }
   const uint8_t *data = nullptr;
-  env->napi_get_code_cache(env, filename, &data, &len);
-  if (len == 0) {
-    if (napi_gen_code_cache(env, script, length, &data, &len) != napi_ok) {
-      return napi_pending_exception;
-    }
-    env->napi_store_code_cache(env, filename, data, len);
+  int32_t len = 0;
+  if (napi_compile_code_cache(env, script, length, filename, &data, &len) !=
+      napi_ok) {
+    return napi_pending_exception;
   }
-  if (data) {
-    return napi_run_code_cache(env, data, len, result);
-  }
-  return napi_run_script(env, script, length, filename, result);
+  env->napi_store_script_cache(env, filename, script, length, data, len);
+  return napi_run_code_cache(env, data, len, result);
 }
 #endif
 }  // namespace harmonyimpl

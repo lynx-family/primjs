@@ -267,50 +267,38 @@ struct napi_runtime__ {
   }
 
 #ifdef ENABLE_CODECACHE
-  bool StoreCodeCache(const std::string& filename, const uint8_t* data,
-                      int length) {
-    if (blob_ != nullptr) {
-      return blob_->insert(filename, data, length);
-    }
-    return false;
+  bool StoreCodeCache(const std::string& filename, uint64_t source_hash,
+                      const uint8_t* data, int length) {
+    return blob_ != nullptr &&
+           blob_->insert(filename, source_hash, data, length);
   }
 
-  void GetCodeCache(const std::string& filename, const uint8_t** data,
-                    int* length) {
-    if (blob_ == nullptr) return;
-    const CachedData* dt = blob_->find(filename, length);
-    if (dt != nullptr) {
-      *data = dt->data_;
-    }
+  bool GetCodeCache(const std::string& filename, uint64_t source_hash,
+                    std::vector<uint8_t>* data) {
+    return blob_ != nullptr && blob_->find(filename, source_hash, data);
   }
 
-  void WriteCache() {
-    if (blob_ != nullptr) {
-      blob_->output();
-    }
-  }
+  bool WriteCache() { return blob_ != nullptr && blob_->output(); }
 
-  bool ReadCache() {
-    if (blob_ != nullptr) {
-      return blob_->input();
-    }
-    return false;
-  }
+  bool ReadCache() { return blob_ != nullptr && blob_->input(); }
 
   void InitCacheBlob(const std::string& cache_path, int max_cap) {
-    blob_ = std::make_unique<CacheBlob>(cache_path, max_cap);
+    blob_ = CacheBlob::Open(cache_path, max_cap);
   }
 
 #ifdef PROFILE_CODECACHE
   void DumpCacheStatus(void* dump_vec) {
-    if (blob_ != nullptr) blob_->dump_status(dump_vec);
+    if (blob_ != nullptr) {
+      blob_->dump_status(
+          static_cast<std::vector<std::pair<std::string, int>>*>(dump_vec));
+    }
   }
 #endif  // PROFILE_CODECACHE
 #endif  // ENABLE_CODECACHE
 
  private:
 #ifdef ENABLE_CODECACHE
-  std::unique_ptr<CacheBlob> blob_;
+  std::shared_ptr<CacheBlob> blob_;
 #endif  // ENABLE_CODECACHE
   std::unique_ptr<WorkerThread> worker_;
   napi_env env_;
@@ -761,29 +749,45 @@ napi_status napi_post_worker_task(napi_env env, std::function<void()> task) {
   return napi_ok;
 }
 
+static uint64_t SourceHash(const char* script, size_t length) {
+  if (length == NAPI_AUTO_LENGTH) {
+    length = strlen(script);
+  }
+  return CacheBlob::HashSource(script, length);
+}
+
+napi_status napi_store_script_cache(napi_env env, const std::string& filename,
+                                    const char* script, size_t script_length,
+                                    const uint8_t* data, int length) {
+  bool stored = env->rt->StoreCodeCache(
+      filename, SourceHash(script, script_length), data, length);
+  return stored ? napi_ok : napi_generic_failure;
+}
+
+napi_status napi_get_script_cache(napi_env env, const std::string& filename,
+                                  const char* script, size_t script_length,
+                                  std::vector<uint8_t>* data) {
+  env->rt->GetCodeCache(filename, SourceHash(script, script_length), data);
+  return napi_ok;
+}
+
+// Callers built against these two slots (an older libnapi_v8.so, say) get a
+// miss they will not try to fill, so they run uncached.
 napi_status napi_store_code_cache(napi_env env, const std::string& filename,
                                   const uint8_t* data, int length) {
-  uint8_t* buf = new uint8_t[length];
-  memcpy(buf, data, length);
-  env->rt->PostWorkerTask([=] {
-    if (!env->rt->StoreCodeCache(filename, buf, length)) {
-      // If store failed, delete this data.
-      delete[] buf;
-    }
-  });
-  return napi_ok;
+  return napi_generic_failure;
 }
 
 napi_status napi_get_code_cache(napi_env env, const std::string& filename,
                                 const uint8_t** data, int* length) {
-  env->rt->GetCodeCache(filename, data, length);
+  *data = nullptr;
+  *length = -1;
   return napi_ok;
 }
 
 napi_status napi_init_code_cache(napi_env env, int capacity,
                                  const std::string& cache_file,
                                  std::function<void(bool)> callback) {
-  // directy post to worker thread
   env->rt->InitCacheBlob(cache_file, capacity);
   env->rt->PostWorkerTask([env, callback] {
     LOG_TIME_START();
@@ -793,14 +797,25 @@ napi_status napi_init_code_cache(napi_env env, int capacity,
   return napi_ok;
 }
 
+napi_status napi_open_code_cache(napi_env env, int capacity,
+                                 const std::string& cache_file, bool* loaded) {
+  // Read synchronously so a script evaluated right after runtime creation
+  // already sees the entries.
+  env->rt->InitCacheBlob(cache_file, capacity);
+  LOG_TIME_START();
+  *loaded = env->rt->ReadCache();
+  LOG_TIME_END("----- ReadCache time consumption -----");
+  return napi_ok;
+}
+
 napi_status napi_output_code_cache(napi_env env, unsigned int place_holder) {
   // Considering that with very very small possibility that this task be
   // completed if it's posted to napi's worker thread, A synchonous file
   // operation is performed.
   LOG_TIME_START();
-  env->rt->WriteCache();
+  bool written = env->rt->WriteCache();
   LOG_TIME_END("----- WriteCache time consumption -----");
-  return napi_ok;
+  return written ? napi_ok : napi_generic_failure;
 }
 
 napi_status napi_dump_code_cache_status(napi_env env, void* dump_vec) {

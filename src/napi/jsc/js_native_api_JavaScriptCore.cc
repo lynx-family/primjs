@@ -2975,6 +2975,12 @@ napi_status napi_gen_code_cache(napi_env env, const char* script,
   // JavaScriptCore do not support codecache yet.
   return napi_ok;
 }
+napi_status napi_compile_code_cache(napi_env env, const char* script,
+                                    size_t script_len, const char* filename,
+                                    const uint8_t** data, int* length) {
+  // JavaScriptCore do not support codecache yet.
+  return napi_ok;
+}
 #endif  // ENABLE_CODECACHE
 
 napi_status napi_add_finalizer(napi_env env, napi_value js_object,

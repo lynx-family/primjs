@@ -13,6 +13,9 @@
 #include <algorithm>
 #include <climits>  // INT_MAX
 #include <cmath>
+#include <cstdlib>
+#include <cstring>
+#include <memory>
 #include <utility>
 #include <vector>
 
@@ -2547,30 +2550,74 @@ napi_status napi_is_promise(napi_env env, napi_value value, bool* is_promise) {
 #ifdef ENABLE_CODECACHE
 #include <string>
 namespace {
-// this function should not be called on JS Thread
-// because it may consume a lot of time
-void create_codecache(napi_env env, v8::Persistent<v8::Script>* script,
-                      v8::Isolate* isolate, std::string name) {
-  v8::HandleScope scope(isolate);
-  v8::Local<v8::Script> v8_script = script->Get(isolate);
-
+// Runs on the JS thread right after the script, so a Local suffices; a
+// v8::Persistent here would outlive the call and pin the script's context.
+void create_codecache(napi_env env, v8::Local<v8::Script> script,
+                      const std::string& name, const char* source,
+                      size_t source_length) {
+  v8::HandleScope scope(env->ctx->isolate);
   v8::ScriptCompiler::CachedData* dt =
-      v8::ScriptCompiler::CreateCodeCache(v8_script->GetUnboundScript());
-  env->napi_store_code_cache(env, name, dt->data, dt->length);
+      v8::ScriptCompiler::CreateCodeCache(script->GetUnboundScript());
+  env->napi_store_script_cache(env, name, source, source_length, dt->data,
+                               dt->length);
   delete dt;
 }
 }  // anonymous namespace
 
+// A V8 code cache cannot run without its source; use napi_run_script_cache.
 napi_status napi_run_code_cache(napi_env env, const uint8_t* data, int length,
                                 napi_value* result) {
   NAPI_PREAMBLE(env);
   return GET_RETURN_STATUS(env);
 }
+
+// Compiles eagerly so the cache covers every function, not only the top
+// level. V8 rejects a cache from another V8 build, flags or ABI.
+napi_status napi_compile_code_cache(napi_env env, const char* script,
+                                    size_t script_len, const char* filename,
+                                    const uint8_t** data, int* length) {
+  NAPI_PREAMBLE(env);
+  *data = nullptr;
+  *length = 0;
+
+  v8::Isolate* isolate = env->ctx->isolate;
+  v8::HandleScope scope(isolate);
+  v8::Context::Scope context_scope(env->ctx->context());
+
+  v8::Local<v8::String> v8_script;
+  CHECK_NEW_FROM_UTF8_LEN(env, v8_script, script, script_len);
+  v8::MaybeLocal<v8::UnboundScript> maybe_script;
+  if (filename) {
+    v8::Local<v8::Value> origin_string;
+    CHECK_NEW_FROM_UTF8(env, origin_string, filename);
+    v8::ScriptOrigin so(isolate, origin_string);
+    v8::ScriptCompiler::Source src(v8_script, so);
+    maybe_script = v8::ScriptCompiler::CompileUnboundScript(
+        isolate, &src, v8::ScriptCompiler::kEagerCompile);
+  } else {
+    v8::ScriptCompiler::Source src(v8_script);
+    maybe_script = v8::ScriptCompiler::CompileUnboundScript(
+        isolate, &src, v8::ScriptCompiler::kEagerCompile);
+  }
+  CHECK_MAYBE_EMPTY_WITH_PREAMBLE(env, maybe_script, napi_generic_failure);
+
+  std::unique_ptr<v8::ScriptCompiler::CachedData> cache(
+      v8::ScriptCompiler::CreateCodeCache(maybe_script.ToLocalChecked()));
+  RETURN_STATUS_IF_FALSE(env, cache != nullptr && cache->length > 0,
+                         napi_generic_failure);
+  auto* copy = static_cast<uint8_t*>(std::malloc(cache->length));
+  RETURN_STATUS_IF_FALSE(env, copy != nullptr, napi_generic_failure);
+  std::memcpy(copy, cache->data, cache->length);
+  *data = copy;
+  *length = cache->length;
+  return GET_RETURN_STATUS(env);
+}
+
 napi_status napi_gen_code_cache(napi_env env, const char* script,
                                 size_t script_len, const uint8_t** data,
                                 int* length) {
-  NAPI_PREAMBLE(env);
-  return GET_RETURN_STATUS(env);
+  return napi_compile_code_cache(env, script, script_len, nullptr, data,
+                                 length);
 }
 #endif  // ENABLE_CODECACHE
 

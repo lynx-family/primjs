@@ -227,12 +227,43 @@ Value Env::GetUnhandledRecjectionException() {
 }
 
 #ifdef ENABLE_CODECACHE
+bool Env::InitCodeCache(int capacity, const std::string& filename) {
+  bool loaded = false;
+  NAPI_ENV_CALL(open_code_cache, _env, capacity, filename, &loaded);
+  return loaded;
+}
+
 void Env::InitCodeCache(int capacity, const std::string& filename,
                         std::function<void(bool)> callback) {
   NAPI_ENV_CALL(init_code_cache, _env, capacity, filename, std::move(callback));
 }
 
-void Env::OutputCodeCache() { NAPI_ENV_CALL(output_code_cache, _env, 0); }
+bool Env::OutputCodeCache() {
+  return NAPI_ENV_CALL(output_code_cache, _env, 0) == napi_ok;
+}
+
+bool Env::PrepareCodeCache(int capacity, const std::string& cache_file,
+                           const std::string& filename, const char* script,
+                           size_t length) {
+  // Null in engine adapters built against the old function table.
+  if (_env->napi_compile_code_cache == nullptr) return false;
+  InitCodeCache(capacity, cache_file);
+  HandleScope handle_scope(*this);
+  ContextScope context_scope(*this);
+  const uint8_t* data = nullptr;
+  int size = 0;
+  NAPI_ENV_CALL(compile_code_cache, _env, script, length, filename.c_str(),
+                &data, &size);
+  if (data == nullptr) {
+    // A compile error only surfaces as "nothing prepared".
+    GetAndClearPendingException();
+    return false;
+  }
+  napi_status stored = NAPI_ENV_CALL(store_script_cache, _env, filename, script,
+                                     length, data, size);
+  std::free(const_cast<uint8_t*>(data));
+  return stored == napi_ok && OutputCodeCache();
+}
 
 void Env::DumpCacheStatus(std::vector<std::pair<std::string, int>>* dump_vec) {
 #ifdef PROFILE_CODECACHE

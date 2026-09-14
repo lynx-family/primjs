@@ -67,6 +67,10 @@ declare_args() {
   enable_virtual_stack = false
 
   enable_napi_adapter_extern = false
+
+  # Compiles the script code cache (CacheBlob, napi_run_script_cache). It adds
+  # slots to napi_env__, so every target sharing the napi headers must agree.
+  enable_codecache = false
 }
 
 # Pre-generated PrimJS snapshot assembly is only available for these platforms.

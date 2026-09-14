@@ -93,7 +93,7 @@ void Tester::analyze_cache_statistics() {
 }
 
 void Tester::test_OutputCodeCache() {
-  _env.InitCodeCache(4096, "napi-test-cache.bin", [](bool t) {});
+  _env.InitCodeCache(4096, "napi-test-cache.bin");
   HandleScope hscope(_env);
 
   const char* script =
@@ -144,9 +144,7 @@ void Tester::test_OutputCodeCache() {
 void Tester::test_InputCodeCache() {
   HandleScope hscope(_env);
 
-  _env.InitCodeCache(4096, "napi-test-cache.bin", [](bool t) {});
-  // worker thread correctly finish their work
-  std::this_thread::sleep_for(std::chrono::milliseconds(400));
+  _env.InitCodeCache(4096, "napi-test-cache.bin");
   // _env.DumpCacheStatus();
   const char* script =
       "function fabo(x) {"
@@ -178,9 +176,11 @@ void Tester::test_InputCodeCache() {
   v = _env.RunScriptCache(script2, "test2.js");
   v = _env.RunScriptCache(script2, "test2.js");
 
+  // The blob is shared per cache path and outlives InitCodeCache calls, so
+  // the counters accumulate over the previous phases.
   analyze_cache_statistics();
-  EXPECT_EQ(_cache_status.total_query_, 4);
-  EXPECT_EQ(_cache_status.missed_query_, 0);
+  EXPECT_EQ(_cache_status.total_query_, 8);
+  EXPECT_EQ(_cache_status.missed_query_, 2);
   EXPECT_EQ(_cache_status.expired_query_, 0);
   EXPECT_FALSE(_cache_status.update_);
 
@@ -191,9 +191,7 @@ void Tester::test_InputCodeCache() {
 }
 
 void Tester::test_AppendCache() {
-  _env.InitCodeCache(4096, "napi-test-cache.bin", [](bool t) {});
-
-  std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  _env.InitCodeCache(4096, "napi-test-cache.bin");
   // _env.DumpCacheStatus();
   const char* script =
       "function ffun(x) {"
@@ -215,8 +213,8 @@ void Tester::test_AppendCache() {
   EXPECT_EQ(v.ToNumber().Int32Value(), 55);
 
   analyze_cache_statistics();
-  EXPECT_EQ(_cache_status.total_query_, 2);
-  EXPECT_EQ(_cache_status.missed_query_, 1);
+  EXPECT_EQ(_cache_status.total_query_, 10);
+  EXPECT_EQ(_cache_status.missed_query_, 3);
   EXPECT_EQ(_cache_status.expired_query_, 0);
   EXPECT_TRUE(_cache_status.update_);
 
@@ -226,9 +224,7 @@ void Tester::test_AppendCache() {
 }
 
 void Tester::test_ReplaceCache() {
-  _env.InitCodeCache(2560, "napi-test-cache.bin", [](bool t) {});
-
-  std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  _env.InitCodeCache(2560, "napi-test-cache.bin");
   // _env.DumpCacheStatus();
   const char* script =
       "function ffun(x) {"
@@ -241,8 +237,8 @@ void Tester::test_ReplaceCache() {
   std::this_thread::sleep_for(std::chrono::milliseconds(100));
   analyze_cache_statistics();
 
-  EXPECT_EQ(_cache_status.total_query_, 1);
-  EXPECT_EQ(_cache_status.missed_query_, 1);
+  EXPECT_EQ(_cache_status.total_query_, 11);
+  EXPECT_EQ(_cache_status.missed_query_, 4);
   EXPECT_EQ(_cache_status.expired_query_, 0);
   EXPECT_TRUE(_cache_status.update_);
 
@@ -251,8 +247,7 @@ void Tester::test_ReplaceCache() {
 }
 
 void Tester::test_ExecutionTime() {
-  _env.InitCodeCache(1 << 18, "napi-test-cache.bin", [](bool t) {});
-  std::this_thread::sleep_for(std::chrono::milliseconds(100));
+  _env.InitCodeCache(1 << 18, "napi-test-cache.bin");
   char* script = nullptr;
   const char* filename = "new_raytrace.js";
   read_string(filename, &script);

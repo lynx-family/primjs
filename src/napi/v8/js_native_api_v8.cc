@@ -211,41 +211,30 @@ static napi_status napi_run_script_cache(napi_env env, const char* script,
 
   v8::Local<v8::Context> context = env->ctx->context();
 
+  v8::Local<v8::Value> origin_string;
+  CHECK_NEW_FROM_UTF8(env, origin_string, filename);
+  v8::ScriptOrigin so(env->ctx->isolate, origin_string);
+
   v8::MaybeLocal<v8::Script> maybe_script;
-  bool need_mkcache = false;
-  {
-    v8::Local<v8::Value> origin_string;
-    CHECK_NEW_FROM_UTF8(env, origin_string, filename);
-    v8::ScriptOrigin so(env->ctx->isolate, origin_string);
-    {
-      const uint8_t* data = nullptr;
-      int length = -1;
-      // find_codecache(env, filename, &data, &length);
-      env->napi_get_code_cache(env, filename, &data, &length);
-      // if lenght equals 0, it means CacheBlob is being modified
-      // and thus reading is not allowed yet, but there is no actual
-      // need to make cache immediately to void duplicated cache-making
-      need_mkcache = data == nullptr && length != -1;
-      if (data != nullptr) {
-        // The following v8::ScriptCompiler::Source will release this
-        // cached_data.
-        uint8_t* cache = new uint8_t[length];
-        memcpy(cache, data, length);
-        v8::ScriptCompiler::CachedData* cached_data =
-            new v8::ScriptCompiler::CachedData(
-                cache, length, v8::ScriptCompiler::CachedData::BufferOwned);
-        v8::ScriptCompiler::Source src(v8_script, so, cached_data);
-        LOG_TIME_START();
-        maybe_script = v8::ScriptCompiler::Compile(
-            context, &src, v8::ScriptCompiler::kConsumeCodeCache);
-        LOG_TIME_END("----- script compilation with cache -----");
-        need_mkcache = cached_data->rejected;
-      }
-    }
+  std::vector<uint8_t> cache;
+  env->napi_get_script_cache(env, filename, script, length, &cache);
+  bool need_mkcache = cache.empty();
+  if (!cache.empty()) {
+    // Source deletes cached_data but not its buffer, which `cache` owns.
+    v8::ScriptCompiler::CachedData* cached_data =
+        new v8::ScriptCompiler::CachedData(
+            cache.data(), static_cast<int>(cache.size()),
+            v8::ScriptCompiler::CachedData::BufferNotOwned);
+    v8::ScriptCompiler::Source src(v8_script, so, cached_data);
+    LOG_TIME_START();
+    maybe_script = v8::ScriptCompiler::Compile(
+        context, &src, v8::ScriptCompiler::kConsumeCodeCache);
+    LOG_TIME_END("----- script compilation with cache -----");
+    need_mkcache = cached_data->rejected;
   }
   if (maybe_script.IsEmpty()) {
     LOG_TIME_START();
-    maybe_script = v8::Script::Compile(context, v8_script);
+    maybe_script = v8::Script::Compile(context, v8_script, &so);
     LOG_TIME_END("----- script compilation -----");
   }
 
@@ -257,9 +246,8 @@ static napi_status napi_run_script_cache(napi_env env, const char* script,
   CHECK_MAYBE_EMPTY(env, script_result, napi_generic_failure);
 
   if (need_mkcache) {
-    v8::Isolate* iso = env->ctx->isolate;
-    v8::Persistent<v8::Script> pscr(iso, maybe_script.ToLocalChecked());
-    create_codecache(env, &pscr, iso, filename);
+    create_codecache(env, maybe_script.ToLocalChecked(), filename, script,
+                     length);
   }
 
   *result =

@@ -2572,54 +2572,53 @@ napi_status napi_run_script_cache(napi_env env, const char* script,
     length = std::strlen(script);
   }
 
-  LEPUSValue result_val = LEPUS_UNINITIALIZED;
-  {
-    int len = -1;
-    const uint8_t* data = nullptr;
-    env->napi_get_code_cache(env, filename, &data, &len);
-    if (data) {
-      // TODO(yang): check whether the script is obsolate
-      LOG_TIME_START();
-      LEPUSValue top_func =
-          LEPUS_EvalBinary(env->ctx->ctx, data, static_cast<size_t>(len),
-                           LEPUS_EVAL_BINARY_LOAD_ONLY);
-      if (!LEPUS_IsException(top_func) && !LEPUS_IsUndefined(top_func)) {
-        LEPUSValue global = LEPUS_GetGlobalObject(env->ctx->ctx);
-        env->ctx->CreateHandle(top_func, true);
-        result_val = LEPUS_EvalFunction(env->ctx->ctx, top_func, global);
-      }
-      LOG_TIME_END("----- script eval with cache -----");
-    } else if (len == 0) {
-      // if len is 0, we need to make cache.
-      // if len is -1, someone is modifying the cache, we do not make cache.
-      LOG_TIME_START();
-      LEPUSValue top_func =
-          LEPUS_Eval(env->ctx->ctx, script, length, filename,
-                     LEPUS_EVAL_FLAG_COMPILE_ONLY | LEPUS_EVAL_TYPE_GLOBAL);
-      CHECK_QJS(env,
-                !LEPUS_IsException(top_func) && !LEPUS_IsUndefined(top_func));
-      LEPUSValue global = LEPUS_GetGlobalObject(env->ctx->ctx);
-      env->ctx->CreateHandle(top_func, true);
+  LEPUSContext* ctx = env->ctx->ctx;
+  LEPUSValue top_func = LEPUS_UNDEFINED;
 
-      size_t obj_len;
-      data = LEPUS_WriteObject(env->ctx->ctx, &obj_len, top_func,
-                               LEPUS_WRITE_OBJ_BYTECODE);
-      env->napi_store_code_cache(env, filename, data,
-                                 static_cast<int32_t>(obj_len));
-      js_free_comp(env->ctx->ctx,
-                   reinterpret_cast<void*>(const_cast<uint8_t*>(data)));
-      result_val = LEPUS_EvalFunction(env->ctx->ctx, top_func, global);
-      LOG_TIME_END(
-          "---- evaluating %s and making code cache for it lengthed %d -----",
-          filename, (int)obj_len);
+  std::vector<uint8_t> cache;
+  env->napi_get_script_cache(env, filename, script, length, &cache);
+  if (!cache.empty()) {
+    LOG_TIME_START();
+    top_func = LEPUS_EvalBinary(ctx, cache.data(), cache.size(),
+                                LEPUS_EVAL_BINARY_LOAD_ONLY);
+    LOG_TIME_END("----- script eval with cache -----");
+    if (LEPUS_IsException(top_func)) {
+      // Bytecode from an incompatible engine version: recompile and replace.
+      JS_FreeValue_Comp(ctx, LEPUS_GetException(ctx));
+      top_func = LEPUS_UNDEFINED;
     }
   }
-  if (LEPUS_IsUninitialized(result_val)) {
+
+  if (LEPUS_IsUndefined(top_func)) {
     LOG_TIME_START();
-    result_val = LEPUS_Eval(env->ctx->ctx, script, length,
-                            filename ? filename : "", LEPUS_EVAL_TYPE_GLOBAL);
-    LOG_TIME_END("----- script eval without cache -----");
+    top_func =
+        LEPUS_Eval(ctx, script, length, filename,
+                   LEPUS_EVAL_FLAG_COMPILE_ONLY | LEPUS_EVAL_TYPE_GLOBAL);
+    CHECK_QJS(env,
+              !LEPUS_IsException(top_func) && !LEPUS_IsUndefined(top_func));
+    env->ctx->CreateHandle(top_func, true);
+
+    size_t obj_len = 0;
+    uint8_t* data =
+        LEPUS_WriteObject(ctx, &obj_len, top_func, LEPUS_WRITE_OBJ_BYTECODE);
+    if (data != nullptr) {
+      env->napi_store_script_cache(env, filename, script, length, data,
+                                   static_cast<int32_t>(obj_len));
+      js_free_comp(ctx, data);
+    } else {
+      // The script cannot be serialized; it still runs, only uncached.
+      JS_FreeValue_Comp(ctx, LEPUS_GetException(ctx));
+    }
+    LOG_TIME_END(
+        "---- compiling %s and making code cache for it lengthed %d -----",
+        filename, (int)obj_len);
+  } else {
+    env->ctx->CreateHandle(top_func, true);
   }
+
+  LEPUSValue global = LEPUS_GetGlobalObject(ctx);
+  LEPUSValue result_val = LEPUS_EvalFunction(ctx, top_func, global);
+  JS_FreeValue_Comp(ctx, global);
   CHECK_QJS(env, !LEPUS_IsException(result_val));
 
   *result = env->ctx->CreateHandle(result_val);
@@ -2627,14 +2626,15 @@ napi_status napi_run_script_cache(napi_env env, const char* script,
 }
 
 // `data` memory need to be freed from outside
-napi_status napi_gen_code_cache(napi_env env, const char* script,
-                                size_t script_len, const uint8_t** data,
-                                int* length) {
+napi_status napi_compile_code_cache(napi_env env, const char* script,
+                                    size_t script_len, const char* filename,
+                                    const uint8_t** data, int* length) {
   if (script_len == NAPI_AUTO_LENGTH) {
     script_len = std::strlen(script);
   }
+  // The filename is embedded in the bytecode and shows up in stack traces.
   LEPUSValue top_func =
-      LEPUS_Eval(env->ctx->ctx, script, script_len, "",
+      LEPUS_Eval(env->ctx->ctx, script, script_len, filename ? filename : "",
                  LEPUS_EVAL_FLAG_COMPILE_ONLY | LEPUS_EVAL_TYPE_GLOBAL);
   CHECK_QJS(env, !LEPUS_IsException(top_func) && !LEPUS_IsUndefined(top_func));
   env->ctx->CreateHandle(top_func);
@@ -2649,6 +2649,13 @@ napi_status napi_gen_code_cache(napi_env env, const char* script,
   js_free_comp(env->ctx->ctx, reinterpret_cast<void*>(cache));
 
   return napi_clear_last_error(env);
+}
+
+napi_status napi_gen_code_cache(napi_env env, const char* script,
+                                size_t script_len, const uint8_t** data,
+                                int* length) {
+  return napi_compile_code_cache(env, script, script_len, nullptr, data,
+                                 length);
 }
 
 #endif  // ENABLE_CODECACHE

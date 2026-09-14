@@ -1,343 +1,247 @@
+// Copyright 2024 The Lynx Authors. All rights reserved.
+// Licensed under the Apache License Version 2.0 that can be found in the
+// LICENSE file in the root directory of this source tree.
+
 #include <gtest/gtest.h>
 #include <stdio.h>
 
-#include <iostream>
-#include <queue>
+#include <cstdint>
+#include <fstream>
+#include <memory>
 #include <string>
 #include <thread>
+#include <vector>
 
 #include "code_cache.h"
 
 namespace {
-class WorkerThread {
- public:
-  using Task = std::function<void()>;
 
-  WorkerThread(size_t stack_size = 0) : stopped_(false) {
-#if !defined(OS_WIN)
-#if WIN32
-    thread_.p = nullptr;
-    thread_.x = 0;
-#else
-    thread_ = (pthread_t)((unsigned long long)0);
-#endif
-    pthread_attr_t thread_attr;
-    pthread_attr_init(&thread_attr);
+const char kCachePath[] = "test-code-cache.bin";
+const uint64_t kHashA = CacheBlob::HashSource("source A", 8);
+const uint64_t kHashB = CacheBlob::HashSource("source B", 8);
 
-    if (stack_size) {
-      pthread_attr_setstacksize(&thread_attr, stack_size);
-    }
+std::vector<uint8_t> Bytes(uint8_t content, int length) {
+  return std::vector<uint8_t>(length, content);
+}
 
-    int ret = pthread_create(
-        &thread_, &thread_attr,
-        [](void* data) -> void* {
-          static_cast<WorkerThread*>(data)->Run();
-          return nullptr;
-        },
-        this);
-    (void)ret;
-    assert(ret == 0);
+bool Insert(CacheBlob* blob, const std::string& filename, uint64_t source_hash,
+            uint8_t content, int length) {
+  std::vector<uint8_t> data = Bytes(content, length);
+  return blob->insert(filename, source_hash, data.data(), length);
+}
 
-    pthread_attr_destroy(&thread_attr);
-#endif
-  }
+std::vector<uint8_t> ReadFile(const std::string& path) {
+  std::ifstream in(path, std::ios::binary);
+  return std::vector<uint8_t>((std::istreambuf_iterator<char>(in)),
+                              std::istreambuf_iterator<char>());
+}
 
-  ~WorkerThread() { Stop(); }
-
-  void Stop() {
-#if !defined(OS_WIN)
-#if WIN32
-    if (nullptr != thread_.p)
-#else
-    if ((pthread_t)((unsigned long long)0) != thread_)
-#endif
-    {
-      {
-        std::lock_guard<std::mutex> lock(mutex_);
-        stopped_ = true;
-        cond_.notify_one();
-      }
-      ::pthread_join(thread_, nullptr);
-#if WIN32
-      thread_.p = nullptr;
-      thread_.x = 0;
-#else
-      thread_ = (pthread_t)((unsigned long long)0);
-#endif
-    }
-#endif
-  }
-
-  void PostTask(Task task) {
-    std::lock_guard<std::mutex> lock(mutex_);
-    bool empty = queue_.empty();
-    queue_.push(std::move(task));
-    if (empty) {
-      cond_.notify_one();
-    }
-  }
-
- private:
-  void Run() {
-    while (true) {
-      Task task;
-      {
-        std::unique_lock<std::mutex> lock(mutex_);
-        cond_.wait(lock, [this] { return !queue_.empty() || stopped_; });
-        if (stopped_) {
-          break;
-        }
-        task = std::move(queue_.front());
-        queue_.pop();
-      }
-      task();
-    }
-  }
-
-#if !defined(OS_WIN)
-  pthread_t thread_;
-#endif
-  std::mutex mutex_;
-  std::condition_variable cond_;
-  std::queue<Task> queue_;
-  bool stopped_;
-};
-}  // namespace
+void WriteFile(const std::string& path, const std::vector<uint8_t>& bytes) {
+  std::ofstream out(path, std::ios::binary | std::ios::trunc);
+  out.write(reinterpret_cast<const char*>(bytes.data()), bytes.size());
+}
 
 class CodeCacheTest : public ::testing::Test {
  protected:
-  std::unique_ptr<CacheBlob> blob_;
+  void SetUp() override { remove(kCachePath); }
+  void TearDown() override { remove(kCachePath); }
 
- private:
-  std::unique_ptr<WorkerThread> worker_;
-  static const std::string cache_path_;
-
- public:
-  CodeCacheTest()
-      : blob_(new CacheBlob(cache_path_)), worker_(new WorkerThread()) {}
-
-  void RemoveCacheFile() { remove(cache_path_.c_str()); }
-
-  void WriteCodeCache(const std::string& filename, uint8_t* data, int len) {
-    uint8_t* buf = new uint8_t[len];
-    memcpy(buf, data, len);
-    worker_->PostTask([=]() {
-      if (!blob_->insert(filename, buf, len)) {
-        delete[] buf;
-      }
-    });
-    delete[] data;
-    // To avoid that the whole process exit quickly
-    // which make the task skipped.
-    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+  bool CacheFileExists() {
+    FILE* file = fopen(kCachePath, "rb");
+    if (file == nullptr) return false;
+    fclose(file);
+    return true;
   }
-
-  void ReInitCacheBlob(int max_size = 0) {
-    blob_->output();
-    // Wait for blob to finish its file operations.
-    std::this_thread::sleep_for(std::chrono::milliseconds(1));
-    if (max_size) {
-      blob_.reset(new CacheBlob(cache_path_, max_size));
-    } else {
-      blob_.reset(new CacheBlob(cache_path_));
-    }
-  }
-
-  void InputCacheFile() {
-    CacheBlob* blob = blob_.get();
-    worker_->PostTask([blob]() { blob->input(); });
-    // Wait for blob to finish its file operations.
-    std::this_thread::sleep_for(std::chrono::milliseconds(1));
-  }
-
-  bool CheckCacheFileExist() {
-    FILE* file_in = fopen(cache_path_.c_str(), "r");
-    return file_in != NULL;
-  }
-
-  void WriteTestContent(const std::string& filename, uint8_t content, int len) {
-    uint8_t* data = new uint8_t[len];
-    memset(data, content, len);
-    WriteCodeCache(filename, data, len);
-  }
-
-  void StopWorker() { worker_->Stop(); }
 };
 
-const std::string CodeCacheTest::cache_path_ = "test-code-cache.bin";
+TEST_F(CodeCacheTest, FindReturnsCopyOfInsertedData) {
+  CacheBlob blob(kCachePath);
+  ASSERT_TRUE(Insert(&blob, "f1.js", kHashA, 1, 16));
 
-TEST_F(CodeCacheTest, BlobInit) {
-  uint8_t* data0 = new uint8_t[16];
-  memset(data0, 1, 16);
-  std::string f1("f1.js");
-  WriteCodeCache(f1, data0, 16);
+  std::vector<uint8_t> out;
+  ASSERT_TRUE(blob.find("f1.js", kHashA, &out));
+  EXPECT_EQ(out, Bytes(1, 16));
+  EXPECT_EQ(blob.size(), 16);
 
-  int len = 0;
-  const CachedData* r0 = blob_->find(f1, &len);
-  ASSERT_NE(nullptr, r0);
-  ASSERT_EQ(16, len);
-  ASSERT_EQ(1, r0->data_[0]);
-
-  uint8_t* data1 = new uint8_t[1024];
-  memset(data1, 2, 1024);
-  WriteCodeCache(f1, data1, 1024);
-
-  r0 = blob_->find(f1, &len);
-  ASSERT_NE(nullptr, r0);
-  ASSERT_EQ(1024, len);
-  ASSERT_EQ(2, r0->data_[0]);
-
-  std::string f2("f2.js");
-  ASSERT_EQ(blob_->find(f2, &len), nullptr);
-  ASSERT_EQ(len, 0);
+  EXPECT_FALSE(blob.find("missing.js", kHashA, &out));
+  EXPECT_TRUE(out.empty());
 }
 
-TEST_F(CodeCacheTest, ReadFile) {
-  std::string f0("f0.js");
-  std::string f1("f1.js");
-  std::string f2("f2.js");
+TEST_F(CodeCacheTest, ChangedSourceMissesUntilReplaced) {
+  CacheBlob blob(kCachePath);
+  ASSERT_TRUE(Insert(&blob, "f1.js", kHashA, 1, 16));
 
-  int len0 = 16;
-  int len1 = 1024;
-  int len2 = 512;
-  WriteTestContent(f0, 0, len0);
-  WriteTestContent(f1, 1, len1);
-  WriteTestContent(f2, 2, len2);
+  std::vector<uint8_t> out;
+  EXPECT_FALSE(blob.find("f1.js", kHashB, &out));
+  EXPECT_TRUE(out.empty());
 
-  ReInitCacheBlob(4096);
-  ASSERT_TRUE(CheckCacheFileExist());
-
-  InputCacheFile();
-  const CachedData* data = nullptr;
-  int len = -1;
-  data = blob_->find(f0, &len);
-  ASSERT_EQ(len0, len);
-  ASSERT_NE(data, nullptr);
-  ASSERT_EQ(data->data_[0], 0);
-
-  len = -1;
-  data = blob_->find(f2, &len);
-  ASSERT_EQ(len2, len);
-  ASSERT_NE(data, nullptr);
-  ASSERT_EQ(data->data_[0], 2);
+  ASSERT_TRUE(Insert(&blob, "f1.js", kHashB, 2, 1024));
+  ASSERT_TRUE(blob.find("f1.js", kHashB, &out));
+  EXPECT_EQ(out, Bytes(2, 1024));
+  EXPECT_FALSE(blob.find("f1.js", kHashA, &out));
+  EXPECT_EQ(blob.size(), 1024);
 }
 
-TEST_F(CodeCacheTest, Replace) {
-  ReInitCacheBlob(64);
-
-  std::string f0("f0.js");
-  std::string f1("f1.js");
-  std::string f2("f2.js");
-
-  int len0 = 16;
-  int len1 = 8;
-  int len2 = 24;
-
-  WriteTestContent(f0, 0, len0);
-  WriteTestContent(f1, 1, len1);
-  WriteTestContent(f2, 2, len2);
-
-  std::string ft("ft.js");
-  int lent = 24;
-  WriteTestContent(ft, 't', lent);
-
-  ASSERT_EQ(64, blob_->size());
-
-  // Check whether f1 is replaced by ft
-  int len = -1;
-  auto data = blob_->find(ft, &len);
-  ASSERT_EQ(lent, len);
-  ASSERT_NE(data, nullptr);
-  ASSERT_EQ(data->data_[0], 't');
-
-  len = -1;
-  data = blob_->find(f1, &len);
-  ASSERT_EQ(0, len);
-  ASSERT_EQ(nullptr, data);
-
-  // heat f0 & f2.
-  blob_->find(f0, &len);
-  blob_->find(f0, &len);
-  blob_->find(f2, &len);
-  blob_->find(f2, &len);
-
-  // ft is removed.
-  WriteTestContent(f1, 'a', len1);
-  ASSERT_EQ(blob_->size(), 48);
-  ASSERT_EQ(nullptr, blob_->find(ft, &len));
-
-  len = -1;
-  data = blob_->find(f1, &len);
-  ASSERT_NE(nullptr, data);
-  ASSERT_EQ('a', data->data_[0]);
-  ASSERT_EQ(len1, data->length_);
+TEST_F(CodeCacheTest, RejectsInvalidInput) {
+  CacheBlob blob(kCachePath, 64);
+  std::vector<uint8_t> data = Bytes(1, 8);
+  EXPECT_FALSE(blob.insert("f.js", kHashA, nullptr, 8));
+  EXPECT_FALSE(blob.insert("f.js", kHashA, data.data(), 0));
+  EXPECT_FALSE(Insert(&blob, "f.js", kHashA, 1, 65));
+  EXPECT_TRUE(Insert(&blob, "f.js", kHashA, 1, 64));
 }
 
-TEST_F(CodeCacheTest, Update) {
-  ReInitCacheBlob(32);
-  std::string f0("f0.js");
-  std::string f1("f1.js");
-  int len0 = 24;
-  int len1 = 4;
+TEST_F(CodeCacheTest, EvictsLeastUsedWhenFull) {
+  CacheBlob blob(kCachePath, 100);
+  ASSERT_TRUE(Insert(&blob, "hot.js", kHashA, 1, 40));
+  ASSERT_TRUE(Insert(&blob, "cold.js", kHashA, 2, 40));
+  std::vector<uint8_t> out;
+  ASSERT_TRUE(blob.find("hot.js", kHashA, &out));
 
-  WriteTestContent(f0, 0, len0);
-  WriteTestContent(f1, 1, len1);
-
-  // update f1
-  WriteTestContent(f1, 'a', len1);
-  int len = -1;
-  auto data = blob_->find(f1, &len);
-  ASSERT_EQ(len1, len);
-  ASSERT_NE(nullptr, data);
-  ASSERT_EQ(data->data_[0], 'a');
-
-  // update f1 and remove f0
-  len1 = 28;
-  WriteTestContent(f1, 'b', len1);
-  len = -1;
-  ASSERT_EQ(nullptr, blob_->find(f0, &len));
-  ASSERT_EQ(0, len);
-  ASSERT_EQ(len1, blob_->size());
-
-  len = -1;
-  data = blob_->find(f1, &len);
-  ASSERT_NE(nullptr, data->data_);
-  ASSERT_EQ(len1, data->length_);
-  ASSERT_EQ('b', data->data_[0]);
+  ASSERT_TRUE(Insert(&blob, "new.js", kHashA, 3, 40));
+  EXPECT_TRUE(blob.find("hot.js", kHashA, &out));
+  EXPECT_FALSE(blob.find("cold.js", kHashA, &out));
+  EXPECT_TRUE(blob.find("new.js", kHashA, &out));
+  EXPECT_EQ(blob.size(), 80);
 }
 
-TEST_F(CodeCacheTest, Remove) {
-  ReInitCacheBlob(32);
+TEST_F(CodeCacheTest, OutputAndInputRoundTrip) {
+  {
+    CacheBlob blob(kCachePath);
+    ASSERT_TRUE(Insert(&blob, "f0.js", kHashA, 0, 16));
+    ASSERT_TRUE(Insert(&blob, "f1.js", kHashB, 1, 1024));
+    blob.output();
+  }
+  ASSERT_TRUE(CacheFileExists());
 
-  std::string f0("f0.js");
-  std::string f1("f1.js");
-
-  int len0 = 24;
-  int len1 = 8;
-
-  WriteTestContent(f0, 'a', len0);
-  WriteTestContent(f1, 'b', len1);
-
-  int len = -1;
-  auto data = blob_->find(f0, &len);
-  ASSERT_NE(nullptr, data);
-  ASSERT_EQ(len0, len);
-
-  blob_->remove(f0);
-  len = -1;
-  data = blob_->find(f0, &len);
-  ASSERT_EQ(nullptr, data);
-  ASSERT_EQ(0, len);
-  ASSERT_EQ(len1, blob_->size());
+  CacheBlob blob(kCachePath);
+  ASSERT_TRUE(blob.input());
+  EXPECT_TRUE(blob.input());
+  EXPECT_EQ(blob.size(), 1040);
+  std::vector<uint8_t> out;
+  ASSERT_TRUE(blob.find("f0.js", kHashA, &out));
+  EXPECT_EQ(out, Bytes(0, 16));
+  ASSERT_TRUE(blob.find("f1.js", kHashB, &out));
+  EXPECT_EQ(out, Bytes(1, 1024));
+  EXPECT_FALSE(blob.find("f1.js", kHashA, &out));
 }
 
-TEST_F(CodeCacheTest, Boundary) {
-  std::string f0("f0.js");
-  std::string f1("f1.js");
+TEST_F(CodeCacheTest, OutputOnlyWritesWhenDirty) {
+  CacheBlob blob(kCachePath);
+  blob.output();
+  EXPECT_FALSE(CacheFileExists());
 
-  uint8_t* d = new uint8_t[8];
-  // illegal inputs.
-  ASSERT_FALSE(blob_->insert(f0, nullptr, 16));
-  ASSERT_FALSE(blob_->insert(f0, d, 0));
-  ASSERT_TRUE(blob_->insert(f0, d, 16));
+  ASSERT_TRUE(Insert(&blob, "f0.js", kHashA, 0, 16));
+  blob.output();
+  ASSERT_TRUE(CacheFileExists());
+
+  remove(kCachePath);
+  blob.output();
+  EXPECT_FALSE(CacheFileExists());
+
+  std::vector<uint8_t> out;
+  ASSERT_TRUE(blob.find("f0.js", kHashA, &out));
+  blob.output();
+  EXPECT_FALSE(CacheFileExists());
 }
+
+TEST_F(CodeCacheTest, InputMergesEntriesInsertedBeforeLoad) {
+  {
+    CacheBlob blob(kCachePath);
+    ASSERT_TRUE(Insert(&blob, "f0.js", kHashA, 0, 16));
+    ASSERT_TRUE(Insert(&blob, "f1.js", kHashA, 1, 16));
+    blob.output();
+  }
+
+  CacheBlob blob(kCachePath);
+  ASSERT_TRUE(Insert(&blob, "f0.js", kHashB, 2, 32));
+  ASSERT_TRUE(blob.input());
+  EXPECT_EQ(blob.size(), 48);
+  std::vector<uint8_t> out;
+  ASSERT_TRUE(blob.find("f0.js", kHashB, &out));
+  EXPECT_EQ(out, Bytes(2, 32));
+  ASSERT_TRUE(blob.find("f1.js", kHashA, &out));
+}
+
+TEST_F(CodeCacheTest, TruncatedFileIsRejectedAndRewritten) {
+  {
+    CacheBlob blob(kCachePath);
+    ASSERT_TRUE(Insert(&blob, "f0.js", kHashA, 0, 512));
+    ASSERT_TRUE(Insert(&blob, "f1.js", kHashA, 1, 512));
+    blob.output();
+  }
+  std::vector<uint8_t> bytes = ReadFile(kCachePath);
+  ASSERT_GT(bytes.size(), 700u);
+  bytes.resize(700);
+  WriteFile(kCachePath, bytes);
+
+  CacheBlob blob(kCachePath);
+  EXPECT_FALSE(blob.input());
+  EXPECT_EQ(blob.size(), 0);
+
+  blob.output();
+  CacheBlob reloaded(kCachePath);
+  EXPECT_TRUE(reloaded.input());
+  EXPECT_EQ(reloaded.size(), 0);
+}
+
+TEST_F(CodeCacheTest, CorruptedDataIsRejected) {
+  {
+    CacheBlob blob(kCachePath);
+    ASSERT_TRUE(Insert(&blob, "f0.js", kHashA, 0, 512));
+    blob.output();
+  }
+  std::vector<uint8_t> bytes = ReadFile(kCachePath);
+  bytes[bytes.size() / 2] ^= 0xFF;
+  WriteFile(kCachePath, bytes);
+
+  CacheBlob blob(kCachePath);
+  EXPECT_FALSE(blob.input());
+  EXPECT_EQ(blob.size(), 0);
+}
+
+TEST_F(CodeCacheTest, ForeignFormatIsRejected) {
+  WriteFile(kCachePath, Bytes(0x42, 4096));
+  CacheBlob blob(kCachePath);
+  EXPECT_FALSE(blob.input());
+  EXPECT_EQ(blob.size(), 0);
+}
+
+TEST_F(CodeCacheTest, OpenSharesOneBlobPerPath) {
+  std::shared_ptr<CacheBlob> first = CacheBlob::Open(kCachePath, 4096);
+  std::shared_ptr<CacheBlob> second = CacheBlob::Open(kCachePath, 1);
+  EXPECT_EQ(first, second);
+  EXPECT_NE(first, CacheBlob::Open("other-code-cache.bin", 4096));
+
+  ASSERT_TRUE(Insert(first.get(), "f0.js", kHashA, 0, 16));
+  std::vector<uint8_t> out;
+  EXPECT_TRUE(second->find("f0.js", kHashA, &out));
+
+  first.reset();
+  second.reset();
+  std::shared_ptr<CacheBlob> fresh = CacheBlob::Open(kCachePath, 4096);
+  EXPECT_FALSE(fresh->find("f0.js", kHashA, &out));
+}
+
+TEST_F(CodeCacheTest, ConcurrentAccessFromSeveralThreads) {
+  std::shared_ptr<CacheBlob> blob = CacheBlob::Open(kCachePath, 1 << 20);
+  std::vector<std::thread> threads;
+  for (int t = 0; t < 4; ++t) {
+    threads.emplace_back([blob, t] {
+      const std::string filename = "worker" + std::to_string(t) + ".js";
+      for (int i = 0; i < 200; ++i) {
+        ASSERT_TRUE(
+            Insert(blob.get(), filename, kHashA, static_cast<uint8_t>(t), 256));
+        std::vector<uint8_t> out;
+        ASSERT_TRUE(blob->find(filename, kHashA, &out));
+        EXPECT_EQ(out, Bytes(static_cast<uint8_t>(t), 256));
+        blob->find("worker0.js", kHashA, &out);
+        if (i % 50 == 0) blob->output();
+      }
+    });
+  }
+  for (auto& thread : threads) thread.join();
+  EXPECT_EQ(blob->size(), 4 * 256);
+}
+
+}  // namespace
