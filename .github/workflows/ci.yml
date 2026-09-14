@@ -32,6 +32,36 @@ jobs:
         run: |-
           POD_VERSION=0.0.1-for-ci-test PRIMJS_COMMIT_ID=${{ github.event.pull_request.head.sha }} bundle exec pod spec lint PrimJS.podspec --verbose --skip-import-validation --allow-warnings
   
+  swift-package:
+    runs-on: macos-latest
+    steps:
+      - name: Download Source
+        uses: actions/checkout@v4.2.2
+      - name: Check generated SwiftPM headers
+        run: python3 tools/ios_tools/generate_spm_headers.py --check
+      - name: Build and test (macOS)
+        run: |-
+          swift build
+          swift test
+      - name: Build and test with Debugger trait (macOS)
+        run: |-
+          swift build --traits Debugger
+          swift test --traits Debugger
+      - name: Build and test (iOS Simulator)
+        run: |-
+          UDID=$(xcrun simctl list devices available -j | python3 -c '
+          import json, sys
+          devices = json.load(sys.stdin)["devices"]
+          runtimes = sorted((r for r in devices if "iOS" in r), reverse=True)
+          print(next(d["udid"] for r in runtimes for d in devices[r] if d["name"].startswith("iPhone")))')
+          xcodebuild test -scheme PrimJS-Package \
+            -destination "platform=iOS Simulator,id=$UDID" \
+            -derivedDataPath .build/DerivedData -quiet
+      - name: Build (iOS device)
+        run: |-
+          xcodebuild build -scheme PrimJS-Package -destination 'generic/platform=iOS' \
+            -derivedDataPath .build/DerivedData -quiet
+
   check-unittests-linux:
     runs-on: lynx-ubuntu-22.04-medium
     steps:
