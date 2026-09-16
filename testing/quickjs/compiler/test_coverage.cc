@@ -138,7 +138,7 @@ TEST(QjsCoverage, DumpFiltersByRuntimeId) {
   if (!LEPUS_IsGCMode(ctx)) LEPUS_FreeValue(ctx, result);
 
   std::string dump = CoverageDump(ctx, kFirstRuntimeId);
-  EXPECT_NE(dump.find("\"scriptId\":\"101\""), std::string::npos);
+  EXPECT_NE(dump.find("\"scriptId\":\"1\""), std::string::npos);
   EXPECT_NE(dump.find("\"url\":\"coverage_first.js\""), std::string::npos);
   EXPECT_EQ(dump.find("coverage_second.js"), std::string::npos);
   EXPECT_NE(dump.find("\"ranges\":[["), std::string::npos);
@@ -149,7 +149,7 @@ TEST(QjsCoverage, DumpFiltersByRuntimeId) {
   EXPECT_TRUE(CoverageFunctionRecord(dump, "second").empty());
 
   dump = CoverageDump(ctx, kSecondRuntimeId);
-  EXPECT_NE(dump.find("\"scriptId\":\"202\""), std::string::npos);
+  EXPECT_NE(dump.find("\"scriptId\":\"1\""), std::string::npos);
   EXPECT_EQ(dump.find("coverage_first.js"), std::string::npos);
   EXPECT_NE(dump.find("\"url\":\"coverage_second.js\""), std::string::npos);
   EXPECT_TRUE(CoverageFunctionRecord(dump, "first").empty());
@@ -188,9 +188,57 @@ TEST(QjsCoverage, DumpBufferSurvivesGC) {
   LEPUS_RunGC(rt);
 
   const std::string dump_copy(dump, dump_length);
-  EXPECT_NE(dump_copy.find("\"scriptId\":\"103\""), std::string::npos);
+  EXPECT_NE(dump_copy.find("\"scriptId\":\"1\""), std::string::npos);
   EXPECT_FALSE(CoverageFunctionRecord(dump_copy, "survivesGC").empty());
   JS_FreeCoverageDumpString(dump);
+
+  LEPUS_FreeContext(ctx);
+  LEPUS_FreeRuntime(rt);
+}
+
+TEST(QjsCoverage, DumpSeparatesScriptsWithTheSameRuntimeId) {
+  constexpr int32_t kRuntimeId = 104;
+  constexpr char kFirstSource[] =
+      "function fromFirstScript() {} fromFirstScript();";
+  constexpr char kSecondSource[] =
+      "function fromSecondScript() {} fromSecondScript();";
+
+  LEPUSRuntime* rt = LEPUS_NewRuntime();
+  ASSERT_NE(rt, nullptr);
+  LEPUSContext* ctx = LEPUS_NewContext(rt);
+  ASSERT_NE(ctx, nullptr);
+
+  LEPUSValue result = LEPUS_Eval_WITH_COVERAGE(
+      ctx, kFirstSource, strlen(kFirstSource), "coverage_same_runtime_first.js",
+      LEPUS_EVAL_TYPE_GLOBAL, 0, kRuntimeId);
+  ASSERT_FALSE(LEPUS_IsException(result));
+  if (!LEPUS_IsGCMode(ctx)) LEPUS_FreeValue(ctx, result);
+
+  result = LEPUS_Eval_WITH_COVERAGE(ctx, kSecondSource, strlen(kSecondSource),
+                                    "coverage_same_runtime_second.js",
+                                    LEPUS_EVAL_TYPE_GLOBAL, 0, kRuntimeId);
+  ASSERT_FALSE(LEPUS_IsException(result));
+  if (!LEPUS_IsGCMode(ctx)) LEPUS_FreeValue(ctx, result);
+
+  const std::string dump = CoverageDump(ctx, kRuntimeId);
+  EXPECT_NE(dump.find("\"scriptId\":\"1\",\"url\":"
+                      "\"coverage_same_runtime_first.js\""),
+            std::string::npos);
+  EXPECT_NE(dump.find("\"scriptId\":\"2\",\"url\":"
+                      "\"coverage_same_runtime_second.js\""),
+            std::string::npos);
+
+  const size_t first_url = dump.find("coverage_same_runtime_first.js");
+  const size_t first_function = dump.find("fromFirstScript");
+  const size_t second_url = dump.find("coverage_same_runtime_second.js");
+  const size_t second_function = dump.find("fromSecondScript");
+  ASSERT_NE(first_url, std::string::npos);
+  ASSERT_NE(first_function, std::string::npos);
+  ASSERT_NE(second_url, std::string::npos);
+  ASSERT_NE(second_function, std::string::npos);
+  EXPECT_LT(first_url, first_function);
+  EXPECT_LT(first_function, second_url);
+  EXPECT_LT(second_url, second_function);
 
   LEPUS_FreeContext(ctx);
   LEPUS_FreeRuntime(rt);
