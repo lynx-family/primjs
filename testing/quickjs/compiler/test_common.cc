@@ -156,6 +156,70 @@ TEST_F(CommonQjsTest, StructuredCloneTest) {
   }
 }
 #endif
+TEST_F(CommonQjsTest, NullishCoalescingValues) {
+  std::string src = R"(
+    if ((null ?? 3) !== 3) throw new Error("null must use the fallback");
+    if ((undefined ?? 3) !== 3)
+      throw new Error("undefined must use the fallback");
+    if ((null ?? undefined ?? 3) !== 3)
+      throw new Error("nullish chain must use the fallback");
+    if ((null ?? 0 ?? 3) !== 0)
+      throw new Error("nullish chain must preserve zero");
+
+    function coalesce(value) { return value ?? 3; }
+    for (const value of [null, undefined]) {
+      if (coalesce(value) !== 3) throw new Error("dynamic nullish value");
+    }
+    for (const value of [0, -0, false, "", NaN, 42, true, "value",
+                         {}, [], Symbol("value"), 0n]) {
+      if (!Object.is(coalesce(value), value))
+        throw new Error("non-nullish value must be preserved");
+    }
+  )";
+  auto ret = LEPUS_Eval(ctx_, src.c_str(), src.size(), "test.js",
+                        LEPUS_EVAL_TYPE_GLOBAL);
+  if (LEPUS_IsException(ret)) {
+    FAIL() << js_get_exception_string(ctx_);
+  }
+  if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, ret);
+}
+
+TEST_F(CommonQjsTest, NullishCoalescingEvaluationOrder) {
+  std::string src = R"(
+    let reads = 0;
+    let calls = 0;
+    let current;
+    const object = { get value() { reads++; return current; } };
+    function fallback() { calls++; return 3; }
+    for (const value of [null, undefined, 0, false, "", {}]) {
+      current = value;
+      reads = calls = 0;
+      const result = object.value ?? fallback();
+      const nullish = value === null || value === undefined;
+      if (reads !== 1 || calls !== (nullish ? 1 : 0) ||
+          !Object.is(result, nullish ? 3 : value))
+        throw new Error("incorrect evaluation order or short circuit");
+    }
+
+    const sentinel = {};
+    function poison() { throw sentinel; }
+    for (const value of [null, undefined]) {
+      let caught = false;
+      calls = 0;
+      try { value ?? poison() ?? fallback(); }
+      catch (error) { caught = error === sentinel; }
+      if (!caught || calls !== 0)
+        throw new Error("RHS exception must stop the chain");
+    }
+  )";
+  auto ret = LEPUS_Eval(ctx_, src.c_str(), src.size(), "test.js",
+                        LEPUS_EVAL_TYPE_GLOBAL);
+  if (LEPUS_IsException(ret)) {
+    FAIL() << js_get_exception_string(ctx_);
+  }
+  if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, ret);
+}
+
 TEST_F(CommonQjsTest, WStringTest) {
   const char* buf = "testWstring";
   uint16_t* wbuf = (uint16_t*)malloc(24);
