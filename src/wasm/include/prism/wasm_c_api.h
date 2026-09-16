@@ -472,6 +472,8 @@ WASM_API_EXTERN own wasm_func_t* wasm_func_new_with_env(
     void* env, void (*finalizer)(void*));
 
 WASM_API_EXTERN own wasm_functype_t* wasm_func_type(const wasm_func_t*);
+WASM_API_EXTERN const wasm_functype_t* wasm_func_type_borrow(
+    const wasm_func_t*);
 WASM_API_EXTERN size_t wasm_func_param_arity(const wasm_func_t*);
 WASM_API_EXTERN size_t wasm_func_result_arity(const wasm_func_t*);
 

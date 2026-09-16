@@ -4,8 +4,6 @@
 
 #include "runtime/prism/wasm_runtime.h"
 
-#include <string>
-
 #include "common/wasm_log.h"
 #include "common/wasm_utils.h"
 #include "quickjs/include/primjs_monitor.h"
@@ -16,10 +14,24 @@
 namespace primjs::wasm {
 PrismRuntime::PrismRuntime() : wasm_engine_(nullptr), wasm_store_(nullptr) {
   WLOGD("Running PrismRuntime::%s...", __func__);
+  InitRuntime();
 }
 
 PrismRuntime::~PrismRuntime() {
   WLOGD("Running PrismRuntime::%s...", __func__);
+  // Safety net: idempotent; normally called explicitly before destruction.
+  ReleaseStore();
+}
+
+void PrismRuntime::ReleaseStore() {
+  if (wasm_likely(wasm_store_)) {
+    wasm_store_delete(wasm_store_);
+    wasm_store_ = nullptr;
+  }
+  if (wasm_likely(wasm_engine_)) {
+    wasm_engine_delete(wasm_engine_);
+    wasm_engine_ = nullptr;
+  }
 }
 
 int PrismRuntime::NumberToWasm(double dvalue, wasm_val_t* w_val) {

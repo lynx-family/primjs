@@ -7,6 +7,9 @@
 
 #include <string>
 
+#ifdef ENABLE_WASM_PERF_COMPARE
+#include "common/interop_runtime_perf.h"
+#endif
 #include "common/js_type.h"
 #include "common/wasm_log.h"
 #if defined(__APPLE__)
@@ -30,6 +33,11 @@ class Wasm3Function {
   Wasm3Function(const Wasm3Function&) = default;
 
   IM3Function function() const { return m3_function_; }
+
+#ifdef ENABLE_WASM_PERF_COMPARE
+  wasm_perf::CallSamplingState& perf_call_state() { return perf_call_state_; }
+  Wasm3Instance* perf_instance() const { return instance_; }
+#endif
 
   static const void* QJSWasmCallback(IM3Runtime runtime, IM3ImportContext _ctx,
                                      u64* _sp, void* _mem);
@@ -146,6 +154,9 @@ class Wasm3Function {
 
   OWNER IM3Function m3_function_;
   OWNER JSValueRefs js_function_;
+#ifdef ENABLE_WASM_PERF_COMPARE
+  wasm_perf::CallSamplingState perf_call_state_;
+#endif
 };
 
 }  // namespace primjs::wasm

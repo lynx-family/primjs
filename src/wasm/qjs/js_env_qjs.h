@@ -9,7 +9,9 @@
 // THIS HEADER FILE SHOULD NOT BE INCLUDED IN ANY HEADERS IN JSC/QJS MODULE
 
 #include <atomic>
+#include <cstdint>
 #include <map>
+#include <vector>
 
 #include "common/js_type.h"
 #include "common/one_of.h"
@@ -39,24 +41,42 @@ class QJSEnv {
   ~QJSEnv();
   void Finalize();
 
-  JSValue GetProperty(JSValue target, const char *name);
+  JSValue GetProperty(JSValue target, const char *name,
+                      JSValue *exception = nullptr);
+  // Prism may consume accessor results after GetProperty returns. Keep the
+  // returned QuickJS reference owned until the caller releases it.
+  JSValue GetPropertyForPrism(JSValue target, const char *name,
+                              JSValue *exception = nullptr);
   bool SetProperty(JSValue obj, const char *name, JSValue val);
   bool SetPropertyAtIndex(JSValue obj, uint32_t index, JSValue val);
   JSValue MakeFunction(const char *name, void *pack);
   JSValue MakeString(const char *str);
   JSValue MakeNumber(double num);
+  bool MakeBigInt64(int64_t num, JSValue *result, JSValue *exception = nullptr);
+  void SetWasmRoot(LEPUSValue root) { wasm_root_ = WASMGCPersistent(root); }
+  LEPUSValue wasm_root() const { return wasm_root_.Get(); }
 
   JSValue ReserveObject(JSValue obj);
   void ReleaseObject(JSValue obj);
 
   void ValueToInt32(int32_t &num, JSValue val, JSValue &result);
   void ValueToBigInt64(int64_t &num, JSValue val, JSValue &result);
+  void ValueToBigInt64ForPrism(int64_t &num, JSValue val, JSValue &result);
   void ValueToNumber(double &num, JSValue val, JSValue &result);
 
   JSValue ValueToObject(JSValue val);
   JSValue ValueToFunction(JSValue val);
   JSValue CallAsFunction(JSValue function, JSValue thisObject, size_t argc,
                          JSValue args[], JSValue *exception);
+  JSValue CallAsFunctionForPrism(JSValue function, JSValue thisObject,
+                                 size_t argc, JSValue args[],
+                                 JSValue *exception);
+
+  // Prism import callbacks need to carry an arbitrary thrown JS value across
+  // the native trap boundary. The separate boolean is required because both
+  // null and undefined are valid exception payloads.
+  void CapturePendingWasmException();
+  bool TakeWasmException(LEPUSValue *exception);
 
   inline static LEPUSValue ToQJS(JSValue from) { return from.Get(); }
 
@@ -68,6 +88,7 @@ class QJSEnv {
 
   bool IsObject(JSValue val) { return LEPUS_IsObject(val.Get()); }
   bool IsNumber(JSValue val) { return LEPUS_IsNumber(val.Get()); }
+  bool IsBigInt(JSValue val) { return LEPUS_IsBigInt(val.Get()); }
   bool IsUndefined(JSValue val) { return LEPUS_IsUndefined(val.Get()); }
   bool IsNull(JSValue val) { return LEPUS_IsNull(val.Get()); }
   bool IsException(JSValue val) { return LEPUS_IsException(val.Get()); }
@@ -96,7 +117,7 @@ class QJSEnv {
 
   JSValue DupValue(JSValue value);
   void FreeValue(LEPUSRuntime *rt, JSValue value);
-  void FreeValue(JSValue value);
+  void FreeValue(const JSValue &value);
 
   JSValue ReserveValue(JSValue obj);
   void ReleaseValue(JSValue obj);
@@ -113,8 +134,15 @@ class QJSEnv {
   auto &wasm_table_cache() { return wasm_table_cache_; }
   auto &wasm_global_cache() { return wasm_global_cache_; }
   auto &wasm_func_cache() { return wasm_func_cache_; }
+  uint64_t BeginWasmImportCallbackTransaction();
+  void CacheWasmImportCallback(JSObject value, uint64_t transaction = 0);
+  size_t RollbackWasmImportCallbackTransaction(uint64_t transaction);
+
+  JSContext js_ctx() const { return js_ctx_; }
 
  private:
+  void StashWasmException(LEPUSValue exception);
+
   BORROWER LEPUSRuntime *js_rt_;
   BORROWER JSContext js_ctx_;
   BORROWER std::atomic_bool *ctx_invalid_;
@@ -123,6 +151,15 @@ class QJSEnv {
   std::map<uintptr_t, WASMGCPersistent> wasm_table_cache_;
   std::map<uintptr_t, WASMGCPersistent> wasm_global_cache_;
   std::map<uintptr_t, WASMGCPersistent> wasm_func_cache_;
+  struct WasmImportCallbackRoot {
+    WASMGCPersistent value;
+    uint64_t transaction;
+  };
+  std::vector<WasmImportCallbackRoot> wasm_import_callback_roots_;
+  uint64_t next_wasm_import_callback_transaction_ = 0;
+  BORROWER WASMGCPersistent wasm_root_ = WASMGCPersistent(LEPUS_UNDEFINED);
+  bool has_pending_wasm_exception_ = false;
+  LEPUSValue pending_wasm_exception_ = LEPUS_UNDEFINED;
 };
 
 }  // namespace qjs

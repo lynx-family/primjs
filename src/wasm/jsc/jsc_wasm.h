@@ -20,8 +20,18 @@ class JSCWasmExt {
   static void RegisterWebAssembly(JSContextRef ctx,
                                   std::atomic_bool* ctx_invalid,
                                   WasmRuntimeType runtime_type);
+  // Test-only entry point that bypasses the app's settings-driven engine
+  // selection. Production callers must use RegisterWebAssembly above.
+  static void RegisterWebAssemblyForTesting(JSContextRef ctx,
+                                            std::atomic_bool* ctx_invalid,
+                                            WasmRuntimeType runtime_type);
+#if defined(QJS_UNITTEST)
+  static bool SetCurrentPrismReleaseCountForTesting(
+      JSContextRef ctx, std::atomic_int* release_count);
+#endif
   static void RegisterWebAssembly(JSContextRef ctx,
                                   std::atomic_bool* ctx_invalid);
+  static void PrepareForContextRelease(JSContextRef ctx);
 
   static constexpr const char* kWasmName = "WebAssembly";
   static constexpr const char* kModuleName = "Module";

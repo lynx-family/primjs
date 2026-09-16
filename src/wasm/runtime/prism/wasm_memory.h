@@ -13,15 +13,19 @@
 namespace primjs {
 namespace wasm {
 class PrismInstance;
+class PrismRuntime;
 
 class PrismMemory {
  public:
   explicit PrismMemory(wasm_memory_t* memory);
-  PrismMemory(uint32_t initial, uint32_t maximum);
-  PrismMemory(wasm_memory_t* memory, PrismInstance* instance);
+  PrismMemory(PrismRuntime* runtime, uint32_t initial, uint32_t maximum);
+  PrismMemory(wasm_memory_t* memory, PrismRuntime* runtime,
+              PrismInstance* instance, uint32_t maximum);
   ~PrismMemory();
 
   wasm_memory_t* memory() { return memory_; }
+  uint32_t maximum() const { return maximum_; }
+  PrismRuntime* runtime() const { return runtime_; }
 
   bool valid() const;
   size_t pages();
@@ -30,7 +34,10 @@ class PrismMemory {
 
  private:
   wasm_memory_t* memory_;
+  uint32_t maximum_ = wasm_limits_max_default;
+  PrismRuntime* runtime_ = nullptr;
   [[maybe_unused]] PrismInstance* instance_ = nullptr;
+  bool owns_handle_ = false;
 };
 
 }  // namespace wasm

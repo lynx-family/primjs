@@ -8,6 +8,7 @@
 // NOTE:
 // THIS HEADER FILE SHOULD NOT BE INCLUDED IN ANY HEADERS IN RUNTIME MODULE
 
+#include <atomic>
 #include <cstddef>
 #include <map>
 
@@ -34,6 +35,9 @@
 #include "runtime/wasm3/wasm_module.h"
 #include "runtime/wasm3/wasm_runtime.h"
 #include "runtime/wasm3/wasm_table.h"
+#ifdef ENABLE_WASM_PERF_COMPARE
+#include "common/interop_runtime_perf.h"
+#endif  // ENABLE_WASM_PERF_COMPARE
 
 namespace primjs {
 using jsc::JSCEnv;
@@ -84,6 +88,8 @@ class InteropRuntime {
     return instance;
   }
 
+  auto& wasm_runtime() { return wasm_runtime_; }
+
   static void IncreaseRefCount(InteropRuntime*& instance) {
     instance->ref_count_.fetch_add(1, std::memory_order_relaxed);
     WLOGD("Increasing interop runtime ref count..., ref_count_ = %d",
@@ -92,29 +98,131 @@ class InteropRuntime {
 
   static void DecreaseRefCount(InteropRuntime*& instance) {
     WASM_DCHECK(instance->ref_count_.load(std::memory_order_acquire) > 0);
-    instance->ref_count_.fetch_sub(1, std::memory_order_release);
+    if (instance->wasm_runtime_.is<PrismRuntime*>()) {
+      int remaining =
+          instance->ref_count_.fetch_sub(1, std::memory_order_acq_rel) - 1;
+      WLOGD("Decreasing interop runtime ref count..., ref_count_ = %d",
+            remaining);
+
+      if (remaining == 0) MaybeReleasePrism(instance);
+      return;
+    }
+
+    // Same rule as the Prism branch above: decide on the decrement's own return
+    // value. A separate load lets two threads that drop the last two references
+    // both observe zero and both run Destructor.
+    const int remaining =
+        instance->ref_count_.fetch_sub(1, std::memory_order_acq_rel) - 1;
     WLOGD("Decreasing interop runtime ref count..., ref_count_ = %d",
-          instance->ref_count_.load(std::memory_order_relaxed));
-    if (instance->ref_count_.load(std::memory_order_acquire) == 0) {
+          remaining);
+
+    if (remaining == 0) {
       Destructor(instance);
     }
   }
 
   int GetRefCount() const { return ref_count_.load(std::memory_order_acquire); }
 
+#if defined(QJS_UNITTEST)
+  static void SetPrismReleaseCountForTesting(InteropRuntime* instance,
+                                             std::atomic_int* release_count) {
+    instance->prism_release_count_for_testing_ = release_count;
+  }
+#endif
+
+  // Prism owns all native handles through one store. Requesting release does
+  // not delete the store until every JS wrapper has finished its native-only
+  // finalizer, so wrapper teardown can never inspect a store-owned handle
+  // after the store has been released.
+  // The caller keeps its current reference; use this while that owner still
+  // remains reachable through the JS root.
+  static void RequestPrismRelease(InteropRuntime*& instance) {
+    if (!instance || !instance->wasm_runtime_.is<PrismRuntime*>()) return;
+    instance->prism_release_requested_.store(true, std::memory_order_release);
+    MaybeReleasePrism(instance);
+  }
+
+  static void RequestPrismReleaseAndConsumeRef(InteropRuntime*& instance) {
+    if (!instance || !instance->wasm_runtime_.is<PrismRuntime*>()) return;
+
+    // The QJS context registry owns one counted reference and transfers it
+    // here. Publishing the request before consuming that reference prevents the
+    // count from reaching zero and later being resurrected by a release pin.
+    // Clear the caller's pointer up front so this ownership token is one-shot.
+    auto* owned_instance = instance;
+    instance = nullptr;
+    owned_instance->prism_release_requested_.store(true,
+                                                   std::memory_order_release);
+    DecreaseRefCount(owned_instance);
+  }
+
   static void ReleaseJSEnv(InteropRuntime*& instance) {
+    if (wasm_unlikely(!instance)) return;
+
     if (instance->js_env_.is<QJSEnv*>()) {
       auto qjs_env = instance->js_env_.get<QJSEnv*>();
+      if (wasm_unlikely(!qjs_env)) return;
       qjs_env->Finalize();
       delete qjs_env;
     }
 #if defined(__APPLE__)
     else {
       auto jsc_env = instance->js_env_.get<JSCEnv*>();
+      if (wasm_unlikely(!jsc_env)) return;
       jsc_env->Finalize();
       delete jsc_env;
     }
 #endif
+  }
+
+  static void ReleasePrismJSEnv(InteropRuntime*& instance) {
+    if (wasm_unlikely(!instance ||
+                      !instance->wasm_runtime_.is<PrismRuntime*>())) {
+      return;
+    }
+    if (instance->js_env_.is<QJSEnv*>()) {
+      auto qjs_env = instance->js_env_.get<QJSEnv*>();
+      if (qjs_env) {
+        qjs_env->Finalize();
+        delete qjs_env;
+      }
+      instance->js_env_ = JSEnvRef(static_cast<QJSEnv*>(nullptr));
+    }
+#if defined(__APPLE__)
+    else {
+      auto jsc_env = instance->js_env_.get<JSCEnv*>();
+      if (jsc_env) {
+        jsc_env->Finalize();
+        delete jsc_env;
+      }
+      instance->js_env_ = JSEnvRef(static_cast<JSCEnv*>(nullptr));
+    }
+#endif
+  }
+
+  static void AbandonJSEnv(InteropRuntime*& instance) {
+    if (wasm_unlikely(!instance)) return;
+    if (instance->js_env_.is<QJSEnv*>()) {
+      delete instance->js_env_.get<QJSEnv*>();
+      instance->js_env_ = JSEnvRef(static_cast<QJSEnv*>(nullptr));
+    }
+#if defined(__APPLE__)
+    else {
+      delete instance->js_env_.get<JSCEnv*>();
+      instance->js_env_ = JSEnvRef(static_cast<JSCEnv*>(nullptr));
+    }
+#endif
+  }
+
+  static void DestroyUnowned(InteropRuntime*& instance) {
+    if (wasm_unlikely(!instance)) return;
+    WASM_DCHECK(instance->ref_count_.load(std::memory_order_acquire) == 0);
+    if (instance->wasm_runtime_.is<PrismRuntime*>()) {
+      ReleasePrismJSEnv(instance);
+    } else {
+      ReleaseJSEnv(instance);
+    }
+    Destructor(instance);
   }
 
   InteropRuntime(const InteropRuntime&) = delete;
@@ -128,11 +236,36 @@ class InteropRuntime {
 
   WasmModuleRef CreateWasmModule(uint8_t* data, size_t size,
                                  WasmResult& result) {
-    if (wasm_runtime_.is<Wasm3Runtime*>()) {
-      return CreateWasm3Module(data, size, result);
+#ifdef ENABLE_WASM_PERF_COMPARE
+    const bool sample = wasm_perf::ShouldSampleLoad();
+    const uint64_t start_ns = sample ? wasm_perf::NowNs() : 0;
+#endif
+    const bool is_wasm3 = wasm_runtime_.is<Wasm3Runtime*>();
+    WasmModuleRef module;
+    if (is_wasm3) {
+      module = CreateWasm3Module(data, size, result);
     } else {
-      return CreatePrismModule(data, size, result);
+      module = CreatePrismModule(data, size, result);
     }
+#ifdef ENABLE_WASM_PERF_COMPARE
+    const uint64_t elapsed_ns = sample ? wasm_perf::ElapsedNs(start_ns) : 0;
+    wasm_perf::LoadToken* load_token = nullptr;
+    if (is_wasm3) {
+      auto* wasm3_module = wasm_perf::TaggedPointerOrNull<Wasm3Module*>(module);
+      if (wasm3_module) load_token = &wasm3_module->perf_load();
+    } else {
+      auto* prism_module = wasm_perf::TaggedPointerOrNull<PrismModule*>(module);
+      if (prism_module) load_token = &prism_module->perf_load();
+    }
+    const bool module_created = result == WasmSucceed && load_token;
+    if (module_created) load_token->BeginModuleJourney(sample, elapsed_ns);
+    if (!module_created && sample) {
+      wasm_perf::ReportFailure(
+          MODULE_WASM, DEFAULT_BIZ_NAME,
+          is_wasm3 ? "wasm_module_fail_wasm3" : "wasm_module_fail_prism");
+    }
+#endif
+    return module;
   }
 
   WasmMemoryRef CreateWasmMemory(uint32_t initial, uint32_t maximum,
@@ -162,22 +295,102 @@ class InteropRuntime {
     }
   }
 
+  PrismGlobal* CreatePrismGlobalFromValue(bool mutability, wasm_val_t* value) {
+    auto prism_runtime = wasm_runtime_.get<PrismRuntime*>();
+    return new PrismGlobal(nullptr, mutability, value, prism_runtime);
+  }
+
   template <typename JSEnv>
-  WasmInstanceRef CreateWasmInstance(WasmModuleRef wasm_module,
-                                     typename JSEnv::JSObject imports,
-                                     WasmResult& result) {
+  WasmInstanceRef CreateWasmInstance(
+      WasmModuleRef wasm_module, typename JSEnv::JSObject imports,
+      WasmResult& result, typename JSEnv::JSValue* import_exception = nullptr) {
     WASM_CHECK(js_env_.is<JSEnv*>());
     auto js_env = js_env_.get<JSEnv*>();
-
-    if (wasm_runtime_.is<Wasm3Runtime*>()) {
-      auto wasm3_module = wasm_module.get<Wasm3Module*>();
-      return wasm3_module->CreateWasmInstance<JSEnv>(js_env, imports, this,
-                                                     result);
+    const bool is_wasm3 = wasm_runtime_.is<Wasm3Runtime*>();
+#ifdef ENABLE_WASM_PERF_COMPARE
+    wasm_perf::LoadToken* load_token = nullptr;
+    if (is_wasm3) {
+      auto* wasm3_module =
+          wasm_perf::TaggedPointerOrNull<Wasm3Module*>(wasm_module);
+      if (wasm3_module) load_token = &wasm3_module->perf_load();
     } else {
-      auto prism_module = wasm_module.get<PrismModule*>();
-      return prism_module->CreateWasmInstance<JSEnv>(js_env, imports, this,
-                                                     result);
+      auto* prism_module =
+          wasm_perf::TaggedPointerOrNull<PrismModule*>(wasm_module);
+      if (prism_module) load_token = &prism_module->perf_load();
     }
+    const bool first_instance_pending =
+        load_token && load_token->first_instance_pending();
+    // The first instance inherits the module's one decision. Drawing again
+    // here would make a first journey 19% likely to be selected. Reused
+    // instances draw once from the same sampler as both engines.
+    const bool sample_load =
+        load_token &&
+        (first_instance_pending ? load_token->first_instance_sampled()
+                                : wasm_perf::ShouldSampleLoad());
+    const uint64_t start_ns = sample_load ? wasm_perf::NowNs() : 0;
+#endif
+
+    WasmInstanceRef instance;
+    if (is_wasm3) {
+      if (wasm_unlikely(!wasm_module.is<Wasm3Module*>())) {
+        result = "Wasm module belongs to a different runtime";
+        instance = static_cast<Wasm3Instance*>(nullptr);
+      } else {
+        auto wasm3_module = wasm_module.get<Wasm3Module*>();
+        instance = wasm3_module->CreateWasmInstance<JSEnv>(js_env, imports,
+                                                           this, result);
+      }
+    } else {
+      auto prism_runtime = wasm_runtime_.get<PrismRuntime*>();
+      if (wasm_unlikely(!wasm_module.is<PrismModule*>())) {
+        result = "Wasm module belongs to a different runtime";
+        instance = static_cast<PrismInstance*>(nullptr);
+      } else {
+        auto prism_module = wasm_module.get<PrismModule*>();
+        if (wasm_unlikely(prism_module->runtime() != prism_runtime)) {
+          result = "Prism module belongs to a different runtime";
+          instance = static_cast<PrismInstance*>(nullptr);
+        } else {
+          instance = prism_module->CreateWasmInstance<JSEnv>(
+              js_env, imports, this, result, import_exception);
+        }
+      }
+    }
+#ifdef ENABLE_WASM_PERF_COMPARE
+    const uint64_t elapsed_ns =
+        sample_load ? wasm_perf::ElapsedNs(start_ns) : 0;
+    wasm_perf::LoadFinishResult load_result;
+    if (load_token && result == WasmSucceed) {
+      wasm_perf::LoadToken* first_call_token = nullptr;
+      if (is_wasm3) {
+        auto* wasm3_instance =
+            wasm_perf::TaggedPointerOrNull<Wasm3Instance*>(instance);
+        if (wasm3_instance) first_call_token = &wasm3_instance->perf_load();
+      } else {
+        auto* prism_instance =
+            wasm_perf::TaggedPointerOrNull<PrismInstance*>(instance);
+        if (prism_instance) first_call_token = &prism_instance->perf_load();
+      }
+      if (first_call_token && first_instance_pending) {
+        load_result = load_token->FinishFirstInstance(*first_call_token, true,
+                                                      elapsed_ns);
+      } else if (first_call_token) {
+        load_result = wasm_perf::FinishReusedInstanceJourney(
+            *first_call_token, sample_load, true, elapsed_ns);
+      }
+    }
+    if (load_result.sampled) {
+      wasm_perf::ReportDuration(
+          MODULE_WASM, DEFAULT_BIZ_NAME,
+          is_wasm3 ? "wasm_load_ms_wasm3" : "wasm_load_ms_prism",
+          wasm_perf::NsToMs(load_result.load_ns));
+    } else if (sample_load) {
+      wasm_perf::ReportFailure(
+          MODULE_WASM, DEFAULT_BIZ_NAME,
+          is_wasm3 ? "wasm_instance_fail_wasm3" : "wasm_instance_fail_prism");
+    }
+#endif
+    return instance;
   }
 
   template <typename JSEnv>
@@ -191,14 +404,12 @@ class InteropRuntime {
 #else
     static_assert(std::is_same_v<JSEnv, QJSEnv>);
 #endif
-    using JSValue = typename JSEnv::JSValue;
-
     constexpr const char* code = "Call WebAssembly Function";
     WASM_CHECK(js_env_.is<JSEnv*>());
     auto js_env = js_env_.get<JSEnv*>();
-
+#ifndef ENABLE_WASM_PERF_COMPARE
+    using JSValue = typename JSEnv::JSValue;
     JSValue result = js_env->MakeUndefined();
-
     if (wasm_function_ref.is<Wasm3Function*>()) {
       auto function = wasm_function_ref.get<Wasm3Function*>();
       result = function->CallWasmFunction(js_env, argc, argv, code, exception);
@@ -206,8 +417,17 @@ class InteropRuntime {
       auto function = wasm_function_ref.get<PrismFunction*>();
       result = function->CallWasmFunction(js_env, argc, argv, code, exception);
     }
-
     return result;
+#else
+    if (wasm_function_ref.is<Wasm3Function*>()) {
+      return CallWasmFunctionForEngine<true>(
+          js_env, wasm_function_ref.get<Wasm3Function*>(), argc, argv, code,
+          exception);
+    }
+    return CallWasmFunctionForEngine<false>(
+        js_env, wasm_function_ref.get<PrismFunction*>(), argc, argv, code,
+        exception);
+#endif
   }
 
   template <typename JSEnv>
@@ -391,21 +611,40 @@ class InteropRuntime {
     using JSValue = typename JSEnv::JSValue;
     using JSObject = typename JSEnv::JSObject;
 
-    if (!module || !instance) {
-      return 0;
+    if (wasm_unlikely(!module || !instance)) {
+      return 1;
     }
 
     WASM_CHECK(js_env_.is<JSEnv*>());
     auto js_env = js_env_.get<JSEnv*>();
-    PrismRuntime* prism_runtime = module->runtime();
+    auto prism_runtime = wasm_runtime_.get<PrismRuntime*>();
 
     wasm_module_t* prism_module = module->module();
     wasm_instance_t* prism_instance = instance->instance();
-    wasm_extern_vec_t exports;
-
+    wasm_extern_vec_t exports{};
     wasm_instance_exports(prism_instance, &exports);
-    wasm_exporttype_vec_t export_types;
+    // Prism returns fresh owned handles, even for cached imports or aliases.
+    // Cache hits borrow the existing JS wrapper and leave the fresh handle in
+    // this vector for deletion. Only a new wrapper takes ownership below.
+    struct ExternVecScope {
+      wasm_extern_vec_t* vec;
+      ~ExternVecScope() { wasm_extern_vec_delete(vec); }
+    } exports_scope{&exports};
+
+    wasm_exporttype_vec_t export_types{};
     wasm_module_exports(prism_module, &export_types);
+    struct ExportTypeVecScope {
+      wasm_exporttype_vec_t* vec;
+      ~ExportTypeVecScope() { wasm_exporttype_vec_delete(vec); }
+    } export_types_scope{&export_types};
+
+#if defined(QJS_UNITTEST)
+    if (PrismInstance::fail_export_after_for_testing_ == 0) return 1;
+#endif
+    if (wasm_unlikely(exports.size != export_types.size)) {
+      WLOGE("Prism export count does not match module metadata");
+      return 1;
+    }
 
     size_t export_size = exports.size;
     for (size_t i = 0; i < export_size; ++i) {
@@ -413,77 +652,37 @@ class InteropRuntime {
           wasm_exporttype_type(export_types.data[i]);
       const wasm_name_t* name = wasm_exporttype_name(export_types.data[i]);
 
-      JSValue undef = js_env->MakeUndefined();
-      JSObject prop = js_env->ValueToObject(undef);
+      // Start without a GC handle. A cached function is a borrowed value;
+      // converting undefined to an object first would create an exception
+      // handle, then overwrite its runtime with the borrowed value's nullptr.
+      JSObject prop{};
+      bool release_qjs_prop = false;
+      if (wasm_unlikely(exports.data[i] == nullptr || type == nullptr)) {
+        return 1;
+      }
       assert(wasm_extern_kind(exports.data[i]) == wasm_externtype_kind(type));
+
       switch (wasm_externtype_kind(type)) {
         case WASM_EXTERN_FUNC: {
-          wasm_func_t* func = wasm_extern_as_func(exports.data[i]);
-          char buf[11];
-          snprintf(buf, sizeof(buf), "%zu", i);
-          prism_func* pf = prism_get_func(func);
-          uintptr_t ptr = reinterpret_cast<uintptr_t>(pf);
-          auto& func_cache = js_env->wasm_func_cache();
-          if (func_cache.count(ptr)) {
-            prop = js_env->DupValue(func_cache[ptr]);
-          } else {
-            PrismFunction* pfc = nullptr;
-            if (pf->userdata) {
-              pfc = reinterpret_cast<PrismFunction*>(
-                  prism_get_prism_func_userdata(pf));
-              pfc->set_function(func);
-              uintptr_t ptr_key = reinterpret_cast<uintptr_t>(pfc);
-              if (func_cache.count(ptr_key)) {
-                func_cache.erase(ptr_key);
-              }
-            } else {
-              pfc = new PrismFunction(func, prism_runtime, instance);
-            }
-            prop = js_env->MakeWasmFunction(this, buf, pfc);
+          wasm_func_t* w_func = wasm_extern_as_func(exports.data[i]);
+          prism_func* p_func = prism_get_func(w_func);
+          uintptr_t ptr = reinterpret_cast<uintptr_t>(p_func);
+          if (!prism_runtime->GetExportFunctionObject<JSEnv>(ptr, &prop) ||
+              !js_env->IsWasmFunction(prop)) {
+            PrismFunction* func =
+                new PrismFunction(w_func, prism_runtime, instance, true);
+            exports.data[i] = nullptr;
+            std::string func_name(name->data, name->size);
+            prop = js_env->MakeWasmFunction(this, func_name.c_str(), func);
             if (wasm_unlikely(js_env->IsNull(prop))) {
-              delete pfc;
-              return false;
-            }
-            func_cache[ptr] = js_env->DupValue(prop);
-          }
-        } break;
-        case WASM_EXTERN_GLOBAL: {
-          wasm_global_t* global = wasm_extern_as_global(exports.data[i]);
-          uint32_t global_idx = prism_get_global_idx(global);
-          auto& global_cache = js_env->wasm_global_cache();
-          uintptr_t ptr = reinterpret_cast<uintptr_t>(instance) + global_idx;
-          if (global_cache.count(ptr)) {
-            prop = js_env->DupValue(global_cache[ptr]);
-          } else {
-            wasm_val_t val;
-            wasm_global_get(global, &val);
-            bool mutability = PrismGlobal::mutability(global);
-            PrismGlobal* gbl = new PrismGlobal(global, mutability, &val,
-                                               prism_runtime, instance);
-            prop = js_env->MakeWasmGlobal(this, gbl);
-            if (wasm_unlikely(js_env->IsNull(prop))) {
-              delete gbl;
+              WLOGE("MakeFunction %s failed!", func_name.c_str());
+              delete func;
               return 1;
             }
-            global_cache[ptr] = js_env->DupValue(prop);
-          }
-        } break;
-        case WASM_EXTERN_MEMORY: {
-          wasm_memory_t* memory = wasm_extern_as_memory(exports.data[i]);
-          auto& mem_cache = js_env->wasm_memory_cache();
-          prism_mem_info* minfo = prism_get_memory(memory);
-          uintptr_t ptr = reinterpret_cast<uintptr_t>(minfo);
-          if (mem_cache.count(ptr)) {
-            prop = js_env->DupValue(mem_cache[ptr]);
-          } else {
-            PrismMemory* mem_wrapper = new PrismMemory(memory, instance);
-            prop =
-                js_env->MakeWasmMemory(this, mem_wrapper, mem_wrapper->pages());
-            if (wasm_unlikely(js_env->IsNull(prop))) {
-              delete mem_wrapper;
-              return 1;
+            prism_runtime->CacheExportFunctionObject<JSEnv>(ptr, prop);
+            if constexpr (std::is_same_v<JSEnv, QJSEnv>) {
+              release_qjs_prop = true;
             }
-            mem_cache[ptr] = js_env->DupValue(prop);
           }
         } break;
         case WASM_EXTERN_TABLE: {
@@ -492,28 +691,109 @@ class InteropRuntime {
           prism_table* p_tab = prism_get_table(table);
           uintptr_t ptr = reinterpret_cast<uintptr_t>(p_tab);
           if (tab_cache.count(ptr)) {
-            prop = js_env->DupValue(tab_cache[ptr]);
+            prop = tab_cache[ptr];
           } else {
             PrismTable* tbl = new PrismTable(prism_runtime, table, instance);
+            exports.data[i] = nullptr;
             prop = js_env->MakeWasmTable(this, tbl);
             if (wasm_unlikely(js_env->IsNull(prop))) {
               delete tbl;
               return 1;
             }
-            tab_cache[ptr] = js_env->DupValue(prop);
+            if constexpr (std::is_same_v<JSEnv, QJSEnv>) {
+              tab_cache[ptr] = prop;
+            } else {
+              tab_cache[ptr] = js_env->DupValue(prop);
+            }
+          }
+        } break;
+        case WASM_EXTERN_MEMORY: {
+          wasm_memory_t* memory = wasm_extern_as_memory(exports.data[i]);
+          auto& mem_cache = js_env->wasm_memory_cache();
+          prism_mem_info* minfo = prism_get_memory(memory);
+          uintptr_t ptr = reinterpret_cast<uintptr_t>(minfo);
+          if (mem_cache.count(ptr)) {
+            prop = mem_cache[ptr];
+          } else {
+            wasm_limits_t limits{};
+            if (!PrismInstance::ReadMemoryTypeLimits(type, &limits)) {
+              return 1;
+            }
+            PrismMemory* mem_wrapper =
+                new PrismMemory(memory, prism_runtime, instance, limits.max);
+            exports.data[i] = nullptr;
+            prop =
+                js_env->MakeWasmMemory(this, mem_wrapper, mem_wrapper->pages());
+            if (wasm_unlikely(js_env->IsNull(prop))) {
+              delete mem_wrapper;
+              return 1;
+            }
+            if constexpr (std::is_same_v<JSEnv, QJSEnv>) {
+              mem_cache[ptr] = prop;
+            } else {
+              mem_cache[ptr] = js_env->DupValue(prop);
+            }
+          }
+        } break;
+        case WASM_EXTERN_GLOBAL: {
+          wasm_global_t* global = wasm_extern_as_global(exports.data[i]);
+          prism_global* gbl = prism_get_global_ptr(global);
+          auto& global_cache = js_env->wasm_global_cache();
+          uintptr_t ptr = reinterpret_cast<uintptr_t>(gbl);
+          if (global_cache.count(ptr)) {
+            prop = global_cache[ptr];
+          } else {
+            wasm_val_t val;
+            wasm_global_get(global, &val);
+            bool mutability = PrismGlobal::mutability(global);
+            PrismGlobal* gbl = new PrismGlobal(global, mutability, &val,
+                                               prism_runtime, instance);
+            exports.data[i] = nullptr;
+            prop = js_env->MakeWasmGlobal(this, gbl);
+            if (wasm_unlikely(js_env->IsNull(prop))) {
+              delete gbl;
+              return 1;
+            }
+            if constexpr (std::is_same_v<JSEnv, QJSEnv>) {
+              global_cache[ptr] = prop;
+            } else {
+              global_cache[ptr] = js_env->DupValue(prop);
+            }
           }
         } break;
         default:
           assert(false && "unreachable code.");
       }
       std::string prop_name_str(name->data, name->size);
-      if (wasm_unlikely(!js_env->SetProperty(obj, prop_name_str.c_str(),
-                                             js_env->DupValue(prop)))) {
-        js_env->FreeValue(prop);
-        return false;
+      WLOGD("Exporting %s: `%s`",
+            wasm::ExternKindName(wasm_externtype_kind(type)),
+            prop_name_str.c_str());
+      JSValue property_value = prop;
+      if constexpr (std::is_same_v<JSEnv, QJSEnv>) {
+        property_value = js_env->DupValue(prop);
       }
+      if (wasm_unlikely(!js_env->SetProperty(obj, prop_name_str.c_str(),
+                                             property_value))) {
+        WLOGE("Exporting %s `%s` failed",
+              wasm::ExternKindName(wasm_externtype_kind(type)),
+              prop_name_str.c_str());
+        if constexpr (std::is_same_v<JSEnv, QJSEnv>) {
+          if (release_qjs_prop) {
+            js_env->FreeValue(prop);
+          }
+        }
+        return 1;
+      }
+      if (release_qjs_prop) {
+        js_env->FreeValue(prop);
+      }
+#if defined(QJS_UNITTEST)
+      if (PrismInstance::fail_export_after_for_testing_ ==
+          static_cast<int>(i + 1)) {
+        return 1;
+      }
+#endif
     }
-
     return 0;
   }
 
@@ -541,18 +821,13 @@ class InteropRuntime {
 
   PrismModule* CreatePrismModule(void* data, size_t len, WasmResult& result) {
     auto prism_runtime = wasm_runtime_.get<PrismRuntime*>();
-
-    if (prism_runtime->wasm_store() == nullptr &&
-        prism_runtime->InitRuntime()) {
-      return nullptr;
-    }
     wasm_byte_vec_t binary;
     binary.size = len;
     binary.data = static_cast<char*>(data);
 
     wasm_module_t* module =
         wasm_module_new(prism_runtime->wasm_store(), &binary);
-    if (module == nullptr) {
+    if (wasm_unlikely(module == nullptr)) {
       result = "Create prism module failed!";
       return nullptr;
     }
@@ -593,7 +868,12 @@ class InteropRuntime {
     WASM_DCHECK(type == TableElemType::kFuncRef);
     WLOGD("CreateWasmTable with initial:%u, maximum: %u, type:%d", initial,
           maximum, type);
-    return new PrismTable(prism_runtime, initial, maximum, nullptr);
+    auto table = new PrismTable(prism_runtime, initial, maximum, nullptr);
+    if (!table->valid()) {
+      delete table;
+      return nullptr;
+    }
+    return table;
   }
   // memory
   Wasm3Memory* CreateWasm3Memory(uint32_t initial, uint32_t maximum,
@@ -621,12 +901,14 @@ class InteropRuntime {
   PrismMemory* CreatePrismMemory(uint32_t initial, uint32_t maximum,
                                  WasmResult& result) {
     auto prism_runtime = wasm_runtime_.get<PrismRuntime*>();
-    if (wasm_unlikely(prism_runtime->wasm_store() == nullptr)) {
-      if (prism_runtime->InitRuntime()) {
-        return nullptr;
-      }
+    auto memory = new PrismMemory(prism_runtime, initial, maximum);
+    if (!memory->valid()) {
+      delete memory;
+      result = "Create prism memory failed!";
+      return nullptr;
     }
-    return new PrismMemory(initial, maximum);
+    result = WasmSucceed;
+    return memory;
   }
   // global
   Wasm3Global* CreateWasm3Global(ValueType type, bool mutability,
@@ -650,8 +932,6 @@ class InteropRuntime {
     prism_runtime->NumberToWasm(number, &val);
     return new PrismGlobal(nullptr, mutability, &val, prism_runtime);
   }
-
-  auto& wasm_runtime() { return wasm_runtime_; }
 
   template <typename T>
   T js_env() {
@@ -698,6 +978,107 @@ class InteropRuntime {
   }
 
  private:
+#ifdef ENABLE_WASM_PERF_COMPARE
+  template <bool IsWasm3, typename JSEnv, typename Function>
+  typename JSEnv::JSValue CallWasmFunctionForEngine(
+      JSEnv* js_env, Function* function, size_t argc,
+      const typename JSEnv::JSValue argv[], const char* code,
+      typename JSEnv::JSValue* exception) {
+    using JSValue = typename JSEnv::JSValue;
+    JSValue result = js_env->MakeUndefined();
+    auto& call_state = function->perf_call_state();
+    const wasm_perf::CallSampleKind sample_kind =
+        wasm_perf::BeginCall(call_state);
+    auto* perf_instance = function->perf_instance();
+    const uint64_t claimed_load =
+        sample_kind == wasm_perf::CallSampleKind::kFirstAttempt && perf_instance
+            ? perf_instance->perf_load().TryClaim()
+            : 0;
+    const bool sample_load = wasm_perf::LoadToken::OwnsClaim(claimed_load);
+    const bool sample_call =
+        sample_kind == wasm_perf::CallSampleKind::kSteady || sample_load;
+    const uint64_t call_start_ns = sample_call ? wasm_perf::NowNs() : 0;
+
+    result = function->CallWasmFunction(js_env, argc, argv, code, exception);
+
+    if (sample_kind != wasm_perf::CallSampleKind::kNone) {
+      const uint64_t elapsed_ns =
+          sample_call ? wasm_perf::ElapsedNs(call_start_ns) : 0;
+      bool failed = false;
+      if constexpr (std::is_same_v<JSEnv, QJSEnv>) {
+        failed = (exception && !js_env->IsUndefined(*exception)) ||
+                 js_env->IsException(result);
+      }
+      // On non-Apple builds the static_assert in CallWasmFunction forces
+      // JSEnv == QJSEnv. On Apple this branch handles JSC's exception slot.
+#if defined(__APPLE__)
+      else {
+        failed = (exception && *exception != nullptr);
+      }
+#endif
+
+      if (sample_kind == wasm_perf::CallSampleKind::kFirstAttempt) {
+        auto* load_token =
+            perf_instance ? &perf_instance->perf_load() : nullptr;
+        const wasm_perf::FirstCallResult first_attempt =
+            wasm_perf::FinishFirstAttempt(call_state, load_token, claimed_load,
+                                          !failed, elapsed_ns);
+        if (first_attempt.completed_first_call) {
+          constexpr const char* kFirstCallKey =
+              IsWasm3 ? "wasm_first_call_ms_wasm3" : "wasm_first_call_ms_prism";
+          wasm_perf::ReportDuration(
+              MODULE_WASM, DEFAULT_BIZ_NAME, kFirstCallKey,
+              wasm_perf::NsToMs(first_attempt.first_call_ns));
+        } else if (first_attempt.sampled_failure) {
+          constexpr const char* kCallFailKey =
+              IsWasm3 ? "wasm_call_fail_wasm3" : "wasm_call_fail_prism";
+          wasm_perf::ReportFailure(MODULE_WASM, DEFAULT_BIZ_NAME, kCallFailKey);
+        }
+      } else {
+        wasm_perf::FinishCall(call_state, sample_kind, !failed);
+        if (failed) {
+          constexpr const char* kCallFailKey =
+              IsWasm3 ? "wasm_call_fail_wasm3" : "wasm_call_fail_prism";
+          wasm_perf::ReportFailure(MODULE_WASM, DEFAULT_BIZ_NAME, kCallFailKey);
+        } else {
+          constexpr const char* kCallKey = IsWasm3
+                                               ? "wasm_steady_call_ms_wasm3"
+                                               : "wasm_steady_call_ms_prism";
+          wasm_perf::ReportDuration(MODULE_WASM, DEFAULT_BIZ_NAME, kCallKey,
+                                    wasm_perf::NsToMs(elapsed_ns));
+        }
+      }
+    }
+    return result;
+  }
+#endif
+
+  static void Destructor(InteropRuntime*& instance) {
+    WLOGD("Destroying interop runtime instance...");
+    delete instance;
+    instance = nullptr;
+  }
+
+  static void MaybeReleasePrism(InteropRuntime*& instance) {
+    // Only the caller whose own fetch_sub observed zero reaches this point.
+    // That transition is the release credential. A second object-local claim
+    // would be too late to protect a contender from dereferencing freed memory.
+    if (!instance ||
+        !instance->prism_release_requested_.load(std::memory_order_acquire) ||
+        instance->ref_count_.load(std::memory_order_acquire) != 0) {
+      return;
+    }
+    WASM_DCHECK(instance->ref_count_.load(std::memory_order_acquire) == 0);
+    auto* prism = instance->wasm_runtime_.get<PrismRuntime*>();
+#if defined(QJS_UNITTEST)
+    if (auto* count = instance->prism_release_count_for_testing_) {
+      count->fetch_add(1, std::memory_order_acq_rel);
+    }
+#endif
+    if (prism) prism->ReleaseStore();
+    Destructor(instance);
+  }
+
   template <typename JSEnv, typename WRuntime>
   InteropRuntime(JSEnv* js_env, WRuntime* wasm_runtime) {
 #if defined(__APPLE__)
@@ -719,12 +1100,6 @@ class InteropRuntime {
     } else {
       delete wasm_runtime_.get<Wasm3Runtime*>();
     }
-  };
-
-  static void Destructor(InteropRuntime*& instance) {
-    WLOGD("Destroying interop runtime instance...");
-    delete instance;
-    instance = nullptr;
   }
 
   // Only Freed by global.WebAssembly.Finalize()
@@ -734,6 +1109,10 @@ class InteropRuntime {
   // refcount of interop runtime, only all borrower destroyed, interop runtime
   // will be destroyed
   std::atomic_int ref_count_{0};
+  std::atomic_bool prism_release_requested_{false};
+#if defined(QJS_UNITTEST)
+  std::atomic_int* prism_release_count_for_testing_{nullptr};
+#endif
 };
 }  // namespace primjs
 

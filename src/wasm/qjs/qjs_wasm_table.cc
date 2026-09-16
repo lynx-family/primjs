@@ -4,7 +4,9 @@
 
 #include "qjs/qjs_wasm_table.h"
 
+#include <cmath>
 #include <cstddef>
+#include <limits>
 #include <utility>
 
 #include "common/interop_runtime.h"
@@ -19,6 +21,35 @@
 #include "runtime/wasm3/wasm_function.h"
 
 namespace primjs::qjs {
+namespace {
+bool ToPrismTableFunction(LEPUSContext* ctx, QJSEnv* js_env,
+                          LEPUSValueConst value, PrismRuntime* expected_runtime,
+                          wasm_func_t** result, const char* code) {
+  *result = nullptr;
+  if (js_env->IsNull(value)) return true;
+  if (!js_env->IsWasmFunction(value)) {
+    ThrowIfException(ctx, ErrorTypes::kTypeError, code,
+                     "Table value must be null or a Prism function");
+    return false;
+  }
+  auto function_opaque = static_cast<QJSWasmFunction*>(
+      LEPUS_GetOpaque(value, QJSWasmFunction::class_id()));
+  if (!function_opaque || !function_opaque->function().is<PrismFunction*>()) {
+    ThrowIfException(ctx, ErrorTypes::kTypeError, code,
+                     "Table value must be a Prism function");
+    return false;
+  }
+  auto prism_function = function_opaque->function().get<PrismFunction*>();
+  if (prism_function->runtime() != expected_runtime) {
+    ThrowIfException(ctx, ErrorTypes::kTypeError, code,
+                     "Table value belongs to a different Prism runtime");
+    return false;
+  }
+  *result = prism_function->function();
+  return true;
+}
+}  // namespace
+
 QJSWasmTable::QJSWasmTable(WasmTableRef table, InteropRuntime* interop)
     : table_(std::move(table)) {
   WLOGD("Running QJSWasmTable::%s...", __func__);
@@ -88,6 +119,11 @@ LEPUSValue QJSWasmTable::CreateJSObject(LEPUSContext* ctx,
     return LEPUS_EXCEPTION;
   }
   HandleScope func_scope(ctx, &obj, HANDLE_TYPE_LEPUS_VALUE);
+  if (interop->wasm_runtime().is<PrismRuntime*>() &&
+      !RetainWasmRoot(ctx, obj, interop->js_env<QJSEnv*>()->wasm_root())) {
+    if (!LEPUS_IsGCMode(ctx)) LEPUS_FreeValue(ctx, obj);
+    return LEPUS_EXCEPTION;
+  }
 
   auto table_data = new QJSWasmTable(table, interop);
   LEPUS_SetOpaque(obj, table_data);
@@ -100,11 +136,72 @@ LEPUSValue QJSWasmTable::CallAsConstructor(LEPUSContext* ctx,
                                            int argc, LEPUSValueConst* argv) {
   WLOGD("Running QJSWasmTable::%s...", __func__);
 
+  auto interop =
+      static_cast<InteropRuntime*>(JSGetPrivateData(ctx, constructor));
+  bool is_prism = interop->wasm_runtime().is<PrismRuntime*>();
   if (argc != 1 || !LEPUS_IsObject(argv[0])) {
     return LEPUS_ThrowTypeError(ctx, "new Table without TableDescriptor!");
   }
 
   LEPUSValue table_desc = argv[0];
+  if (is_prism) {
+    auto read_size = [&](LEPUSValue value, int32_t* result) {
+      double number = 0;
+      if (LEPUS_ToFloat64(ctx, &number, value) < 0) return false;
+      if (!std::isfinite(number) ||
+          number > std::numeric_limits<int32_t>::max() ||
+          number < std::numeric_limits<int32_t>::min()) {
+        LEPUS_ThrowTypeError(ctx, "table size is not a valid int32");
+        return false;
+      }
+      *result = static_cast<int32_t>(number);
+      return true;
+    };
+
+    ScopedPrismProperty initial_value(ctx, table_desc, "initial");
+    if (initial_value.IsException()) return LEPUS_EXCEPTION;
+    int32_t initial = 0;
+    if (!read_size(initial_value.value(), &initial)) return LEPUS_EXCEPTION;
+    if (initial < 0) {
+      return LEPUS_ThrowTypeError(ctx, ErrorMessages::kInvalidInitialSize_1001);
+    }
+
+    ScopedPrismProperty max_value(ctx, table_desc, "maximum");
+    if (max_value.IsException()) return LEPUS_EXCEPTION;
+    int32_t maximum = MaxSaneTableSize;
+    if (!LEPUS_IsUndefined(max_value.value())) {
+      if (!read_size(max_value.value(), &maximum)) return LEPUS_EXCEPTION;
+      if (maximum < 0) {
+        return LEPUS_ThrowTypeError(ctx,
+                                    ErrorMessages::kInvalidTableLimits_1001);
+      }
+      if (maximum > MaxSaneTableSize) maximum = MaxSaneTableSize;
+    }
+    if (initial > maximum) {
+      return LEPUS_ThrowRangeError(ctx,
+                                   ErrorMessages::kInvalidTableLimits_1002);
+    }
+
+    ScopedPrismProperty elem_type(ctx, table_desc, "element");
+    if (elem_type.IsException()) return LEPUS_EXCEPTION;
+    const char* type_str = LEPUS_ToCString(ctx, elem_type.value());
+    HandleScope string_scope(ctx, &type_str, HANDLE_TYPE_CSTRING);
+    if (!type_str) return LEPUS_EXCEPTION;
+    bool supported = strcmp(type_str, "anyfunc") == 0;
+    if (!LEPUS_IsGCMode(ctx)) LEPUS_FreeCString(ctx, type_str);
+    if (!supported) {
+      return LEPUS_ThrowTypeError(ctx,
+                                  ErrorMessages::kUnsupportedElemType_1002);
+    }
+
+    WasmTableRef table =
+        interop->CreatePrismTable(initial, maximum, TableElemType::kFuncRef);
+    if (table == nullptr) {
+      return LEPUS_ThrowRangeError(ctx, "Unable to create Prism table");
+    }
+    return CreateJSObject(ctx, interop, table);
+  }
+
   // get the initial page size
   LEPUSValue initial_value = JSGetPropertyStrFree(ctx, table_desc, "initial");
   int32_t initial = 0;
@@ -146,9 +243,6 @@ LEPUSValue QJSWasmTable::CallAsConstructor(LEPUSContext* ctx,
   }
 
   // create wasm table with table desc
-  auto interop =
-      static_cast<InteropRuntime*>(JSGetPrivateData(ctx, constructor));
-
   WasmTableRef table =
       interop->CreateWasmTable(initial, maximum, TableElemType::kFuncRef);
 
@@ -250,29 +344,33 @@ LEPUSValue QJSWasmTable::GetIndexCallback(LEPUSContext* ctx,
     WASM_DCHECK(table->table_.get<PrismTable*>() != nullptr);
     auto wasm_table = table->table_.get<PrismTable*>();
     length = table->table_.get<PrismTable*>()->size();
-    if (length <= index) {
+    if (wasm_unlikely(length <= index)) {
       return ThrowIfException(ctx, ErrorTypes::kRangeError, code,
                               ErrorMessages::kOutOfBoundOperation_1006);
     }
 
-    wasm_func_t* func_ref = wasm_table->get(index);
-    if (!func_ref) return QJSEnv::ToQJS(js_env->MakeNull());
-
-    auto& func_cache = js_env->wasm_func_cache();
-
-    prism_func* pf = prism_get_func(func_ref);
-    uintptr_t ptr = reinterpret_cast<uintptr_t>(pf);
-    if (func_cache.count(ptr)) {
-      // when calling table.get, func_cache[ptr] is always PrimFunction JS
-      // Object, because creating exports will wrap whatever
-      // function(imported/internal) function to PrismFunction JS object
-      func_value = func_cache[ptr].Get();
+    uintptr_t ptr = wasm_table->function_identity(index);
+    if (wasm_unlikely(!ptr)) return QJSEnv::ToQJS(js_env->MakeNull());
+    QJSEnv::JSObject cached_func;
+    if (wasm_table->runtime()->GetExportFunctionObject<QJSEnv>(ptr,
+                                                               &cached_func) &&
+        js_env->IsWasmFunction(cached_func)) {
+      func_value = cached_func.Get();
     } else {
-      auto func_data = new PrismFunction(func_ref, wasm_table->runtime(),
-                                         wasm_table->instance());
-      func_value =
-          js_env->MakeWasmFunction(interop_runtime, nullptr, func_data).Get();
-      func_cache[ptr] = func_value;
+      auto& func_cache = js_env->wasm_func_cache();
+      if (!func_cache.count(ptr) || !js_env->IsWasmFunction(func_cache[ptr])) {
+        wasm_func_t* func_ref = wasm_table->get(index);
+        if (wasm_unlikely(!func_ref)) {
+          return QJSEnv::ToQJS(js_env->MakeNull());
+        }
+        auto func_data = new PrismFunction(func_ref, wasm_table->runtime(),
+                                           wasm_table->instance(), false);
+        func_cache[ptr] =
+            js_env->MakeWasmFunction(interop_runtime, nullptr, func_data);
+      }
+      wasm_table->runtime()->CacheExportFunctionObject<QJSEnv>(ptr,
+                                                               func_cache[ptr]);
+      func_value = func_cache[ptr].Get();
     }
   }
 
@@ -351,7 +449,8 @@ LEPUSValue QJSWasmTable::SetIndexCallback(LEPUSContext* ctx,
       if (wasm_func_cache.count(ptr)) {
         js_env->FreeValue(wasm_func_cache[ptr]);
       }
-      wasm_func_cache[ptr] = value_obj;
+      // Keep the GC storage cell associated with its owning runtime.
+      wasm_func_cache[ptr].Reset(ctx, value_obj);
     }
     wasm3_table->set(index, func_addr);
   } else {
@@ -364,38 +463,26 @@ LEPUSValue QJSWasmTable::SetIndexCallback(LEPUSContext* ctx,
                               ErrorMessages::kOutOfBoundOperation_1008);
     }
 
-    PrismFunction* prism_function = nullptr;
-    if (wasm_likely(js_env->IsWasmFunction(value_obj))) {
-      auto function_opaque = static_cast<QJSWasmFunction*>(
-          LEPUS_GetOpaque(value_obj, QJSWasmFunction::class_id()));
-      WasmFunctionRef wasm_function = function_opaque->function();
-      if (wasm_likely(wasm_function.is<PrismFunction*>())) {
-        prism_function = wasm_function.get<PrismFunction*>();
-      } else {
-        return ThrowIfException(ctx, ErrorTypes::kTypeError, code,
-                                ErrorMessages::kInvalidTableElem_1001);
-      }
-    } else if (!js_env->IsNull(value_obj)) {
-      return ThrowIfException(ctx, ErrorTypes::kTypeError, code,
-                              ErrorMessages::kInvalidTableElem_1002);
-    }
-
     wasm_func_t* func_addr = nullptr;
-    if (prism_function) {
+    if (!ToPrismTableFunction(ctx, js_env, value_obj, prism_table->runtime(),
+                              &func_addr, code)) {
+      return LEPUS_EXCEPTION;
+    }
+    if (!prism_table->set(index, func_addr)) {
+      return ThrowIfException(ctx, ErrorTypes::kTypeError, code,
+                              "Unable to set Prism table value");
+    }
+    if (func_addr) {
       auto& wasm_func_cache = js_env->wasm_func_cache();
-      func_addr = prism_function->function();
       prism_func* func = prism_get_func(func_addr);
       uintptr_t ptr = reinterpret_cast<uintptr_t>(func);
-      js_env->DupValue(value_obj);
-      // Table.set allows only exported functions. Therefore, incoming function
-      // is already in the function cache. Note that the object cache is now
-      // stored in WasmTable instead of JS's agent.
+      auto cached_func =
+          js_env->DupValue(QJSEnv::FromQJS(value_obj, LEPUS_GetRuntime(ctx)));
       if (wasm_func_cache.count(ptr)) {
         js_env->FreeValue(wasm_func_cache[ptr]);
       }
-      wasm_func_cache[ptr] = value_obj;
+      wasm_func_cache[ptr] = cached_func;
     }
-    prism_table->set(index, func_addr);
   }
 
   return LEPUS_UNDEFINED;

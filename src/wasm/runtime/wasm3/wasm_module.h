@@ -2,6 +2,9 @@
 // Licensed under the Apache License Version 2.0 that can be found in the
 // LICENSE file in the root directory of this source tree.
 
+#ifdef ENABLE_WASM_PERF_COMPARE
+#include "common/interop_runtime_perf.h"
+#endif
 #include "common/js_type.h"
 #include "common/wasm_log.h"
 #include "common/wasm_type.h"
@@ -185,6 +188,10 @@ class Wasm3Module {
   // Temporary approach.
   IM3Module module() const { return module_; }
 
+#ifdef ENABLE_WASM_PERF_COMPARE
+  wasm_perf::LoadToken& perf_load() { return perf_load_; }
+#endif
+
   void FreeModule();
 
  private:
@@ -194,6 +201,9 @@ class Wasm3Module {
   const size_t len_ = 0;
 
   OWNER IM3Module module_;
+#ifdef ENABLE_WASM_PERF_COMPARE
+  wasm_perf::LoadToken perf_load_;
+#endif
 };
 
 }  // namespace primjs::wasm

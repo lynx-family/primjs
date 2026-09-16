@@ -35,6 +35,8 @@ class JSCWasmMemory {
                                     WasmMemoryRef memory, size_t pages,
                                     JSValueRef* exception);
 
+  static bool IsJSCWasmMemory(JSContextRef ctx, JSValueRef target);
+
   WasmMemoryRef& memory() { return memory_; }
 
  protected:

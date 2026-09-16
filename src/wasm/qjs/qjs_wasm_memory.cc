@@ -4,6 +4,8 @@
 
 #include "qjs/qjs_wasm_memory.h"
 
+#include <cmath>
+#include <limits>
 #include <utility>
 
 #include "common/interop_runtime.h"
@@ -49,6 +51,11 @@ LEPUSValue QJSWasmMemory::CreateJSObject(LEPUSContext* ctx,
   if (LEPUS_IsException(obj)) {
     return LEPUS_EXCEPTION;
   }
+  if (interop->wasm_runtime().is<PrismRuntime*>() &&
+      !RetainWasmRoot(ctx, obj, interop->js_env<QJSEnv*>()->wasm_root())) {
+    if (!LEPUS_IsGCMode(ctx)) LEPUS_FreeValue(ctx, obj);
+    return LEPUS_EXCEPTION;
+  }
   auto memory_data = new QJSWasmMemory(memory, pages, interop);
   LEPUS_SetOpaque(obj, memory_data);
 
@@ -69,6 +76,54 @@ LEPUSValue QJSWasmMemory::CallAsConstructor(LEPUSContext* ctx,
   }
 
   LEPUSValue memory_desc = argv[0];
+  auto interop =
+      static_cast<InteropRuntime*>(JSGetPrivateData(ctx, constructor));
+  if (interop->wasm_runtime().is<PrismRuntime*>()) {
+    ScopedPrismProperty initial_value(ctx, memory_desc, "initial");
+    if (initial_value.IsException()) return LEPUS_EXCEPTION;
+    if (LEPUS_IsUndefined(initial_value.value())) {
+      return ThrowIfException(ctx, ErrorTypes::kTypeError, code,
+                              "Property initial is required.");
+    }
+
+    uint32_t init_pages = 0;
+    if (LEPUS_ToUint32(ctx, &init_pages, initial_value.value()) < 0) {
+      return LEPUS_EXCEPTION;
+    }
+
+    uint32_t max_pages = kMaxPagesNum;
+    ScopedPrismProperty max_value(ctx, memory_desc, "maximum");
+    if (max_value.IsException()) return LEPUS_EXCEPTION;
+    if (!LEPUS_IsUndefined(max_value.value()) &&
+        LEPUS_ToUint32(ctx, &max_pages, max_value.value()) < 0) {
+      return LEPUS_EXCEPTION;
+    }
+    if (max_pages < init_pages) {
+      return ThrowIfException(ctx, ErrorTypes::kRangeError, code,
+                              "maximum must not be smaller than initial");
+    }
+
+    WasmResult result = WasmSucceed;
+    WasmMemoryRef memory =
+        interop->CreateWasmMemory(init_pages, max_pages, result);
+    if (result) {
+      return ThrowIfException(ctx, ErrorTypes::kRangeError, code, result);
+    }
+
+    LEPUSValue mem_obj = CreateJSObject(ctx, interop, memory, init_pages);
+    if (LEPUS_IsException(mem_obj)) {
+      delete memory.get<PrismMemory*>();
+      return LEPUS_EXCEPTION;
+    }
+    HandleScope func_scope(ctx, &mem_obj, HANDLE_TYPE_LEPUS_VALUE);
+    uintptr_t ptr = interop->GetMemoryPtr(memory);
+    if (LEPUS_IsException(
+            InitializeMemory(ctx, ptr, mem_obj, memory, interop))) {
+      if (!LEPUS_IsGCMode(ctx)) LEPUS_FreeValue(ctx, mem_obj);
+      return LEPUS_EXCEPTION;
+    }
+    return mem_obj;
+  }
 
   // 1. Let initial be descriptor["initial"].
   LEPUSValue initial_value = JSGetPropertyStrFree(ctx, memory_desc, "initial");
@@ -105,9 +160,6 @@ LEPUSValue QJSWasmMemory::CallAsConstructor(LEPUSContext* ctx,
 
   // 4. Let memtype be { min initial, max maximum }. skip...
   // 5. Let store be the surrounding agent's associated store.
-  auto interop =
-      static_cast<InteropRuntime*>(JSGetPrivateData(ctx, constructor));
-
   // 6. Let (store, memaddr) be mem_alloc(store, memtype). If allocation fails,
   //    throw a RangeError exception.
   WasmResult result = WasmSucceed;
@@ -272,14 +324,21 @@ LEPUSValue QJSWasmMemory::GrowCallback(LEPUSContext* ctx,
     return LEPUS_ThrowTypeError(ctx, ErrorMessages::kNoConvertibleNum_1007);
   }
 
-  int grow_pages = 0;
+  double requested_pages = 0;
   LEPUSValue num_value = argv[0];
   if (LEPUS_IsNumber(num_value)) {
-    LEPUS_ToInt32(ctx, &grow_pages, num_value);
+    LEPUS_ToFloat64(ctx, &requested_pages, num_value);
   } else {
     return ThrowIfException(ctx, ErrorTypes::kTypeError, code,
                             ErrorMessages::kNoConvertibleNum_1008);
   }
+  requested_pages = std::trunc(requested_pages);
+  if (!std::isfinite(requested_pages) || requested_pages < 0 ||
+      requested_pages > std::numeric_limits<uint32_t>::max()) {
+    return ThrowIfException(ctx, ErrorTypes::kTypeError, code,
+                            ErrorMessages::kNoConvertibleNum_1008);
+  }
+  const uint32_t grow_pages = static_cast<uint32_t>(requested_pages);
 
   size_t pages = 0;
   if (memory->memory_.is<Wasm3Memory*>()) {

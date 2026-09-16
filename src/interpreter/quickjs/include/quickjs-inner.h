@@ -67,6 +67,12 @@ extern "C" {
 #endif  // DCHECK
 
 typedef int BOOL;
+
+// Internal QuickJS hook used by the wasm binding to release per-context native
+// resources after both RC and tracing-GC context teardown paths finish.
+// Registrations are additive and duplicate callbacks are ignored.
+QJS_HIDE void LEPUS_NotifyContextFreed(LEPUSContext *ctx);
+
 #define SYSCALL_CHECK(condition) \
   if ((condition) == -1) {       \
     /*abort()*/                  \
@@ -3214,7 +3220,7 @@ void insert_weakref_record(LEPUSContext *ctx, LEPUSObject *p,
 
 char *js_strmalloc(const char *s, size_t n);
 char *js_strmalloc_gc(LEPUSContext *ctx, const char *s, size_t n);
-void *lepus_dbuf_realloc_rt(LEPUSRuntime *rt, void *ptr, size_t size,
+void *lepus_dbuf_realloc_rt(void *opaque, void *ptr, size_t size,
                             int alloc_tag);
 void AddLepusRefCount(LEPUSContext *ctx);
 void LEPUS_SetHeapOpaque(LEPUSContext *ctx, LEPUSValue obj, void *opaque);

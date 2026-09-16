@@ -4,6 +4,8 @@
 
 #include "qjs/qjs_wasm_instance.h"
 
+#include <memory>
+
 #include "common/interop_runtime.h"
 #include "common/messages.h"
 #include "common/wasm_utils.h"
@@ -81,38 +83,63 @@ LEPUSValue QJSWasmInstance::CallAsConstructor(LEPUSContext* ctx,
     return ThrowIfException(ctx, ErrorTypes::kTypeError, code,
                             ErrorMessages::kModuleNeeded_1006);
   }
-  LEPUSValue import_obj = argv[1];
-
   auto module = static_cast<QJSWasmModule*>(
       LEPUS_GetOpaque(argv[0], QJSWasmModule::class_id()));
   auto interop =
       static_cast<InteropRuntime*>(JSGetPrivateData(ctx, new_target));
+  LEPUSValue import_obj = argc > 1 ? argv[1] : LEPUS_UNDEFINED;
+  if (argc > 1 && !LEPUS_IsUndefined(import_obj) &&
+      !LEPUS_IsObject(import_obj)) {
+    return ThrowIfException(ctx, ErrorTypes::kTypeError, code,
+                            "import object must be an object");
+  }
   WasmModuleRef wasm_module = module->module();
   WasmResult result = WasmSucceed;
-  WasmInstanceRef instance =
-      interop->CreateWasmInstance<QJSEnv>(wasm_module, import_obj, result);
+  auto js_env = interop->js_env<QJSEnv*>();
+  QJSEnv::JSValue import_exception = js_env->MakeNull();
+  WasmInstanceRef instance = interop->CreateWasmInstance<QJSEnv>(
+      wasm_module, import_obj, result, &import_exception);
+  if (!js_env->IsNull(import_exception)) {
+    return LEPUS_EXCEPTION;
+  }
   if (result) {
     return ThrowIfException(ctx, ErrorTypes::kTypeError, code, result);
   }
 
+  // Hold the native instance before allocating any JS wrappers. Export setup
+  // may fail before its first wrapper, or release its last partial wrapper.
+  auto opaque = std::make_unique<QJSWasmInstance>(instance, interop);
   LEPUSValue instance_obj = LEPUS_NewObjectClass(ctx, class_id());
   HandleScope func_scope(ctx, &instance_obj, HANDLE_TYPE_LEPUS_VALUE);
-  LEPUSValue exported_obj = LEPUS_NewObject(ctx);
-  func_scope.PushHandle(&exported_obj, HANDLE_TYPE_LEPUS_VALUE);
-  if (!LEPUS_IsException(instance_obj) && !LEPUS_IsException(exported_obj)) {
-    if (interop->CreateJSExports<QJSEnv>(exported_obj, wasm_module, instance)) {
-      return ThrowIfException(ctx, ErrorTypes::kTypeError, code,
-                              "wasm instance exporting failed.");
-    } else {
-      LEPUS_SetPropertyStr(ctx, instance_obj, "exports", exported_obj);
-      auto opaque = new QJSWasmInstance(instance, interop);
-      LEPUS_SetOpaque(instance_obj, opaque);
-      return instance_obj;
+  if (LEPUS_IsException(instance_obj)) return LEPUS_EXCEPTION;
+  if (interop->wasm_runtime().is<PrismRuntime*>()) {
+    if (!RetainWasmRoot(ctx, instance_obj,
+                        interop->js_env<QJSEnv*>()->wasm_root())) {
+      if (!LEPUS_IsGCMode(ctx)) LEPUS_FreeValue(ctx, instance_obj);
+      return LEPUS_EXCEPTION;
     }
   }
-
-  return ThrowIfException(ctx, ErrorTypes::kTypeError, code,
-                          ErrorMessages::kInstantiationFailed_1002);
+  LEPUSValue exported_obj = LEPUS_NewObject(ctx);
+  func_scope.PushHandle(&exported_obj, HANDLE_TYPE_LEPUS_VALUE);
+  if (LEPUS_IsException(exported_obj)) {
+    if (!LEPUS_IsGCMode(ctx)) LEPUS_FreeValue(ctx, instance_obj);
+    return LEPUS_EXCEPTION;
+  }
+  if (interop->CreateJSExports<QJSEnv>(exported_obj, wasm_module, instance)) {
+    if (!LEPUS_IsGCMode(ctx)) {
+      LEPUS_FreeValue(ctx, exported_obj);
+      LEPUS_FreeValue(ctx, instance_obj);
+    }
+    return ThrowIfException(ctx, ErrorTypes::kTypeError, code,
+                            "wasm instance exporting failed.");
+  }
+  // SetProperty consumes exported_obj even when it fails.
+  if (LEPUS_SetPropertyStr(ctx, instance_obj, "exports", exported_obj) < 0) {
+    if (!LEPUS_IsGCMode(ctx)) LEPUS_FreeValue(ctx, instance_obj);
+    return LEPUS_EXCEPTION;
+  }
+  LEPUS_SetOpaque(instance_obj, opaque.release());
+  return instance_obj;
 }
 
 }  // namespace primjs::qjs

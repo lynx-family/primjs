@@ -6,6 +6,9 @@
 
 #include <JavaScriptCore/JavaScriptCore.h>
 
+#include <cmath>
+#include <limits>
+
 #include "common/interop_runtime.h"
 #include "common/js_type.h"
 #include "common/messages.h"
@@ -132,6 +135,10 @@ JSObjectRef JSCWasmMemory::CreateJSObject(JSContextRef ctx,
   return obj;
 }
 
+bool JSCWasmMemory::IsJSCWasmMemory(JSContextRef ctx, JSValueRef target) {
+  return target && JSValueIsObjectOfClass(ctx, target, class_ref());
+}
+
 // static
 JSObjectRef JSCWasmMemory::CallAsConstructor(JSContextRef ctx,
                                              JSObjectRef constructor,
@@ -147,6 +154,11 @@ JSObjectRef JSCWasmMemory::CallAsConstructor(JSContextRef ctx,
   }
 
   JSObjectRef memory_descriptor = JSValueToObject(ctx, argv[0], exception);
+  auto interop = static_cast<InteropRuntime*>(JSObjectGetPrivate(constructor));
+  bool is_prism = interop->wasm_runtime().is<PrismRuntime*>();
+  if (is_prism && ((exception && *exception) || !memory_descriptor)) {
+    return nullptr;
+  }
 
   uint32_t initial_page_count = 0;
   {
@@ -162,10 +174,12 @@ JSObjectRef JSCWasmMemory::CallAsConstructor(JSContextRef ctx,
   {
     JSValueRef maximum = JSObjectGetProperty(ctx, memory_descriptor,
                                              JSString("maximum"), exception);
+    if (is_prism && exception && *exception) return nullptr;
 
     if (!JSValueIsUndefined(ctx, maximum)) {
       maximum_page_count =
           static_cast<uint32_t>(JSValueToNumber(ctx, maximum, exception));
+      if (is_prism && exception && *exception) return nullptr;
 
       if (initial_page_count > maximum_page_count) {
         return ThrowIfException(
@@ -176,12 +190,13 @@ JSObjectRef JSCWasmMemory::CallAsConstructor(JSContextRef ctx,
     }
   }
 
-  auto interop = static_cast<InteropRuntime*>(JSObjectGetPrivate(constructor));
   WasmResult result = WasmSucceed;
   WasmMemoryRef memory =
       interop->CreateWasmMemory(initial_page_count, maximum_page_count, result);
   if (result) {
-    return ThrowIfException(ctx, ErrorTypes::kError, code, result, exception);
+    return ThrowIfException(
+        ctx, is_prism ? ErrorTypes::kRangeError : ErrorTypes::kError, code,
+        result, exception);
   }
 
   return CreateJSObject(ctx, constructor, memory, initial_page_count,
@@ -226,7 +241,13 @@ JSValueRef JSCWasmMemory::GetBufferCallback(JSContextRef ctx,
       // Reasonably speaking, the old buffer must be make detached here,
       // but actually no operation will be taken given that no such
       // interface is provided by JavaScriptCore,
-      JSValueUnprotect(ctx, jsc_memory->buffer_);
+      auto js_env = jsc_memory->interop_runtime_->js_env<JSCEnv*>();
+      bool is_prism = wasm_memory.is<PrismMemory*>();
+      if (is_prism) {
+        js_env->UnprotectWasmMemoryBuffer(jsc_memory->buffer_);
+      } else {
+        JSValueUnprotect(ctx, jsc_memory->buffer_);
+      }
 
       if (buffer == nullptr) {
         // This is a trick to persuade JSC to create an ArrayBuffer
@@ -242,7 +263,11 @@ JSValueRef JSCWasmMemory::GetBufferCallback(JSContextRef ctx,
       jsc_memory->buffer_ = JSObjectMakeArrayBufferWithBytesNoCopy(
           ctx, buffer, buffer_size, nullptr, nullptr, exception);
 
-      JSValueProtect(ctx, jsc_memory->buffer_);
+      if (is_prism) {
+        js_env->ProtectWasmMemoryBuffer(jsc_memory->buffer_);
+      } else {
+        JSValueProtect(ctx, jsc_memory->buffer_);
+      }
     }
 
     return jsc_memory->buffer_;
@@ -265,14 +290,21 @@ JSValueRef JSCWasmMemory::GrowCallback(JSContextRef ctx, JSObjectRef function,
     return ThrowIfException(ctx, ErrorTypes::kTypeError, code,
                             ErrorMessages::kNoConvertibleNum_1001, exception);
   }
-  size_t grow_pages = 0;
+  double requested_pages = 0;
   JSValueRef num_obj = argv[0];
   if (JSValueIsNumber(ctx, num_obj)) {
-    grow_pages = JSValueToNumber(ctx, num_obj, exception);
+    requested_pages = JSValueToNumber(ctx, num_obj, exception);
   } else {
     return ThrowIfException(ctx, ErrorTypes::kTypeError, code,
                             ErrorMessages::kNoConvertibleNum_1002, exception);
   }
+  requested_pages = std::trunc(requested_pages);
+  if (!std::isfinite(requested_pages) || requested_pages < 0 ||
+      requested_pages > std::numeric_limits<uint32_t>::max()) {
+    return ThrowIfException(ctx, ErrorTypes::kTypeError, code,
+                            ErrorMessages::kNoConvertibleNum_1002, exception);
+  }
+  const uint32_t grow_pages = static_cast<uint32_t>(requested_pages);
 
   // grow the memory size
   uint32_t pages = 0;

@@ -47,6 +47,11 @@ LEPUSValue QJSWasmGlobal::CreateJSObject(LEPUSContext* ctx,
     return LEPUS_EXCEPTION;
   }
   HandleScope func_scope(ctx, &obj, HANDLE_TYPE_LEPUS_VALUE);
+  if (interop->wasm_runtime().is<PrismRuntime*>() &&
+      !RetainWasmRoot(ctx, obj, interop->js_env<QJSEnv*>()->wasm_root())) {
+    if (!LEPUS_IsGCMode(ctx)) LEPUS_FreeValue(ctx, obj);
+    return LEPUS_EXCEPTION;
+  }
   auto global_data = new QJSWasmGlobal(global, interop);
   LEPUS_SetOpaque(obj, global_data);
   return obj;
@@ -66,6 +71,49 @@ LEPUSValue QJSWasmGlobal::CallAsConstructor(LEPUSContext* ctx,
 
   LEPUSValue descriptor = argv[0];
   LEPUSValue v = argc == 2 ? argv[1] : LEPUS_UNDEFINED;
+
+  auto interop =
+      static_cast<InteropRuntime*>(JSGetPrivateData(ctx, constructor));
+  if (interop->wasm_runtime().is<PrismRuntime*>()) {
+    ScopedPrismProperty desc_mutable(ctx, descriptor, "mutable");
+    if (desc_mutable.IsException()) return LEPUS_EXCEPTION;
+
+    const char* err_msg =
+        "Descriptor property 'value' must be a WebAssembly type";
+    ScopedPrismProperty value_type(ctx, descriptor, "value");
+    if (value_type.IsException()) return LEPUS_EXCEPTION;
+    if (LEPUS_IsUndefined(value_type.value())) {
+      return ThrowIfException(ctx, ErrorTypes::kTypeError, code, err_msg);
+    }
+
+    const char* value_type_str = LEPUS_ToCString(ctx, value_type.value());
+    HandleScope string_scope(ctx, &value_type_str, HANDLE_TYPE_CSTRING);
+    if (!value_type_str) return LEPUS_EXCEPTION;
+    ValueType type = StrToType(value_type_str);
+    if (!LEPUS_IsGCMode(ctx)) {
+      LEPUS_FreeCString(ctx, value_type_str);
+    }
+    if (type != ValueType::kTypeI32 && type != ValueType::kTypeI64 &&
+        type != ValueType::kTypeF32 && type != ValueType::kTypeF64) {
+      return ThrowIfException(ctx, ErrorTypes::kTypeError, code, err_msg);
+    }
+
+    auto prism_runtime = interop->wasm_runtime().get<PrismRuntime*>();
+    wasm_val_t wasm_value = WASM_INIT_VAL;
+    wasm_value.kind = prism_runtime->WasmType(type);
+    if (!LEPUS_IsUndefined(v)) {
+      auto js_env = interop->js_env<QJSEnv*>();
+      QJSEnv::JSValue conversion_exception = js_env->MakeNull();
+      if (!prism_runtime->ToWebAssemblyValue(
+              js_env, QJSEnv::FromQJS(v, LEPUS_GetRuntime(ctx)), &wasm_value,
+              &conversion_exception)) {
+        return LEPUS_EXCEPTION;
+      }
+    }
+    WasmGlobalRef global = interop->CreatePrismGlobalFromValue(
+        LEPUS_ToBool(ctx, desc_mutable.value()), &wasm_value);
+    return CreateJSObject(ctx, interop, global);
+  }
 
   // 1. Let mutable be descriptor["mutable"].
   LEPUSValue desc_mutable = JSGetPropertyStrFree(ctx, descriptor, "mutable");
@@ -92,16 +140,12 @@ LEPUSValue QJSWasmGlobal::CallAsConstructor(LEPUSContext* ctx,
     return ThrowIfException(ctx, ErrorTypes::kTypeError, code, err_msg);
   }
 
-  // If v is missing, Let value be DefaultValue(valuetype).
+  // Keep wasm3's existing Number-based conversion unchanged.
   double value = 0;
   if (!LEPUS_IsUndefined(v) &&
       LEPUS_IsException(JsToValue(ctx, &value, v, type))) {
     return LEPUS_EXCEPTION;
   }
-
-  // create wasm global with global desc
-  auto interop =
-      static_cast<InteropRuntime*>(JSGetPrivateData(ctx, constructor));
   WasmGlobalRef global =
       interop->CreateWasmGlobal(type, LEPUS_ToBool(ctx, desc_mutable), value);
 
@@ -169,7 +213,11 @@ LEPUSValue QJSWasmGlobal::GetValueCallback(LEPUSContext* ctx,
     auto prism_global = global->global_.get<PrismGlobal*>();
     wasm_val_t wasm_value;
     prism_global->GetValue(&wasm_value);
-    prism_global->runtime()->ToJSValue(js_env, &val, &wasm_value);
+    QJSEnv::JSValue conversion_exception = js_env->MakeNull();
+    if (!prism_global->runtime()->ToJSValue(js_env, &val, &wasm_value,
+                                            &conversion_exception)) {
+      return LEPUS_EXCEPTION;
+    }
   }
 
   return val.Get();
@@ -219,6 +267,7 @@ LEPUSValue QJSWasmGlobal::SetValueCallback(LEPUSContext* ctx,
     }
   } else {
     auto prism_global = global->global_.get<PrismGlobal*>();
+    auto js_env = global->interop_runtime_->js_env<QJSEnv*>();
     if (!prism_global->mutability()) {
       return ThrowIfException(ctx, ErrorTypes::kTypeError, code, err_msg);
     }
@@ -228,12 +277,16 @@ LEPUSValue QJSWasmGlobal::SetValueCallback(LEPUSContext* ctx,
                               "Set global v128 value not supported!");
     }
 
-    double value;
-    if (LEPUS_IsException(JsToValue(ctx, &value, val, type))) {
+    wasm_val_t wasm_value = WASM_INIT_VAL;
+    wasm_value.kind = prism_global->runtime()->WasmType(type);
+    QJSEnv::JSValue conversion_exception = js_env->MakeNull();
+    if (!prism_global->runtime()->ToWebAssemblyValue(
+            js_env, QJSEnv::FromQJS(val, LEPUS_GetRuntime(ctx)), &wasm_value,
+            &conversion_exception)) {
       return LEPUS_EXCEPTION;
     }
 
-    if (prism_global->set_value(value)) {
+    if (prism_global->set_value(&wasm_value)) {
       LEPUS_ThrowInternalError(ctx, "Global set failed.");
       return LEPUS_EXCEPTION;
     }

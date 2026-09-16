@@ -11,6 +11,8 @@
 #include "common/wasm_utils.h"
 
 namespace primjs::jsc {
+constexpr const char* kWasmRootProperty = "__PRIMJS_WASM_ROOT__";
+
 typedef enum {
   None = 0,
   Writable = 1 << 0,

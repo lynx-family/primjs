@@ -345,7 +345,9 @@ M3Result ResizeMemory(IM3Memory memory, IM3Runtime io_runtime, u32 i_numPages) {
     i_numPagesToAlloc = 256;
 #endif
 
-  if (i_numPages <= memory->maxPages) {
+  // Both memory.grow entry points can wrap the page-count addition. Growing
+  // must never shrink a live allocation or invalidate its existing views.
+  if (i_numPages >= memory->numPages && i_numPages <= memory->maxPages) {
     // Call realloc here, allocated in memory will be saved
     return AllocMemory(memory, io_runtime, i_numPages);
   }

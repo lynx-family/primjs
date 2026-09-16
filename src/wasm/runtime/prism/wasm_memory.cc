@@ -5,32 +5,41 @@
 #include "runtime/prism/wasm_memory.h"
 
 #include <cstdlib>
-#include <memory>
 
 #include "common/wasm_log.h"
 #include "common/wasm_type.h"
 #include "common/wasm_utils.h"
 #include "prism/wasm_c_api.h"
+#include "runtime/prism/wasm_runtime.h"
 
 namespace primjs::wasm {
 class PrismInstance;
 
-PrismMemory::PrismMemory(uint32_t initial, uint32_t maximum)
-    : memory_(nullptr) {
+PrismMemory::PrismMemory(PrismRuntime* runtime, uint32_t initial,
+                         uint32_t maximum)
+    : memory_(nullptr), maximum_(maximum), runtime_(runtime) {
   WLOGD("Running PrismMemory::%s...", __func__);
-  memory_ = wasm_import_memory_new(initial, maximum);
+  wasm_limits_t limit = {initial, maximum};
+  wasm_memorytype_t* type = wasm_memorytype_new(&limit);
+  memory_ = wasm_memory_new(runtime_->wasm_store(), type);
+  wasm_memorytype_delete(type);
 }
 
 PrismMemory::PrismMemory(wasm_memory_t* memory) : memory_(memory) {}
 
-PrismMemory::PrismMemory(wasm_memory_t* memory, PrismInstance* instance)
-    : memory_(memory), instance_(instance) {}
+PrismMemory::PrismMemory(wasm_memory_t* memory, PrismRuntime* runtime,
+                         PrismInstance* instance, uint32_t maximum)
+    : memory_(memory),
+      maximum_(maximum),
+      runtime_(runtime),
+      instance_(instance),
+      owns_handle_(true) {}
 
 PrismMemory::~PrismMemory() {
-  if (memory_) {
-    wasm_import_memory_delete(memory_);
-    memory_ = nullptr;
+  if (owns_handle_) {
+    wasm_memory_delete(memory_);
   }
+  memory_ = nullptr;
 }
 
 bool PrismMemory::valid() const { return memory_ != nullptr; }

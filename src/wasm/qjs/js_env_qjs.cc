@@ -27,6 +27,15 @@ void QJSEnv::Finalize() {
   for (auto &tab : wasm_table_cache_) FreeValue(tab.second);
   for (auto &glob : wasm_global_cache_) FreeValue(glob.second);
   for (auto &func : wasm_func_cache_) FreeValue(func.second);
+  for (auto &callback : wasm_import_callback_roots_) FreeValue(callback.value);
+  wasm_import_callback_roots_.clear();
+  if (has_pending_wasm_exception_) {
+    if (!LEPUS_IsGCModeRT(js_rt_)) {
+      LEPUS_FreeValueRT(js_rt_, pending_wasm_exception_);
+    }
+    has_pending_wasm_exception_ = false;
+    pending_wasm_exception_ = LEPUS_UNDEFINED;
+  }
 }
 
 QJSEnv::~QJSEnv() { WLOGD("Running QJSEnv::%s...", __func__); }
@@ -37,6 +46,15 @@ JSValue QJSEnv::MakeObject() {
 
 JSValue QJSEnv::MakeNumber(double num) {
   return FromQJS(LEPUS_NewFloat64(js_ctx_, num), js_rt_);
+}
+
+bool QJSEnv::MakeBigInt64(int64_t num, JSValue *result, JSValue *exception) {
+  LEPUSValue value = LEPUS_NewBigInt64(js_ctx_, num);
+  *result = FromQJS(value, js_rt_);
+  if (exception != nullptr && LEPUS_IsException(value)) {
+    *exception = FromQJS(LEPUS_EXCEPTION, js_rt_);
+  }
+  return !LEPUS_IsException(value);
 }
 
 JSValue QJSEnv::MakeUndefined() {
@@ -119,10 +137,23 @@ WasmFunctionRef QJSEnv::GetWasmFunction(JSObject value) {
   return {};
 }
 
-JSValue QJSEnv::GetProperty(JSObject target, const char *name) {
+JSValue QJSEnv::GetProperty(JSObject target, const char *name,
+                            JSValue *exception) {
   LEPUSValue res = LEPUS_GetPropertyStr(js_ctx_, target.Get(), name);
+  if (exception != nullptr && LEPUS_IsException(res)) {
+    *exception = FromQJS(LEPUS_EXCEPTION, js_rt_);
+  }
   if (!LEPUS_IsGCMode(js_ctx_)) {
     LEPUS_FreeValue(js_ctx_, res);
+  }
+  return FromQJS(res, js_rt_);
+}
+
+JSValue QJSEnv::GetPropertyForPrism(JSObject target, const char *name,
+                                    JSValue *exception) {
+  LEPUSValue res = LEPUS_GetPropertyStr(js_ctx_, target.Get(), name);
+  if (exception != nullptr && LEPUS_IsException(res)) {
+    *exception = FromQJS(LEPUS_EXCEPTION, js_rt_);
   }
   return FromQJS(res, js_rt_);
 }
@@ -177,6 +208,22 @@ void QJSEnv::ValueToBigInt64(int64_t &i64, JSValue val, JSValue &exception) {
   }
 }
 
+void QJSEnv::ValueToBigInt64ForPrism(int64_t &i64, JSValue val,
+                                     JSValue &exception) {
+  exception = JS_NULL;
+  if (LEPUS_IsUndefined(val.Get()) || LEPUS_IsNull(val.Get()) ||
+      LEPUS_IsNumber(val.Get())) {
+    exception = FromQJS(
+        LEPUS_ThrowTypeError(
+            js_ctx_, "Undefined or Null or Number cannot convert to BigInt"),
+        js_rt_);
+    return;
+  }
+  if (LEPUS_ToBigInt64(js_ctx_, &i64, val.Get())) {
+    exception = FromQJS(LEPUS_EXCEPTION, js_rt_);
+  }
+}
+
 // NOTE: The caller ensures this value is a number.
 void QJSEnv::ValueToNumber(double &num, JSValue val, JSValue &exception) {
   exception = JS_NULL;
@@ -195,6 +242,47 @@ JSValue QJSEnv::CallAsFunction(JSValue function, JSValue thisObject,
   return FromQJS(res, js_rt_);
 }
 
+JSValue QJSEnv::CallAsFunctionForPrism(JSValue function, JSValue thisObject,
+                                       size_t argc, JSValue args[],
+                                       JSValue *exception) {
+  LEPUSValue *arr = new LEPUSValue[argc];
+  for (size_t i = 0; i < argc; i++) arr[i] = args[i].Get();
+  LEPUSValue result =
+      LEPUS_Call(js_ctx_, function.Get(), thisObject.Get(), argc, arr);
+  delete[] arr;
+  if (LEPUS_IsException(result)) {
+    // LEPUS_GetException transfers the pending value to us and clears QJS's
+    // null-sentinel slot. Keep an explicit presence bit so literal null and
+    // undefined remain distinguishable from "no imported exception".
+    LEPUSValue thrown = LEPUS_GetException(js_ctx_);
+    StashWasmException(thrown);
+    if (exception != nullptr) {
+      *exception = FromQJS(thrown, js_rt_);
+    }
+  }
+  return FromQJS(result, js_rt_);
+}
+
+void QJSEnv::StashWasmException(LEPUSValue exception) {
+  if (has_pending_wasm_exception_ && !LEPUS_IsGCModeRT(js_rt_)) {
+    LEPUS_FreeValueRT(js_rt_, pending_wasm_exception_);
+  }
+  pending_wasm_exception_ = exception;
+  has_pending_wasm_exception_ = true;
+}
+
+void QJSEnv::CapturePendingWasmException() {
+  StashWasmException(LEPUS_GetException(js_ctx_));
+}
+
+bool QJSEnv::TakeWasmException(LEPUSValue *exception) {
+  if (!has_pending_wasm_exception_ || exception == nullptr) return false;
+  *exception = pending_wasm_exception_;
+  pending_wasm_exception_ = LEPUS_UNDEFINED;
+  has_pending_wasm_exception_ = false;
+  return true;
+}
+
 JSValue QJSEnv::DupValue(JSValue value) {
   if (!LEPUS_IsGCModeRT(js_rt_)) {
     return FromQJS(LEPUS_DupValueRT(js_rt_, value.Get()), js_rt_);
@@ -203,7 +291,34 @@ JSValue QJSEnv::DupValue(JSValue value) {
   }
 }
 
-void QJSEnv::FreeValue(JSValue value) {
+uint64_t QJSEnv::BeginWasmImportCallbackTransaction() {
+  ++next_wasm_import_callback_transaction_;
+  if (next_wasm_import_callback_transaction_ == 0) {
+    ++next_wasm_import_callback_transaction_;
+  }
+  return next_wasm_import_callback_transaction_;
+}
+
+void QJSEnv::CacheWasmImportCallback(JSObject value, uint64_t transaction) {
+  wasm_import_callback_roots_.push_back({DupValue(value), transaction});
+}
+
+size_t QJSEnv::RollbackWasmImportCallbackTransaction(uint64_t transaction) {
+  size_t rolled_back = 0;
+  for (auto it = wasm_import_callback_roots_.begin();
+       it != wasm_import_callback_roots_.end();) {
+    if (it->transaction != transaction) {
+      ++it;
+      continue;
+    }
+    FreeValue(it->value);
+    it = wasm_import_callback_roots_.erase(it);
+    ++rolled_back;
+  }
+  return rolled_back;
+}
+
+void QJSEnv::FreeValue(const JSValue &value) {
   if (!LEPUS_IsGCModeRT(js_rt_)) {
     LEPUS_FreeValueRT(js_rt_, value.Get());
   }
@@ -295,6 +410,11 @@ void QJSEnv::Mark(LEPUS_MarkFunc *mark_func, LEPUSRuntime *rt,
     LEPUS_MarkValue(rt, glob.second.Get(), mark_func, trace_tool);
   for (auto &func : wasm_func_cache_)
     LEPUS_MarkValue(rt, func.second.Get(), mark_func, trace_tool);
+  for (auto &callback : wasm_import_callback_roots_)
+    LEPUS_MarkValue(rt, callback.value.Get(), mark_func, trace_tool);
+  if (has_pending_wasm_exception_) {
+    LEPUS_MarkValue(rt, pending_wasm_exception_, mark_func, trace_tool);
+  }
 }
 
 }  // namespace primjs::qjs

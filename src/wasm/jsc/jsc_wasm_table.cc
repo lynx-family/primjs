@@ -7,7 +7,9 @@
 #include <JavaScriptCore/JavaScriptCore.h>
 
 #include <cassert>
+#include <cmath>
 #include <cstddef>
+#include <limits>
 
 #include "common/interop_runtime.h"
 #include "common/js_type.h"
@@ -23,12 +25,52 @@
 namespace primjs::jsc {
 using primjs::TableElemType;
 
-// static
-JSClassRef JSCWasmTable::class_ref_ = JSCWasmTable::InitClassRef();
-JSClassRef JSCWasmTable::constructor_class_ref_ =
-    JSCWasmTable::InitCtorClassRef();
-JSClassRef JSCWasmTable::prototype_class_ref_ =
-    JSCWasmTable::InitProtoClassRef();
+namespace {
+bool ToPrismTableFunction(JSContextRef ctx, JSCEnv* js_env, JSValueRef value,
+                          PrismRuntime* expected_runtime, wasm_func_t** result,
+                          JSValueRef* exception, const char* code) {
+  *result = nullptr;
+  if (js_env->IsNull(value)) return true;
+  if (!js_env->IsWasmFunction(value)) {
+    ThrowIfException(ctx, ErrorTypes::kTypeError, code,
+                     "Table value must be null or a Prism function", exception);
+    return false;
+  }
+  JSObjectRef function_object = JSValueToObject(ctx, value, exception);
+  if ((exception && *exception) || !function_object) return false;
+  auto function_opaque =
+      static_cast<JSCWasmFunction*>(JSObjectGetPrivate(function_object));
+  if (!function_opaque || !function_opaque->function().is<PrismFunction*>()) {
+    ThrowIfException(ctx, ErrorTypes::kTypeError, code,
+                     "Table value must be a Prism function", exception);
+    return false;
+  }
+  auto prism_function = function_opaque->function().get<PrismFunction*>();
+  if (prism_function->runtime() != expected_runtime) {
+    ThrowIfException(ctx, ErrorTypes::kTypeError, code,
+                     "Table value belongs to a different Prism runtime",
+                     exception);
+    return false;
+  }
+  *result = prism_function->function();
+  return true;
+}
+}  // namespace
+
+JSClassRef JSCWasmTable::class_ref() {
+  static JSClassRef class_ref = JSCWasmTable::InitClassRef();
+  return class_ref;
+}
+
+JSClassRef JSCWasmTable::prototype_class_ref() {
+  static JSClassRef prototype_class_ref = JSCWasmTable::InitProtoClassRef();
+  return prototype_class_ref;
+}
+
+JSClassRef JSCWasmTable::constructor_class_ref() {
+  static JSClassRef constructor_class_ref = JSCWasmTable::InitCtorClassRef();
+  return constructor_class_ref;
+}
 
 JSClassRef JSCWasmTable::InitClassRef() {
   JSClassDefinition def = JSClassCreator::GetClassDefinition("Table", Finalize);
@@ -54,9 +96,9 @@ JSClassRef JSCWasmTable::InitCtorClassRef() {
 }
 
 void JSCWasmTable::ReleaseClassRef() {
-  JSClassRelease(class_ref_);
-  JSClassRelease(prototype_class_ref_);
-  JSClassRelease(constructor_class_ref_);
+  JSClassRelease(class_ref());
+  JSClassRelease(prototype_class_ref());
+  JSClassRelease(constructor_class_ref());
 }
 
 JSCWasmTable::JSCWasmTable(WasmTableRef table, InteropRuntime* interop)
@@ -82,7 +124,7 @@ void JSCWasmTable::Finalize(JSObjectRef object) {
 
 JSObjectRef JSCWasmTable::CreatePrototype(JSContextRef ctx,
                                           JSValueRef* exception) {
-  JSObjectRef prototype = JSObjectMake(ctx, prototype_class_ref_, NULL);
+  JSObjectRef prototype = JSObjectMake(ctx, prototype_class_ref(), NULL);
 
   // NOTE(TL;DR)
   // JSStaticValue will define static property for prototype object, where
@@ -108,7 +150,7 @@ JSObjectRef JSCWasmTable::CreateConstructor(JSContextRef ctx,
                                             InteropRuntime* interop,
                                             JSValueRef* exception) {
   // set the private data with wctx object(PrismRuntime*)
-  JSObjectRef ctor = JSObjectMake(ctx, constructor_class_ref_, interop);
+  JSObjectRef ctor = JSObjectMake(ctx, constructor_class_ref(), interop);
 
   JSObjectRef prototype = CreatePrototype(ctx, exception);
   InitConstructor(ctx, ctor, "Table", prototype, exception);
@@ -127,7 +169,7 @@ JSObjectRef JSCWasmTable::CreateJSObject(JSContextRef ctx,
   WASM_DCHECK(interop != nullptr);
   JSCWasmTable* table_data = new JSCWasmTable(table, interop);
 
-  JSObjectRef obj = JSObjectMake(ctx, class_ref_, table_data);
+  JSObjectRef obj = JSObjectMake(ctx, class_ref(), table_data);
 
   JSValueRef prototype = JSObjectGetProperty(
       ctx, constructor, JSCBuiltinObjects::PrototypeStr(), exception);
@@ -138,7 +180,7 @@ JSObjectRef JSCWasmTable::CreateJSObject(JSContextRef ctx,
 }
 
 bool JSCWasmTable::IsJSCWasmTable(JSContextRef ctx, JSValueRef target) {
-  return JSValueIsObjectOfClass(ctx, target, class_ref_);
+  return JSValueIsObjectOfClass(ctx, target, class_ref());
 }
 
 JSObjectRef JSCWasmTable::CallAsConstructor(JSContextRef ctx,
@@ -155,14 +197,41 @@ JSObjectRef JSCWasmTable::CallAsConstructor(JSContextRef ctx,
   }
 
   JSObjectRef table_desc = JSValueToObject(ctx, argv[0], exception);
-  JSValueRef init_value =
-      JSObjectGetProperty(ctx, table_desc, JSString("initial"), NULL);
+  auto interop = static_cast<InteropRuntime*>(JSObjectGetPrivate(constructor));
+  bool is_prism = interop->wasm_runtime().is<PrismRuntime*>();
+  if (is_prism && ((exception && *exception) || !table_desc)) return nullptr;
+  JSValueRef* descriptor_exception = is_prism ? exception : nullptr;
+
+  auto read_size = [&](JSValueRef value, int32_t* result) {
+    if (!is_prism) return JSValueGetInt32(ctx, value, result);
+    double number = JSValueToNumber(ctx, value, exception);
+    if ((exception && *exception) || !std::isfinite(number) ||
+        number > std::numeric_limits<int32_t>::max() ||
+        number < std::numeric_limits<int32_t>::min()) {
+      if ((!exception || !*exception) && exception) {
+        ThrowIfException(ctx, ErrorTypes::kTypeError, code,
+                         "Table size must be a finite int32", exception);
+      }
+      return false;
+    }
+    *result = static_cast<int32_t>(number);
+    return true;
+  };
+
+  JSValueRef init_value = JSObjectGetProperty(
+      ctx, table_desc, JSString("initial"), descriptor_exception);
+  if (is_prism && exception && *exception) return nullptr;
   if (JSValueIsUndefined(ctx, init_value)) {
     return ThrowIfException(ctx, ErrorTypes::kTypeError, code,
                             "Property 'initial' is required", exception);
   }
   int32_t init_num;
-  if (!JSValueGetInt32(ctx, init_value, &init_num) || init_num < 0) {
+  if (!read_size(init_value, &init_num)) {
+    if (is_prism && exception && *exception) return nullptr;
+    return ThrowIfException(ctx, ErrorTypes::kTypeError, code,
+                            ErrorMessages::kNoNegative_1001, exception);
+  }
+  if (init_num < 0) {
     return ThrowIfException(ctx, ErrorTypes::kTypeError, code,
                             ErrorMessages::kNoNegative_1001, exception);
   }
@@ -173,11 +242,12 @@ JSObjectRef JSCWasmTable::CallAsConstructor(JSContextRef ctx,
   }
 
   // get max page size
-  JSValueRef max_value =
-      JSObjectGetProperty(ctx, table_desc, JSString("maximum"), NULL);
+  JSValueRef max_value = JSObjectGetProperty(
+      ctx, table_desc, JSString("maximum"), descriptor_exception);
+  if (is_prism && exception && *exception) return nullptr;
   int32_t max_num = MaxSaneTableSize;
-  if (!JSValueIsUndefined(ctx, max_value) &&
-      !JSValueGetInt32(ctx, max_value, &max_num)) {
+  if (!JSValueIsUndefined(ctx, max_value) && !read_size(max_value, &max_num)) {
+    if (is_prism && exception && *exception) return nullptr;
     return ThrowIfException(
         ctx, ErrorTypes::kTypeError, code,
         "Property 'maximum' must be convertible to a valid number", exception);
@@ -199,26 +269,37 @@ JSObjectRef JSCWasmTable::CallAsConstructor(JSContextRef ctx,
                             exception);
   }
 
-  JSValueRef element_type =
-      JSObjectGetProperty(ctx, table_desc, JSString("element"), NULL);
+  JSValueRef element_type = JSObjectGetProperty(
+      ctx, table_desc, JSString("element"), descriptor_exception);
+  if (is_prism && exception && *exception) return nullptr;
   JSStringRef ty_str = NULL;
-  if (JSValueIsString(ctx, element_type)) {
-    ty_str = JSValueToStringCopy(ctx, element_type, NULL);
+  if (is_prism || JSValueIsString(ctx, element_type)) {
+    ty_str = JSValueToStringCopy(ctx, element_type, descriptor_exception);
   }
+  if (is_prism && exception && *exception) return nullptr;
 
-  if (ty_str == NULL || !JSStringIsEqualToUTF8CString(ty_str, "anyfunc")) {
+  bool supported_type =
+      ty_str && JSStringIsEqualToUTF8CString(ty_str, "anyfunc");
+  if (is_prism && ty_str) JSStringRelease(ty_str);
+  if (!supported_type) {
     return ThrowIfException(ctx, ErrorTypes::kTypeError, code,
                             ErrorMessages::kUnsupportedElemType_1001,
                             exception);
   }
 
-  auto interop = static_cast<InteropRuntime*>(JSObjectGetPrivate(constructor));
   // NOTE: only support "anyfunc".
-  WasmTableRef table =
-      interop->CreateWasmTable(init_num, max_num, TableElemType::kFuncRef);
+  WasmTableRef table;
+  if (is_prism) {
+    table =
+        interop->CreatePrismTable(init_num, max_num, TableElemType::kFuncRef);
+  } else {
+    table =
+        interop->CreateWasmTable(init_num, max_num, TableElemType::kFuncRef);
+  }
   if (table == nullptr) {
-    return ThrowIfException(ctx, ErrorTypes::kError, code,
-                            ErrorMessages::kInternalError_1001, exception);
+    return ThrowIfException(
+        ctx, is_prism ? ErrorTypes::kRangeError : ErrorTypes::kError, code,
+        ErrorMessages::kInternalError_1001, exception);
   }
   return CreateJSObject(ctx, constructor, table, exception);
 }
@@ -231,7 +312,7 @@ JSValueRef JSCWasmTable::GetLengthCallback(JSContextRef ctx,
   WLOGD("Running JSCWasmTable::%s...", __func__);
   constexpr const char* code = "WebAssembly.Table.length";
 
-  if (!JSValueIsObjectOfClass(ctx, thisObject, class_ref_)) {
+  if (!JSValueIsObjectOfClass(ctx, thisObject, class_ref())) {
     return ThrowIfException(ctx, ErrorTypes::kTypeError, code,
                             ErrorMessages::kInvalidArgs_1003, exception);
   }
@@ -260,13 +341,13 @@ JSValueRef JSCWasmTable::GetIndexCallback(JSContextRef ctx,
 
   auto table_opaque =
       static_cast<JSCWasmTable*>(JSObjectGetPrivate(thisObject));
-  if (!table_opaque || argc < 1) {
+  if (wasm_unlikely(!table_opaque || argc < 1)) {
     return ThrowIfException(ctx, ErrorTypes::kTypeError, code,
                             ErrorMessages::kNoConvertibleNum_1003, exception);
   }
 
   int32_t index;
-  if (!JSValueGetInt32(ctx, argv[0], &index) || index < 0) {
+  if (wasm_unlikely(!JSValueGetInt32(ctx, argv[0], &index) || index < 0)) {
     return ThrowIfException(ctx, ErrorTypes::kTypeError, code,
                             ErrorMessages::kNoConvertibleNum_1004, exception);
   }
@@ -311,26 +392,38 @@ JSValueRef JSCWasmTable::GetIndexCallback(JSContextRef ctx,
     }
   } else {
     auto prism_table = wasm_table.get<PrismTable*>();
-    if (index >= prism_table->size()) {
+    if (wasm_unlikely(index >= prism_table->size())) {
       return ThrowIfException(ctx, ErrorTypes::kRangeError, code,
                               ErrorMessages::kInvalidTableIndex_1002,
                               exception);
     }
-    auto func_ref = prism_table->get(index);
-    if (!func_ref) return js_env->MakeNull();
-    prism_func* func = prism_get_func(func_ref);
-    auto& func_cache = js_env->wasm_func_cache();
-    uintptr_t ptr = reinterpret_cast<uintptr_t>(func);
-    if (func_cache.count(ptr)) {
-      // the same as QJSWasmTable::GetIndexCallback, there is no need to check
-      // whether func_cache[ptr] is a PrismFunction JS Object
-      func_value = func_cache[ptr];
+    uintptr_t ptr = prism_table->function_identity(index);
+    if (wasm_unlikely(!ptr)) return js_env->MakeNull();
+    JSCEnv::JSObject cached_func;
+    if (prism_table->runtime()->GetExportFunctionObject<JSCEnv>(ptr,
+                                                                &cached_func) &&
+        js_env->IsWasmFunction(cached_func)) {
+      func_value = cached_func;
     } else {
-      auto func_data = new PrismFunction(func_ref, prism_table->runtime(),
-                                         prism_table->instance());
-      func_value =
-          js_env->MakeWasmFunction(interop_runtime, nullptr, func_data);
-      func_cache[ptr] = func_value;
+      auto& func_cache = js_env->wasm_func_cache();
+      if (!func_cache.count(ptr) || !js_env->IsWasmFunction(func_cache[ptr])) {
+        auto func_ref = prism_table->get(index);
+        if (wasm_unlikely(!func_ref)) return js_env->MakeNull();
+        auto func_data = new PrismFunction(func_ref, prism_table->runtime(),
+                                           prism_table->instance(), false);
+        JSObjectRef wrapper =
+            js_env->MakeWasmFunction(interop_runtime, nullptr, func_data);
+        if (wasm_unlikely(!wrapper)) {
+          delete func_data;
+          return ThrowIfException(ctx, ErrorTypes::kError, code,
+                                  "Unable to create Prism function wrapper",
+                                  exception);
+        }
+        js_env->CacheWasmFunction(ptr, wrapper);
+      }
+      prism_table->runtime()->CacheExportFunctionObject<JSCEnv>(
+          ptr, func_cache[ptr]);
+      func_value = func_cache[ptr];
     }
   }
 
@@ -398,6 +491,21 @@ JSValueRef JSCWasmTable::SetIndexCallback(JSContextRef ctx,
       // Table.set allows only exported functions. Therefore, incoming function
       // is already in the function cache. Note that the object cache is now
       // stored in WasmTable instead of JS's agent.
+      //
+      // Refcount note (do NOT "fix" this without reading the whole comment):
+      // Each underlying wasm function pointer (`ptr`) has at most one JS
+      // wrapper, so on a cache hit `value_obj` IS the same JSObject as
+      // `func_cache[ptr]`. Overwriting the slot with the same object keeps
+      // the existing JSValueProtect intact — net protect count stays at 1,
+      // there is no leak.
+      // - On cache miss we Dup (= JSValueProtect) the new object once.
+      // - On cache hit we deliberately do NOT Free + Dup; that pair would
+      //   transiently drop the protect count to 0 and is pointless because
+      //   the object is identical.
+      // Adding `Free(func_cache[ptr])` here without a matching Dup would
+      // unprotect a still-cached object → potential UAF after GC.
+      // Verified clean by ASan + UBSan js-api/table-jsc.js (10× table.set
+      // per slot, prism+wasm3, ref_count returns to 0 at teardown).
       if (!func_cache.count(ptr)) {
         js_env->DupValue(value_obj);
       }
@@ -408,44 +516,29 @@ JSValueRef JSCWasmTable::SetIndexCallback(JSContextRef ctx,
     WASM_DCHECK(table->table_.get<PrismTable*>() != nullptr);
     auto prism_table = table->table_.get<PrismTable*>();
     length = prism_table->size();
-    if (length <= index) {
+    if (wasm_unlikely(length <= index)) {
       return ThrowIfException(ctx, ErrorTypes::kRangeError, code,
                               ErrorMessages::kOutOfBoundOperation_1002,
                               exception);
     }
 
-    PrismFunction* prism_function = nullptr;
-    if (wasm_likely(js_env->IsWasmFunction(value_obj))) {
-      auto function_opaque = static_cast<JSCWasmFunction*>(
-          JSObjectGetPrivate(JSValueToObject(ctx, value_obj, exception)));
-      WasmFunctionRef wasm_function = function_opaque->function();
-      if (wasm_function.is<PrismFunction*>()) {
-        prism_function = wasm_function.get<PrismFunction*>();
-      } else {
-        return ThrowIfException(ctx, ErrorTypes::kTypeError, code,
-                                ErrorMessages::kInvalidTableElem_1004,
-                                exception);
-      }
-    } else if (!js_env->IsNull(value_obj)) {
-      return ThrowIfException(ctx, ErrorTypes::kTypeError, code,
-                              ErrorMessages::kInvalidTableElem_1005, exception);
-    }
-
     wasm_func_t* func_addr = nullptr;
-    if (wasm_likely(prism_function)) {
+    if (!ToPrismTableFunction(ctx, js_env, value_obj, prism_table->runtime(),
+                              &func_addr, exception, code)) {
+      return nullptr;
+    }
+    if (!prism_table->set(index, func_addr)) {
+      return ThrowIfException(ctx, ErrorTypes::kTypeError, code,
+                              "Unable to set Prism table value", exception);
+    }
+    if (wasm_likely(func_addr)) {
       auto& func_cache = js_env->wasm_func_cache();
-      func_addr = prism_function->function();
       prism_func* func = prism_get_func(func_addr);
       uintptr_t ptr = reinterpret_cast<uintptr_t>(func);
-      // Table.set allows only exported functions. Therefore, incoming function
-      // is already in the function cache. Note that the object cache is now
-      // stored in WasmTable instead of JS's agent.
-      if (!func_cache.count(ptr)) {
-        js_env->DupValue(value_obj);
-      }
-      func_cache[ptr] = JSValueToObject(ctx, value_obj, exception);
+      // Prism keeps one protected identity wrapper for each native function.
+      js_env->CacheWasmFunction(ptr,
+                                JSValueToObject(ctx, value_obj, exception));
     }
-    prism_table->set(index, func_addr);
   }
 
   return JSValueMakeUndefined(ctx);

@@ -22,6 +22,33 @@ class QJSWebAssembly {
   static void RegisterWebAssembly(
       LEPUSContext *ctx, std::atomic_bool *ctx_invalid,
       WasmRuntimeType runtime_type = WasmRuntimeType::WASM3);
+  // Test-only entry point that bypasses the app's settings-driven engine
+  // selection. Production callers must use RegisterWebAssembly above.
+  static void RegisterWebAssemblyForTesting(LEPUSContext *ctx,
+                                            std::atomic_bool *ctx_invalid,
+                                            WasmRuntimeType runtime_type);
+#if defined(QJS_UNITTEST)
+  static int LivePrismInstancesForTesting();
+  static void FailPrismExportAfterForTesting(int exports);
+  static void InvalidateWasmRootForTesting(LEPUSContext *ctx);
+  static int GetCurrentPrismRefCountForTesting(LEPUSContext *ctx);
+  static bool SetCurrentPrismReleaseCountForTesting(
+      LEPUSContext *ctx, std::atomic_int *release_count);
+#endif
+#if defined(QJS_UNITTEST) && !defined(ENABLE_WASM_PERF_TEST_CAPTURE)
+  enum class PrismImportBindingPathForTesting {
+    kUnknown,
+    kBorrowedAllFunctions,
+    kOwnedDescriptors,
+  };
+  static void ResetPrismImportBindingPathForTesting();
+  static PrismImportBindingPathForTesting
+  LastPrismImportBindingPathForTesting();
+  static size_t PrismBorrowedImportViewCallsForTesting();
+  static size_t PrismOwnedImportDescriptorEnumerationsForTesting();
+  static size_t PrismRolledBackImportFunctionsForTesting();
+  static size_t PrismRolledBackImportCallbackRootsForTesting();
+#endif
   static LEPUSClassID class_id() {
     static LEPUSClassID class_id = LEPUS_NewClassID(&class_id);
     return class_id;

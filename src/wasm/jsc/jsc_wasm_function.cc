@@ -17,7 +17,15 @@
 
 namespace primjs::jsc {
 // static
-JSClassRef JSCWasmFunction::class_id_ = nullptr;
+JSClassRef JSCWasmFunction::class_id() {
+  static JSClassRef class_id = [] {
+    JSClassDefinition def =
+        JSClassCreator::GetClassDefinition("Function", Finalize);
+    def.callAsFunction = CallWasmFunction;
+    return JSClassCreate(&def);
+  }();
+  return class_id;
+}
 
 JSCWasmFunction::JSCWasmFunction(WasmFunctionRef function,
                                  InteropRuntime* interop)
@@ -45,12 +53,7 @@ void JSCWasmFunction::Finalize(JSObjectRef object) {
 // static
 JSObjectRef JSCWasmFunction::CreatePrototype(JSContextRef ctx,
                                              JSValueRef* exception) {
-  JSClassDefinition def =
-      JSClassCreator::GetClassDefinition("Function", Finalize);
-  def.callAsFunction = CallWasmFunction;
-  JSClassRef obj_jsclass = JSClassCreate(&def);
-  class_id_ = obj_jsclass;
-
+  class_id();
   return JSObjectMake(ctx, nullptr, nullptr);
 }
 
@@ -61,15 +64,44 @@ JSObjectRef JSCWasmFunction::CreateJSObject(JSContextRef ctx,
                                             JSValueRef* exception) {
   auto interop = static_cast<InteropRuntime*>(JSObjectGetPrivate(constructor));
   WASM_DCHECK(interop != nullptr);
-  auto func_opaque = new JSCWasmFunction(function, interop);
+  if (interop->wasm_runtime().is<Wasm3Runtime*>()) {
+    auto func_opaque = new JSCWasmFunction(function, interop);
+    JSObjectRef obj = JSObjectMake(ctx, class_id(), func_opaque);
+    JSObjectRef js_function = JSCBuiltinObjects::GetJSFunction(ctx, exception);
+    if (!js_function || (exception && *exception)) return nullptr;
+    JSObjectSetPrototype(ctx, obj, JSObjectGetPrototype(ctx, js_function));
+    return obj;
+  }
 
-  WASM_DCHECK(class_id_ != nullptr);
-  JSObjectRef obj = JSObjectMake(ctx, class_id_, func_opaque);
+  JSValueRef wasm_root = nullptr;
+  wasm_root = JSObjectGetProperty(ctx, constructor, JSString(kWasmRootProperty),
+                                  exception);
+  if ((exception && *exception) || !JSValueIsObject(ctx, wasm_root)) {
+    return nullptr;
+  }
 
+  // Resolve the mutable global Function binding before transferring native
+  // function ownership to the JS wrapper. On failure the caller still owns
+  // the function and can release it exactly once.
   JSObjectRef js_function = JSCBuiltinObjects::GetJSFunction(ctx, exception);
   if (!js_function || (exception && *exception)) return nullptr;
   JSValueRef may_func_prototype = JSObjectGetPrototype(ctx, js_function);
+
+  JSObjectRef obj = JSObjectMake(ctx, class_id(), nullptr);
+  if (wasm_root) {
+    JSObjectSetProperty(ctx, obj, JSString(kWasmRootProperty), wasm_root,
+                        kJSPropertyAttributeReadOnly |
+                            kJSPropertyAttributeDontEnum |
+                            kJSPropertyAttributeDontDelete,
+                        exception);
+    if (exception && *exception) {
+      return nullptr;
+    }
+  }
+
   JSObjectSetPrototype(ctx, obj, may_func_prototype);
+  auto func_opaque = new JSCWasmFunction(function, interop);
+  WASM_CHECK(JSObjectSetPrivate(obj, func_opaque));
 
   return obj;
 }

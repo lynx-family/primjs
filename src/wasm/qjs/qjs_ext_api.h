@@ -19,6 +19,8 @@ bool JSSafeNewClass(LEPUSContext *ctx, LEPUSClassID class_id,
 LEPUSValueConst InitConstructor(LEPUSContext *ctx, LEPUSValueConst wasm_root,
                                 const char *name, LEPUSCFunction *func,
                                 int length, LEPUSValueConst proto);
+bool RetainWasmRoot(LEPUSContext *ctx, LEPUSValue obj,
+                    LEPUSValueConst wasm_root);
 
 void *JSGetPrivateData(LEPUSContext *ctx, LEPUSValueConst target);
 int Attach(LEPUSContext *ctx, LEPUSValue target, const char *name,
@@ -33,6 +35,31 @@ FORCE_INLINE LEPUSValue JSGetPropertyStrFree(LEPUSContext *ctx,
   }
   return prop_value;
 }
+
+// Prism consumes descriptor accessors after the property read returns. In RC
+// mode LEPUS_GetPropertyStr returns an owned value; in tracing-GC mode the
+// handle scope keeps it live. Keep this helper Prism-only so wasm3 retains its
+// established ownership behavior.
+class ScopedPrismProperty {
+ public:
+  ScopedPrismProperty(LEPUSContext *ctx, LEPUSValueConst object,
+                      const char *name)
+      : ctx_(ctx),
+        value_(LEPUS_GetPropertyStr(ctx, object, name)),
+        scope_(ctx, &value_, HANDLE_TYPE_LEPUS_VALUE) {}
+
+  ~ScopedPrismProperty() {
+    if (!LEPUS_IsGCMode(ctx_)) LEPUS_FreeValue(ctx_, value_);
+  }
+
+  LEPUSValue value() const { return value_; }
+  bool IsException() const { return LEPUS_IsException(value_); }
+
+ private:
+  LEPUSContext *ctx_;
+  LEPUSValue value_;
+  HandleScope scope_;
+};
 
 FORCE_INLINE void *JSObjectGetPrivate(LEPUSContext *ctx,
                                       LEPUSValueConst target) {

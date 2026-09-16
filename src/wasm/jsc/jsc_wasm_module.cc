@@ -92,7 +92,12 @@ bool JSCWasmModule::IsWasmModuleObject(JSContextRef ctx,
                                        JSObjectRef constructor,
                                        JSObjectRef target,
                                        JSValueRef* exception) {
-  return HasInstance(ctx, constructor, target, exception);
+  auto interop = static_cast<InteropRuntime*>(JSObjectGetPrivate(constructor));
+  if (interop && interop->wasm_runtime().is<Wasm3Runtime*>()) {
+    return HasInstance(ctx, constructor, target, exception);
+  }
+  return target && JSValueIsObjectOfClass(ctx, target, class_ref()) &&
+         JSObjectGetPrivate(target) != nullptr;
 }
 
 JSObjectRef JSCWasmModule::CreateJSObject(JSContextRef ctx,
@@ -262,7 +267,6 @@ JSValueRef JSCWasmModule::ExportsCallback(JSContextRef ctx,
   }
   JSObjectRef module_obj = JSValueToObject(ctx, argv[0], nullptr);
   JSObjectRef exports = JSObjectMakeArray(ctx, 0, NULL, nullptr);
-
   auto js_mod = static_cast<JSCWasmModule*>(JSObjectGetPrivate(module_obj));
   WASM_DCHECK(js_mod != nullptr);
   auto interop_runtime = js_mod->interop_runtime_;
@@ -295,7 +299,6 @@ JSValueRef JSCWasmModule::ImportsCallback(JSContextRef ctx,
   }
   JSObjectRef module_obj = JSValueToObject(ctx, argv[0], nullptr);
   JSObjectRef imports = JSObjectMakeArray(ctx, 0, NULL, nullptr);
-
   auto js_mod = static_cast<JSCWasmModule*>(JSObjectGetPrivate(module_obj));
   WASM_DCHECK(js_mod != nullptr);
   auto interop_runtime = js_mod->interop_runtime_;

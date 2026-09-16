@@ -445,8 +445,7 @@ static LEPUSValue JSRef2Value(LEPUSContext *ctx, LEPUSValue ref) {
 static size_t js_malloc_usable_size_unknown(const void *ptr) { return 0; }
 
 QJS_STATIC inline void js_dbuf_init(LEPUSContext *ctx, DynBuf *s) {
-  dbuf_init2(s, ctx->rt,
-             reinterpret_cast<DynBufReallocFunc *>(lepus_dbuf_realloc_rt));
+  dbuf_init2(s, ctx->rt, lepus_dbuf_realloc_rt);
 }
 
 static JSClassShortDef const js_std_class_def[] = {
@@ -1063,6 +1062,11 @@ void JS_FreeContext_GC(LEPUSContext *ctx) {
   if (ctx->object_ctx_check && ctx->check_tools) {
     delete ctx->check_tools;
   }
+  // Mirror RC-mode LEPUS_FreeContext: notify the embedder-registered callback
+  // (e.g. PrismOnContextFreed in src/wasm/qjs) so per-ctx native resources can
+  // be released. Without this, GC mode never invokes the callback, leaking
+  // wasm_store/engine and the C++ wrappers held by InteropRuntime.
+  LEPUS_NotifyContextFreed(ctx);
   system_free(ctx);
 }
 
@@ -6025,8 +6029,8 @@ redo:
         /* remainder modulo 2^64 */
         v = (u.u64 & (((uint64_t)1 << 52) - 1)) | ((uint64_t)1 << 52);
         ret = v << ((e - 1023) - 52);
-        /* take the sign into account */
-        if (u.u64 >> 63) ret = -ret;
+        /* take the sign into account with defined unsigned wrap */
+        if (u.u64 >> 63) ret = (int64_t)(0ULL - (uint64_t)ret);
       } else {
         ret = 0; /* also handles NaN and +inf */
       }
@@ -6082,8 +6086,8 @@ redo:
         v = (u.u64 & (((uint64_t)1 << 52) - 1)) | ((uint64_t)1 << 52);
         v = v << ((e - 1023) - 52 + 32);
         ret = v >> 32;
-        /* take the sign into account */
-        if (u.u64 >> 63) ret = -ret;
+        /* take the sign into account with defined unsigned wrap */
+        if (u.u64 >> 63) ret = (int32_t)(0U - (uint32_t)ret);
       } else {
         ret = 0; /* also handles NaN and +inf */
       }
@@ -7677,10 +7681,18 @@ static void close_var_refs(LEPUSRuntime *rt, LEPUSStackFrame *sf) {
   return;
 }
 
+// Keep this in sync with the RC dispatcher in quickjs.cc. LEPUSValue is an
+// aggregate on some targets, and Clang assigns incompatible function-sanitizer
+// hashes to otherwise identical callbacks compiled in separate translation
+// units. Registration still enforces the LEPUSCFunction signature.
 QJS_STATIC LEPUSValue js_call_c_function(LEPUSContext *ctx,
                                          LEPUSValueConst func_obj,
                                          LEPUSValueConst this_obj, int argc,
-                                         LEPUSValueConst *argv, int flags) {
+                                         LEPUSValueConst *argv, int flags)
+#if defined(__clang__)
+    __attribute__((no_sanitize("function")))
+#endif
+{
   LEPUSRuntime *rt = ctx->rt;
   LEPUSCFunctionType func;
   LEPUSObject *p;
@@ -18232,12 +18244,16 @@ static double js_math_fround(double a) { return static_cast<float>(a); }
 
 static LEPUSValue js_math_imul(LEPUSContext *ctx, LEPUSValueConst this_val,
                                int argc, LEPUSValueConst *argv) {
-  int a, b;
+  int32_t a, b;
 
   if (JS_ToInt32_GC(ctx, &a, argv[0])) return LEPUS_EXCEPTION;
   if (JS_ToInt32_GC(ctx, &b, argv[1])) return LEPUS_EXCEPTION;
-  /* purposely ignoring overflow */
-  return LEPUS_NewInt32(ctx, a * b);
+  const uint32_t product = static_cast<uint32_t>(a) * static_cast<uint32_t>(b);
+  const int64_t signed_result =
+      product <= static_cast<uint32_t>(INT32_MAX)
+          ? static_cast<int64_t>(product)
+          : static_cast<int64_t>(product) - (static_cast<int64_t>(1) << 32);
+  return LEPUS_NewInt32(ctx, static_cast<int32_t>(signed_result));
 }
 
 static LEPUSValue js_math_clz32(LEPUSContext *ctx, LEPUSValueConst this_val,

@@ -37,6 +37,8 @@ class JSCWasmGlobal {
 
   static JSObjectRef CreatePrototype(JSContextRef ctx, JSValueRef* exception);
 
+  static bool IsJSCWasmGlobal(JSContextRef ctx, JSValueRef target);
+
   static JSObjectRef CallAsConstructor(JSContextRef ctx,
                                        JSObjectRef constructor, size_t argc,
                                        const JSValueRef argv[],

@@ -152,6 +152,12 @@ JSObjectRef JSCWasmInstance::CallAsConstructor(JSContextRef ctx,
 
   auto js_env = interop->js_env<JSCEnv*>();
 
+  if (interop->wasm_runtime().is<PrismRuntime*>() && argc > 1 &&
+      !JSValueIsUndefined(ctx, argv[1]) && !JSValueIsObject(ctx, argv[1])) {
+    return ThrowIfException(ctx, ErrorTypes::kTypeError, code,
+                            "import object must be an object", exception);
+  }
+
   JSObjectRef module_ctor = js_env->js_module_constructor();
   if (!JSCWasmModule::IsWasmModuleObject(ctx, module_ctor, module_obj,
                                          exception)) {
@@ -167,8 +173,13 @@ JSObjectRef JSCWasmInstance::CallAsConstructor(JSContextRef ctx,
   auto module = static_cast<JSCWasmModule*>(JSObjectGetPrivate(module_obj));
   WasmModuleRef wasm_module = module->module();
   WasmResult result = WasmSucceed;
-  WasmInstanceRef instance =
-      interop->CreateWasmInstance<JSCEnv>(wasm_module, import_obj, result);
+  JSValueRef import_exception = nullptr;
+  WasmInstanceRef instance = interop->CreateWasmInstance<JSCEnv>(
+      wasm_module, import_obj, result, &import_exception);
+  if (import_exception) {
+    if (exception) *exception = import_exception;
+    return nullptr;
+  }
   if (result) {
     return ThrowIfException(ctx, ErrorTypes::kTypeError, code, result,
                             exception);

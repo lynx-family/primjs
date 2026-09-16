@@ -4,6 +4,8 @@
 
 #include "jsc/jsc_wasm_global.h"
 
+#include <vector>
+
 #include "common/interop_runtime.h"
 #include "common/js_type.h"
 #include "common/messages.h"
@@ -117,6 +119,10 @@ JSObjectRef JSCWasmGlobal::CreateJSObject(JSContextRef ctx,
   return obj;
 }
 
+bool JSCWasmGlobal::IsJSCWasmGlobal(JSContextRef ctx, JSValueRef target) {
+  return target && JSValueIsObjectOfClass(ctx, target, class_ref());
+}
+
 // static
 JSObjectRef JSCWasmGlobal::CallAsConstructor(JSContextRef ctx,
                                              JSObjectRef constructor,
@@ -132,28 +138,57 @@ JSObjectRef JSCWasmGlobal::CallAsConstructor(JSContextRef ctx,
   }
 
   JSObjectRef descriptor = JSValueToObject(ctx, argv[0], exception);
-
-  JSValueRef mutableValue =
-      JSObjectGetProperty(ctx, descriptor, JSString("mutable"), exception);
-  bool mutability = JSValueToBoolean(ctx, mutableValue);
-
-  JSValueRef value =
-      JSObjectGetProperty(ctx, descriptor, JSString("value"), exception);
-  JSStringRef value_string = JSValueToStringCopy(ctx, value, exception);
-
-  size_t type_name_length = JSStringGetMaximumUTF8CStringSize(value_string);
-  char type_name[type_name_length];
-  type_name_length =
-      JSStringGetUTF8CString(value_string, type_name, type_name_length);
-
-  JSValueRef argument = argc == 2 ? argv[1] : JSValueMakeUndefined(ctx);
-
-  double number = JSValueToNumber(ctx, argument, exception);
-
-  ValueType type = StrToType(type_name);
+  if ((exception && *exception) || !descriptor) return nullptr;
 
   auto interop = static_cast<InteropRuntime*>(JSObjectGetPrivate(constructor));
-  WasmGlobalRef global = interop->CreateWasmGlobal(type, mutability, number);
+  bool is_prism = interop->wasm_runtime().is<PrismRuntime*>();
+  JSValueRef* descriptor_exception = exception;
+
+  JSValueRef mutableValue = JSObjectGetProperty(
+      ctx, descriptor, JSString("mutable"), descriptor_exception);
+  if (is_prism && exception && *exception) return nullptr;
+  bool mutability = JSValueToBoolean(ctx, mutableValue);
+
+  JSValueRef value = JSObjectGetProperty(ctx, descriptor, JSString("value"),
+                                         descriptor_exception);
+  if (is_prism && exception && *exception) return nullptr;
+  JSStringRef value_string =
+      JSValueToStringCopy(ctx, value, descriptor_exception);
+  if (is_prism && ((exception && *exception) || !value_string)) return nullptr;
+
+  JSValueRef argument = argc == 2 ? argv[1] : JSValueMakeUndefined(ctx);
+  WasmGlobalRef global;
+  if (is_prism) {
+    size_t type_name_length = JSStringGetMaximumUTF8CStringSize(value_string);
+    std::vector<char> type_name(type_name_length);
+    JSStringGetUTF8CString(value_string, type_name.data(), type_name_length);
+    JSStringRelease(value_string);
+    ValueType type = StrToType(type_name.data());
+    if (type != ValueType::kTypeI32 && type != ValueType::kTypeI64 &&
+        type != ValueType::kTypeF32 && type != ValueType::kTypeF64) {
+      return ThrowIfException(
+          ctx, ErrorTypes::kTypeError, code,
+          "Descriptor property 'value' must be a supported WebAssembly type",
+          exception);
+    }
+    auto prism_runtime = interop->wasm_runtime().get<PrismRuntime*>();
+    auto js_env = interop->js_env<JSCEnv*>();
+    wasm_val_t wasm_value = WASM_INIT_VAL;
+    wasm_value.kind = prism_runtime->WasmType(type);
+    if (argc == 2 && !prism_runtime->ToWebAssemblyValue(
+                         js_env, argument, &wasm_value, exception)) {
+      return nullptr;
+    }
+    global = interop->CreatePrismGlobalFromValue(mutability, &wasm_value);
+  } else {
+    // Keep wasm3's existing Number-based conversion unchanged.
+    size_t type_name_length = JSStringGetMaximumUTF8CStringSize(value_string);
+    char type_name[type_name_length];
+    JSStringGetUTF8CString(value_string, type_name, type_name_length);
+    ValueType type = StrToType(type_name);
+    double number = JSValueToNumber(ctx, argument, exception);
+    global = interop->CreateWasmGlobal(type, mutability, number);
+  }
 
   return CreateJSObject(ctx, constructor, global, exception);
 }
@@ -197,7 +232,10 @@ JSValueRef JSCWasmGlobal::GetValueCallback(JSContextRef ctx,
     auto prism_global = wasm_global.get<PrismGlobal*>();
     wasm_val_t wasm_value;
     prism_global->GetValue(&wasm_value);
-    prism_global->runtime()->ToJSValue(js_env, &value, &wasm_value);
+    if (!prism_global->runtime()->ToJSValue(js_env, &value, &wasm_value,
+                                            exception)) {
+      return nullptr;
+    }
   }
 
   return value;
@@ -265,12 +303,14 @@ JSValueRef JSCWasmGlobal::SetValueCallback(JSContextRef ctx,
                               exception);
     }
 
-    double value;
-    if (JSValueRef err = JsToValue(ctx, &value, val, type)) {
-      return err;
+    wasm_val_t wasm_value = WASM_INIT_VAL;
+    wasm_value.kind = prism_global->runtime()->WasmType(type);
+    if (!prism_global->runtime()->ToWebAssemblyValue(js_env, val, &wasm_value,
+                                                     exception)) {
+      return nullptr;
     }
 
-    if (prism_global->set_value(value)) {
+    if (prism_global->set_value(&wasm_value)) {
       return ThrowIfException(ctx, ErrorTypes::kError, code,
                               "Global set failed.", exception);
     }

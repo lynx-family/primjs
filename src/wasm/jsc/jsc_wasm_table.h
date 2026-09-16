@@ -76,10 +76,6 @@ class JSCWasmTable {
   //  import failure.
   static constexpr uint32_t MaxSaneTableSize = 100000;
 
-  static JSClassRef class_ref_;
-  static JSClassRef prototype_class_ref_;
-  static JSClassRef constructor_class_ref_;
-
   OWNER WasmTableRef table_;
 
   BORROWER InteropRuntime* interop_runtime_;
@@ -87,6 +83,9 @@ class JSCWasmTable {
   static JSClassRef InitClassRef();
   static JSClassRef InitProtoClassRef();
   static JSClassRef InitCtorClassRef();
+  static JSClassRef class_ref();
+  static JSClassRef prototype_class_ref();
+  static JSClassRef constructor_class_ref();
 };
 }  // namespace jsc
 }  // namespace primjs

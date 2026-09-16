@@ -54,9 +54,11 @@ extern "C" {
 #endif
 #include <time.h>
 
+#include <algorithm>
 #include <atomic>
 #include <cstdint>
 #include <cstdlib>
+#include <mutex>
 #include <unordered_set>
 #include <vector>
 #if defined(ANDROID) || defined(__ANDROID__) || defined(OS_IOS) || \
@@ -733,8 +735,9 @@ void *lepus_realloc_rt(LEPUSRuntime *rt, void *ptr, size_t size,
   return rt->js_realloc_rt(rt, ptr, size, alloc_tag);
 }
 
-void *lepus_dbuf_realloc_rt(LEPUSRuntime *rt, void *ptr, size_t size,
+void *lepus_dbuf_realloc_rt(void *opaque, void *ptr, size_t size,
                             int alloc_tag = ALLOC_TAG_WITHOUT_PTR) {
+  auto *rt = static_cast<LEPUSRuntime *>(opaque);
   void *res = rt->js_realloc_rt(rt, ptr, size, alloc_tag);
   if (res != nullptr) {
     WriteBarrierNoStore(rt, res);
@@ -863,7 +866,7 @@ char *lepus_strdup(LEPUSContext *ctx, const char *str,
 }
 
 QJS_STATIC inline void js_dbuf_init(LEPUSContext *ctx, DynBuf *s) {
-  dbuf_init2(s, ctx->rt, (DynBufReallocFunc *)lepus_dbuf_realloc_rt);
+  dbuf_init2(s, ctx->rt, lepus_dbuf_realloc_rt);
 }
 
 static JSClassShortDef const js_std_class_def[] = {
@@ -2136,6 +2139,33 @@ QJS_STATIC void free_finalization_registry_context(
   return;
 }
 
+namespace {
+struct ContextFreedCallbackRegistry {
+  std::mutex mutex;
+  std::vector<LEPUSContextFreedCallback> callbacks;
+};
+
+ContextFreedCallbackRegistry &GetContextFreedCallbackRegistry() {
+  // Contexts may be released during process shutdown. Keep the small callback
+  // registry alive for the process lifetime so finalizers never depend on
+  // translation-unit destruction order.
+  static auto *const registry = new ContextFreedCallbackRegistry();
+  return *registry;
+}
+}  // namespace
+
+void LEPUS_NotifyContextFreed(LEPUSContext *ctx) {
+  std::vector<LEPUSContextFreedCallback> callbacks;
+  {
+    auto &registry = GetContextFreedCallbackRegistry();
+    std::lock_guard<std::mutex> lock(registry.mutex);
+    callbacks = registry.callbacks;
+  }
+  for (auto callback : callbacks) {
+    callback(ctx);
+  }
+}
+
 void LEPUS_FreeContext(LEPUSContext *ctx) {
   CallGCFunc(JS_FreeContext_GC, ctx);
   LEPUSRuntime *rt = ctx->rt;
@@ -2188,6 +2218,7 @@ void LEPUS_FreeContext(LEPUSContext *ctx) {
 
   ctx->fg_ctx->ctx = nullptr;
   free_finalization_registry_context(ctx->rt, ctx->fg_ctx);
+  LEPUS_NotifyContextFreed(ctx);
   lepus_free_rt(ctx->rt, ctx);
 
 #ifdef DUMP_MEM
@@ -2218,6 +2249,16 @@ LEPUSRuntime *LEPUS_GetRuntime(LEPUSContext *ctx) { return ctx->rt; }
 
 void LEPUS_SetMaxStackSize(LEPUSContext *ctx, size_t stack_size) {
   ctx->rt->stack_size = stack_size;
+}
+
+void LEPUS_SetContextFreedCallback(LEPUSContextFreedCallback cb) {
+  if (!cb) return;
+  auto &registry = GetContextFreedCallbackRegistry();
+  std::lock_guard<std::mutex> lock(registry.mutex);
+  if (std::find(registry.callbacks.begin(), registry.callbacks.end(), cb) ==
+      registry.callbacks.end()) {
+    registry.callbacks.push_back(cb);
+  }
 }
 
 QJS_STATIC inline BOOL is_strict_mode(LEPUSContext *ctx) {
@@ -11101,8 +11142,9 @@ redo:
         v = (u.u64 & (((uint64_t)1 << 52) - 1)) | ((uint64_t)1 << 52);
         v = v << ((e - 1023) - 52 + 32);
         ret = v >> 32;
-        /* take the sign into account */
-        if (u.u64 >> 63) ret = -ret;
+        /* take the sign into account; use uint32_t to make the wrap
+           defined for ret == INT32_MIN (avoids UBSan signed overflow) */
+        if (u.u64 >> 63) ret = (int32_t)(0u - (uint32_t)ret);
       } else {
         ret = 0; /* also handles NaN and +inf */
       }
@@ -14075,10 +14117,18 @@ void close_lexical_var(LEPUSContext *ctx, LEPUSStackFrame *sf, int idx) {
   return;
 }
 
+// LEPUSValue is an aggregate on some targets. Clang's function sanitizer
+// assigns incompatible type hashes to otherwise identical QuickJS callbacks
+// compiled in separate translation units. Registration still enforces the
+// LEPUSCFunction signature, so disable only that false-positive check here.
 QJS_STATIC LEPUSValue js_call_c_function(LEPUSContext *ctx,
                                          LEPUSValueConst func_obj,
                                          LEPUSValueConst this_obj, int argc,
-                                         LEPUSValueConst *argv, int flags) {
+                                         LEPUSValueConst *argv, int flags)
+#if defined(__clang__)
+    __attribute__((no_sanitize("function")))
+#endif
+{
   LEPUSRuntime *rt = ctx->rt;
   LEPUSCFunctionType func;
   LEPUSObject *p;
@@ -39291,12 +39341,16 @@ QJS_STATIC double js_math_fround(double a) { return (float)a; }
 
 QJS_STATIC LEPUSValue js_math_imul(LEPUSContext *ctx, LEPUSValueConst this_val,
                                    int argc, LEPUSValueConst *argv) {
-  int a, b;
+  int32_t a, b;
 
   if (LEPUS_ToInt32(ctx, &a, argv[0])) return LEPUS_EXCEPTION;
   if (LEPUS_ToInt32(ctx, &b, argv[1])) return LEPUS_EXCEPTION;
-  /* purposely ignoring overflow */
-  return LEPUS_NewInt32(ctx, a * b);
+  const uint32_t product = static_cast<uint32_t>(a) * static_cast<uint32_t>(b);
+  const int64_t signed_result =
+      product <= static_cast<uint32_t>(INT32_MAX)
+          ? static_cast<int64_t>(product)
+          : static_cast<int64_t>(product) - (static_cast<int64_t>(1) << 32);
+  return LEPUS_NewInt32(ctx, static_cast<int32_t>(signed_result));
 }
 
 QJS_STATIC LEPUSValue js_math_clz32(LEPUSContext *ctx, LEPUSValueConst this_val,

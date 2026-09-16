@@ -28,6 +28,7 @@ class PrismGlobal {
 
   // setter and getter for value
   int set_value(double value);
+  int set_value(const wasm_val_t* value);
 
   int GetValue(wasm_val_t* value) {
     wasm_global_get(global_, value);
@@ -57,6 +58,7 @@ class PrismGlobal {
   wasm_val_t value_;
   wasm_global_t* global_ = nullptr;
   [[maybe_unused]] PrismInstance* instance_ = nullptr;
+  bool owns_handle_ = false;
 };
 
 }  // namespace primjs::wasm

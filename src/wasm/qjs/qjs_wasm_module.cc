@@ -151,10 +151,22 @@ LEPUSValue QJSWasmModule::CallAsConstructor(LEPUSContext* ctx,
         "Exception happened when constructing Wasm Module...");
   }
   HandleScope func_scope(ctx, &module_obj, HANDLE_TYPE_LEPUS_VALUE);
+  if (interop->wasm_runtime().is<PrismRuntime*>() &&
+      !RetainWasmRoot(ctx, module_obj,
+                      interop->js_env<QJSEnv*>()->wasm_root())) {
+    delete module.get<PrismModule*>();
+    if (useBase64) std::free(data);
+    if (!LEPUS_IsGCMode(ctx)) LEPUS_FreeValue(ctx, module_obj);
+    return LEPUS_EXCEPTION;
+  }
   auto opaque = new QJSWasmModule(interop, module);
   LEPUS_SetOpaque(module_obj, opaque);
 
-  // 3. If module is error, throw a CompileError exception. skip...
+  // Prism already owns an immutable snapshot; bytes_ has no readers.
+  // Base64 still transfers its decoded buffer to the ArrayBuffer below.
+  if (!useBase64 && module.is<PrismModule*>()) return module_obj;
+
+  // 3. If module is error, throw an exception. handled above.
   // 4. Set this.[[Module]] to module.
   // 5. Set this.[[Bytes]] to stableBytes.
   LEPUSValue stable_bytes =
@@ -255,7 +267,9 @@ uint8_t* QJSWasmModule::GetBufferFromBytes(LEPUSContext* ctx,
 void QJSWasmModule::GCMark(LEPUSRuntime* rt, LEPUSValueConst obj,
                            LEPUS_MarkFunc* mark_func, uint64_t trace_tool) {
   auto opaque = static_cast<QJSWasmModule*>(LEPUS_GetOpaque(obj, class_id()));
-  WASM_DCHECK(opaque != nullptr);
+  // The tracing collector can visit the class prototype or a module object
+  // before its native payload is installed. A null opaque is therefore a
+  // valid state and simply contributes no native-held JS roots.
   if (opaque) {
     LEPUS_MarkValue(rt, opaque->bytes_, mark_func, trace_tool);
   }

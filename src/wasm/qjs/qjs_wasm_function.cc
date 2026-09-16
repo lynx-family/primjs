@@ -98,6 +98,13 @@ LEPUSValue QJSWasmFunction::CreateJSObject(LEPUSContext* ctx,
   if (LEPUS_IsException(obj)) {
     return LEPUS_EXCEPTION;
   }
+  if (interop->wasm_runtime().is<PrismRuntime*>()) {
+    LEPUSValue wasm_root = interop->js_env<QJSEnv*>()->wasm_root();
+    if (wasm_unlikely(!RetainWasmRoot(ctx, obj, wasm_root))) {
+      if (!LEPUS_IsGCMode(ctx)) LEPUS_FreeValue(ctx, obj);
+      return LEPUS_EXCEPTION;
+    }
+  }
   auto func_opaque = new QJSWasmFunction(function, interop);
   LEPUS_SetOpaque(obj, func_opaque);
   return obj;

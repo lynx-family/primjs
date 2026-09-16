@@ -33,10 +33,13 @@ void Wasm3Instance::IncreaseRefCount(Wasm3Instance*& instance) {
 void Wasm3Instance::DecreaseRefCount(Wasm3Instance*& instance) {
   if (!instance) return;
   WASM_DCHECK(instance->ref_count_.load(std::memory_order_acquire) > 0);
-  instance->ref_count_.fetch_sub(1, std::memory_order_release);
-  WLOGD("Decreasing Wasm3Instance ref count..., ref_count_ = %d",
-        instance->ref_count_.load(std::memory_order_relaxed));
-  if (instance->ref_count_.load(std::memory_order_acquire) == 0) {
+  // Same reasoning as PrismInstance::DecreaseRefCount: test the value returned
+  // by the decrement, not a subsequent load, so two threads dropping the last
+  // two references cannot both observe zero and both destroy the instance.
+  const int remaining =
+      instance->ref_count_.fetch_sub(1, std::memory_order_acq_rel) - 1;
+  WLOGD("Decreasing Wasm3Instance ref count..., ref_count_ = %d", remaining);
+  if (remaining == 0) {
     Destructor(instance);
   }
 }

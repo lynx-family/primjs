@@ -803,6 +803,14 @@ void *LEPUS_GetContextOpaque(LEPUSContext *ctx);
 void LEPUS_SetContextOpaque(LEPUSContext *ctx, void *opaque);
 LEPUSRuntime *LEPUS_GetRuntime(LEPUSContext *ctx);
 void LEPUS_SetMaxStackSize(LEPUSContext *ctx, size_t stack_size);
+
+// Embedder hook: register a callback invoked after LEPUS_FreeContext (or
+// JS_FreeContext_GC under GC mode) has completed all internal cleanup for a
+// given LEPUSContext. Used to release per-context native resources owned by
+// the embedder. Registered callbacks are process-global, additive, and must be
+// idempotent. Registering the same callback more than once has no effect.
+typedef void (*LEPUSContextFreedCallback)(LEPUSContext *ctx);
+void LEPUS_SetContextFreedCallback(LEPUSContextFreedCallback cb);
 void LEPUS_SetClassProto(LEPUSContext *ctx, LEPUSClassID class_id,
                          LEPUSValue obj);
 LEPUSValue LEPUS_GetClassProto(LEPUSContext *ctx, LEPUSClassID class_id);

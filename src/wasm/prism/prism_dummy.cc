@@ -9,7 +9,38 @@
 
 // Dummy implementations for functions in prism.h
 
+size_t prism_module_import_count(const wasm_module_t*) { return 0; }
+
+bool prism_module_imports_are_all_functions(const wasm_module_t*) {
+  return false;
+}
+
+bool prism_module_import_borrow(const wasm_module_t*, size_t,
+                                prism_module_import_view*) {
+  return false;
+}
+
+bool prism_module_import_func_matches(const wasm_module_t*, size_t,
+                                      const wasm_func_t*) {
+  return false;
+}
+
+wasm_func_t* prism_func_new_with_env_for_import(wasm_store_t*,
+                                                const wasm_module_t*, size_t,
+                                                wasm_func_callback_with_env_t,
+                                                void*, void (*)(void*)) {
+  return nullptr;
+}
+
 prism_func* prism_get_func(wasm_func_t* func) { return nullptr; }
+
+prism_func* prism_get_func_ptr(const wasm_instance_t*, uint32_t) {
+  return nullptr;
+}
+
+prism_global* prism_get_global_ptr(wasm_global_t*) { return nullptr; }
+
+prism_mem* prism_update_memory(prism_mem* mem) { return mem; }
 
 prism_table* prism_get_table(wasm_table_t* tab) { return nullptr; }
 
@@ -395,6 +426,10 @@ wasm_func_t* wasm_func_new_with_env(wasm_store_t* store,
 }
 
 wasm_functype_t* wasm_func_type(const wasm_func_t* func) { return nullptr; }
+
+const wasm_functype_t* wasm_func_type_borrow(const wasm_func_t* func) {
+  return nullptr;
+}
 
 size_t wasm_func_param_arity(const wasm_func_t* func) { return 0; }
 

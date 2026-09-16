@@ -50,11 +50,9 @@ class JSCWasmFunction {
 
   WasmFunctionRef& function() { return function_; }
 
-  static JSClassRef class_id() { return class_id_; }
+  static JSClassRef class_id();
 
  private:
-  static JSClassRef class_id_;
-
   OWNER WasmFunctionRef function_;
 
   BORROWER InteropRuntime* interop_runtime_;

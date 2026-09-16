@@ -10,6 +10,9 @@
 #include <map>
 #include <vector>
 
+#ifdef ENABLE_WASM_PERF_COMPARE
+#include "common/interop_runtime_perf.h"
+#endif
 #include "common/one_of.h"
 #include "common/wasm_type.h"
 #include "common/wasm_utils.h"
@@ -38,6 +41,10 @@ class Wasm3Instance {
   IM3Module instance() const { return instance_; }
 
   void set_instance(IM3Module instance) { instance_ = instance; }
+
+#ifdef ENABLE_WASM_PERF_COMPARE
+  wasm_perf::LoadToken& perf_load() { return perf_load_; }
+#endif
 
   template <typename JSEnv>
   int LinkMemory(JSEnv* js_env, IM3Module mod, typename JSEnv::JSObject imports,
@@ -251,6 +258,9 @@ class Wasm3Instance {
   BORROWER Wasm3Runtime* runtime_ = nullptr;
 
   OWNER IM3Module instance_ = nullptr;
+#ifdef ENABLE_WASM_PERF_COMPARE
+  wasm_perf::LoadToken perf_load_;
+#endif
 };
 
 }  // namespace wasm

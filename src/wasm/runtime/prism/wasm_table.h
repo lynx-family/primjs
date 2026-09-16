@@ -29,6 +29,8 @@ class PrismTable {
   ~PrismTable();
 
   uint32_t size();
+  uint32_t maximum() const { return maximum_; }
+  uintptr_t function_identity(size_t index) const;
   // return the function ref at tbl[index]
   wasm_func_t* get(size_t index);
 
@@ -49,6 +51,7 @@ class PrismTable {
   PrismRuntime* runtime_;
   wasm_table_t* table_;
   PrismInstance* instance_ = nullptr;
+  bool owns_handle_ = false;
 };
 
 }  // namespace wasm

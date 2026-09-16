@@ -48,7 +48,7 @@ deps = {
     "buildtools/cmake": {
         "type": "http",
         "url": {
-            "linux": "https://cmake.org/files/v3.18/cmake-3.18.1-Linux-x86_64.tar.gz",
+            "linux": "https://github.com/Kitware/CMake/releases/download/v3.18.1/cmake-3.18.1-Linux-x86_64.tar.gz",
             "darwin": "https://dl.google.com/android/repository/ba34c321f92f6e6fd696c8354c262c122f56abf8.cmake-3.18.1-darwin.zip",
         }.get(system, None),
         "sha256": {

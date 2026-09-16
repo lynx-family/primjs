@@ -39,16 +39,36 @@ LEPUSValueConst InitConstructor(LEPUSContext *ctx, LEPUSValueConst wasm_root,
   LEPUSClassID wasm_class_id = LEPUS_GetClassID(ctx, wasm_root);
   auto interop_runtime =
       static_cast<InteropRuntime *>(LEPUS_GetOpaque(wasm_root, wasm_class_id));
-
-  LEPUSValue ptr = LEPUS_MKPTR(LEPUS_TAG_LEPUS_CPOINTER, interop_runtime);
-  LEPUS_DefinePropertyValueStr(ctx, ctor_obj, private_name, ptr, 0);
+  if (interop_runtime->wasm_runtime().is<PrismRuntime *>()) {
+    // Prism's store is released through the WebAssembly root. Keep that root
+    // reachable while a constructor can still create a wrapper.
+    if (!LEPUS_IsGCMode(ctx)) LEPUS_DupValue(ctx, wasm_root);
+    LEPUS_DefinePropertyValueStr(ctx, ctor_obj, private_name, wasm_root, 0);
+  } else {
+    LEPUSValue ptr = LEPUS_MKPTR(LEPUS_TAG_LEPUS_CPOINTER, interop_runtime);
+    LEPUS_DefinePropertyValueStr(ctx, ctor_obj, private_name, ptr, 0);
+  }
 
   return ctor_obj;
 }
 
+bool RetainWasmRoot(LEPUSContext *ctx, LEPUSValue obj,
+                    LEPUSValueConst wasm_root) {
+  if (!LEPUS_IsObject(wasm_root)) return false;
+  if (!LEPUS_IsGCMode(ctx)) LEPUS_DupValue(ctx, wasm_root);
+  return LEPUS_DefinePropertyValueStr(ctx, obj, private_name, wasm_root, 0) >=
+         0;
+}
+
 void *JSGetPrivateData(LEPUSContext *ctx, LEPUSValueConst target) {
-  LEPUSValue rt_ptr = LEPUS_GetPropertyStr(ctx, target, private_name);
-  return LEPUS_VALUE_GET_PTR(rt_ptr);
+  LEPUSValue private_value = LEPUS_GetPropertyStr(ctx, target, private_name);
+  if (!LEPUS_IsObject(private_value)) {
+    return LEPUS_VALUE_GET_CPOINTER(private_value);
+  }
+  LEPUSClassID wasm_class_id = LEPUS_GetClassID(ctx, private_value);
+  void *interop = LEPUS_GetOpaque(private_value, wasm_class_id);
+  if (!LEPUS_IsGCMode(ctx)) LEPUS_FreeValue(ctx, private_value);
+  return interop;
 }
 
 int Attach(LEPUSContext *ctx, LEPUSValue target, const char *name,
