@@ -2520,4 +2520,49 @@ TEST_F(CommonQjsTest, FastArrayDeleteLastFinalizerPushNoLeak) {
   if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, ret);
 }
 
+TEST_F(CommonQjsTest, SeparableStringWideFlattenOverflowRejected) {
+  // BUG-022: JS_ConcatSeparableString built rope nodes without a length limit,
+  // letting a pure-JS concat loop drive the logical length up to the 31-bit
+  // bitfield maximum (0x7FFFFFFF) while allocating only ~1KB. Flattening such a
+  // wide rope made js_alloc_string_rt compute (max_len << is_wide_char) on an
+  // int, overflowing signed int and under-allocating the backing JSString,
+  // which produced a heap-buffer-overflow write on the first uint16 store.
+  //
+  // With the fix the over-long concatenation must throw "string too long"
+  // before the rope is ever built, so flattening it can never overflow.
+  std::string src = R"(
+    // A single wide (uint16) leaf; any code point >= 0x100 forces is_wide_char.
+    var seed = String.fromCharCode(0x4141);
+
+    // Build the largest valid rope, JS_STRING_LEN_MAX == 2^30 - 1, from
+    // shared subtrees. Every intermediate concatenation remains within the
+    // supported string-length range.
+    var parts = [seed];
+    var t = seed;
+    for (var i = 1; i < 30; i++) { t = t + t; parts.push(t); }
+    var maxLengthRope = parts[29];
+    for (var i = 28; i >= 0; i--)
+      maxLengthRope = maxLengthRope + parts[i];
+
+    // Appending one character would make the logical length 2^30, so this
+    // exact boundary crossing must be rejected before a rope node is built.
+    var threw = false;
+    try {
+      var payload = maxLengthRope + seed;
+      // Force a wide flatten if the concat unexpectedly succeeded.
+      payload.charCodeAt(0);
+    } catch (e) {
+      threw = e instanceof InternalError && e.message === "string too long";
+    }
+    if (!threw) throw new Error("over-long rope concat was not rejected");
+  )";
+  auto ret = LEPUS_Eval(ctx_, src.c_str(), src.size(), "test.js",
+                        LEPUS_EVAL_TYPE_GLOBAL);
+  if (LEPUS_IsException(ret)) {
+    std::string err = js_get_exception_string(ctx_);
+    FAIL() << err;
+  }
+  if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, ret);
+}
+
 }  // namespace common_qjs_test
