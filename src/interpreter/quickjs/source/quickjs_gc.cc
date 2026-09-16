@@ -1943,9 +1943,11 @@ static LEPUSValue JS_ConcatSeparableString(LEPUSContext *ctx, LEPUSValue op1,
     func_scope.PushHandle(&op2, HANDLE_TYPE_LEPUS_VALUE);
   }
 
-  auto *separable_string = static_cast<JSSeparableString *>(lepus_malloc_gc(
-      ctx, sizeof(JSSeparableString), ALLOC_TAG_JSSeparableString));
-  if (!separable_string) return LEPUS_EXCEPTION;
+  /* Compute the resulting length before allocating the rope node so we can
+     reject over-long strings up front, without leaving a half-initialized
+     GC-managed object behind. Both operands already satisfy the invariant
+     len <= JS_STRING_LEN_MAX (< 2^30), so the sum cannot overflow the
+     uint32_t accumulator. */
   uint8_t is_wide_char = 0;
   uint32_t len = 0;
   uint32_t depth = 1;
@@ -1971,6 +1973,19 @@ static LEPUSValue JS_ConcatSeparableString(LEPUSContext *ctx, LEPUSValue op1,
     len += p2->len;
   }
 
+  /* Enforce the same length limit as the eager path (JS_ConcatString1).
+     Without this check the rope's logical length can be driven up to the
+     31-bit bitfield maximum, and flattening a wide rope later computes
+     `max_len << is_wide_char` on an `int` in js_alloc_string_rt, which
+     overflows and under-allocates the backing JSString, leading to a heap
+     buffer overflow write. */
+  if (len > JS_STRING_LEN_MAX) {
+    return LEPUS_ThrowInternalError(ctx, "string too long");
+  }
+
+  auto *separable_string = static_cast<JSSeparableString *>(lepus_malloc_gc(
+      ctx, sizeof(JSSeparableString), ALLOC_TAG_JSSeparableString));
+  if (!separable_string) return LEPUS_EXCEPTION;
   separable_string->len = len;
   separable_string->is_wide_char = is_wide_char;
   separable_string->depth = depth;
