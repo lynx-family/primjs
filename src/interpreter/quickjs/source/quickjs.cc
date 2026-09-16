@@ -22656,7 +22656,11 @@ __exception int js_parse_cond_expr(JSParseState *s, int parse_flags) {
 
       emit_op(s, OP_dup);
       emit_op(s, OP_is_undefined);
+      label2 = emit_goto(s, OP_if_true, -1);
+      emit_op(s, OP_dup);
+      emit_op(s, OP_is_null);
       emit_goto(s, OP_if_false, label1);
+      emit_label(s, label2);
       emit_op(s, OP_drop);
 
       coverage_slot = emit_coverage_slot(s, s->token.ptr);

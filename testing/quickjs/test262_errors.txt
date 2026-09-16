@@ -724,23 +724,7 @@ test/language/expressions/class/private-static-getter-multiple-evaluations-of-cl
 test/language/expressions/class/private-static-method-brand-check-multiple-evaluations-of-class-realm.js:26: TypeError: $262.createRealm is not a function
 test/language/expressions/class/private-static-setter-multiple-evaluations-of-class-realm.js:26: TypeError: $262.createRealm is not a function
 test/language/expressions/class/static-init-await-reference.js:18: SyntaxError: invalid property name
-test/language/expressions/coalesce/abrupt-is-a-short-circuit.js:39: Test262Error: null ?? poison() ?? morePoison(); Expected a Test262Error to be thrown but no exception was thrown at all
-test/language/expressions/coalesce/chainable-if-parenthesis-covered-logical-and.js:37: Test262Error: (null ?? 41) && 42 Expected SameValue(«null», «42») to be true
-test/language/expressions/coalesce/chainable-if-parenthesis-covered-logical-or.js:37: Test262Error: (null ?? 42) || 43 Expected SameValue(«43», «42») to be true
-test/language/expressions/coalesce/chainable-with-bitwise-and.js:37: Test262Error: null ?? 42 & 43 Expected SameValue(«null», «42») to be true
-test/language/expressions/coalesce/chainable-with-bitwise-or.js:37: Test262Error: null ?? 1 | 42 Expected SameValue(«null», «43») to be true
-test/language/expressions/coalesce/chainable-with-bitwise-xor.js:37: Test262Error: null ?? 1 ^ 42 Expected SameValue(«null», «43») to be true
-test/language/expressions/coalesce/chainable.js:38: Test262Error: null ?? undefined ?? 42 Expected SameValue(«null», «42») to be true
-test/language/expressions/coalesce/follows-null.js:37: Test262Error: null ?? 42 Expected SameValue(«null», «42») to be true
-test/language/expressions/coalesce/short-circuit-number-0.js:37: Test262Error: null ?? 0 ?? null Expected SameValue(«null», «0») to be true
-test/language/expressions/coalesce/short-circuit-number-42.js:37: Test262Error: null ?? 42 ?? null Expected SameValue(«null», «42») to be true
-test/language/expressions/coalesce/short-circuit-number-empty-string.js:37: Test262Error: null ?? str ?? null Expected SameValue(«null», «») to be true
-test/language/expressions/coalesce/short-circuit-number-false.js:37: Test262Error: null ?? false ?? null Expected SameValue(«null», «false») to be true
-test/language/expressions/coalesce/short-circuit-number-object.js:37: Test262Error: null ?? obj ?? null Expected SameValue(«null», «null») to be true
-test/language/expressions/coalesce/short-circuit-number-string.js:37: Test262Error: null ?? str ?? null Expected SameValue(«null», «undefined») to be true
-test/language/expressions/coalesce/short-circuit-number-symbol.js:37: Test262Error: null ?? s ?? null Expected SameValue(«null», «Symbol()») to be true
-test/language/expressions/coalesce/short-circuit-number-true.js:37: Test262Error: null ?? true ?? null Expected SameValue(«null», «true») to be true
-test/language/expressions/coalesce/tco-pos-null.js:25: strict mode: Test262Error: Expected SameValue(«0», «1») to be true
+test/language/expressions/coalesce/tco-pos-null.js:24: strict mode: InternalError: stack overflow
 test/language/expressions/coalesce/tco-pos-undefined.js:24: strict mode: InternalError: stack overflow
 test/language/expressions/comma/tco-final.js:17: strict mode: InternalError: stack overflow
 test/language/expressions/compound-assignment/compound-assignment-operator-calls-putvalue-lref--v--1.js:19: Test262Error: Expected a ReferenceError to be thrown but no exception was thrown at all
@@ -777,7 +761,6 @@ test/language/expressions/compound-assignment/left-hand-side-private-reference-a
 test/language/expressions/compound-assignment/left-hand-side-private-reference-accessor-property-rshift.js:59: Test262Error: The expression should evaluate to the result Expected SameValue(«undefined», «3») to be true
 test/language/expressions/compound-assignment/left-hand-side-private-reference-accessor-property-srshift.js:59: Test262Error: The expression should evaluate to the result Expected SameValue(«undefined», «3») to be true
 test/language/expressions/compound-assignment/left-hand-side-private-reference-accessor-property-sub.js:59: Test262Error: The expression should evaluate to the result Expected SameValue(«undefined», «1») to be true
-test/language/expressions/conditional/coalesce-expr-ternary.js:26: Test262Error: null ?? true ? 0 : 42 Expected SameValue(«42», «0») to be true
 test/language/expressions/conditional/tco-cond.js:17: strict mode: InternalError: stack overflow
 test/language/expressions/conditional/tco-pos.js:17: strict mode: InternalError: stack overflow
 test/language/expressions/delete/super-property-null-base.js:26: Test262Error: Expected a ReferenceError but got a TypeError
