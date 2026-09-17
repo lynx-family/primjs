@@ -36564,14 +36564,13 @@ QJS_STATIC LEPUSValue js_array_slice(LEPUSContext *ctx,
   k = start;
   final = start + count;
   n = 0;
-  /* The fast array test on arr ensures that
-     JS_CreateDataPropertyUint32() won't modify obj in case arr is
-     an exotic object */
-  /* Special case fast arrays */
-  if (js_get_fast_array(ctx, obj, &arrp, &count32) &&
-      js_is_fast_array(ctx, arr)) {
+  /* Destination writes can run finalizers that resize or convert obj, even
+     when arr is a fast array. Refresh the source storage before each read. */
+  if (js_is_fast_array(ctx, arr)) {
     /* XXX: should share code with fast array constructor */
-    for (; k < final && k < count32; k++, n++) {
+    for (; k < final && js_get_fast_array(ctx, obj, &arrp, &count32) &&
+           k < count32;
+         k++, n++) {
       if (JS_CreateDataPropertyUint32(ctx, arr, n, LEPUS_DupValue(ctx, arrp[k]),
                                       LEPUS_PROP_THROW) < 0)
         goto exception;
