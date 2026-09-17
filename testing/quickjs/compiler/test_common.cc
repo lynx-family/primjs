@@ -1301,6 +1301,274 @@ TEST_F(CommonQjsTest, TypedArraySliceMemOverlap) {
   if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
 }
 
+TEST_F(CommonQjsTest, ArraySliceSpeciesFinalizerObservesSourceMutation) {
+  if (LEPUS_IsGCMode(ctx_)) {
+    GTEST_SKIP() << "Requires synchronous reference-counted finalization";
+  }
+  std::string src = R"(
+    var source = [10, 20, 30];
+    var cleanupCount = 0;
+    var getterCount = 0;
+    var registry = new FinalizationRegistry(function() {
+      cleanupCount++;
+      Object.defineProperty(source, 1, {
+        configurable: true,
+        enumerable: true,
+        get: function() {
+          getterCount++;
+          return 222;
+        },
+      });
+    });
+    function makeResult() {
+      var target = {};
+      registry.register(target, "slice");
+      return [target, 0, 0];
+    }
+
+    source.constructor = {
+      [Symbol.species]: function() {
+        return makeResult();
+      },
+    };
+
+    var result = source.slice();
+    Assert(cleanupCount === 1);
+    Assert(getterCount === 1);
+    Assert(result[0] === 10);
+    Assert(result[1] === 222);
+    Assert(result[2] === 30);
+  )";
+
+  auto ret = LEPUS_Eval(ctx_, src.c_str(), src.size(), "test.js",
+                        LEPUS_EVAL_TYPE_GLOBAL);
+  if (LEPUS_IsException(ret)) {
+    std::string err = js_get_exception_string(ctx_);
+    FAIL() << err;
+  }
+  if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, ret);
+}
+
+TEST_F(CommonQjsTest, ArraySpliceSpeciesFinalizerObservesSourceMutation) {
+  if (LEPUS_IsGCMode(ctx_)) {
+    GTEST_SKIP() << "Requires synchronous reference-counted finalization";
+  }
+  std::string src = R"(
+    var source = [10, 20, 30];
+    var cleanupCount = 0;
+    var getterCount = 0;
+    var registry = new FinalizationRegistry(function() {
+      cleanupCount++;
+      Object.defineProperty(source, 1, {
+        configurable: true,
+        enumerable: true,
+        get: function() {
+          getterCount++;
+          return 222;
+        },
+      });
+    });
+    function makeResult() {
+      var target = {};
+      registry.register(target, "splice");
+      return [target, 0, 0];
+    }
+
+    source.constructor = {
+      [Symbol.species]: function() {
+        return makeResult();
+      },
+    };
+
+    var result = source.splice(0, 3);
+    Assert(cleanupCount === 1);
+    Assert(getterCount === 1);
+    Assert(result[0] === 10);
+    Assert(result[1] === 222);
+    Assert(result[2] === 30);
+    Assert(source.length === 0);
+  )";
+
+  auto ret = LEPUS_Eval(ctx_, src.c_str(), src.size(), "test.js",
+                        LEPUS_EVAL_TYPE_GLOBAL);
+  if (LEPUS_IsException(ret)) {
+    std::string err = js_get_exception_string(ctx_);
+    FAIL() << err;
+  }
+  if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, ret);
+}
+
+TEST_F(CommonQjsTest, ArraySliceSpliceSpeciesFinalizerMutations) {
+  if (LEPUS_IsGCMode(ctx_)) {
+    GTEST_SKIP() << "Requires synchronous reference-counted finalization";
+  }
+  const char* src = R"(
+    function check(condition, message) {
+      if (!condition) throw new Error(message);
+    }
+    function test(method, mutation) {
+      var source = [10, 20, 30, 40];
+      var cleanupCount = 0;
+      var getterCount = 0;
+      var destination;
+      var marker = {};
+      var registry = new FinalizationRegistry(function() {
+        cleanupCount++;
+        if (mutation === "grow") {
+          for (var i = 0; i < 128; i++) source.push(i);
+          source[2] = 222;
+        } else if (mutation === "shrink" || mutation === "inherit") {
+          source.length = 2;
+        } else if (mutation === "throw") {
+          Object.defineProperty(source, 2, {
+            configurable: true,
+            get: function() { getterCount++; throw marker; },
+          });
+        } else if (mutation === "freezeResult") {
+          Object.freeze(destination);
+        } else if (mutation === "convertResult") {
+          Object.defineProperty(destination, 1, {
+            configurable: true,
+            get: function() { getterCount++; return -1; },
+          });
+          source[2] = 222;
+        }
+      });
+      if (mutation === "inherit") {
+        var proto = Object.create(Array.prototype);
+        Object.defineProperty(proto, 2, {
+          get: function() { getterCount++; return 222; },
+        });
+        Object.setPrototypeOf(source, proto);
+      }
+      source.constructor = {
+        [Symbol.species]: function(length) {
+          check(length === 3, "species length");
+          var target = {};
+          registry.register(target, null);
+          destination = [target];
+          return destination;
+        },
+      };
+      var result;
+      var error;
+      try {
+        result = method === "slice" ? source.slice(1, 4)
+                                     : source.splice(1, 3);
+      } catch (e) { error = e; }
+      var label = method + "/" + mutation;
+      check(cleanupCount === 1, label + " cleanup");
+      check(destination[0] === 20, label + " first element");
+      if (mutation === "throw" || mutation === "freezeResult") {
+        check(mutation === "throw" ? error === marker
+                                   : error instanceof TypeError,
+              label + " exception");
+        check(getterCount === (mutation === "throw" ? 1 : 0),
+              label + " getter");
+        check(source.length === 4 && source[1] === 20,
+              label + " source unchanged before splice edits");
+        return;
+      }
+      check(error === undefined, label + " unexpected exception");
+      check(result === destination && result.length === 3, label + " result");
+      if (mutation === "shrink" || mutation === "inherit") {
+        check(!Object.prototype.hasOwnProperty.call(result, 2),
+              label + " trailing hole");
+        if (mutation === "inherit") {
+          check(result[1] === 222 && getterCount === 1, label + " inherited");
+        } else {
+          check(!Object.prototype.hasOwnProperty.call(result, 1),
+                label + " removed element");
+        }
+      } else {
+        check(result[1] === 222 && result[2] === 40, label + " values");
+        check(getterCount === 0, label + " destination getter not invoked");
+      }
+      if (method === "splice") {
+        check(source.length === 1 && source[0] === 10, label + " source");
+      }
+    }
+    for (var method of ["slice", "splice"]) {
+      for (var mutation of ["grow", "shrink", "inherit", "throw",
+                            "freezeResult", "convertResult"]) {
+        test(method, mutation);
+      }
+    }
+  )";
+  auto ret =
+      LEPUS_Eval(ctx_, src, strlen(src), "test.js", LEPUS_EVAL_TYPE_GLOBAL);
+  if (LEPUS_IsException(ret)) {
+    FAIL() << js_get_exception_string(ctx_);
+  }
+  LEPUS_FreeValue(ctx_, ret);
+}
+
+TEST_F(CommonQjsTest, ArraySliceSpliceSpeciesCopySemantics) {
+  const char* src = R"(
+    function check(condition, message) {
+      if (!condition) throw new Error(message);
+    }
+    for (var method of ["slice", "splice"]) {
+      for (var kind of ["default", "prefilled", "alias", "proxy"]) {
+        var source = [10, 20, 30, 40];
+        var destination;
+        var writes = 0;
+        if (kind !== "default") {
+          source.constructor = {
+            [Symbol.species]: function(length) {
+              check(length === 3, "species length");
+              if (kind === "alias") return source;
+              destination = [100, 200, 300];
+              if (kind === "proxy") {
+                destination = new Proxy(destination, {
+                  defineProperty: function(target, key, desc) {
+                    if (key === "0") {
+                      writes++;
+                      Object.defineProperty(source, 2, {
+                        configurable: true,
+                        get: function() { return 222; },
+                      });
+                    }
+                    return Reflect.defineProperty(target, key, desc);
+                  },
+                });
+              }
+              return destination;
+            },
+          };
+        }
+        var result = method === "slice" ? source.slice(1, 4)
+                                         : source.splice(1, 3);
+        check(result[0] === 20, kind + " first value");
+        if (kind === "alias" && method === "splice") {
+          check(result === source && result.length === 1, "splice alias");
+        } else {
+          check(result.length === 3 && result[2] === 40, kind + " bounds");
+          check(result[1] === (kind === "proxy" ? 222 : 30), kind + " value");
+          if (kind === "alias") check(result === source, "slice alias");
+        }
+        check(writes === (kind === "proxy" ? 1 : 0), kind + " writes");
+        if (method === "splice" && kind !== "alias") {
+          check(source.length === 1 && source[0] === 10, kind + " splice");
+        }
+      }
+      var sparse = [10, , 30];
+      var copied = method === "slice" ? sparse.slice(0, 3)
+                                       : sparse.splice(0, 3);
+      check(copied.length === 3 && !(1 in copied), "sparse hole");
+      check(copied[0] === 10 && copied[2] === 30, "sparse values");
+      var empty = method === "slice" ? [].slice() : [].splice();
+      check(empty.length === 0, "empty");
+    }
+  )";
+  auto ret =
+      LEPUS_Eval(ctx_, src, strlen(src), "test.js", LEPUS_EVAL_TYPE_GLOBAL);
+  if (LEPUS_IsException(ret)) {
+    FAIL() << js_get_exception_string(ctx_);
+  }
+  if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, ret);
+}
+
 TEST_F(CommonQjsTest, TestDateUtc) {
   double fields[] = {1970, 0, 213503982336, 0, 0, 0, -18446744073709552000.0};
   auto ret = set_date_fields(fields, 0, 0);
