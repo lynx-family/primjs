@@ -17982,6 +17982,13 @@ __exception int js_parse_string(JSParseState *s, int sep, BOOL do_throw,
           c = '\n';
         }
         /* do not update s->line_num */
+        // <Primjs begin>
+        if (c == '\n') {
+          utf8_parsed = 0;
+          s->last_utf8_adapte_size = 0;
+          s->utf8_adapte_size = 0;
+        }
+        // <Primjs end>
       } else if (c == '\n' || c == '\r')
         goto invalid_char;
     }
