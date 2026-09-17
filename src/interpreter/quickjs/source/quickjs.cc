@@ -9606,6 +9606,30 @@ QJS_STATIC int js_update_property_flags(LEPUSContext *ctx, LEPUSObject *p,
   return 0;
 }
 
+/* Own resources detached by an existing-property update until all accesses to
+   the property's backing storage have finished. Destruction may reenter JS. */
+class JSPropertyUpdateCleanup {
+ public:
+  explicit JSPropertyUpdateCleanup(LEPUSContext *ctx) : ctx_(ctx) {}
+  JSPropertyUpdateCleanup(const JSPropertyUpdateCleanup &) = delete;
+  JSPropertyUpdateCleanup &operator=(const JSPropertyUpdateCleanup &) = delete;
+
+  ~JSPropertyUpdateCleanup() {
+    LEPUS_FreeValue(ctx_, value);
+    LEPUS_FreeValue(ctx_, getter);
+    LEPUS_FreeValue(ctx_, setter);
+    if (var_ref) free_var_ref(ctx_->rt, var_ref);
+  }
+
+  LEPUSValue value = LEPUS_UNDEFINED;
+  LEPUSValue getter = LEPUS_UNDEFINED;
+  LEPUSValue setter = LEPUS_UNDEFINED;
+  JSVarRef *var_ref = nullptr;
+
+ private:
+  LEPUSContext *ctx_;
+};
+
 /* allowed flags:
    LEPUS_PROP_CONFIGURABLE, LEPUS_PROP_WRITABLE, LEPUS_PROP_ENUMERABLE
    LEPUS_PROP_HAS_GET, LEPUS_PROP_HAS_SET, LEPUS_PROP_HAS_VALUE,
@@ -9660,6 +9684,10 @@ redo_prop_update:
       goto redo_prop_update;
     }
 
+    // Move replaced references into this scope; never release them while pr or
+    // prs will still be used. This also covers every error return below.
+    JSPropertyUpdateCleanup cleanup(ctx);
+
     if (flags & (LEPUS_PROP_HAS_VALUE | LEPUS_PROP_HAS_WRITABLE |
                  LEPUS_PROP_HAS_GET | LEPUS_PROP_HAS_SET)) {
       if (flags & (LEPUS_PROP_HAS_GET | LEPUS_PROP_HAS_SET)) {
@@ -9680,9 +9708,9 @@ redo_prop_update:
           if (js_shape_prepare_update(ctx, p, &prs)) return -1;
           /* convert to getset */
           if ((prs->flags & LEPUS_PROP_TMASK) == LEPUS_PROP_VARREF) {
-            free_var_ref(ctx->rt, pr->u.var_ref);
+            cleanup.var_ref = pr->u.var_ref;
           } else {
-            LEPUS_FreeValue(ctx, pr->u.value);
+            cleanup.value = pr->u.value;
           }
           prs->flags =
               (prs->flags & (LEPUS_PROP_CONFIGURABLE | LEPUS_PROP_ENUMERABLE)) |
@@ -9703,15 +9731,13 @@ redo_prop_update:
         }
         if (flags & LEPUS_PROP_HAS_GET) {
           if (pr->u.getset.getter)
-            LEPUS_FreeValue(ctx,
-                            LEPUS_MKPTR(LEPUS_TAG_OBJECT, pr->u.getset.getter));
+            cleanup.getter = LEPUS_MKPTR(LEPUS_TAG_OBJECT, pr->u.getset.getter);
           if (new_getter) LEPUS_DupValue(ctx, getter);
           pr->u.getset.getter = new_getter;
         }
         if (flags & LEPUS_PROP_HAS_SET) {
           if (pr->u.getset.setter)
-            LEPUS_FreeValue(ctx,
-                            LEPUS_MKPTR(LEPUS_TAG_OBJECT, pr->u.getset.setter));
+            cleanup.setter = LEPUS_MKPTR(LEPUS_TAG_OBJECT, pr->u.getset.setter);
           if (new_setter) LEPUS_DupValue(ctx, setter);
           pr->u.getset.setter = new_setter;
         }
@@ -9720,11 +9746,9 @@ redo_prop_update:
           /* convert to data descriptor */
           if (js_shape_prepare_update(ctx, p, &prs)) return -1;
           if (pr->u.getset.getter)
-            LEPUS_FreeValue(ctx,
-                            LEPUS_MKPTR(LEPUS_TAG_OBJECT, pr->u.getset.getter));
+            cleanup.getter = LEPUS_MKPTR(LEPUS_TAG_OBJECT, pr->u.getset.getter);
           if (pr->u.getset.setter)
-            LEPUS_FreeValue(ctx,
-                            LEPUS_MKPTR(LEPUS_TAG_OBJECT, pr->u.getset.setter));
+            cleanup.setter = LEPUS_MKPTR(LEPUS_TAG_OBJECT, pr->u.getset.setter);
           prs->flags &= ~(LEPUS_PROP_TMASK | LEPUS_PROP_WRITABLE);
           pr->u.value = LEPUS_UNDEFINED;
         } else if ((prs->flags & LEPUS_PROP_TMASK) == LEPUS_PROP_VARREF) {
@@ -9767,8 +9791,9 @@ redo_prop_update:
               if (!js_same_value(ctx, val, *pr->u.var_ref->pvalue))
                 goto not_configurable;
             }
-            /* update the reference */
-            set_value(ctx, pr->u.var_ref->pvalue, LEPUS_DupValue(ctx, val));
+            /* update the reference, deferring release until after flags */
+            cleanup.value = *pr->u.var_ref->pvalue;
+            *pr->u.var_ref->pvalue = LEPUS_DupValue(ctx, val);
           }
           /* if writable is set to false, no longer a
              reference (for mapped arguments) */
@@ -9777,7 +9802,7 @@ redo_prop_update:
             LEPUSValue val1;
             if (js_shape_prepare_update(ctx, p, &prs)) return -1;
             val1 = LEPUS_DupValue(ctx, *pr->u.var_ref->pvalue);
-            free_var_ref(ctx->rt, pr->u.var_ref);
+            cleanup.var_ref = pr->u.var_ref;
             pr->u.value = val1;
             prs->flags &= ~(LEPUS_PROP_TMASK | LEPUS_PROP_WRITABLE);
           }
@@ -9785,16 +9810,21 @@ redo_prop_update:
           /* XXX: should never happen, type was reset above */
           abort();
         } else {
+          // Complete the potentially allocating shape update before changing
+          // the value, then return without revisiting the shared flags tail.
+          mask = 0;
+          if (flags & LEPUS_PROP_HAS_WRITABLE) mask |= LEPUS_PROP_WRITABLE;
+          if (flags & LEPUS_PROP_HAS_CONFIGURABLE)
+            mask |= LEPUS_PROP_CONFIGURABLE;
+          if (flags & LEPUS_PROP_HAS_ENUMERABLE) mask |= LEPUS_PROP_ENUMERABLE;
+          if (js_update_property_flags(ctx, p, &prs,
+                                       (prs->flags & ~mask) | (flags & mask)))
+            return -1;
           if (flags & LEPUS_PROP_HAS_VALUE) {
-            LEPUS_FreeValue(ctx, pr->u.value);
+            cleanup.value = pr->u.value;
             pr->u.value = LEPUS_DupValue(ctx, val);
           }
-          if (flags & LEPUS_PROP_HAS_WRITABLE) {
-            if (js_update_property_flags(ctx, p, &prs,
-                                         (prs->flags & ~LEPUS_PROP_WRITABLE) |
-                                             (flags & LEPUS_PROP_WRITABLE)))
-              return -1;
-          }
+          return TRUE;
         }
       }
     }
