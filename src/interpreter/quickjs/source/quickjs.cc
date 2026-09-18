@@ -19935,6 +19935,8 @@ typedef struct JSParsePos {
   const uint8_t *last_line_begin_ptr;
   const uint8_t *line_begin_ptr;
   const uint8_t *utf8_parse_front;
+  const uint8_t *last_ptr;
+  const uint8_t *last_last_ptr;
   int utf8_adapte_size;
   int last_utf8_adapte_size;
   // <Primjs end>
@@ -19951,6 +19953,8 @@ int js_parse_get_pos(JSParseState *s, JSParsePos *sp) {
   sp->utf8_adapte_size = s->utf8_adapte_size;
   sp->last_utf8_adapte_size = s->last_utf8_adapte_size;
   sp->utf8_parse_front = s->utf8_parse_front;
+  sp->last_ptr = s->last_ptr;
+  sp->last_last_ptr = s->last_last_ptr;
   // <Primjs end>
   return 0;
 }
@@ -19964,6 +19968,8 @@ __exception int js_parse_seek_token(JSParseState *s, const JSParsePos *sp) {
   s->last_utf8_adapte_size = sp->last_utf8_adapte_size;
   s->utf8_adapte_size = sp->utf8_adapte_size;
   s->line_begin_ptr = sp->line_begin_ptr;
+  s->last_ptr = sp->last_ptr;
+  s->last_last_ptr = sp->last_last_ptr;
   // <Primjs end>
   s->got_lf = sp->got_lf;
   return next_token(s);
