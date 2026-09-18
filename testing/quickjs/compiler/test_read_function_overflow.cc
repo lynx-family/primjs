@@ -2,6 +2,9 @@
 // Licensed under the Apache License Version 2.0 that can be found in the
 // LICENSE file in the root directory of this source tree.
 
+#include <cstring>
+#include <string>
+
 #include "gtest/gtest.h"
 #ifdef __cplusplus
 extern "C" {
@@ -13,9 +16,8 @@ extern "C" {
 #endif
 #include "quickjs/include/quickjs-inner.h"
 
-// Test that LEPUS_ReadObject rejects malformed bytecode with overflowing
-// count fields (cpool_count, closure_var_count, local_count) instead of
-// performing a small allocation followed by an OOB write.
+// Test that LEPUS_ReadObject rejects malformed bytecode metadata and operand
+// indexes before the bytecode can be executed.
 
 class ReadFunctionOverflowTest : public ::testing::Test {
  protected:
@@ -136,9 +138,309 @@ class ReadFunctionOverflowTest : public ::testing::Test {
     *pos += is_wide ? str_len * 2 : str_len;
   }
 
+  struct SerializedFunctionInfo {
+    size_t byte_code_offset;
+    uint32_t byte_code_len;
+  };
+
+  static bool DecodeLEB128Checked(const uint8_t* buf, size_t buf_len,
+                                  size_t* pos, uint32_t* value) {
+    uint32_t result = 0;
+    int shift = 0;
+    while (*pos < buf_len && shift < 35) {
+      uint8_t byte = buf[(*pos)++];
+      result |= static_cast<uint32_t>(byte & 0x7f) << shift;
+      if (!(byte & 0x80)) {
+        *value = result;
+        return true;
+      }
+      shift += 7;
+    }
+    return false;
+  }
+
+  static bool SkipStringChecked(const uint8_t* buf, size_t buf_len,
+                                size_t* pos) {
+    uint32_t len_field;
+    if (!DecodeLEB128Checked(buf, buf_len, pos, &len_field)) return false;
+    size_t byte_len = static_cast<size_t>(len_field >> 1);
+    if (len_field & 1) {
+      if (byte_len > SIZE_MAX / 2) return false;
+      byte_len *= 2;
+    }
+    if (byte_len > buf_len - *pos) return false;
+    *pos += byte_len;
+    return true;
+  }
+
+  static bool SkipLEB128Checked(const uint8_t* buf, size_t buf_len,
+                                size_t* pos) {
+    uint32_t value;
+    return DecodeLEB128Checked(buf, buf_len, pos, &value);
+  }
+
+  static bool ParseSerializedFunction(const uint8_t* buf, size_t buf_len,
+                                      SerializedFunctionInfo* info) {
+    size_t pos = 0;
+    if (pos >= buf_len) return false;
+    uint8_t version = buf[pos++];
+    if (version == 0x41) {
+      if (buf_len - pos < 8) return false;
+      pos += 8;
+    }
+
+    uint32_t atom_count;
+    if (!DecodeLEB128Checked(buf, buf_len, &pos, &atom_count)) return false;
+    for (uint32_t i = 0; i < atom_count; i++) {
+      if (!SkipStringChecked(buf, buf_len, &pos)) return false;
+    }
+
+    if (pos >= buf_len || buf[pos++] != 13) return false;
+    if (buf_len - pos < 3) return false;
+    pos += 3;  // flags and js_mode
+    if (!SkipLEB128Checked(buf, buf_len, &pos)) return false;  // func_name
+
+    uint32_t arg_count;
+    uint32_t var_count;
+    uint32_t defined_arg_count;
+    uint32_t stack_size;
+    uint32_t closure_var_count;
+    uint32_t cpool_count;
+    uint32_t byte_code_len;
+    uint32_t local_count;
+    if (!DecodeLEB128Checked(buf, buf_len, &pos, &arg_count) ||
+        !DecodeLEB128Checked(buf, buf_len, &pos, &var_count) ||
+        !DecodeLEB128Checked(buf, buf_len, &pos, &defined_arg_count) ||
+        !DecodeLEB128Checked(buf, buf_len, &pos, &stack_size) ||
+        !DecodeLEB128Checked(buf, buf_len, &pos, &closure_var_count) ||
+        !DecodeLEB128Checked(buf, buf_len, &pos, &cpool_count) ||
+        !DecodeLEB128Checked(buf, buf_len, &pos, &byte_code_len) ||
+        !DecodeLEB128Checked(buf, buf_len, &pos, &local_count)) {
+      return false;
+    }
+
+    for (uint32_t i = 0; i < local_count; i++) {
+      if (!SkipLEB128Checked(buf, buf_len, &pos) ||
+          !SkipLEB128Checked(buf, buf_len, &pos) ||
+          !SkipLEB128Checked(buf, buf_len, &pos) || pos >= buf_len) {
+        return false;
+      }
+      pos++;  // vardef flags
+    }
+    for (uint32_t i = 0; i < closure_var_count; i++) {
+      if (!SkipLEB128Checked(buf, buf_len, &pos) ||
+          !SkipLEB128Checked(buf, buf_len, &pos) || pos >= buf_len) {
+        return false;
+      }
+      pos++;  // closure flags
+    }
+    if (byte_code_len > buf_len - pos) return false;
+    info->byte_code_offset = pos;
+    info->byte_code_len = byte_code_len;
+    return true;
+  }
+
+  static size_t FindOpcode(const LEPUSFunctionBytecode* function, int opcode) {
+    size_t pos = 0;
+    while (pos < static_cast<size_t>(function->byte_code_len)) {
+      int current_opcode = function->byte_code_buf[pos];
+      if (current_opcode == opcode) return pos;
+      size_t opcode_size = short_opcode_info(current_opcode).size;
+      if (opcode_size == 0 ||
+          opcode_size > static_cast<size_t>(function->byte_code_len) - pos) {
+        break;
+      }
+      pos += opcode_size;
+    }
+    return SIZE_MAX;
+  }
+
+  static LEPUSFunctionBytecode* FindFunctionWithOpcode(
+      LEPUSFunctionBytecode* function, int opcode, size_t* opcode_pos) {
+    size_t pos = FindOpcode(function, opcode);
+    if (pos != SIZE_MAX) {
+      *opcode_pos = pos;
+      return function;
+    }
+    for (int i = 0; i < function->cpool_count; i++) {
+      if (!LEPUS_VALUE_IS_FUNCTION_BYTECODE(function->cpool[i])) continue;
+      auto* child = static_cast<LEPUSFunctionBytecode*>(
+          LEPUS_VALUE_GET_PTR(function->cpool[i]));
+      LEPUSFunctionBytecode* result =
+          FindFunctionWithOpcode(child, opcode, opcode_pos);
+      if (result != nullptr) return result;
+    }
+    return nullptr;
+  }
+
+  uint8_t* CompileFunctionWithOpcode(const char* source, int opcode,
+                                     size_t* out_len, size_t* opcode_pos) {
+    LEPUSValue compiled =
+        LEPUS_Eval(ctx_, source, strlen(source), "<test>",
+                   LEPUS_EVAL_FLAG_COMPILE_ONLY | LEPUS_EVAL_TYPE_GLOBAL);
+    if (LEPUS_IsException(compiled) ||
+        !LEPUS_VALUE_IS_FUNCTION_BYTECODE(compiled)) {
+      *out_len = 0;
+      return nullptr;
+    }
+
+    auto* top =
+        static_cast<LEPUSFunctionBytecode*>(LEPUS_VALUE_GET_PTR(compiled));
+    LEPUSFunctionBytecode* function =
+        FindFunctionWithOpcode(top, opcode, opcode_pos);
+    uint8_t* buf = nullptr;
+    if (function != nullptr) {
+      LEPUSValue function_value =
+          LEPUS_MKPTR(LEPUS_TAG_FUNCTION_BYTECODE, function);
+      buf = LEPUS_WriteObject(ctx_, out_len, function_value,
+                              LEPUS_WRITE_OBJ_BYTECODE);
+    }
+    if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, compiled);
+    return buf;
+  }
+
+  void ExpectInvalidOperandIndex(const char* source, int opcode,
+                                 size_t operand_offset, size_t operand_size,
+                                 const char* expected_error,
+                                 int replacement_opcode = -1) {
+    size_t serialized_len = 0;
+    size_t opcode_pos = SIZE_MAX;
+    uint8_t* serialized =
+        CompileFunctionWithOpcode(source, opcode, &serialized_len, &opcode_pos);
+    ASSERT_NE(serialized, nullptr);
+    ASSERT_NE(opcode_pos, SIZE_MAX);
+
+    SerializedFunctionInfo info;
+    ASSERT_TRUE(ParseSerializedFunction(serialized, serialized_len, &info));
+    ASSERT_LT(opcode_pos + operand_offset + operand_size,
+              static_cast<size_t>(info.byte_code_len) + 1);
+    size_t serialized_opcode_pos = info.byte_code_offset + opcode_pos;
+    ASSERT_EQ(serialized[serialized_opcode_pos], opcode);
+
+    LEPUSValue valid_result = LEPUS_ReadObject(ctx_, serialized, serialized_len,
+                                               LEPUS_READ_OBJ_BYTECODE);
+    ASSERT_FALSE(LEPUS_IsException(valid_result));
+    if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, valid_result);
+
+    memset(serialized + serialized_opcode_pos + operand_offset, 0xff,
+           operand_size);
+    if (replacement_opcode >= 0) {
+      serialized[serialized_opcode_pos] = replacement_opcode;
+    }
+
+    size_t malloc_count_before = 0;
+    size_t malloc_size_before = 0;
+    if (!ctx_->rt->gc_enable) {
+      LEPUS_ThrowSyntaxError(ctx_, "warm up exception cache");
+      LEPUSValue warmup_exception = LEPUS_GetException(ctx_);
+      const char* warmup_message = LEPUS_ToCString(ctx_, warmup_exception);
+      LEPUS_FreeCString(ctx_, warmup_message);
+      LEPUS_FreeValue(ctx_, warmup_exception);
+      malloc_count_before = ctx_->rt->malloc_state.malloc_count;
+      malloc_size_before = ctx_->rt->malloc_state.malloc_size;
+    }
+    LEPUSValue result = LEPUS_ReadObject(ctx_, serialized, serialized_len,
+                                         LEPUS_READ_OBJ_BYTECODE);
+    ASSERT_TRUE(LEPUS_IsException(result));
+    LEPUSValue exception = LEPUS_GetException(ctx_);
+    const char* message = LEPUS_ToCString(ctx_, exception);
+    ASSERT_NE(message, nullptr);
+    EXPECT_NE(std::string(message).find(expected_error), std::string::npos)
+        << message;
+    if (!ctx_->rt->gc_enable) {
+      LEPUS_FreeCString(ctx_, message);
+      LEPUS_FreeValue(ctx_, exception);
+      EXPECT_EQ(ctx_->rt->malloc_state.malloc_count, malloc_count_before);
+      EXPECT_EQ(ctx_->rt->malloc_state.malloc_size, malloc_size_before);
+      lepus_free(ctx_, serialized);
+    }
+  }
+
   LEPUSContext* ctx_;
   LEPUSRuntime* rt_;
 };
+
+TEST_F(ReadFunctionOverflowTest, LocalOperandIndexIsRejectedDuringDecode) {
+  ExpectInvalidOperandIndex("function f() { let a, b, c, d, e; return e; }",
+                            OP_get_loc_check, 1, 2, "invalid bytecode index");
+}
+
+TEST_F(ReadFunctionOverflowTest, InvalidOpcodeIsRejectedBeforeFormatLookup) {
+  ExpectInvalidOperandIndex("function f(value) { return value; }", OP_get_arg0,
+                            0, 0, "invalid opcode", OP_invalid);
+}
+
+TEST_F(ReadFunctionOverflowTest, TruncatedOperandIsRejectedBeforeIndexRead) {
+  ExpectInvalidOperandIndex("function f(value) {}", OP_return_undef, 0, 0,
+                            "read after the end of the buffer", OP_get_arg);
+}
+
+TEST_F(ReadFunctionOverflowTest, Local8OperandIndexIsRejectedDuringDecode) {
+  ExpectInvalidOperandIndex(
+      "function f(input) { var a = input, b = input, c = input, d = input, "
+      "e = input; return a + b + c + d + e; }",
+      OP_get_loc8, 1, 1, "invalid bytecode index");
+}
+
+TEST_F(ReadFunctionOverflowTest,
+       ImplicitLocalOperandIndexIsRejectedDuringDecode) {
+  ExpectInvalidOperandIndex(
+      "function f(input) { var value; if (input) value = 1; else value = 2; "
+      "return value; }",
+      OP_get_loc0, 0, 0, "invalid bytecode index", OP_get_loc3);
+}
+
+TEST_F(ReadFunctionOverflowTest, ArgumentOperandIndexIsRejectedDuringDecode) {
+  ExpectInvalidOperandIndex("function f(a, b, c, d, e) { return e; }",
+                            OP_get_arg, 1, 2, "invalid bytecode index");
+}
+
+TEST_F(ReadFunctionOverflowTest,
+       ImplicitArgumentOperandIndexIsRejectedDuringDecode) {
+  ExpectInvalidOperandIndex("function f(value) { return value; }", OP_get_arg0,
+                            0, 0, "invalid bytecode index", OP_get_arg3);
+}
+
+TEST_F(ReadFunctionOverflowTest,
+       ClosureVariableOperandIndexIsRejectedDuringDecode) {
+  ExpectInvalidOperandIndex(
+      "function outer() { var a, b, c, d, e; "
+      "return function() { return a + b + c + d + e; }; }",
+      OP_get_var_ref, 1, 2, "invalid bytecode index");
+}
+
+TEST_F(ReadFunctionOverflowTest,
+       ImplicitClosureOperandIndexIsRejectedDuringDecode) {
+  ExpectInvalidOperandIndex(
+      "function outer() { var value = 1; "
+      "return function() { return value; }; }",
+      OP_get_var_ref0, 0, 0, "invalid bytecode index", OP_get_var_ref3);
+}
+
+TEST_F(ReadFunctionOverflowTest,
+       CompoundReferenceOperandIndexIsRejectedDuringDecode) {
+  ExpectInvalidOperandIndex(
+      "function f(object) { var value; ({ value } = object); return value; }",
+      OP_make_loc_ref, 5, 2, "invalid bytecode index");
+}
+
+TEST_F(ReadFunctionOverflowTest,
+       ConstantPoolOperandIndexIsRejectedDuringDecode) {
+  ExpectInvalidOperandIndex("function f() { return function() { return 1; }; }",
+                            OP_fclosure8, 1, 1, "invalid bytecode index");
+}
+
+TEST_F(ReadFunctionOverflowTest,
+       LongConstantPoolOperandIndexIsRejectedDuringDecode) {
+  std::string source = "function f() { return [";
+  for (int i = 0; i < 257; i++) {
+    if (i != 0) source += ',';
+    source += "function() {}";
+  }
+  source += "]; }";
+  ExpectInvalidOperandIndex(source.c_str(), OP_fclosure, 1, 4,
+                            "invalid bytecode index");
+}
 
 // Build a crafted bytecode payload with overflowing cpool_count.
 // The idea: take a valid serialized bytecode, locate the cpool_count field,
