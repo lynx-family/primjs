@@ -13824,10 +13824,19 @@ LEPUSValue js_closure2(LEPUSContext *ctx, LEPUSValue func_obj,
       LEPUSClosureVar *cv = &b->closure_var[i];
       JSVarRef *var_ref;
       if (cv->is_local) {
+        /* Standalone bytecode has no enclosing frame to capture from. */
+        if (unlikely(!sf)) {
+          LEPUS_ThrowSyntaxError(ctx, "missing closure stack frame");
+          goto fail;
+        }
         /* reuse the existing variable reference if it already exists */
         var_ref = get_var_ref(ctx, sf, cv->var_idx, cv->is_arg);
         if (!var_ref) goto fail;
       } else {
+        if (unlikely(!cur_var_refs || !cur_var_refs[cv->var_idx])) {
+          LEPUS_ThrowSyntaxError(ctx, "missing closure variable reference");
+          goto fail;
+        }
         var_ref = cur_var_refs[cv->var_idx];
         var_ref->header.ref_count++;
       }
@@ -30940,6 +30949,7 @@ QJS_STATIC LEPUSValue JS_EvalFunctionInternal(LEPUSContext *ctx,
 
   if (LEPUS_VALUE_IS_FUNCTION_BYTECODE(fun_obj)) {
     fun_obj = js_closure(ctx, fun_obj, var_refs, sf);
+    if (LEPUS_IsException(fun_obj)) return LEPUS_EXCEPTION;
     ret_val = JS_CallFree(ctx, fun_obj, this_obj, 0, NULL);
   } else if (LEPUS_VALUE_IS_MODULE(fun_obj)) {
 #ifndef NO_QUICKJS_COMPILER
