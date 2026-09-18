@@ -14,6 +14,7 @@ extern "C" {
 #ifdef __cplusplus
 }
 #endif
+#include "gc/trace-gc.h"
 #include "quickjs/include/quickjs-inner.h"
 
 // Test that LEPUS_ReadObject rejects malformed bytecode metadata and operand
@@ -356,9 +357,140 @@ class ReadFunctionOverflowTest : public ::testing::Test {
     }
   }
 
+  // Serialized nested functions still require their original lexical
+  // environment.
+  void ExpectMissingClosureEnvironment(const char* source, bool is_local,
+                                       const char* expected_error,
+                                       bool null_reference_entry = false) {
+    LEPUSValue compiled =
+        LEPUS_Eval(ctx_, source, strlen(source), "<closure-test>",
+                   LEPUS_EVAL_FLAG_COMPILE_ONLY | LEPUS_EVAL_TYPE_GLOBAL);
+    ASSERT_FALSE(LEPUS_IsException(compiled));
+    HandleScope scope(ctx_, &compiled, HANDLE_TYPE_LEPUS_VALUE);
+    auto* top =
+        static_cast<LEPUSFunctionBytecode*>(LEPUS_VALUE_GET_PTR(compiled));
+    size_t opcode_pos = SIZE_MAX;
+    auto* child = FindFunctionWithOpcode(top, OP_get_var_ref0, &opcode_pos);
+    ASSERT_NE(child, nullptr);
+    ASSERT_GT(child->closure_var_count, 0);
+    ASSERT_EQ(static_cast<bool>(child->closure_var[0].is_local), is_local);
+    size_t size = 0;
+    uint8_t* bytes = LEPUS_WriteObject(
+        ctx_, &size, LEPUS_MKPTR(LEPUS_TAG_FUNCTION_BYTECODE, child),
+        LEPUS_WRITE_OBJ_BYTECODE);
+    ASSERT_NE(bytes, nullptr);
+    scope.PushHandle(bytes, HANDLE_TYPE_DIR_HEAP_OBJ);
+    LEPUSValue decoded =
+        LEPUS_ReadObject(ctx_, bytes, size, LEPUS_READ_OBJ_BYTECODE);
+    ASSERT_FALSE(LEPUS_IsException(decoded));
+    scope.PushHandle(&decoded, HANDLE_TYPE_LEPUS_VALUE);
+    LEPUSValue result;
+    if (null_reference_entry) {
+      auto* function =
+          static_cast<LEPUSFunctionBytecode*>(LEPUS_VALUE_GET_PTR(decoded));
+      ASSERT_FALSE(is_local);
+      ASSERT_EQ(function->closure_var_count, 1);
+      ASSERT_EQ(function->closure_var[0].var_idx, 0);
+      JSVarRef* references[] = {nullptr};
+      LEPUSValue function_object =
+          LEPUS_NewObjectClass(ctx_, JS_CLASS_BYTECODE_FUNCTION);
+      ASSERT_FALSE(LEPUS_IsException(function_object));
+      scope.PushHandle(&function_object, HANDLE_TYPE_LEPUS_VALUE);
+      result =
+          js_closure2(ctx_, function_object, function, references, nullptr);
+      function_object = LEPUS_UNDEFINED;
+    } else {
+      result = LEPUS_EvalFunction(ctx_, decoded, LEPUS_UNDEFINED);
+    }
+    decoded =
+        LEPUS_UNDEFINED;  // Closure creation consumes bytecode in RC mode.
+    EXPECT_TRUE(LEPUS_IsException(result));
+    LEPUSValue exception = LEPUS_GetException(ctx_);
+    scope.PushHandle(&exception, HANDLE_TYPE_LEPUS_VALUE);
+    const char* message = LEPUS_ToCString(ctx_, exception);
+    ASSERT_NE(message, nullptr);
+    EXPECT_NE(std::string(message).find("SyntaxError"), std::string::npos);
+    EXPECT_NE(std::string(message).find(expected_error), std::string::npos)
+        << message;
+    if (!ctx_->rt->gc_enable) {
+      LEPUS_FreeCString(ctx_, message);
+      LEPUS_FreeValue(ctx_, exception);
+      LEPUS_FreeValue(ctx_, result);
+      lepus_free(ctx_, bytes);
+      LEPUS_FreeValue(ctx_, compiled);
+    }
+  }
+
+  void ExpectClosureRoundTrip(const char* source, int expected) {
+    size_t size = 0;
+    uint8_t* bytes = CompileToBytecode(source, &size);
+    ASSERT_NE(bytes, nullptr);
+    HandleScope scope(ctx_, bytes, HANDLE_TYPE_DIR_HEAP_OBJ);
+    LEPUSValue decoded =
+        LEPUS_ReadObject(ctx_, bytes, size, LEPUS_READ_OBJ_BYTECODE);
+    ASSERT_FALSE(LEPUS_IsException(decoded));
+    scope.PushHandle(&decoded, HANDLE_TYPE_LEPUS_VALUE);
+    LEPUSValue result = LEPUS_EvalFunction(ctx_, decoded, LEPUS_UNDEFINED);
+    decoded = LEPUS_UNDEFINED;
+    scope.PushHandle(&result, HANDLE_TYPE_LEPUS_VALUE);
+    ASSERT_FALSE(LEPUS_IsException(result));
+    int32_t value = 0;
+    ASSERT_EQ(LEPUS_ToInt32(ctx_, &value, result), 0);
+    EXPECT_EQ(value, expected);
+    if (!ctx_->rt->gc_enable) {
+      LEPUS_FreeValue(ctx_, result);
+      lepus_free(ctx_, bytes);
+    }
+  }
+
   LEPUSContext* ctx_;
   LEPUSRuntime* rt_;
 };
+
+TEST_F(ReadFunctionOverflowTest, StandaloneLocalClosureRequiresStackFrame) {
+  ExpectMissingClosureEnvironment(
+      "function outer() { var value = 42; "
+      "return function() { return value; }; }",
+      true, "missing closure stack frame");
+}
+
+TEST_F(ReadFunctionOverflowTest, StandaloneArgumentClosureRequiresStackFrame) {
+  ExpectMissingClosureEnvironment(
+      "function outer(value) { return function() { return value; }; }", true,
+      "missing closure stack frame");
+}
+
+TEST_F(ReadFunctionOverflowTest, StandaloneInheritedClosureRequiresReferences) {
+  ExpectMissingClosureEnvironment(
+      "function outer() { var value = 42; return function middle() { "
+      "return function() { return value; }; }; }",
+      false, "missing closure variable reference");
+}
+
+TEST_F(ReadFunctionOverflowTest, ValidNestedClosuresStillRoundTrip) {
+  ExpectClosureRoundTrip(
+      "(function(value) { var local = 2; return function() { "
+      "return function() { return value + local; }; }; })(40)()()",
+      42);
+}
+
+TEST_F(ReadFunctionOverflowTest, DirectEvalClosuresStillRoundTrip) {
+  ExpectClosureRoundTrip(
+      "(function(value) { var local = 2; return eval("
+      "'(function() { return value + local; })')(); })(40)",
+      42);
+}
+
+TEST_F(ReadFunctionOverflowTest, ClosureFreeFunctionStillRoundTrips) {
+  ExpectClosureRoundTrip("(function() { return 42; })()", 42);
+}
+
+TEST_F(ReadFunctionOverflowTest, NullInheritedClosureEntryIsRejected) {
+  ExpectMissingClosureEnvironment(
+      "function outer() { var value = 42; return function middle() { "
+      "return function() { return value; }; }; }",
+      false, "missing closure variable reference", true);
+}
 
 TEST_F(ReadFunctionOverflowTest, LocalOperandIndexIsRejectedDuringDecode) {
   ExpectInvalidOperandIndex("function f() { let a, b, c, d, e; return e; }",

@@ -12154,6 +12154,7 @@ static LEPUSValue JS_EvalFunctionInternal(LEPUSContext *ctx, LEPUSValue fun_obj,
   if (LEPUS_VALUE_IS_FUNCTION_BYTECODE(fun_obj)) {
     HandleScope func_scope{ctx, &fun_obj, HANDLE_TYPE_LEPUS_VALUE};
     fun_obj = js_closure_gc(ctx, fun_obj, var_refs, sf);
+    if (LEPUS_IsException(fun_obj)) return LEPUS_EXCEPTION;
     ret_val = JS_CallFree_GC(ctx, fun_obj, this_obj, 0, NULL);
   } else if (LEPUS_VALUE_IS_MODULE(fun_obj)) {
 #ifndef NO_QUICKJS_COMPILER
