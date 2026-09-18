@@ -68,6 +68,8 @@ jobs:
         with:
           node-version: '24.14.1'
           registry-url: 'https://registry.npmjs.org'
+          cache: npm
+          cache-dependency-path: primjs/packages/weak-node-api/package*.json
 
       - name: Install dependencies and prepare headers
         run: |

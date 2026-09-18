@@ -56,19 +56,38 @@ jobs:
         java-version: 11
 
     - name: Cache Gradle packages
-      uses: actions/cache@v4
+      uses: lynx-infra/cache@main
       with:
         path: |
           ~/.gradle/caches
           ~/.gradle/wrapper
-        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+        key: ${{ runner.os }}-${{ runner.arch }}-gradle-jdk11-v1-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
         restore-keys: |
-          ${{ runner.os }}-gradle-
+          ${{ runner.os }}-${{ runner.arch }}-gradle-jdk11-v1-
+
+    - name: Cache Habitat dependencies
+      uses: lynx-infra/cache@main
+      with:
+        path: |
+          ~/.habitat_cache/habitat
+          ~/.habitat_cache/git
+          ~/.habitat_cache/objects
+        key: ${{ runner.os }}-${{ runner.arch }}-habitat-v1-${{ hashFiles('.habitat', 'DEPS', 'tools/hab') }}
+        restore-keys: |
+          ${{ runner.os }}-${{ runner.arch }}-habitat-v1-
 
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
         node-version: '22.14.0'
+
+    - name: Cache npm packages
+      uses: lynx-infra/cache@main
+      with:
+        path: ~/.npm/_cacache
+        key: ${{ runner.os }}-${{ runner.arch }}-npm-v1-${{ hashFiles('packages/weak-node-api/package*.json') }}
+        restore-keys: |
+          ${{ runner.os }}-${{ runner.arch }}-npm-v1-
 
     - name: Prepare weak-node-api headers
       run: |-
