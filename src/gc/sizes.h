@@ -62,7 +62,12 @@ const size_t kWordBytes = 4;
 const size_t kDWordBytes = 8;
 const size_t kQWordBytes = 16;
 
-// Heap object header size.
+// Every GC heap object uses the same layout:
+//
+//   [8-byte metadata][payload]
+//
+// Memory tracking stores an 8-bit slot index in metadata instead of adding a
+// pointer-sized word to every allocation.
 const size_t kHeaderSize = kDWordBytes;
 
 // The offset of the reference count field.
@@ -70,14 +75,29 @@ const offset_t kOffsetRefCount = -kWordBytes;
 // The offset of the GC header.
 const offset_t kOffsetGCHeader = -kDWordBytes;
 
-// Object Header bits
-// Total 64 bit, classmeta | kAllocatedBit | kColorBit
-
-// [0] Allocated:   Flag to tell if the object is allocated *by the allocator*
-// [1] Color:       set when this object has been marked
-// Bit for flags word (-8 offset)
+// Metadata bit layout:
+//
+//   63       allocated by the allocator
+//   62..32   payload size
+//   31..14   unused
+//   13..6    memory accounting slot index
+//   5..0     allocation tag
+//
+// kColorBit is a legacy alias in the low word and is not an additional field in
+// this encoding.
 static constexpr uint64_t kAllocatedBit = 0x80000000;
 static constexpr uint64_t kAllocatedBit64 = 0x8000000000000000;
+static constexpr uint32_t kPayloadSizeBits = 31;
+static constexpr uint32_t kPayloadSizeMask =
+    (static_cast<uint32_t>(1) << kPayloadSizeBits) - 1;
+static constexpr uint32_t kMemorySlotBits = 8;
+static constexpr uint32_t kMemorySlotShift = 6;
+static constexpr uint32_t kMemorySlotMask =
+    ((static_cast<uint32_t>(1) << kMemorySlotBits) - 1) << kMemorySlotShift;
+static_assert(kMemorySlotShift >= 6,
+              "memory slot must not overlap the allocation tag");
+static_assert(kMemorySlotShift + kMemorySlotBits <= 32,
+              "memory slot must fit in the GC header low word");
 // Actually, this bit is redundant, however the write-barrier can optimize
 // performance by using it
 static constexpr uint64_t kColorBit = 0x2;
