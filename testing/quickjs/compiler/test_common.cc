@@ -2520,6 +2520,97 @@ TEST_F(CommonQjsTest, FastArrayDeleteLastFinalizerPushNoLeak) {
   if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, ret);
 }
 
+TEST_F(CommonQjsTest, CopyWithinFinalizationReentrancyNoUAF) {
+  if (ctx_->gc_enable) GTEST_SKIP();
+  const char* source = R"(
+    (function () {
+      var arr = [];
+      for (var i = 0; i < 16; i++) arr[i] = { id: i };
+      var witness = 0;
+      var fr = new FinalizationRegistry(function () {
+        if (arr.length > 1) arr.length = 1;
+        witness++;
+      });
+      (function () {
+        var victim = { id: -1 };
+        fr.register(victim, "held");
+        arr[0] = victim;
+      })();
+      arr.copyWithin(0, 8);
+      return witness === 1 && arr.length === 1;
+    })()
+  )";
+  LEPUSValue ret = LEPUS_Eval(ctx_, source, strlen(source), "test.js",
+                              LEPUS_EVAL_TYPE_GLOBAL);
+  if (LEPUS_IsException(ret)) {
+    std::string err = js_get_exception_string(ctx_);
+    FAIL() << err;
+  }
+  EXPECT_TRUE(LEPUS_ToBool(ctx_, ret));
+  if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, ret);
+}
+
+TEST_F(CommonQjsTest, CopyWithinFinalizationReentrancyCopiesEveryIndex) {
+  if (ctx_->gc_enable) GTEST_SKIP();
+  const char* source = R"(
+    (function () {
+      function dump(a) {
+        var cells = [];
+        for (var i = 0; i < a.length; i++) {
+          cells.push((i in a) ? String(a[i]) : "<hole>");
+        }
+        return "len=" + a.length + "[" + cells.join(",") + "]";
+      }
+      var fired = 0;
+      var registries = [];
+      function armReentry(arr, index, onDrop) {
+        var fr = new FinalizationRegistry(function () {
+          fired++;
+          onDrop();
+        });
+        registries.push(fr);
+        (function () {
+          var victim = {};
+          fr.register(victim, "held");
+          arr[index] = victim;
+        })();
+      }
+
+      var fwd = [null, 1, 2, 3];
+      armReentry(fwd, 0, function () { if (fwd.length > 2) fwd.length = 2; });
+      fwd.copyWithin(0, 2);
+
+      var rev = [0, 1, 2, null];
+      armReentry(rev, 3, function () { if (rev.length > 2) rev.length = 2; });
+      rev.copyWithin(1, 0);
+
+      var slow = [null, 1, 2, 3];
+      armReentry(slow, 0, function () {
+        Object.defineProperty(slow, 3, {
+          get: function () { return "G"; },
+          configurable: true
+        });
+      });
+      slow.copyWithin(0, 2);
+
+      return "fwd=" + dump(fwd) + " rev=" + dump(rev) + " slow=" + dump(slow) +
+             " fired=" + fired;
+    })()
+  )";
+  LEPUSValue ret = LEPUS_Eval(ctx_, source, strlen(source), "test.js",
+                              LEPUS_EVAL_TYPE_GLOBAL);
+  if (LEPUS_IsException(ret)) {
+    std::string err = js_get_exception_string(ctx_);
+    FAIL() << err;
+  }
+  const char* got = LEPUS_ToCString(ctx_, ret);
+  EXPECT_STREQ(got,
+               "fwd=len=2[2,<hole>] rev=len=3[0,0,1] slow=len=4[2,G,2,G] "
+               "fired=3");
+  LEPUS_FreeCString(ctx_, got);
+  LEPUS_FreeValue(ctx_, ret);
+}
+
 TEST_F(CommonQjsTest, SeparableStringWideFlattenOverflowRejected) {
   // BUG-022: JS_ConcatSeparableString built rope nodes without a length limit,
   // letting a pure-JS concat loop drive the logical length up to the 31-bit
