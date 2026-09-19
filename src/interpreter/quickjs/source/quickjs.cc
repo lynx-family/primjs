@@ -35668,6 +35668,9 @@ QJS_STATIC int JS_CopySubArray(LEPUSContext *ctx, LEPUSValueConst obj,
         l = min_int64(l, to + 1);
 
         for (j = 0; j < l; ++j) {
+          if (!p->fast_array) break;
+          len = p->u.array.count;
+          if (from - j >= len || to - j >= len) break;
           set_value(ctx, p->u.array.u.values + to - j,
                     LEPUS_DupValue(ctx, p->u.array.u.values[from - j]));
         }
@@ -35676,11 +35679,14 @@ QJS_STATIC int JS_CopySubArray(LEPUSContext *ctx, LEPUSValueConst obj,
         l = min_int64(l, len - from);
         l = min_int64(l, len - to);
         for (j = 0; j < l; ++j) {
+          if (!p->fast_array) break;
+          len = p->u.array.count;
+          if (from + j >= len || to + j >= len) break;
           set_value(ctx, p->u.array.u.values + to + j,
                     LEPUS_DupValue(ctx, p->u.array.u.values[from + j]));
         }
       }
-      i += l;
+      i += j - 1;
     } else {
       fromPresent = JS_TryGetPropertyInt64(ctx, obj, from, &val);
       if (fromPresent < 0) goto exception;
