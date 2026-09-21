@@ -160,8 +160,6 @@ endif()
 
 if(ENABLE_VIRTUAL_STACK)
   add_definitions(-DENABLE_VIRTUAL_STACK=1)
-else()
-  add_definitions(-DENABLE_VIRTUAL_STACK=0)
 endif()
 
 if(WIN32)
