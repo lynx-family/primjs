@@ -32586,6 +32586,108 @@ QJS_STATIC uint32_t bc_get_flags(uint32_t flags, int *pidx, int n) {
   return val;
 }
 
+enum BytecodeIndexKind : uint8_t {
+  BC_INDEX_NONE,
+  BC_INDEX_IMPLICIT_LOCAL,
+  BC_INDEX_IMPLICIT_ARG,
+  BC_INDEX_IMPLICIT_CLOSURE,
+  BC_INDEX_U8_LOCAL,
+  BC_INDEX_U8_CPOOL,
+  BC_INDEX_U16_LOCAL,
+  BC_INDEX_U16_ARG,
+  BC_INDEX_U16_CLOSURE,
+  BC_INDEX_U32_CPOOL,
+  BC_INDEX_U16_AT_5_LOCAL,
+  BC_INDEX_U16_AT_5_ARG,
+  BC_INDEX_U16_AT_5_CLOSURE,
+};
+
+constexpr uint8_t BC_HAS_ATOM = 1 << 7;
+struct BytecodeValidationInfo {
+  uint8_t size;
+  uint8_t kind;
+};
+
+#define BC_INDEX_none(id) BC_INDEX_NONE
+#define BC_INDEX_none_int(id) BC_INDEX_NONE
+#define BC_INDEX_none_loc(id) BC_INDEX_IMPLICIT_LOCAL
+#define BC_INDEX_none_arg(id) BC_INDEX_IMPLICIT_ARG
+#define BC_INDEX_none_var_ref(id) BC_INDEX_IMPLICIT_CLOSURE
+#define BC_INDEX_u8(id) BC_INDEX_NONE
+#define BC_INDEX_i8(id) BC_INDEX_NONE
+#define BC_INDEX_loc8(id) BC_INDEX_U8_LOCAL
+#define BC_INDEX_const8(id) BC_INDEX_U8_CPOOL
+#define BC_INDEX_label8(id) BC_INDEX_NONE
+#define BC_INDEX_u16(id) BC_INDEX_NONE
+#define BC_INDEX_i16(id) BC_INDEX_NONE
+#define BC_INDEX_label16(id) BC_INDEX_NONE
+#define BC_INDEX_npop(id) BC_INDEX_NONE
+#define BC_INDEX_npopx(id) BC_INDEX_NONE
+#define BC_INDEX_loc(id) BC_INDEX_U16_LOCAL
+#define BC_INDEX_arg(id) BC_INDEX_U16_ARG
+#define BC_INDEX_var_ref(id) BC_INDEX_U16_CLOSURE
+#define BC_INDEX_u32(id) BC_INDEX_NONE
+#define BC_INDEX_i32(id) BC_INDEX_NONE
+#define BC_INDEX_const(id) BC_INDEX_U32_CPOOL
+#define BC_INDEX_label(id) BC_INDEX_NONE
+#define BC_INDEX_atom(id) (BC_INDEX_NONE | BC_HAS_ATOM)
+#define BC_INDEX_atom_u8(id) (BC_INDEX_NONE | BC_HAS_ATOM)
+#define BC_INDEX_atom_u16(id)                                    \
+  ((OP_##id == OP_make_loc_ref       ? BC_INDEX_U16_AT_5_LOCAL   \
+    : OP_##id == OP_make_arg_ref     ? BC_INDEX_U16_AT_5_ARG     \
+    : OP_##id == OP_make_var_ref_ref ? BC_INDEX_U16_AT_5_CLOSURE \
+                                     : BC_INDEX_NONE) |          \
+   BC_HAS_ATOM)
+#define BC_INDEX_atom_label_u8(id) (BC_INDEX_NONE | BC_HAS_ATOM)
+#define BC_INDEX_atom_label_u16(id) (BC_INDEX_NONE | BC_HAS_ATOM)
+#define BC_INDEX_label_u16(id) BC_INDEX_NONE
+#define BC_INDEX_u64(id) BC_INDEX_NONE
+
+static constexpr BytecodeValidationInfo bytecode_validation_info[OP_COUNT] = {
+#define FMT(f)
+#define DEF(id, size, n_pop, n_push, f) {size, BC_INDEX_##f(id)},
+#define def(id, size, n_pop, n_push, f)
+#define DEF_NON_SHIPPABLE(id, size, n_pop, n_push, f) \
+  DEF(id, size, n_pop, n_push, f)
+#include "quickjs/include/quickjs-opcode.h"
+#undef DEF_NON_SHIPPABLE
+#undef def
+#undef DEF
+#undef FMT
+};
+static_assert(countof(bytecode_validation_info) == OP_COUNT,
+              "bytecode validation metadata must cover every opcode");
+
+#undef BC_INDEX_none
+#undef BC_INDEX_none_int
+#undef BC_INDEX_none_loc
+#undef BC_INDEX_none_arg
+#undef BC_INDEX_none_var_ref
+#undef BC_INDEX_u8
+#undef BC_INDEX_i8
+#undef BC_INDEX_loc8
+#undef BC_INDEX_const8
+#undef BC_INDEX_label8
+#undef BC_INDEX_u16
+#undef BC_INDEX_i16
+#undef BC_INDEX_label16
+#undef BC_INDEX_npop
+#undef BC_INDEX_npopx
+#undef BC_INDEX_loc
+#undef BC_INDEX_arg
+#undef BC_INDEX_var_ref
+#undef BC_INDEX_u32
+#undef BC_INDEX_i32
+#undef BC_INDEX_const
+#undef BC_INDEX_label
+#undef BC_INDEX_atom
+#undef BC_INDEX_atom_u8
+#undef BC_INDEX_atom_u16
+#undef BC_INDEX_atom_label_u8
+#undef BC_INDEX_atom_label_u16
+#undef BC_INDEX_label_u16
+#undef BC_INDEX_u64
+
 QJS_STATIC int JS_ReadFunctionBytecode(LEPUSContext *ctx, BCReaderState *s,
                                        LEPUSFunctionBytecode *&b,
                                        int byte_code_offset, uint32_t bc_len) {
@@ -32605,89 +32707,87 @@ QJS_STATIC int JS_ReadFunctionBytecode(LEPUSContext *ctx, BCReaderState *s,
   }
   b->byte_code_buf = bc_buf;
 
+  const uint32_t var_count = b->var_count;
+  const uint32_t arg_count = b->arg_count;
+  const uint32_t closure_var_count = b->closure_var_count;
+  const uint32_t cpool_count = b->cpool_count;
   pos = 0;
   while (pos < bc_len) {
     op = bc_buf[pos];
-    if (op == OP_invalid || op >= OP_COUNT) {
+    if (unlikely(op == OP_invalid || op >= OP_COUNT)) {
       b->byte_code_len = pos;
       LEPUS_ThrowSyntaxError(ctx, "invalid opcode (op=%u pc=%d)", op, pos);
       return s->error_state = -1;
     }
-    const JSOpCode *oi = &short_opcode_info(op);
-    len = oi->size;
-    if (len == 0 || static_cast<uint32_t>(len) > bc_len - pos) {
+    const BytecodeValidationInfo &validation_info =
+        bytecode_validation_info[op];
+    len = validation_info.size;
+    if (unlikely(len == 0 || static_cast<uint32_t>(len) > bc_len - pos)) {
       b->byte_code_len = pos;
       return bc_read_error_end(s);
     }
-    switch (oi->fmt) {
-      case OP_FMT_none_loc:
-        idx = (op - OP_get_loc0) % 4;
-        if (idx >= b->var_count) goto invalid_index;
-        break;
-      case OP_FMT_loc8:
-        idx = get_u8(bc_buf + pos + 1);
-        if (idx >= b->var_count) goto invalid_index;
-        break;
-      case OP_FMT_loc:
-        idx = get_u16(bc_buf + pos + 1);
-        if (idx >= b->var_count) goto invalid_index;
-        break;
-      case OP_FMT_none_arg:
-        idx = (op - OP_get_arg0) % 4;
-        if (idx >= b->arg_count) goto invalid_index;
-        break;
-      case OP_FMT_arg:
-        idx = get_u16(bc_buf + pos + 1);
-        if (idx >= b->arg_count) goto invalid_index;
-        break;
-      case OP_FMT_none_var_ref:
-        idx = (op - OP_get_var_ref0) % 4;
-        if (idx >= b->closure_var_count) goto invalid_index;
-        break;
-      case OP_FMT_var_ref:
-        idx = get_u16(bc_buf + pos + 1);
-        if (idx >= b->closure_var_count) goto invalid_index;
-        break;
-      case OP_FMT_const8:
-        idx = get_u8(bc_buf + pos + 1);
-        if (idx >= b->cpool_count) goto invalid_index;
-        break;
-      case OP_FMT_const:
-        idx = get_u32(bc_buf + pos + 1);
-        if (idx >= b->cpool_count) goto invalid_index;
-        break;
-      case OP_FMT_atom_u16:
-        idx = get_u16(bc_buf + pos + 5);
-        switch (op) {
-          case OP_make_loc_ref:
-            if (idx >= b->var_count) goto invalid_index;
-            break;
-          case OP_make_arg_ref:
-            if (idx >= b->arg_count) goto invalid_index;
-            break;
-          case OP_make_var_ref_ref:
-            if (idx >= b->closure_var_count) goto invalid_index;
-            break;
-          default:
-            break;
-        }
-        break;
-      default:
-        break;
-    }
+    const uint8_t validation = validation_info.kind;
+    if (unlikely(validation != BC_INDEX_NONE)) {
+      switch (validation & ~BC_HAS_ATOM) {
+        case BC_INDEX_IMPLICIT_LOCAL:
+          idx = (op - OP_get_loc0) % 4;
+          if (unlikely(idx >= var_count)) goto invalid_index;
+          break;
+        case BC_INDEX_U8_LOCAL:
+          idx = get_u8(bc_buf + pos + 1);
+          if (unlikely(idx >= var_count)) goto invalid_index;
+          break;
+        case BC_INDEX_U16_LOCAL:
+          idx = get_u16(bc_buf + pos + 1);
+          if (unlikely(idx >= var_count)) goto invalid_index;
+          break;
+        case BC_INDEX_IMPLICIT_ARG:
+          idx = (op - OP_get_arg0) % 4;
+          if (unlikely(idx >= arg_count)) goto invalid_index;
+          break;
+        case BC_INDEX_U16_ARG:
+          idx = get_u16(bc_buf + pos + 1);
+          if (unlikely(idx >= arg_count)) goto invalid_index;
+          break;
+        case BC_INDEX_IMPLICIT_CLOSURE:
+          idx = (op - OP_get_var_ref0) % 4;
+          if (unlikely(idx >= closure_var_count)) goto invalid_index;
+          break;
+        case BC_INDEX_U16_CLOSURE:
+          idx = get_u16(bc_buf + pos + 1);
+          if (unlikely(idx >= closure_var_count)) goto invalid_index;
+          break;
+        case BC_INDEX_U8_CPOOL:
+          idx = get_u8(bc_buf + pos + 1);
+          if (unlikely(idx >= cpool_count)) goto invalid_index;
+          break;
+        case BC_INDEX_U32_CPOOL:
+          idx = get_u32(bc_buf + pos + 1);
+          if (unlikely(idx >= cpool_count)) goto invalid_index;
+          break;
+        case BC_INDEX_U16_AT_5_LOCAL:
+          idx = get_u16(bc_buf + pos + 5);
+          if (unlikely(idx >= var_count)) goto invalid_index;
+          break;
+        case BC_INDEX_U16_AT_5_ARG:
+          idx = get_u16(bc_buf + pos + 5);
+          if (unlikely(idx >= arg_count)) goto invalid_index;
+          break;
+        case BC_INDEX_U16_AT_5_CLOSURE:
+          idx = get_u16(bc_buf + pos + 5);
+          if (unlikely(idx >= closure_var_count)) goto invalid_index;
+          break;
+        default:
+          break;
+      }
 
-    switch (oi->fmt) {
-      case OP_FMT_atom:
-      case OP_FMT_atom_u8:
-      case OP_FMT_atom_u16:
-      case OP_FMT_atom_label_u8:
-      case OP_FMT_atom_label_u16:
+      if (validation & BC_HAS_ATOM) {
         idx = get_u32(bc_buf + pos + 1);
         if (s->is_rom_data) {
           /* just increment the reference count of the atom */
           LEPUS_DupAtom(s->ctx, (JSAtom)idx);
         } else {
-          if (bc_idx_to_atom(s, &atom, idx)) {
+          if (unlikely(bc_idx_to_atom(s, &atom, idx))) {
             /* Note: the atoms will be freed up to this position */
             b->byte_code_len = pos;
             return -1;
@@ -32699,9 +32799,7 @@ QJS_STATIC int JS_ReadFunctionBytecode(LEPUSContext *ctx, BCReaderState *s,
           printf("\n");
 #endif
         }
-        break;
-      default:
-        break;
+      }
     }
     pos += len;
     continue;
