@@ -225,6 +225,8 @@ class GraphBuilder {
   }
   Node* LoadImpl(MachineType type, Node* object, Node* offset = nullptr);
   void StoreImpl(MachineType type, Node* object, Node* offset, Node* value);
+  void ReleaseStoreImpl(MachineType type, Node* object, Node* offset,
+                        Node* value);
   Node* Return(Node* value = nullptr);
   Node* Unreachable();
 
@@ -474,6 +476,9 @@ class GraphBuilder {
   }
   Node* TruncInt32ToInt8(Node* input) {
     return Convert(input, ConvertType::kTrunc, MachineType::kInt8);
+  }
+  Node* TruncInt32ToInt16(Node* input) {
+    return Convert(input, ConvertType::kTrunc, MachineType::kInt16);
   }
   Node* TruncInt64ToBool(Node* input) {
     return Convert(input, ConvertType::kTrunc, MachineType::kBool);

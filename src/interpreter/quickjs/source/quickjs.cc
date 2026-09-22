@@ -387,6 +387,10 @@ QJS_STATIC void js_generator_finalizer(LEPUSRuntime *rt, LEPUSValue obj);
 QJS_STATIC void js_generator_mark(LEPUSRuntime *rt, LEPUSValueConst val,
                                   LEPUS_MarkFunc *mark_func,
                                   uint64_t trace_tool = 0);
+QJS_STATIC void js_global_object_finalizer(LEPUSRuntime *rt, LEPUSValue val);
+QJS_STATIC void js_global_object_mark(LEPUSRuntime *rt, LEPUSValueConst val,
+                                      LEPUS_MarkFunc *mark_func,
+                                      uint64_t trace_tool = 0);
 QJS_STATIC void js_weakref_finalizer(LEPUSRuntime *rt, LEPUSValue val);
 QJS_STATIC void js_finalizationRegistry_finalizer(LEPUSRuntime *rt,
                                                   LEPUSValue val);
@@ -948,6 +952,13 @@ static JSClassShortDef const js_std_class_def[] = {
      js_generator_mark}, /* JS_CLASS_GENERATOR */
 };
 
+static int js_init_global_object_class(LEPUSRuntime *rt) {
+  LEPUSClassDef def = {};
+  def.finalizer = js_global_object_finalizer;
+  def.gc_mark = js_global_object_mark;
+  return JS_NewClass1(rt, JS_CLASS_GLOBAL_OBJECT, &def, JS_ATOM_Object);
+}
+
 int init_class_range(LEPUSRuntime *rt, JSClassShortDef const *tab, int start,
                      int count) {
   LEPUSClassDef cm_s, *cm = &cm_s;
@@ -970,13 +981,13 @@ int init_bigint_name(LEPUSRuntime *rt) {
 
   rt->class_array[JS_CLASS_BIG_INT].class_name =
       __JS_NewAtomInit(rt, bigint_class_name, sizeof(bigint_class_name) - 1,
-                       JS_ATOM_TYPE_STRING, TRUE);
+                       JS_ATOM_TYPE_STRING);
   rt->class_array[JS_CLASS_BIG_INT64_ARRAY].class_name = __JS_NewAtomInit(
       rt, bigint64_array_class_name, sizeof(bigint64_array_class_name) - 1,
-      JS_ATOM_TYPE_STRING, TRUE);
+      JS_ATOM_TYPE_STRING);
   rt->class_array[JS_CLASS_BIG_UINT64_ARRAY].class_name = __JS_NewAtomInit(
       rt, biguint64_array_class_name, sizeof(biguint64_array_class_name) - 1,
-      JS_ATOM_TYPE_STRING, TRUE);
+      JS_ATOM_TYPE_STRING);
   return 0;
 }
 
@@ -1093,6 +1104,7 @@ QJS_STATIC LEPUSRuntime *JS_NewRuntime_RC(const LEPUSMallocFunctions *mf,
   if (init_class_range(rt, js_std_class_def, JS_CLASS_OBJECT,
                        countof(js_std_class_def)) < 0)
     goto fail;
+  if (js_init_global_object_class(rt) < 0) goto fail;
   init_bigint_name(rt);
   rt->class_array[JS_CLASS_ARGUMENTS].exotic = &js_arguments_exotic_methods;
   rt->class_array[JS_CLASS_STRING].exotic = &js_string_exotic_methods;
@@ -1178,6 +1190,7 @@ void JS_ResetRuntimeForEffect(LEPUSRuntime *rt, const LEPUSMallocFunctions *mf,
   if (init_class_range(rt, js_std_class_def, JS_CLASS_OBJECT,
                        countof(js_std_class_def)) < 0)
     goto fail;
+  if (js_init_global_object_class(rt) < 0) goto fail;
   init_bigint_name(rt);
   rt->class_array[JS_CLASS_ARGUMENTS].exotic = &js_arguments_exotic_methods;
   rt->class_array[JS_CLASS_STRING].exotic = &js_string_exotic_methods;
@@ -1638,29 +1651,71 @@ QJS_STATIC inline JSAtomStruct *atom_set_free(uint32_t v) {
   return (JSAtomStruct *)(((uintptr_t)v << 1) | 1);
 }
 
+#ifdef ENABLE_LEPUSNG
+void js_string_set_cache(LEPUSContext *ctx, JSString *str, void *cache) {
+  if (!str->has_aux) {
+    if (!cache) return;
+    auto *aux = static_cast<JSStringAux *>(
+        lepus_malloc(ctx, sizeof(JSStringAux), ALLOC_TAG_WITHOUT_PTR));
+    if (unlikely(!aux)) return;
+    aux->meta = str->meta;
+    aux->cache = nullptr;
+    HeapObjStore(ctx, &str->aux, aux);
+    str->has_aux = 1;
+    if (ctx->gc_enable) set_alloc_tag(str, ALLOC_TAG_JSStringWithAux);
+  }
+
+  void *old_cache = str->aux->cache;
+  str->aux->cache = cache;
+  ctx->rt->js_callbacks_.free_str_cache(old_cache, cache);
+  if (!cache) {
+    JSStringAux *aux = str->aux;
+    JSStringMeta meta = aux->meta;
+    str->has_aux = 0;
+    str->meta = meta;
+    if (ctx->gc_enable) {
+      set_alloc_tag(str, ALLOC_TAG_JSString);
+    } else {
+      lepus_free_rt(ctx->rt, aux);
+    }
+  }
+}
+
+void *js_string_get_cache(const JSString *str) {
+  return str->has_aux ? str->aux->cache : nullptr;
+}
+
+void js_string_free_cache(LEPUSRuntime *rt, JSString *str) {
+  if (!str->has_aux) return;
+  JSStringAux *aux = str->aux;
+  JSStringMeta meta = aux->meta;
+  if (aux->cache && rt->js_callbacks_.free_str_cache) {
+    rt->js_callbacks_.free_str_cache(aux->cache, nullptr);
+  }
+  str->has_aux = 0;
+  str->meta = meta;
+  if (!rt->gc_enable) lepus_free_rt(rt, aux);
+}
+#endif
+
 /* Note: the string contents are uninitialized */
 QJS_STATIC JSString *js_alloc_string_rt(LEPUSRuntime *rt, int max_len,
-                                        int is_wide_char, BOOL is_const = 0) {
+                                        int is_wide_char) {
   JSString *str;
-  int alloc_tag = is_const ? ALLOC_TAG_JSConstString : ALLOC_TAG_JSString;
   str = static_cast<JSString *>(lepus_malloc_rt(
       rt, sizeof(JSString) + (max_len << is_wide_char) + 1 - is_wide_char,
-      alloc_tag));
+      ALLOC_TAG_JSString));
   if (unlikely(!str)) return NULL;
   str->header.ref_count = 1;
   str->is_wide_char = is_wide_char;
   str->len = max_len;
-  str->atom_type = 0;
-  str->hash = 0;      /* optional but costless */
-  str->hash_next = 0; /* optional */
+  str->has_aux = 0;
+  str->meta.atom_type = 0;
+  str->meta.hash = 0;      /* optional but costless */
+  str->meta.hash_next = 0; /* optional */
+  str->meta.ascii_state = JS_STRING_ASCII_UNKNOWN;
 #ifdef DUMP_LEAKS
   list_add_tail(&str->link, &rt->string_list);
-#endif
-
-#ifdef ENABLE_LEPUSNG
-  // <Primjs begin>
-  str->cache_ = NULL;
-  // <Primjs end>
 #endif
   return str;
 }
@@ -1678,7 +1733,7 @@ JSString *js_alloc_string(LEPUSContext *ctx, int max_len, int is_wide_char) {
 /* same as LEPUS_FreeValueRT() but faster */
 QJS_STATIC inline void js_free_string(LEPUSRuntime *rt, JSString *str) {
   if (--str->header.ref_count <= 0) {
-    if (str->atom_type) {
+    if (js_string_meta(str)->atom_type) {
       JS_FreeAtomStruct(rt, str);
     } else {
 #ifdef DUMP_LEAKS
@@ -1879,7 +1934,7 @@ void LEPUS_FreeRuntime(LEPUSRuntime *rt) {
           } else {
             write("    %6u %6u ", i, p->header.ref_count);
           }
-          switch (p->atom_type) {
+          switch (js_string_meta(p)->atom_type) {
             case JS_ATOM_TYPE_STRING:
               JS_DumpStringNoPrint(rt, p, dump_buf);
               break;
@@ -1889,7 +1944,7 @@ void LEPUS_FreeRuntime(LEPUSRuntime *rt) {
               write(")");
               break;
             case JS_ATOM_TYPE_SYMBOL:
-              if (p->hash == JS_ATOM_HASH_SYMBOL) {
+              if (js_string_meta(p)->hash == JS_ATOM_HASH_SYMBOL) {
                 write("Symbol(");
                 JS_DumpStringNoPrint(rt, p, dump_buf);
                 write(")");
@@ -2379,7 +2434,9 @@ void LEPUS_FreeContext(LEPUSContext *ctx) {
   LEPUS_FreeValue(ctx, ctx->function_ctor);
   LEPUS_FreeValue(ctx, ctx->function_proto);
 
+  js_free_shape_null(ctx->rt, ctx->object_shape);
   js_free_shape_null(ctx->rt, ctx->array_shape);
+  js_free_shape_null(ctx->rt, ctx->arguments_shape);
 
   for (size_t i = 0; i < kFunctionShapeSize; ++i) {
     js_free_shape_null(ctx->rt, ctx->function_shape[i]);
@@ -2661,7 +2718,7 @@ static __attribute__((unused)) void JS_DumpAtoms(LEPUSRuntime *rt) {
         p = rt->atom_array[h];
         printf(" ");
         JS_DumpString(rt, p);
-        h = p->hash_next;
+        h = js_string_meta(p)->hash_next;
       }
       printf("\n");
     }
@@ -2671,9 +2728,10 @@ static __attribute__((unused)) void JS_DumpAtoms(LEPUSRuntime *rt) {
   for (i = 0; i < rt->atom_size; i++) {
     p = rt->atom_array[i];
     if (!atom_is_free(p)) {
-      printf("  %d: { %d %08x ", i, p->atom_type, p->hash);
+      const JSStringMeta *meta = js_string_meta(p);
+      printf("  %d: { %d %08x ", i, meta->atom_type, meta->hash);
       if (!(p->len == 0 && p->is_wide_char != 0)) JS_DumpString(rt, p);
-      printf(" %d }\n", p->hash_next);
+      printf(" %d }\n", meta->hash_next);
     }
   }
   printf("}\n");
@@ -2694,10 +2752,10 @@ QJS_STATIC int JS_ResizeAtomHash(LEPUSRuntime *rt, int new_hash_size) {
     h = rt->atom_hash[i];
     while (h != 0) {
       p = rt->atom_array[h];
-      hash_next1 = p->hash_next;
+      hash_next1 = js_string_meta(p)->hash_next;
       /* add in new hash table */
-      j = p->hash & new_hash_mask;
-      p->hash_next = new_hash[j];
+      j = js_string_meta(p)->hash & new_hash_mask;
+      js_string_meta(p)->hash_next = new_hash[j];
       new_hash[j] = h;
       h = hash_next1;
     }
@@ -2732,9 +2790,9 @@ int JS_InitAtoms(LEPUSRuntime *rt) {
       atom_type = JS_ATOM_TYPE_STRING;
     len = strlen(p);
 #ifndef ROS_FORCE_GC
-    if (__JS_NewAtomInit_NOGC(rt, p, len, atom_type, 1) == JS_ATOM_NULL)
+    if (__JS_NewAtomInit_NOGC(rt, p, len, atom_type) == JS_ATOM_NULL)
 #else
-    if (__JS_NewAtomInit(rt, p, len, atom_type, 1) == JS_ATOM_NULL)
+    if (__JS_NewAtomInit(rt, p, len, atom_type) == JS_ATOM_NULL)
 #endif
       return -1;
     p = p + len + 1;
@@ -2743,19 +2801,22 @@ int JS_InitAtoms(LEPUSRuntime *rt) {
     for (uint32_t c = kFirstCachedSingleCharacter;
          c <= kLastCachedSingleCharacter; c++) {
       char ch = static_cast<char>(c);
-      /* __JS_NewAtomInit interns directly, so decimal characters stay
-         string atoms instead of becoming tagged integers. */
-      JSAtom atom = __JS_NewAtomInit(rt, &ch, 1, JS_ATOM_TYPE_STRING, false);
+      /* Keep decimal characters as string atoms instead of tagged integers. */
+      JSAtom atom = __JS_NewAtomInit(rt, &ch, 1, JS_ATOM_TYPE_STRING);
       if (atom == JS_ATOM_NULL) return -1;
       rt->single_character_string_table[c - kFirstCachedSingleCharacter] = atom;
     }
-    for (uint32_t n = kFirstCachedTwoDigitNumber;
-         n <= kLastCachedTwoDigitNumber; n++) {
-      char buf[2] = {static_cast<char>('0' + n / 10),
-                     static_cast<char>('0' + n % 10)};
-      JSAtom atom = __JS_NewAtomInit(rt, buf, 2, JS_ATOM_TYPE_STRING, false);
+    for (uint32_t value = 0; value < kCachedSmallIntegerStringCount; value++) {
+      if (value < 10) {
+        rt->small_integer_string_table[value] =
+            rt->single_character_string_table['0' + value];
+        continue;
+      }
+      char str[2] = {static_cast<char>('0' + value / 10),
+                     static_cast<char>('0' + value % 10)};
+      JSAtom atom = __JS_NewAtomInit(rt, str, sizeof(str), JS_ATOM_TYPE_STRING);
       if (atom == JS_ATOM_NULL) return -1;
-      rt->two_digit_number_string_table[n - kFirstCachedTwoDigitNumber] = atom;
+      rt->small_integer_string_table[value] = atom;
     }
   }
   return 0;
@@ -2790,13 +2851,13 @@ QJS_HIDE JSAtomKindEnum JS_AtomGetKind(LEPUSContext *ctx, JSAtom v) {
   rt = ctx->rt;
   if (__JS_AtomIsTaggedInt(v)) return JS_ATOM_KIND_STRING;
   p = rt->atom_array[v];
-  switch (p->atom_type) {
+  switch (js_string_meta(p)->atom_type) {
     case JS_ATOM_TYPE_STRING:
       return JS_ATOM_KIND_STRING;
     case JS_ATOM_TYPE_GLOBAL_SYMBOL:
       return JS_ATOM_KIND_SYMBOL;
     case JS_ATOM_TYPE_SYMBOL:
-      switch (p->hash) {
+      switch (js_string_meta(p)->hash) {
         case JS_ATOM_HASH_SYMBOL:
           return JS_ATOM_KIND_SYMBOL;
         case JS_ATOM_HASH_PRIVATE:
@@ -2814,15 +2875,15 @@ QJS_HIDE BOOL JS_AtomIsString(LEPUSContext *ctx, JSAtom v) {
 }
 
 JSAtom js_get_atom_index(LEPUSRuntime *rt, JSAtomStruct *p) {
-  uint32_t i = p->hash_next; /* atom_index */
-  if (p->atom_type != JS_ATOM_TYPE_SYMBOL) {
+  uint32_t i = js_string_meta(p)->hash_next; /* atom_index */
+  if (js_string_meta(p)->atom_type != JS_ATOM_TYPE_SYMBOL) {
     JSAtomStruct *p1;
 
-    i = rt->atom_hash[p->hash & (rt->atom_hash_size - 1)];
+    i = rt->atom_hash[js_string_meta(p)->hash & (rt->atom_hash_size - 1)];
     p1 = rt->atom_array[i];
     while (p1 != p) {
       assert(i != 0);
-      i = p1->hash_next;
+      i = js_string_meta(p1)->hash_next;
       p1 = rt->atom_array[i];
     }
   }
@@ -2844,7 +2905,7 @@ JSAtom __JS_NewAtom(LEPUSRuntime *rt, JSString *str, int atom_type) {
 #endif
   if (atom_type < JS_ATOM_TYPE_SYMBOL) {
     /* str is not NULL */
-    if (str->atom_type == atom_type) {
+    if (js_string_meta(str)->atom_type == atom_type) {
       /* str is the atom, return its index */
       i = js_get_atom_index(rt, str);
       /* reduce string refcount and increase atom's unless constant */
@@ -2859,7 +2920,8 @@ JSAtom __JS_NewAtom(LEPUSRuntime *rt, JSString *str, int atom_type) {
     i = rt->atom_hash[h1];
     while (i != 0) {
       p = rt->atom_array[i];
-      if (p->hash == h && p->atom_type == atom_type && p->len == len &&
+      JSStringMeta *meta = js_string_meta(p);
+      if (meta->hash == h && meta->atom_type == atom_type && p->len == len &&
           js_string_memcmp(p, str, len) == 0) {
 #ifdef ENABLE_COMPATIBLE_MM
         if (!rt->gc_enable && !__JS_AtomIsConst(i))
@@ -2869,7 +2931,7 @@ JSAtom __JS_NewAtom(LEPUSRuntime *rt, JSString *str, int atom_type) {
           p->header.ref_count++;
         goto done;
       }
-      i = p->hash_next;
+      i = meta->hash_next;
     }
   } else {
     h1 = 0; /* avoid warning */
@@ -2910,13 +2972,13 @@ JSAtom __JS_NewAtom(LEPUSRuntime *rt, JSString *str, int atom_type) {
     if (start == 0) {
       /* JS_ATOM_NULL entry */
       p = static_cast<JSAtomStruct *>(
-          lepus_mallocz_rt(rt, sizeof(JSAtomStruct), ALLOC_TAG_JSConstString));
+          lepus_mallocz_rt(rt, sizeof(JSAtomStruct), ALLOC_TAG_JSString));
       if (!p) {
         if (!rt->gc_enable) lepus_free_rt(rt, new_array);
         goto fail;
       }
       if (!rt->gc_enable) p->header.ref_count = 1; /* not refcounted */
-      p->atom_type = JS_ATOM_TYPE_SYMBOL;
+      js_string_meta(p)->atom_type = JS_ATOM_TYPE_SYMBOL;
 #ifdef DUMP_LEAKS
       list_add_tail(&p->link, &rt->string_list);
 #endif
@@ -2939,9 +3001,9 @@ JSAtom __JS_NewAtom(LEPUSRuntime *rt, JSString *str, int atom_type) {
   }
 
   if (str) {
-    if (str->atom_type == 0) {
+    if (js_string_meta(str)->atom_type == 0) {
       p = str;
-      p->atom_type = atom_type;
+      js_string_meta(p)->atom_type = atom_type;
     } else {
       p = static_cast<JSAtomStruct *>(
           lepus_mallocz_rt(rt,
@@ -2977,14 +3039,14 @@ JSAtom __JS_NewAtom(LEPUSRuntime *rt, JSString *str, int atom_type) {
   rt->atom_array[i] = p;
   WriteBarrierNoStore(rt, p);
 
-  p->hash = h;
-  p->hash_next = i; /* atom_index */
-  p->atom_type = atom_type;
+  js_string_meta(p)->hash = h;
+  js_string_meta(p)->hash_next = i; /* atom_index */
+  js_string_meta(p)->atom_type = atom_type;
 
   rt->atom_count++;
 
   if (atom_type != JS_ATOM_TYPE_SYMBOL) {
-    p->hash_next = rt->atom_hash[h1];
+    js_string_meta(p)->hash_next = rt->atom_hash[h1];
     rt->atom_hash[h1] = i;
     if (unlikely(rt->atom_count >= rt->atom_count_resize))
       JS_ResizeAtomHash(rt, rt->atom_hash_size * 2);
@@ -3001,10 +3063,10 @@ done:
 }
 
 JSAtom __attribute__((always_inline)) __attribute__((unused))
-__JS_NewAtomInit_NOGC(LEPUSRuntime *rt, const char *str, int len, int atom_type,
-                      int is_const) {
+__JS_NewAtomInit_NOGC(LEPUSRuntime *rt, const char *str, int len,
+                      int atom_type) {
   JSString *p;
-  p = js_alloc_string_rt(rt, len, 0, is_const);
+  p = js_alloc_string_rt(rt, len, 0);
   if (!p) return JS_ATOM_NULL;
   memcpy(p->u.str8, str, len);
   p->u.str8[len] = '\0';
@@ -3013,9 +3075,9 @@ __JS_NewAtomInit_NOGC(LEPUSRuntime *rt, const char *str, int len, int atom_type,
 }
 /* only works with zero terminated 8 bit strings */
 JSAtom __JS_NewAtomInit(LEPUSRuntime *rt, const char *str, int len,
-                        int atom_type, int is_const = 0) {
+                        int atom_type) {
   JSString *p;
-  p = js_alloc_string_rt(rt, len, 0, is_const);
+  p = js_alloc_string_rt(rt, len, 0);
   if (!p) return JS_ATOM_NULL;
   HandleScope func_scope(rt);
   func_scope.PushHandle(p, HANDLE_TYPE_DIR_HEAP_OBJ);
@@ -3035,14 +3097,80 @@ QJS_STATIC JSAtom __JS_FindAtom(LEPUSRuntime *rt, const char *str, size_t len,
   i = rt->atom_hash[h1];
   while (i != 0) {
     p = rt->atom_array[i];
-    if (p->hash == h && p->atom_type == JS_ATOM_TYPE_STRING && p->len == len &&
-        p->is_wide_char == 0 && memcmp(p->u.str8, str, len) == 0) {
+    JSStringMeta *meta = js_string_meta(p);
+    if (meta->hash == h && meta->atom_type == JS_ATOM_TYPE_STRING &&
+        p->len == len && p->is_wide_char == 0 &&
+        memcmp(p->u.str8, str, len) == 0) {
       if (!rt->gc_enable && !__JS_AtomIsConst(i)) p->header.ref_count++;
       return i;
     }
-    i = p->hash_next;
+    i = meta->hash_next;
   }
   return JS_ATOM_NULL;
+}
+
+QJS_STATIC inline uint16_t js_raw_string_get_char(const uint8_t *str,
+                                                  size_t index,
+                                                  BOOL is_wide_char) {
+  return is_wide_char ? get_u16(str + index * sizeof(uint16_t)) : str[index];
+}
+
+QJS_STATIC BOOL js_string_equals_raw(const JSString *atom, const uint8_t *str,
+                                     size_t len, BOOL is_wide_char) {
+  if (atom->is_wide_char == is_wide_char) {
+    return memcmp(atom->u.str8, str, len << is_wide_char) == 0;
+  }
+  for (size_t i = 0; i < len; i++) {
+    uint16_t atom_char =
+        atom->is_wide_char ? atom->u.str16[i] : atom->u.str8[i];
+    if (atom_char != js_raw_string_get_char(str, i, is_wide_char)) {
+      return FALSE;
+    }
+  }
+  return TRUE;
+}
+
+QJS_STATIC JSAtom __JS_FindRawAtom(LEPUSRuntime *rt, const uint8_t *str,
+                                   size_t len, BOOL is_wide_char,
+                                   int atom_type) {
+  uint32_t h = atom_type;
+  if (is_wide_char) {
+    for (size_t i = 0; i < len; i++) {
+      h = h * 263 + js_raw_string_get_char(str, i, TRUE);
+    }
+  } else {
+    h = hash_string8(str, len, h);
+  }
+  h &= JS_ATOM_HASH_MASK;
+  uint32_t h1 = h & (rt->atom_hash_size - 1);
+  uint32_t atom = rt->atom_hash[h1];
+  while (atom != 0) {
+    JSAtomStruct *p = rt->atom_array[atom];
+    JSStringMeta *meta = js_string_meta(p);
+    if (meta->hash == h && meta->atom_type == atom_type && p->len == len &&
+        js_string_equals_raw(p, str, len, is_wide_char)) {
+      if (!rt->gc_enable && !__JS_AtomIsConst(atom)) p->header.ref_count++;
+      return atom;
+    }
+    atom = meta->hash_next;
+  }
+  return JS_ATOM_NULL;
+}
+
+QJS_STATIC JSAtom JS_NewAtomRawString(LEPUSContext *ctx, const uint8_t *str,
+                                      size_t len, BOOL is_wide_char) {
+  if (len == 0 || !is_num(js_raw_string_get_char(str, 0, is_wide_char))) {
+    JSAtom atom =
+        __JS_FindRawAtom(ctx->rt, str, len, is_wide_char, JS_ATOM_TYPE_STRING);
+    if (atom != JS_ATOM_NULL) return atom;
+  }
+
+  JSString *p = js_alloc_string(ctx, static_cast<int>(len), is_wide_char);
+  if (!p) return JS_ATOM_NULL;
+  size_t size = len << is_wide_char;
+  memcpy(p->u.str8, str, size);
+  if (!is_wide_char) p->u.str8[len] = '\0';
+  return JS_NewAtomStr(ctx, p);
 }
 
 QJS_STATIC void JS_FreeAtomStruct(LEPUSRuntime *rt, JSAtomStruct *p) {
@@ -3052,24 +3180,24 @@ QJS_STATIC void JS_FreeAtomStruct(LEPUSRuntime *rt, JSAtomStruct *p) {
         return;
     }
 #endif
-  uint32_t i = p->hash_next; /* atom_index */
-  if (p->atom_type != JS_ATOM_TYPE_SYMBOL) {
+  uint32_t i = js_string_meta(p)->hash_next; /* atom_index */
+  if (js_string_meta(p)->atom_type != JS_ATOM_TYPE_SYMBOL) {
     JSAtomStruct *p0, *p1;
     uint32_t h0;
 
-    h0 = p->hash & (rt->atom_hash_size - 1);
+    h0 = js_string_meta(p)->hash & (rt->atom_hash_size - 1);
     i = rt->atom_hash[h0];
     p1 = rt->atom_array[i];
     if (p1 == p) {
-      rt->atom_hash[h0] = p1->hash_next;
+      rt->atom_hash[h0] = js_string_meta(p1)->hash_next;
     } else {
       for (;;) {
         assert(i != 0);
         p0 = p1;
-        i = p1->hash_next;
+        i = js_string_meta(p1)->hash_next;
         p1 = rt->atom_array[i];
         if (p1 == p) {
-          p0->hash_next = p1->hash_next;
+          js_string_meta(p0)->hash_next = js_string_meta(p1)->hash_next;
           break;
         }
       }
@@ -3250,7 +3378,7 @@ LEPUSValue __JS_AtomToValue(LEPUSContext *ctx, JSAtom atom, BOOL force_string) {
     JSAtomStruct *p;
     assert(atom < rt->atom_size);
     p = rt->atom_array[atom];
-    if (p->atom_type == JS_ATOM_TYPE_STRING) {
+    if (js_string_meta(p)->atom_type == JS_ATOM_TYPE_STRING) {
       goto ret_string;
     } else if (force_string) {
       if (p->len == 0 && p->is_wide_char != 0) {
@@ -3292,8 +3420,8 @@ BOOL JS_AtomIsArrayIndex(LEPUSContext *ctx, uint32_t *pval, JSAtom atom) {
 
     assert(atom < rt->atom_size);
     p = rt->atom_array[atom];
-    if (p->atom_type == JS_ATOM_TYPE_STRING && is_num_string(&val, p) &&
-        val != -1) {
+    if (js_string_meta(p)->atom_type == JS_ATOM_TYPE_STRING &&
+        is_num_string(&val, p) && val != -1) {
       *pval = val;
       return TRUE;
     } else {
@@ -3317,7 +3445,8 @@ QJS_STATIC LEPUSValue JS_AtomIsNumericIndex1(LEPUSContext *ctx, JSAtom atom) {
     return LEPUS_NewInt32(ctx, __JS_AtomToUInt32(atom));
   assert(atom < rt->atom_size);
   p1 = rt->atom_array[atom];
-  if (p1->atom_type != JS_ATOM_TYPE_STRING) return LEPUS_UNDEFINED;
+  if (js_string_meta(p1)->atom_type != JS_ATOM_TYPE_STRING)
+    return LEPUS_UNDEFINED;
   p = p1;
   len = p->len;
   if (p->is_wide_char) {
@@ -3408,9 +3537,9 @@ QJS_STATIC BOOL JS_AtomSymbolHasDescription(LEPUSContext *ctx, JSAtom v) {
   rt = ctx->rt;
   if (__JS_AtomIsTaggedInt(v)) return FALSE;
   p = rt->atom_array[v];
-  return (((p->atom_type == JS_ATOM_TYPE_SYMBOL &&
-            p->hash == JS_ATOM_HASH_SYMBOL) ||
-           p->atom_type == JS_ATOM_TYPE_GLOBAL_SYMBOL) &&
+  return (((js_string_meta(p)->atom_type == JS_ATOM_TYPE_SYMBOL &&
+            js_string_meta(p)->hash == JS_ATOM_HASH_SYMBOL) ||
+           js_string_meta(p)->atom_type == JS_ATOM_TYPE_GLOBAL_SYMBOL) &&
           !(p->len == 0 && p->is_wide_char != 0));
 }
 
@@ -3512,7 +3641,9 @@ fail:
 QJS_STATIC JSAtom js_atom_concat_num(LEPUSContext *ctx, JSAtom name,
                                      uint32_t n) {
   char buf[16];
-  snprintf(buf, sizeof(buf), "%u", n);
+  size_t len;
+  len = u32toa(buf, n);
+  buf[len] = '\0';
   return js_atom_concat_str(ctx, name, buf);
 }
 #endif
@@ -3605,20 +3736,26 @@ int LEPUS_NewClass(LEPUSRuntime *rt, LEPUSClassID class_id,
   return ret;
 }
 
+inline LEPUSValue js_new_string8(LEPUSContext *ctx, const uint8_t *buf,
+                                 int32_t len) {
+  return js_new_string8_len(ctx, reinterpret_cast<const char *>(buf), len);
+}
+
+inline LEPUSValue js_new_string8(LEPUSContext *ctx, const char *buf,
+                                 int32_t len) {
+  return js_new_string8_len(ctx, buf, len);
+}
+
 LEPUSValue js_new_string8_len(LEPUSContext *ctx, const char *buf, int32_t len) {
   JSString *str;
 
   if (len <= 0) {
     return LEPUS_AtomToString(ctx, JS_ATOM_empty_string);
   }
-  if (ctx->gc_enable) {
-    const auto *chars = reinterpret_cast<const uint8_t *>(buf);
-    if (len == 1 && IsCachedSingleCharacter(chars[0])) {
-      return GetSingleCharacterString_GC_Impl(ctx->rt, chars[0]);
-    }
-    if (len == 2 && IsCachedTwoDigitNumber(chars[0], chars[1])) {
-      return GetTwoDigitNumberString_GC_Impl(ctx->rt, chars[0], chars[1]);
-    }
+  if (len == 1 && ctx->rt->gc_enable &&
+      IsCachedSingleCharacter(static_cast<uint8_t>(buf[0]))) {
+    return GetSingleCharacterString_GC_Impl(ctx->rt,
+                                            static_cast<uint8_t>(buf[0]));
   }
   str = js_alloc_string(ctx, len, 0);
   if (!str) return LEPUS_EXCEPTION;
@@ -3956,6 +4093,13 @@ QJS_STATIC LEPUSValue string_buffer_end(StringBuffer *s) {
     s->str = NULL;
     return LEPUS_AtomToString(s->ctx, JS_ATOM_empty_string);
   }
+  if (s->ctx->gc_enable && s->len == 1) {
+    uint32_t c = s->is_wide_char ? str->u.str16[0] : str->u.str8[0];
+    if (IsCachedSingleCharacter(c)) {
+      s->str = NULL;
+      return GetSingleCharacterString_GC_Impl(s->ctx->rt, c);
+    }
+  }
   if (s->len < s->size) {
     /* smaller size so lepus_realloc should not fail, but OK if it does */
     /* XXX: should add some slack to avoid unnecessary calls */
@@ -3996,7 +4140,12 @@ LEPUSValue LEPUS_NewStringLen(LEPUSContext *ctx, const char *buf,
     return LEPUS_ThrowInternalError(ctx, "string too long");
   if (p == p_end) {
     /* ASCII string */
-    return js_new_string8(ctx, (const uint8_t *)buf, buf_len);
+    LEPUSValue val = js_new_string8(ctx, (const uint8_t *)buf, buf_len);
+    if (!LEPUS_IsException(val)) {
+      js_string_meta(LEPUS_VALUE_GET_STRING(val))->ascii_state =
+          JS_STRING_ASCII_YES;
+    }
+    return val;
   } else {
     if (string_buffer_init(ctx, b, buf_len)) goto fail;
     string_buffer_write8(b, p_start, len1);
@@ -4103,6 +4252,11 @@ static const char *JS_ToCStringLen2_RC(LEPUSContext *ctx, size_t *plen,
     const uint8_t *src = str->u.str8;
     int count;
 
+    if (likely(js_string_meta(str)->ascii_state == JS_STRING_ASCII_YES)) {
+      if (plen) *plen = len;
+      return (const char *)src;
+    }
+
     /* count the number of non-ASCII characters */
     /* Scanning the whole string is required for ASCII strings,
        and computing the number of non-ASCII bytes is less expensive
@@ -4114,9 +4268,11 @@ static const char *JS_ToCStringLen2_RC(LEPUSContext *ctx, size_t *plen,
       count += src[pos] >> 7;
     }
     if (count == 0) {
+      js_string_meta(str)->ascii_state = JS_STRING_ASCII_YES;
       if (plen) *plen = len;
       return (const char *)src;
     }
+    js_string_meta(str)->ascii_state = JS_STRING_ASCII_NO;
     str_new = js_alloc_string(ctx, len + count, 0);
     if (!str_new) goto fail;
     q = str_new->u.str8;
@@ -4317,6 +4473,14 @@ LEPUSValue JS_ConcatStringOriginal(LEPUSContext *ctx, LEPUSValue op1,
       memcpy(p1->u.str8 + p1->len, p2->u.str8, p2->len);
       p1->len += p2->len;
       p1->u.str8[p1->len] = '\0';
+      if (js_string_meta(p1)->ascii_state != JS_STRING_ASCII_NO) {
+        if (js_string_meta(p2)->ascii_state == JS_STRING_ASCII_NO) {
+          js_string_meta(p1)->ascii_state = JS_STRING_ASCII_NO;
+        } else if (js_string_meta(p1)->ascii_state != JS_STRING_ASCII_YES ||
+                   js_string_meta(p2)->ascii_state != JS_STRING_ASCII_YES) {
+          js_string_meta(p1)->ascii_state = JS_STRING_ASCII_UNKNOWN;
+        }
+      }
     }
   ret_op1:
     LEPUS_FreeValue(ctx, op2);
@@ -4403,7 +4567,6 @@ QJS_STATIC LEPUSValue JS_ConcatSeparableString(LEPUSContext *ctx,
   separable_string->depth = depth;
   separable_string->left_op = op1;
   separable_string->right_op = op2;
-  separable_string->flat_content = LEPUS_UNDEFINED;
   return LEPUS_MKPTR(LEPUS_TAG_SEPARABLE_STRING, separable_string);
 }
 
@@ -4420,7 +4583,7 @@ void JS_FreeSeparableString(LEPUSRuntime *rt, LEPUSValue val) {
   while (cur || !stack.Empty()) {
     while (cur) {
       if (--cur->header.ref_count == 0) {
-        if (LEPUS_IsUndefined(cur->flat_content)) {
+        if (!JS_IsSeparableStringFlat(cur)) {
           stack.Push(cur);
           if (JS_IsSeparableString(cur->left_op)) {
             cur = JS_GetSeparableString(cur->left_op);
@@ -4428,7 +4591,7 @@ void JS_FreeSeparableString(LEPUSRuntime *rt, LEPUSValue val) {
           }
           LEPUS_FreeValueRT(rt, cur->left_op);
         } else {
-          LEPUS_FreeValueRT(rt, cur->flat_content);
+          LEPUS_FreeValueRT(rt, JS_GetSeparableStringFlatContent(cur));
           lepus_free_rt(rt, cur);
         }
       }
@@ -4456,8 +4619,8 @@ LEPUSValue JS_GetSeparableStringContentNotDup(LEPUSContext *ctx,
   assert(JS_IsSeparableString(val));
   auto *separable_string = JS_GetSeparableString(val);
 
-  if (LEPUS_VALUE_IS_STRING(separable_string->flat_content)) {
-    return separable_string->flat_content;
+  if (JS_IsSeparableStringFlat(separable_string)) {
+    return JS_GetSeparableStringFlatContent(separable_string);
   }
 
   StringBuffer b_s, *b = &b_s;
@@ -4468,7 +4631,7 @@ LEPUSValue JS_GetSeparableStringContentNotDup(LEPUSContext *ctx,
   auto *cur = separable_string;
   while (cur || !stack.Empty()) {
     while (cur) {
-      if (LEPUS_IsUndefined(cur->flat_content)) {
+      if (!JS_IsSeparableStringFlat(cur)) {
         stack.Push(cur);
         if (JS_IsSeparableString(cur->left_op)) {
           cur = JS_GetSeparableString(cur->left_op);
@@ -4477,7 +4640,7 @@ LEPUSValue JS_GetSeparableStringContentNotDup(LEPUSContext *ctx,
           string_buffer_concat_value(b, cur->left_op);
         }
       } else {
-        string_buffer_concat_value(b, cur->flat_content);
+        string_buffer_concat_value(b, JS_GetSeparableStringFlatContent(cur));
       }
       cur = nullptr;
     }
@@ -4493,12 +4656,12 @@ LEPUSValue JS_GetSeparableStringContentNotDup(LEPUSContext *ctx,
       }
     }
   }
-  separable_string->flat_content = string_buffer_end(b);
+  LEPUSValue flat_content = string_buffer_end(b);
   LEPUS_FreeValue(ctx, separable_string->left_op);
   LEPUS_FreeValue(ctx, separable_string->right_op);
-  separable_string->left_op = LEPUS_NULL;
+  separable_string->left_op = flat_content;
   separable_string->right_op = LEPUS_NULL;
-  return separable_string->flat_content;
+  return JS_GetSeparableStringFlatContent(separable_string);
 }
 
 LEPUSValue JS_GetSeparableStringContent(LEPUSContext *ctx, LEPUSValue val) {
@@ -4907,13 +5070,13 @@ QJS_HIDE LEPUSValue JS_NewObjectFromShape(LEPUSContext *ctx, JSShape *sh,
   p->header.ref_count = 1;
   p->gc_header.mark = 0;
   p->class_id = class_id;
+  p->is_std_array_prototype = 0;
+  p->is_std_object_prototype = 0;
   p->extensible = TRUE;
   p->free_mark = 0;
   p->is_exotic = 0;
   p->fast_array = 0;
   p->is_constructor = 0;
-  p->is_uncatchable_error = 0;
-  p->is_class = 0;
   p->tmp_mark = 0;
   p->first_weak_ref = NULL;
   p->u.opaque = NULL;
@@ -4981,6 +5144,9 @@ QJS_HIDE LEPUSValue JS_NewObjectFromShape(LEPUSContext *ctx, JSShape *sh,
       p->u.regexp.pattern = NULL;
       p->u.regexp.bytecode = NULL;
       goto set_exotic;
+    case JS_CLASS_GLOBAL_OBJECT:
+      p->u.global_object.uninitialized_vars = LEPUS_UNDEFINED;
+      break;
     default:
     set_exotic:
       if (ctx->rt->class_array[class_id].exotic) {
@@ -5660,7 +5826,7 @@ void __JS_FreeValueRT(LEPUSRuntime *rt, LEPUSValue v) {
   switch (tag) {
     case LEPUS_TAG_STRING: {
       JSString *p = LEPUS_VALUE_GET_STRING(v);
-      if (p->atom_type) {
+      if (js_string_meta(p)->atom_type) {
         JS_FreeAtomStruct(rt, p);
       } else {
 #ifdef DUMP_LEAKS
@@ -6331,13 +6497,17 @@ QJS_STATIC void gc_free_cycles(LEPUSRuntime *rt) {
 }
 
 QJS_STATIC void gc_detach_async_var_refs(LEPUSRuntime *rt) {
-  list_head *el, *var_el;
+  list_head *el;
   struct JSAsyncFunctionState *s;
   struct JSVarRef *var_ref;
   list_for_each(el, &rt->async_func_sf) {
     s = list_entry(el, JSAsyncFunctionState, link);
-    list_for_each(var_el, &s->frame.var_ref_list) {
-      var_ref = list_entry(var_el, JSVarRef, link);
+    LEPUSStackFrame *sf = &s->frame;
+    JSVarRef **var_refs = sf->var_refs;
+    if (!var_refs) continue;
+    for (uint32_t i = 0; i < sf->ref_size; i++) {
+      var_ref = var_refs[i];
+      if (!var_ref) continue;
       LEPUS_DupValueRT(rt, *var_ref->pvalue);
       var_ref->is_detached = 1;
     }
@@ -6346,15 +6516,17 @@ QJS_STATIC void gc_detach_async_var_refs(LEPUSRuntime *rt) {
 }
 
 QJS_STATIC void gc_reset_async_var_refs(LEPUSRuntime *rt) {
-  list_head *el, *var_el;
+  list_head *el;
   struct JSAsyncFunctionState *s;
   struct JSVarRef *var_ref;
-  int32_t var_idx, is_arg;
   list_for_each(el, &rt->async_func_sf) {
     s = list_entry(el, JSAsyncFunctionState, link);
     const auto &sf = s->frame;
-    list_for_each(var_el, &sf.var_ref_list) {
-      var_ref = list_entry(var_el, JSVarRef, link);
+    JSVarRef **var_refs = sf.var_refs;
+    if (!var_refs) continue;
+    for (uint32_t i = 0; i < sf.ref_size; i++) {
+      var_ref = var_refs[i];
+      if (!var_ref) continue;
       LEPUS_FreeValueRT(rt, *var_ref->pvalue);
       var_ref->is_detached = 0;
     }
@@ -6428,11 +6600,11 @@ typedef struct JSMemoryUsage_helper {
 void compute_value_size(LEPUSValueConst val, JSMemoryUsage_helper *hp);
 
 void compute_jsstring_size(JSString *str, JSMemoryUsage_helper *hp) {
-  if (!str->atom_type) { /* atoms are handled separately */
+  if (!js_string_meta(str)->atom_type) { /* atoms are handled separately */
     double s_ref_count = str->header.ref_count;
     hp->str_count += 1 / s_ref_count;
     hp->str_size += ((sizeof(*str) + (str->len << str->is_wide_char) + 1 -
-                      str->is_wide_char) /
+                      str->is_wide_char + js_string_aux_size(str)) /
                      s_ref_count);
   }
 }
@@ -6875,8 +7047,8 @@ void LEPUS_ComputeMemoryUsageInternal(LEPUSRuntime *rt, LEPUSMemoryUsage *s,
   for (i = 0; i < rt->atom_size; i++) {
     JSAtomStruct *p = rt->atom_array[i];
     if (!atom_is_free(p)) {
-      s->atom_size +=
-          (sizeof(*p) + (p->len << p->is_wide_char) + 1 - p->is_wide_char);
+      s->atom_size += (sizeof(*p) + (p->len << p->is_wide_char) + 1 -
+                       p->is_wide_char + js_string_aux_size(p));
     }
   }
   s->str_count = round(mem.str_count);
@@ -7867,6 +8039,14 @@ uint32_t GetLEPUSShapePropertyFlags(JSShapeProperty *prs) {
 #endif
 
 /* return the value associated to the autoinit property or an exception */
+static inline JSAutoInitFunc *js_autoinit_get_func(JSProperty *pr) {
+  return (JSAutoInitFunc *)pr->u.init.init_func;
+}
+
+static inline void set_js_autoinit_func(JSProperty *pr, JSAutoInitFunc *func) {
+  pr->u.init.init_func = (uintptr_t)func;
+}
+
 QJS_STATIC int JS_AutoInitProperty(LEPUSContext *ctx, LEPUSObject *p,
                                    JSAtom prop, JSProperty *pr,
                                    JSShapeProperty *prs) {
@@ -7874,13 +8054,25 @@ QJS_STATIC int JS_AutoInitProperty(LEPUSContext *ctx, LEPUSObject *p,
   JSAutoInitFunc *func;
 
   if (js_shape_prepare_update(ctx, p, &prs)) return -1;
-  func = pr->u.init.init_func;
+  func = js_autoinit_get_func(pr);
   /* 'func' shall not modify the object properties 'pr' */
   val = func(ctx, p, prop, pr->u.init.opaque);
   prs->flags &= ~LEPUS_PROP_TMASK;
   pr->u.value = LEPUS_UNDEFINED;
   if (LEPUS_IsException(val)) return -1;
-  pr->u.value = val;
+  if (unlikely(p->class_id == JS_CLASS_GLOBAL_OBJECT)) {
+    JSVarRef *var_ref = js_create_var_ref(ctx, FALSE);
+    if (!var_ref) {
+      LEPUS_FreeValue(ctx, val);
+      return -1;
+    }
+    prs->flags |= LEPUS_PROP_VARREF;
+    pr->u.var_ref = var_ref;
+    var_ref->value = val;
+    var_ref->is_const = !(prs->flags & LEPUS_PROP_WRITABLE);
+  } else {
+    pr->u.value = val;
+  }
   return 0;
 }
 
@@ -8894,6 +9086,28 @@ QJS_STATIC no_inline __exception int convert_fast_array_to_array(
   p->u.array.u.values = NULL; /* fail safe */
   p->u.array.u1.size = 0;
   p->fast_array = 0;
+  p->is_std_array_prototype = FALSE;
+  return 0;
+}
+
+QJS_STATIC int remove_global_object_property(LEPUSContext *ctx, LEPUSObject *p,
+                                             JSShapeProperty *prs,
+                                             JSProperty *pr,
+                                             LEPUSValue *detached_value) {
+  JSVarRef *var_ref = pr->u.var_ref;
+  if (var_ref->header.ref_count == 1) return 0;
+
+  LEPUSObject *detached =
+      LEPUS_VALUE_GET_OBJ(p->u.global_object.uninitialized_vars);
+  JSProperty *detached_pr = add_property(ctx, detached, prs->atom,
+                                         LEPUS_PROP_C_W_E | LEPUS_PROP_VARREF);
+  if (!detached_pr) return -1;
+  detached_pr->u.var_ref = var_ref;
+  var_ref->header.ref_count++;
+  *detached_value = var_ref->value;
+  var_ref->is_lexical = FALSE;
+  var_ref->is_const = FALSE;
+  var_ref->value = LEPUS_UNINITIALIZED;
   return 0;
 }
 
@@ -8929,12 +9143,18 @@ redo:
       }
       /* free the entry */
       pr1 = &p->prop[h - 1];
+      LEPUSValue detached_value = LEPUS_UNDEFINED;
+      if (unlikely(p->class_id == JS_CLASS_GLOBAL_OBJECT) &&
+          (pr->flags & LEPUS_PROP_TMASK) == LEPUS_PROP_VARREF &&
+          remove_global_object_property(ctx, p, pr, pr1, &detached_value))
+        return -1;
       free_property(ctx->rt, pr1, pr->flags);
       LEPUS_FreeAtom(ctx, pr->atom);
       /* put default values */
       pr->flags = 0;
       pr->atom = JS_ATOM_NULL;
       pr1->u.value = LEPUS_UNDEFINED;
+      LEPUS_FreeValue(ctx, detached_value);
       return TRUE;
     }
     lpr = pr;
@@ -8970,6 +9190,204 @@ redo:
   }
   /* not found */
   return TRUE;
+}
+
+/* Take a previously detached binding, or create a new stable cell. */
+QJS_STATIC JSVarRef *js_global_object_find_uninitialized_var(LEPUSContext *ctx,
+                                                             LEPUSObject *p,
+                                                             JSAtom atom,
+                                                             BOOL is_lexical) {
+  LEPUSObject *detached =
+      LEPUS_VALUE_GET_OBJ(p->u.global_object.uninitialized_vars);
+  JSProperty *pr;
+  JSShapeProperty *prs = find_own_property(&pr, detached, atom);
+  JSVarRef *var_ref;
+  if (prs) {
+    assert((prs->flags & LEPUS_PROP_TMASK) == LEPUS_PROP_VARREF);
+    var_ref = pr->u.var_ref;
+    var_ref->header.ref_count++;
+    if (delete_property(ctx, detached, atom) < 0) {
+      free_var_ref(ctx->rt, var_ref);
+      return NULL;
+    }
+    if (!is_lexical) {
+      LEPUS_FreeValue(ctx, var_ref->value);
+      var_ref->value = LEPUS_UNDEFINED;
+    }
+  } else {
+    var_ref = js_create_var_ref(ctx, is_lexical);
+  }
+  return var_ref;
+}
+
+QJS_STATIC JSVarRef *js_global_object_get_var_ref(LEPUSContext *ctx,
+                                                  LEPUSObject *p, JSAtom atom) {
+redo:
+  JSProperty *pr;
+  JSShapeProperty *prs = find_own_property(&pr, p, atom);
+  if (prs) {
+    if (unlikely((prs->flags & LEPUS_PROP_TMASK) == LEPUS_PROP_AUTOINIT)) {
+      if (JS_AutoInitProperty(ctx, p, atom, pr, prs)) return NULL;
+      goto redo;
+    }
+    if ((prs->flags & LEPUS_PROP_TMASK) == LEPUS_PROP_VARREF) {
+      pr->u.var_ref->header.ref_count++;
+      return pr->u.var_ref;
+    }
+    if ((prs->flags & LEPUS_PROP_TMASK) == 0 &&
+        !(prs->flags & LEPUS_PROP_LENGTH)) {
+      JSVarRef *var_ref = js_create_var_ref(ctx, FALSE);
+      if (!var_ref) return NULL;
+      var_ref->is_const = !(prs->flags & LEPUS_PROP_WRITABLE);
+      if (js_shape_prepare_update(ctx, p, &prs)) {
+        free_var_ref(ctx->rt, var_ref);
+        return NULL;
+      }
+      var_ref->value = pr->u.value;
+      prs->flags |= LEPUS_PROP_VARREF;
+      pr->u.var_ref = var_ref;
+      var_ref->header.ref_count++;
+      return var_ref;
+    }
+  }
+
+  LEPUSObject *detached =
+      LEPUS_VALUE_GET_OBJ(p->u.global_object.uninitialized_vars);
+  prs = find_own_property(&pr, detached, atom);
+  if (prs) {
+    assert((prs->flags & LEPUS_PROP_TMASK) == LEPUS_PROP_VARREF);
+    pr->u.var_ref->header.ref_count++;
+    return pr->u.var_ref;
+  }
+
+  JSVarRef *var_ref = js_create_var_ref(ctx, TRUE);
+  if (!var_ref) return NULL;
+  var_ref->is_lexical = FALSE;
+  pr = add_property(ctx, detached, atom, LEPUS_PROP_C_W_E | LEPUS_PROP_VARREF);
+  if (!pr) {
+    free_var_ref(ctx->rt, var_ref);
+    return NULL;
+  }
+  pr->u.var_ref = var_ref;
+  var_ref->header.ref_count++;
+  return var_ref;
+}
+
+QJS_STATIC JSVarRef *js_closure_global_var(LEPUSContext *ctx,
+                                           LEPUSClosureVar *cv) {
+  LEPUSObject *p = LEPUS_VALUE_GET_OBJ(ctx->global_var_obj);
+  JSProperty *pr;
+  JSShapeProperty *prs = find_own_property(&pr, p, cv->var_name);
+  if (prs) {
+    assert((prs->flags & LEPUS_PROP_TMASK) == LEPUS_PROP_VARREF);
+    pr->u.var_ref->header.ref_count++;
+    return pr->u.var_ref;
+  }
+  p = LEPUS_VALUE_GET_OBJ(ctx->global_obj);
+  prs = find_own_property(&pr, p, cv->var_name);
+  if (prs && (prs->flags & LEPUS_PROP_TMASK) == LEPUS_PROP_VARREF) {
+    pr->u.var_ref->header.ref_count++;
+    return pr->u.var_ref;
+  }
+  /* Preserve dynamic lookup semantics for unresolved globals, including
+     strict assignment and properties installed after compilation. */
+  return js_global_object_get_var_ref(ctx, p, cv->var_name);
+}
+
+QJS_STATIC JSVarRef *js_closure_define_global_var(LEPUSContext *ctx,
+                                                  LEPUSClosureVar *cv,
+                                                  BOOL configurable) {
+  if (cv->is_lexical) {
+    LEPUSObject *p = LEPUS_VALUE_GET_OBJ(ctx->global_var_obj);
+    int flags = LEPUS_PROP_ENUMERABLE | LEPUS_PROP_CONFIGURABLE;
+    if (!cv->is_const) flags |= LEPUS_PROP_WRITABLE;
+    JSProperty *pr;
+    JSShapeProperty *prs = find_own_property(&pr, p, cv->var_name);
+    if (prs) {
+      assert((prs->flags & LEPUS_PROP_TMASK) == LEPUS_PROP_VARREF);
+      pr->u.var_ref->header.ref_count++;
+      return pr->u.var_ref;
+    }
+    LEPUSObject *global = LEPUS_VALUE_GET_OBJ(ctx->global_obj);
+    prs = find_own_property(&pr, global, cv->var_name);
+    JSVarRef *var_ref;
+    if (prs && (prs->flags & LEPUS_PROP_TMASK) == LEPUS_PROP_VARREF) {
+      JSVarRef *global_ref = js_create_var_ref(ctx, FALSE);
+      if (!global_ref) return NULL;
+      var_ref = pr->u.var_ref;
+      global_ref->value = var_ref->value;
+      var_ref->value = LEPUS_UNINITIALIZED;
+      pr->u.var_ref = global_ref;
+    } else {
+      var_ref = js_global_object_find_uninitialized_var(ctx, global,
+                                                        cv->var_name, TRUE);
+    }
+    if (!var_ref) return NULL;
+    var_ref->is_lexical = TRUE;
+    var_ref->is_const = cv->is_const;
+    pr = add_property(ctx, p, cv->var_name, flags | LEPUS_PROP_VARREF);
+    if (!pr) {
+      free_var_ref(ctx->rt, var_ref);
+      return NULL;
+    }
+    pr->u.var_ref = var_ref;
+    var_ref->header.ref_count++;
+    return var_ref;
+  }
+
+  LEPUSObject *p = LEPUS_VALUE_GET_OBJ(ctx->global_obj);
+redo:
+  JSProperty *pr;
+  JSShapeProperty *prs = find_own_property(&pr, p, cv->var_name);
+  JSVarRef *var_ref;
+  int flags = LEPUS_PROP_ENUMERABLE | LEPUS_PROP_WRITABLE;
+  if (configurable) flags |= LEPUS_PROP_CONFIGURABLE;
+  if (prs) {
+    if (unlikely((prs->flags & LEPUS_PROP_TMASK) == LEPUS_PROP_AUTOINIT)) {
+      if (JS_AutoInitProperty(ctx, p, cv->var_name, pr, prs)) return NULL;
+      goto redo;
+    }
+    if ((prs->flags & LEPUS_PROP_TMASK) == LEPUS_PROP_VARREF) {
+      var_ref = pr->u.var_ref;
+      var_ref->header.ref_count++;
+    } else {
+      var_ref = js_global_object_get_var_ref(ctx, p, cv->var_name);
+      if (!var_ref) return NULL;
+    }
+    if (cv->var_kind == JS_VAR_GLOBAL_FUNCTION_DECL &&
+        (prs->flags & LEPUS_PROP_CONFIGURABLE)) {
+      if ((prs->flags & LEPUS_PROP_TMASK) == LEPUS_PROP_GETSET) {
+        free_property(ctx->rt, pr, prs->flags);
+        prs->flags = flags | LEPUS_PROP_VARREF;
+        pr->u.var_ref = var_ref;
+        var_ref->header.ref_count++;
+      } else {
+        prs->flags = (prs->flags & ~LEPUS_PROP_C_W_E) | flags;
+      }
+      var_ref->is_const = FALSE;
+    }
+    return var_ref;
+  }
+  if (!p->extensible) return js_global_object_get_var_ref(ctx, p, cv->var_name);
+  var_ref =
+      js_global_object_find_uninitialized_var(ctx, p, cv->var_name, FALSE);
+  if (!var_ref) return NULL;
+  pr = add_property(ctx, p, cv->var_name, flags | LEPUS_PROP_VARREF);
+  if (!pr) {
+    free_var_ref(ctx->rt, var_ref);
+    return NULL;
+  }
+  pr->u.var_ref = var_ref;
+  var_ref->header.ref_count++;
+  return var_ref;
+}
+
+QJS_HIDE JSVarRef *js_get_global_closure_ref_rc(LEPUSContext *ctx,
+                                                LEPUSClosureVar *cv,
+                                                BOOL configurable) {
+  if (cv->closure_type == JS_CLOSURE_GLOBAL_DECL)
+    return js_closure_define_global_var(ctx, cv, configurable);
+  return js_closure_global_var(ctx, cv);
 }
 
 QJS_STATIC int call_setter(LEPUSContext *ctx, LEPUSObject *setter,
@@ -9345,10 +9763,8 @@ retry:
     } else if ((prs->flags & LEPUS_PROP_TMASK) == LEPUS_PROP_GETSET) {
       return call_setter(ctx, pr->u.getset.setter, this_obj, val, flags);
     } else if ((prs->flags & LEPUS_PROP_TMASK) == LEPUS_PROP_VARREF) {
-      /* LEPUS_PROP_WRITABLE is always true for variable
-         references, but they are write protected in module name
-         spaces. */
-      if (p->class_id == JS_CLASS_MODULE_NS) goto read_only_prop;
+      if (p->class_id == JS_CLASS_MODULE_NS || pr->u.var_ref->is_const)
+        goto read_only_prop;
       set_value(ctx, pr->u.var_ref->pvalue, val);
       return TRUE;
     } else if ((prs->flags & LEPUS_PROP_TMASK) == LEPUS_PROP_AUTOINIT) {
@@ -9508,6 +9924,7 @@ retry:
       return ret;
     }
   }
+  if (unlikely(p->class_id == JS_CLASS_GLOBAL_OBJECT)) goto generic_create_prop;
   pr = add_property(ctx, p, prop, LEPUS_PROP_C_W_E);
   if (unlikely(!pr)) {
     LEPUS_FreeValue(ctx, val);
@@ -9686,6 +10103,8 @@ QJS_STATIC int JS_CreateProperty(LEPUSContext *ctx, LEPUSObject *p, JSAtom prop,
                                  LEPUSValueConst setter, int flags) {
   JSProperty *pr;
   int ret, prop_flags;
+  JSVarRef *var_ref = NULL;
+  LEPUSObject *delete_obj = NULL;
 
   /* add a new property or modify an existing exotic one */
   if (p->is_exotic) {
@@ -9763,9 +10182,29 @@ QJS_STATIC int JS_CreateProperty(LEPUSContext *ctx, LEPUSObject *p, JSAtom prop,
                  LEPUS_PROP_GETSET;
   } else {
     prop_flags = flags & LEPUS_PROP_C_W_E;
+    if (p->class_id == JS_CLASS_GLOBAL_OBJECT) {
+      LEPUSObject *detached =
+          LEPUS_VALUE_GET_OBJ(p->u.global_object.uninitialized_vars);
+      JSProperty *detached_pr;
+      JSShapeProperty *detached_prs =
+          find_own_property(&detached_pr, detached, prop);
+      if (detached_prs) {
+        delete_obj = detached;
+        var_ref = detached_pr->u.var_ref;
+        var_ref->header.ref_count++;
+      } else {
+        var_ref = js_create_var_ref(ctx, FALSE);
+        if (!var_ref) return -1;
+      }
+      var_ref->is_const = !(prop_flags & LEPUS_PROP_WRITABLE);
+      prop_flags |= LEPUS_PROP_VARREF;
+    }
   }
   pr = add_property(ctx, p, prop, prop_flags);
-  if (unlikely(!pr)) return -1;
+  if (unlikely(!pr)) {
+    if (var_ref) free_var_ref(ctx->rt, var_ref);
+    return -1;
+  }
   if (flags & (LEPUS_PROP_HAS_GET | LEPUS_PROP_HAS_SET)) {
     pr->u.getset.getter = NULL;
     if ((flags & LEPUS_PROP_HAS_GET) && LEPUS_IsFunction(ctx, getter)) {
@@ -9775,6 +10214,11 @@ QJS_STATIC int JS_CreateProperty(LEPUSContext *ctx, LEPUSObject *p, JSAtom prop,
     if ((flags & LEPUS_PROP_HAS_SET) && LEPUS_IsFunction(ctx, setter)) {
       pr->u.getset.setter = LEPUS_VALUE_GET_OBJ(LEPUS_DupValue(ctx, setter));
     }
+  } else if (p->class_id == JS_CLASS_GLOBAL_OBJECT) {
+    if (delete_obj) delete_property(ctx, delete_obj, prop);
+    pr->u.var_ref = var_ref;
+    var_ref->value = (flags & LEPUS_PROP_HAS_VALUE) ? LEPUS_DupValue(ctx, val)
+                                                    : LEPUS_UNDEFINED;
   } else {
     if (flags & LEPUS_PROP_HAS_VALUE) {
       pr->u.value = LEPUS_DupValue(ctx, val);
@@ -9950,6 +10394,9 @@ redo_prop_update:
           if (js_shape_prepare_update(ctx, p, &prs)) return -1;
           /* convert to getset */
           if ((prs->flags & LEPUS_PROP_TMASK) == LEPUS_PROP_VARREF) {
+            if (unlikely(p->class_id == JS_CLASS_GLOBAL_OBJECT) &&
+                remove_global_object_property(ctx, p, prs, pr, &cleanup.value))
+              return -1;
             cleanup.var_ref = pr->u.var_ref;
           } else {
             cleanup.value = pr->u.value;
@@ -9986,13 +10433,28 @@ redo_prop_update:
       } else {
         if ((prs->flags & LEPUS_PROP_TMASK) == LEPUS_PROP_GETSET) {
           /* convert to data descriptor */
-          if (js_shape_prepare_update(ctx, p, &prs)) return -1;
+          JSVarRef *var_ref = NULL;
+          if (unlikely(p->class_id == JS_CLASS_GLOBAL_OBJECT)) {
+            var_ref =
+                js_global_object_find_uninitialized_var(ctx, p, prop, FALSE);
+            if (!var_ref) return -1;
+          }
+          if (js_shape_prepare_update(ctx, p, &prs)) {
+            if (var_ref) free_var_ref(ctx->rt, var_ref);
+            return -1;
+          }
           if (pr->u.getset.getter)
             cleanup.getter = LEPUS_MKPTR(LEPUS_TAG_OBJECT, pr->u.getset.getter);
           if (pr->u.getset.setter)
             cleanup.setter = LEPUS_MKPTR(LEPUS_TAG_OBJECT, pr->u.getset.setter);
-          prs->flags &= ~(LEPUS_PROP_TMASK | LEPUS_PROP_WRITABLE);
-          pr->u.value = LEPUS_UNDEFINED;
+          if (var_ref) {
+            prs->flags = (prs->flags & ~LEPUS_PROP_TMASK) | LEPUS_PROP_VARREF |
+                         LEPUS_PROP_WRITABLE;
+            pr->u.var_ref = var_ref;
+          } else {
+            prs->flags &= ~(LEPUS_PROP_TMASK | LEPUS_PROP_WRITABLE);
+            pr->u.value = LEPUS_UNDEFINED;
+          }
         } else if ((prs->flags & LEPUS_PROP_TMASK) == LEPUS_PROP_VARREF) {
           /* Note: LEPUS_PROP_VARREF is always writable */
         } else {
@@ -10037,16 +10499,20 @@ redo_prop_update:
             cleanup.value = *pr->u.var_ref->pvalue;
             *pr->u.var_ref->pvalue = LEPUS_DupValue(ctx, val);
           }
-          /* if writable is set to false, no longer a
-             reference (for mapped arguments) */
-          if ((flags & (LEPUS_PROP_HAS_WRITABLE | LEPUS_PROP_WRITABLE)) ==
-              LEPUS_PROP_HAS_WRITABLE) {
+          if (flags & LEPUS_PROP_HAS_WRITABLE) {
             LEPUSValue val1;
-            if (js_shape_prepare_update(ctx, p, &prs)) return -1;
-            val1 = LEPUS_DupValue(ctx, *pr->u.var_ref->pvalue);
-            cleanup.var_ref = pr->u.var_ref;
-            pr->u.value = val1;
-            prs->flags &= ~(LEPUS_PROP_TMASK | LEPUS_PROP_WRITABLE);
+            if (p->class_id == JS_CLASS_GLOBAL_OBJECT) {
+              if (js_shape_prepare_update(ctx, p, &prs)) return -1;
+              pr->u.var_ref->is_const = !(flags & LEPUS_PROP_WRITABLE);
+              prs->flags = (prs->flags & ~LEPUS_PROP_WRITABLE) |
+                           (flags & LEPUS_PROP_WRITABLE);
+            } else if (!(flags & LEPUS_PROP_WRITABLE)) {
+              if (js_shape_prepare_update(ctx, p, &prs)) return -1;
+              val1 = LEPUS_DupValue(ctx, *pr->u.var_ref->pvalue);
+              cleanup.var_ref = pr->u.var_ref;
+              pr->u.value = val1;
+              prs->flags &= ~(LEPUS_PROP_TMASK | LEPUS_PROP_WRITABLE);
+            }
           }
         } else if ((prs->flags & LEPUS_PROP_TMASK) == LEPUS_PROP_AUTOINIT) {
           /* XXX: should never happen, type was reset above */
@@ -10188,7 +10654,7 @@ QJS_STATIC int JS_DefineAutoInitProperty(
   pr = add_property(ctx, p, prop,
                     (flags & LEPUS_PROP_C_W_E) | LEPUS_PROP_AUTOINIT);
   if (unlikely(!pr)) return -1;
-  pr->u.init.init_func = init_func;
+  set_js_autoinit_func(pr, init_func);
   pr->u.init.opaque = opaque;
   return TRUE;
 }
@@ -10399,26 +10865,33 @@ int JS_DefineGlobalVar(LEPUSContext *ctx, JSAtom prop, int def_flags) {
   LEPUSObject *p;
   JSShapeProperty *prs;
   JSProperty *pr;
-  LEPUSValue val;
+  JSVarRef *var_ref;
   int flags;
 
   if (def_flags & DEFINE_GLOBAL_LEX_VAR) {
     p = LEPUS_VALUE_GET_OBJ(ctx->global_var_obj);
     flags = LEPUS_PROP_ENUMERABLE | (def_flags & LEPUS_PROP_WRITABLE) |
             LEPUS_PROP_CONFIGURABLE;
-    val = LEPUS_UNINITIALIZED;
   } else {
     p = LEPUS_VALUE_GET_OBJ(ctx->global_obj);
     flags = LEPUS_PROP_ENUMERABLE | LEPUS_PROP_WRITABLE |
             (def_flags & LEPUS_PROP_CONFIGURABLE);
-    val = LEPUS_UNDEFINED;
   }
   prs = find_own_property1(p, prop);
   if (prs) return 0;
   if (!p->extensible) return 0;
-  pr = add_property(ctx, p, prop, flags);
-  if (unlikely(!pr)) return -1;
-  pr->u.value = val;
+  var_ref = js_global_object_find_uninitialized_var(
+      ctx, LEPUS_VALUE_GET_OBJ(ctx->global_obj), prop,
+      (def_flags & DEFINE_GLOBAL_LEX_VAR) != 0);
+  if (!var_ref) return -1;
+  var_ref->is_lexical = (def_flags & DEFINE_GLOBAL_LEX_VAR) != 0;
+  var_ref->is_const = var_ref->is_lexical && !(flags & LEPUS_PROP_WRITABLE);
+  pr = add_property(ctx, p, prop, flags | LEPUS_PROP_VARREF);
+  if (unlikely(!pr)) {
+    free_var_ref(ctx->rt, var_ref);
+    return -1;
+  }
+  pr->u.var_ref = var_ref;
   return 0;
 }
 
@@ -10496,10 +10969,12 @@ LEPUSValue JS_GetGlobalVarImpl(LEPUSContext *ctx, JSAtom prop,
   p = LEPUS_VALUE_GET_OBJ(ctx->global_var_obj);
   prs = find_own_property(&pr, p, prop);
   if (prs) {
-    /* XXX: should handle LEPUS_PROP_TMASK properties */
-    if (unlikely(LEPUS_IsUninitialized(pr->u.value)))
+    LEPUSValue val = ((prs->flags & LEPUS_PROP_TMASK) == LEPUS_PROP_VARREF)
+                         ? *pr->u.var_ref->pvalue
+                         : pr->u.value;
+    if (unlikely(LEPUS_IsUninitialized(val)))
       return JS_ThrowReferenceErrorUninitialized(ctx, prs->atom);
-    return LEPUS_DupValue(ctx, pr->u.value);
+    return LEPUS_DupValue(ctx, val);
   }
   return JS_GetPropertyInternalImpl(ctx, ctx->global_obj, prop, ctx->global_obj,
                                     throw_ref_error);
@@ -10518,7 +10993,10 @@ int JS_GetGlobalVarRef(LEPUSContext *ctx, JSAtom prop, LEPUSValue *sp) {
     /* XXX: should handle LEPUS_PROP_AUTOINIT properties? */
     /* XXX: conformance: do these tests in
        OP_put_var_ref/OP_get_var_ref ? */
-    if (unlikely(LEPUS_IsUninitialized(pr->u.value))) {
+    LEPUSValue *pvalue = ((prs->flags & LEPUS_PROP_TMASK) == LEPUS_PROP_VARREF)
+                             ? pr->u.var_ref->pvalue
+                             : &pr->u.value;
+    if (unlikely(LEPUS_IsUninitialized(*pvalue))) {
       JS_ThrowReferenceErrorUninitialized(ctx, prs->atom);
       return -1;
     }
@@ -10581,20 +11059,37 @@ static int JS_SetGlobalVar_RC(LEPUSContext *ctx, JSAtom prop, LEPUSValue val,
   if (prs) {
     /* XXX: should handle LEPUS_PROP_AUTOINIT properties? */
     if (flag != 1) {
-      if (unlikely(LEPUS_IsUninitialized(pr->u.value))) {
+      LEPUSValue *pvalue =
+          ((prs->flags & LEPUS_PROP_TMASK) == LEPUS_PROP_VARREF)
+              ? pr->u.var_ref->pvalue
+              : &pr->u.value;
+      if (unlikely(LEPUS_IsUninitialized(*pvalue))) {
         LEPUS_FreeValue(ctx, val);
         JS_ThrowReferenceErrorUninitialized(ctx, prs->atom);
         return -1;
       }
-      if (unlikely(!(prs->flags & LEPUS_PROP_WRITABLE))) {
+      if (unlikely(!(prs->flags & LEPUS_PROP_WRITABLE) ||
+                   (((prs->flags & LEPUS_PROP_TMASK) == LEPUS_PROP_VARREF) &&
+                    pr->u.var_ref->is_const))) {
         LEPUS_FreeValue(ctx, val);
         return JS_ThrowTypeErrorReadOnly(ctx, LEPUS_PROP_THROW, prop);
       }
     }
-    set_value(ctx, &pr->u.value, val);
+    if ((prs->flags & LEPUS_PROP_TMASK) == LEPUS_PROP_VARREF)
+      set_value(ctx, pr->u.var_ref->pvalue, val);
+    else
+      set_value(ctx, &pr->u.value, val);
     return 0;
   }
 
+  if (flag == 2) {
+    int ret = LEPUS_HasProperty(ctx, ctx->global_obj, prop);
+    if (ret <= 0) {
+      LEPUS_FreeValue(ctx, val);
+      if (ret == 0) JS_ThrowReferenceErrorNotDefined(ctx, prop);
+      return -1;
+    }
+  }
   flags = LEPUS_PROP_THROW_STRICT;
   if (flag != 2 && is_strict_mode(ctx)) flags |= LEPUS_PROP_NO_ADD;
   return JS_SetPropertyInternal_RC(ctx, ctx->global_obj, prop, val, flags);
@@ -10604,6 +11099,69 @@ int LEPUS_SetGlobalVar(LEPUSContext *ctx, JSAtom prop, LEPUSValue val,
                        int flag) {
   CallGCFunc(JS_SetGlobalVar_GC, ctx, prop, val, flag);
   return JS_SetGlobalVar_RC(ctx, prop, val, flag);
+}
+
+QJS_STATIC LEPUSValue JS_GetGlobalRef_RC(LEPUSContext *ctx,
+                                         LEPUSValueConst func_obj, int idx,
+                                         BOOL throw_ref_error) {
+  LEPUSObject *func = LEPUS_VALUE_GET_OBJ(func_obj);
+  LEPUSFunctionBytecode *b = func->u.func.function_bytecode;
+  JSVarRef *var_ref = func->u.func.var_refs[idx];
+  LEPUSValue val = *var_ref->pvalue;
+  if (likely(!LEPUS_IsUninitialized(val))) return LEPUS_DupValue(ctx, val);
+  JSAtom atom = b->closure_var[idx].var_name;
+  if (var_ref->is_lexical)
+    return JS_ThrowReferenceErrorUninitialized(ctx, atom);
+  return JS_GetPropertyInternalImpl(ctx, ctx->global_obj, atom, ctx->global_obj,
+                                    throw_ref_error);
+}
+
+LEPUSValue JS_GetGlobalRef(LEPUSContext *ctx, LEPUSValueConst func_obj, int idx,
+                           BOOL throw_ref_error) {
+  CallGCFunc(JS_GetGlobalRef_GC, ctx, func_obj, idx, throw_ref_error);
+  return JS_GetGlobalRef_RC(ctx, func_obj, idx, throw_ref_error);
+}
+
+QJS_STATIC int JS_SetGlobalRef_RC(LEPUSContext *ctx, LEPUSValueConst func_obj,
+                                  int idx, LEPUSValue val, int flag) {
+  LEPUSObject *func = LEPUS_VALUE_GET_OBJ(func_obj);
+  LEPUSFunctionBytecode *b = func->u.func.function_bytecode;
+  JSVarRef *var_ref = func->u.func.var_refs[idx];
+  JSAtom atom = b->closure_var[idx].var_name;
+  if (unlikely(LEPUS_IsUninitialized(*var_ref->pvalue) || var_ref->is_const)) {
+    if (var_ref->is_lexical) {
+      if (flag == 1) {
+        set_value(ctx, var_ref->pvalue, val);
+        return 0;
+      }
+      LEPUS_FreeValue(ctx, val);
+      if (LEPUS_IsUninitialized(*var_ref->pvalue))
+        JS_ThrowReferenceErrorUninitialized(ctx, atom);
+      else
+        JS_ThrowTypeErrorReadOnly(ctx, LEPUS_PROP_THROW, atom);
+      return -1;
+    }
+    int ret = LEPUS_HasProperty(ctx, ctx->global_obj, atom);
+    if (ret < 0) {
+      LEPUS_FreeValue(ctx, val);
+      return -1;
+    }
+    if (!ret && (b->js_mode & JS_MODE_STRICT)) {
+      LEPUS_FreeValue(ctx, val);
+      JS_ThrowReferenceErrorNotDefined(ctx, atom);
+      return -1;
+    }
+    return JS_SetPropertyInternal_RC(ctx, ctx->global_obj, atom, val,
+                                     LEPUS_PROP_THROW_STRICT);
+  }
+  set_value(ctx, var_ref->pvalue, val);
+  return 0;
+}
+
+int JS_SetGlobalRef(LEPUSContext *ctx, LEPUSValueConst func_obj, int idx,
+                    LEPUSValue val, int flag) {
+  CallGCFunc(JS_SetGlobalRef_GC, ctx, func_obj, idx, val, flag);
+  return JS_SetGlobalRef_RC(ctx, func_obj, idx, val, flag);
 }
 
 /* return -1, FALSE or TRUE. return FALSE if not configurable or
@@ -10718,7 +11276,7 @@ BOOL JS_IsUncatchableError(LEPUSContext *ctx, LEPUSValueConst val) {
   LEPUSObject *p;
   if (LEPUS_VALUE_IS_NOT_OBJECT(val)) return FALSE;
   p = LEPUS_VALUE_GET_OBJ(val);
-  return p->class_id == JS_CLASS_ERROR && p->is_uncatchable_error;
+  return p->class_id == JS_CLASS_ERROR && p->u.error.is_uncatchable_error;
 }
 
 QJS_STATIC void JS_SetUncatchableError(LEPUSContext *ctx, LEPUSValueConst val,
@@ -10726,7 +11284,7 @@ QJS_STATIC void JS_SetUncatchableError(LEPUSContext *ctx, LEPUSValueConst val,
   LEPUSObject *p;
   if (LEPUS_VALUE_IS_NOT_OBJECT(val)) return;
   p = LEPUS_VALUE_GET_OBJ(val);
-  if (p->class_id == JS_CLASS_ERROR) p->is_uncatchable_error = flag;
+  if (p->class_id == JS_CLASS_ERROR) p->u.error.is_uncatchable_error = flag;
 }
 
 void LEPUS_ResetUncatchableError(LEPUSContext *ctx) {
@@ -11754,13 +12312,16 @@ static __attribute__((unused)) void JS_DumpObject(LEPUSRuntime *rt,
         if (rt->gc_enable) {
           JSPropertyGC *gc_pr = &p->gc_prop[i];
           if ((prs->flags & LEPUS_PROP_TMASK) == LEPUS_PROP_GETSET) {
-            write("[getset %p %p]", (void *)gc_pr->u.getset->getter,
-                  (void *)gc_pr->u.getset->setter);
+            JSPropertyGetSet *getset = js_property_gc_get_getset(gc_pr);
+            write("[getset %p %p]",
+                  (void *)js_property_gc_get_accessor(getset->getter),
+                  (void *)js_property_gc_get_accessor(getset->setter));
           } else if ((prs->flags & LEPUS_PROP_TMASK) == LEPUS_PROP_VARREF) {
-            write("[varref %p]", (void *)gc_pr->u.var_ref);
+            write("[varref %p]", (void *)js_property_gc_get_var_ref(gc_pr));
           } else if ((prs->flags & LEPUS_PROP_TMASK) == LEPUS_PROP_AUTOINIT) {
-            write("[autoinit %p %p]", (void *)gc_pr->u.autoinit->init_func,
-                  gc_pr->u.autoinit->opaque);
+            JSPropertyAutoInit *autoinit = js_property_gc_get_autoinit(gc_pr);
+            write("[autoinit %p %p]", (void *)autoinit->init_func,
+                  autoinit->opaque);
           } else {
             JS_DumpValueShortNoPrint(rt, gc_pr->u.value, dump_buf);
           }
@@ -12836,40 +13397,35 @@ void RegisterPrimJSCallbacks(LEPUSRuntime *rt, void **funcs,
 void LEPUS_SetStringCache(LEPUSContext *ctx, LEPUSValue val, void *p) {
   CallGCFunc(JS_SetStringCache_GC, ctx, val, p);
   if (JS_IsSeparableString(val)) {
-    auto content = JS_GetSeparableString(val)->flat_content;
-    if (LEPUS_IsUndefined(content)) {
+    JSSeparableString *str = JS_GetSeparableString(val);
+    if (!JS_IsSeparableStringFlat(str)) {
       return;
     }
-    val = content;
+    val = JS_GetSeparableStringFlatContent(str);
   } else if (!LEPUS_VALUE_IS_STRING(val)) {
     return;
   }
   JSString *str = LEPUS_VALUE_GET_STRING(val);
-  void *old_ptr = str->cache_;
-  str->cache_ = p;
-  ctx->rt->js_callbacks_.free_str_cache(old_ptr, p);
+  js_string_set_cache(ctx, str, p);
   return;
 }
 
 void JS_FreeStringCache(LEPUSRuntime *rt, JSString *p) {
-  if (p->cache_ && (rt->js_callbacks_.free_str_cache)) {
-    rt->js_callbacks_.free_str_cache(p->cache_, NULL);
-    p->cache_ = NULL;
-  }
+  js_string_free_cache(rt, p);
 }
 
 void *LEPUS_GetStringCache(LEPUSValue val) {
   if (JS_IsSeparableString(val)) {
-    auto content = JS_GetSeparableString(val)->flat_content;
-    if (LEPUS_IsUndefined(content)) {
+    JSSeparableString *str = JS_GetSeparableString(val);
+    if (!JS_IsSeparableStringFlat(str)) {
       return nullptr;
     }
-    val = content;
+    val = JS_GetSeparableStringFlatContent(str);
   } else if (!LEPUS_VALUE_IS_STRING(val)) {
     return nullptr;
   }
   JSString *str = LEPUS_VALUE_GET_STRING(val);
-  return str->cache_;
+  return js_string_get_cache(str);
 }
 
 #ifndef ENABLE_COMPATIBLE_MM
@@ -12920,8 +13476,8 @@ QJS_STATIC BOOL js_strict_eq2(LEPUSContext *ctx, LEPUSValue op1, LEPUSValue op2,
         // <Primjs change>
         if (p1 == p2) {
           res = TRUE;
-        } else if (p1->atom_type == JS_ATOM_TYPE_STRING &&
-                   p2->atom_type == JS_ATOM_TYPE_STRING) {
+        } else if (js_string_meta(p1)->atom_type == JS_ATOM_TYPE_STRING &&
+                   js_string_meta(p2)->atom_type == JS_ATOM_TYPE_STRING) {
           res = FALSE;
         } else {
           res = (js_string_compare(ctx, p1, p2) == 0);
@@ -13577,7 +14133,6 @@ LEPUSValue JS_IteratorNext2(LEPUSContext *ctx, LEPUSValueConst enum_obj,
                             LEPUSValueConst method, int argc,
                             LEPUSValueConst *argv, int *pdone) {
   LEPUSValue obj = LEPUS_UNDEFINED;
-  HandleScope func_scope(ctx, &obj, HANDLE_TYPE_LEPUS_VALUE);
 
   /* fast path for the built-in iterators (avoid creating the
      intermediate result object) */
@@ -13585,11 +14140,9 @@ LEPUSValue JS_IteratorNext2(LEPUSContext *ctx, LEPUSValueConst enum_obj,
     LEPUSObject *p = LEPUS_VALUE_GET_OBJ(method);
     if (p->class_id == JS_CLASS_C_FUNCTION &&
         p->u.cfunc.cproto == LEPUS_CFUNC_iterator_next) {
-      HandleScope block_scope(ctx->rt);
       LEPUSCFunctionType func;
       LEPUSValueConst args[1];
       args[0] = LEPUS_UNDEFINED;
-      block_scope.PushHandle(&args[0], HANDLE_TYPE_LEPUS_VALUE);
 
       /* in case the function expects one argument */
       if (argc == 0) {
@@ -13601,6 +14154,7 @@ LEPUSValue JS_IteratorNext2(LEPUSContext *ctx, LEPUSValueConst enum_obj,
                                 p->u.cfunc.magic);
     }
   }
+  HandleScope func_scope(ctx, &obj, HANDLE_TYPE_LEPUS_VALUE);
   obj = LEPUS_Call(ctx, method, enum_obj, argc, argv);
   if (LEPUS_IsException(obj)) goto fail;
   if (!LEPUS_IsObject(obj)) {
@@ -13620,19 +14174,26 @@ LEPUSValue JS_IteratorNext(LEPUSContext *ctx, LEPUSValueConst enum_obj,
                            LEPUSValueConst *argv, BOOL *pdone) {
   LEPUSValue obj = LEPUS_UNDEFINED, value = LEPUS_UNDEFINED,
              done_val = LEPUS_UNDEFINED;
-  HandleScope func_scope(ctx, &obj, HANDLE_TYPE_LEPUS_VALUE);
-  func_scope.PushHandle(&value, HANDLE_TYPE_LEPUS_VALUE);
-  func_scope.PushHandle(&done_val, HANDLE_TYPE_LEPUS_VALUE);
   int done;
 
   obj = JS_IteratorNext2(ctx, enum_obj, method, argc, argv, &done);
-  if (LEPUS_IsException(obj)) goto fail;
+  if (LEPUS_IsException(obj)) {
+    *pdone = FALSE;
+    return LEPUS_EXCEPTION;
+  }
   if (done != 2) {
     *pdone = done;
     return obj;
   } else {
+    HandleScope func_scope(ctx, &obj, HANDLE_TYPE_LEPUS_VALUE);
+    func_scope.PushHandle(&value, HANDLE_TYPE_LEPUS_VALUE);
+    func_scope.PushHandle(&done_val, HANDLE_TYPE_LEPUS_VALUE);
     done_val = LEPUS_GetPropertyInternal(ctx, obj, JS_ATOM_done, obj, 0);
-    if (LEPUS_IsException(done_val)) goto fail;
+    if (LEPUS_IsException(done_val)) {
+      if (!ctx->gc_enable) LEPUS_FreeValue(ctx, obj);
+      *pdone = FALSE;
+      return LEPUS_EXCEPTION;
+    }
     *pdone = JS_ToBoolFree(ctx, done_val);
     value = LEPUS_UNDEFINED;
     if (!*pdone) {
@@ -13641,10 +14202,6 @@ LEPUSValue JS_IteratorNext(LEPUSContext *ctx, LEPUSValueConst enum_obj,
     if (!ctx->gc_enable) LEPUS_FreeValue(ctx, obj);
     return value;
   }
-fail:
-  if (!ctx->gc_enable) LEPUS_FreeValue(ctx, obj);
-  *pdone = FALSE;
-  return LEPUS_EXCEPTION;
 }
 
 /* return < 0 in case of exception */
@@ -14010,6 +14567,8 @@ JSVarRef *get_var_ref(LEPUSContext *ctx, LEPUSStackFrame *sf, int var_idx,
   var_ref->gc_header.mark = 0;
   var_ref->is_arg = is_arg;
   var_ref->is_detached = 0;
+  var_ref->is_lexical = 0;
+  var_ref->is_const = 0;
   var_ref->var_idx = var_idx;
   if (is_arg) {
     var_ref->pvalue = &sf->arg_buf[var_idx];
@@ -14020,15 +14579,28 @@ JSVarRef *get_var_ref(LEPUSContext *ctx, LEPUSStackFrame *sf, int var_idx,
   }
 
   var_ref->value = LEPUS_UNDEFINED;
-  list_add_tail(&var_ref->link, &sf->var_ref_list);
   HeapObjStore(ctx, &sf->var_refs[is_arg ? var_idx : sf->arg_count + var_idx],
                var_ref);
   return var_ref;
 }
 
+QJS_STATIC void js_global_object_finalizer(LEPUSRuntime *rt, LEPUSValue val) {
+  LEPUSObject *p = LEPUS_VALUE_GET_OBJ(val);
+  LEPUS_FreeValueRT(rt, p->u.global_object.uninitialized_vars);
+}
+
+QJS_STATIC void js_global_object_mark(LEPUSRuntime *rt, LEPUSValueConst val,
+                                      LEPUS_MarkFunc *mark_func,
+                                      uint64_t trace_tool) {
+  LEPUSObject *p = LEPUS_VALUE_GET_OBJ(val);
+  LEPUS_MarkValue(rt, p->u.global_object.uninitialized_vars, mark_func,
+                  trace_tool);
+}
+
 LEPUSValue js_closure2(LEPUSContext *ctx, LEPUSValue func_obj,
                        LEPUSFunctionBytecode *b, JSVarRef **cur_var_refs,
                        LEPUSStackFrame *sf) {
+  CallGCFunc(js_closure2_gc, ctx, func_obj, b, cur_var_refs, sf);
   LEPUSObject *p;
   JSVarRef **var_refs;
   int i;
@@ -14045,8 +14617,24 @@ LEPUSValue js_closure2(LEPUSContext *ctx, LEPUSValue func_obj,
     HeapObjStore(ctx, &p->u.func.var_refs, var_refs);
     for (i = 0; i < b->closure_var_count; i++) {
       LEPUSClosureVar *cv = &b->closure_var[i];
+      if (cv->closure_type == JS_CLOSURE_GLOBAL_DECL) {
+        int flags = cv->is_lexical ? DEFINE_GLOBAL_LEX_VAR : 0;
+        if (cv->var_kind == JS_VAR_GLOBAL_FUNCTION_DECL)
+          flags |= DEFINE_GLOBAL_FUNC_VAR;
+        if (JS_CheckDefineGlobalVar(ctx, cv->var_name, flags)) goto fail;
+      }
+    }
+    for (i = 0; i < b->closure_var_count; i++) {
+      LEPUSClosureVar *cv = &b->closure_var[i];
       JSVarRef *var_ref;
-      if (cv->is_local) {
+      if (cv->closure_type == JS_CLOSURE_GLOBAL_DECL) {
+        var_ref = js_get_global_closure_ref_rc(ctx, cv,
+                                               b->is_direct_or_indirect_eval);
+        if (!var_ref) goto fail;
+      } else if (cv->closure_type == JS_CLOSURE_GLOBAL) {
+        var_ref = js_get_global_closure_ref_rc(ctx, cv, FALSE);
+        if (!var_ref) goto fail;
+      } else if (cv->is_local) {
         /* Standalone bytecode has no enclosing frame to capture from. */
         if (unlikely(!sf)) {
           LEPUS_ThrowSyntaxError(ctx, "missing closure stack frame");
@@ -14147,7 +14735,7 @@ LEPUSValue js_closure(LEPUSContext *ctx, LEPUSValue bfunc,
     pr = add_property(ctx, p, JS_ATOM_prototype,
                       LEPUS_PROP_WRITABLE | LEPUS_PROP_AUTOINIT);
     if (pr) {
-      pr->u.init.init_func = js_instantiate_prototype;
+      set_js_autoinit_func(pr, js_instantiate_prototype);
       pr->u.init.opaque = nullptr;
     }
   }
@@ -14261,12 +14849,12 @@ fail:
 }
 
 QJS_STATIC void close_var_refs(LEPUSRuntime *rt, LEPUSStackFrame *sf) {
-  struct list_head *el, *el1;
   JSVarRef *var_ref;
-  int var_idx;
-
-  list_for_each_safe(el, el1, &sf->var_ref_list) {
-    var_ref = list_entry(el, JSVarRef, link);
+  JSVarRef **var_refs = sf->var_refs;
+  if (!var_refs) return;
+  for (uint32_t i = 0; i < sf->ref_size; i++) {
+    var_ref = var_refs[i];
+    if (!var_ref) continue;
     if (var_ref->header.ref_count > 1) {
       // still used by function closure.
       var_ref->value = LEPUS_DupValueRT(rt, *var_ref->pvalue);
@@ -14287,11 +14875,19 @@ void close_lexical_var(LEPUSContext *ctx, LEPUSStackFrame *sf, int idx) {
   if (!sf->var_refs) return;
   var_ref = sf->var_refs[var_idx];
   if (var_ref) {
+#ifdef ENABLE_COMPATIBLE_MM
+    if (ctx->gc_enable) {
+      JSVarRefGC *gc_var_ref = js_var_ref_gc(var_ref);
+      HeapObjStore(ctx, &gc_var_ref->value, *js_var_ref_gc_pvalue(gc_var_ref));
+      Release_StoreJSVarRefGCPValue(gc_var_ref, &gc_var_ref->value);
+      sf->var_refs[var_idx] = nullptr;
+      return;
+    }
+#endif
     HeapObjStore(ctx, &var_ref->value, LEPUS_DupValue(ctx, *var_ref->pvalue));
     var_ref->pvalue = &var_ref->value;
     var_ref->is_detached = 1;
     var_ref->from = 0xe;
-    list_del(&var_ref->link);
     if (UNLIKELY(!ctx->gc_enable)) free_var_ref(ctx->rt, var_ref);
     sf->var_refs[var_idx] = nullptr;
   }
@@ -14337,6 +14933,8 @@ QJS_STATIC LEPUSValue js_call_c_function(LEPUSContext *ctx,
   prev_sf = rt->current_stack_frame;
   sf->prev_frame = prev_sf;
   sf->cur_func = (LEPUSValue)func_obj;
+  sf->var_refs = nullptr;
+  sf->ref_size = 0;
   rt->current_stack_frame = sf;
   sf->js_mode = 0;
   sf->arg_count = argc;
@@ -14616,7 +15214,13 @@ QJS_STATIC LEPUSValue JS_CallInternal(LEPUSContext *caller_ctx,
 #else
 #define def(id, size, n_pop, n_push, f) &&case_default,
 #endif
+#define DEF_NON_SHIPPABLE(id, size, n_pop, n_push, f)
 #include "quickjs/include/quickjs-opcode.h"
+#undef DEF_NON_SHIPPABLE
+#define DEF_NON_SHIPPABLE(id, size, n_pop, n_push, f) \
+  [OP_##id] = &&case_OP_##id,
+#include "quickjs/include/quickjs-opcode.h"
+#undef DEF_NON_SHIPPABLE
     [OP_COUNT... 255] = &&case_default
   };
 
@@ -14686,7 +15290,6 @@ QJS_STATIC LEPUSValue JS_CallInternal(LEPUSContext *caller_ctx,
   arg_buf = argv;
   sf->arg_count = argc;
   sf->cur_func = (LEPUSValue)func_obj;
-  init_list_head(&sf->var_ref_list);
   var_refs = p->u.func.var_refs;
 
   // <Primjs begin>
@@ -15284,6 +15887,28 @@ restart:
         pc += 4;
 
         ret = JS_SetGlobalVar_RC(ctx, atom, sp[-1], opcode - OP_put_var);
+        sp--;
+        if (unlikely(ret < 0)) goto exception;
+      }
+      BREAK;
+
+      CASE(OP_get_global_ref_undef) : CASE(OP_get_global_ref) : {
+        int idx = get_u16(pc);
+        pc += 2;
+        sf->cur_pc = pc;
+        LEPUSValue val = JS_GetGlobalRef(ctx, sf->cur_func, idx,
+                                         opcode == OP_get_global_ref);
+        if (unlikely(LEPUS_IsException(val))) goto exception;
+        *sp++ = val;
+      }
+      BREAK;
+
+      CASE(OP_put_global_ref) : CASE(OP_put_global_ref_init) : {
+        int idx = get_u16(pc);
+        pc += 2;
+        sf->cur_pc = pc;
+        int ret = JS_SetGlobalRef(ctx, sf->cur_func, idx, sp[-1],
+                                  opcode == OP_put_global_ref_init);
         sp--;
         if (unlikely(ret < 0)) goto exception;
       }
@@ -16915,7 +17540,7 @@ exception:
     sf->cur_sp = sp;
   } else {
   done:
-    if (unlikely(!list_empty(&sf->var_ref_list))) {
+    if (unlikely(sf->var_refs)) {
       /* variable references reference the stack: must close them */
       close_var_refs(rt, sf);
     }
@@ -17105,7 +17730,6 @@ QJS_STATIC __exception int async_func_init(LEPUSContext *ctx,
   int local_count, i, arg_buf_len, n;
 
   sf = &s->frame;
-  init_list_head(&sf->var_ref_list);
   list_add_tail(&s->link, &ctx->rt->async_func_sf);
   p = LEPUS_VALUE_GET_OBJ(func_obj);
   b = p->u.func.function_bytecode;
@@ -17136,14 +17760,16 @@ QJS_STATIC void async_func_mark(LEPUSRuntime *rt, JSAsyncFunctionState *s,
                                 uint64_t trace_tool) {
   LEPUSStackFrame *sf;
   LEPUSValue *sp;
-  list_head *el;
   JSVarRef *var_ref;
 
   sf = &s->frame;
   // Because sf->var_refs refer var_ref.
-  list_for_each(el, &sf->var_ref_list) {
-    var_ref = list_entry(el, JSVarRef, link);
-    mark_func(rt, LEPUS_MKPTR(LEPUS_TAG_VAR_REF, var_ref), trace_tool);
+  if (sf->var_refs) {
+    for (uint32_t i = 0; i < sf->ref_size; i++) {
+      var_ref = sf->var_refs[i];
+      if (!var_ref) continue;
+      mark_func(rt, LEPUS_MKPTR(LEPUS_TAG_VAR_REF, var_ref), trace_tool);
+    }
   }
 
   JS_MarkValue_RC(rt, sf->cur_func, mark_func);
@@ -24653,7 +25279,8 @@ int LEPUS_SetModuleExport(LEPUSContext *ctx, LEPUSModuleDef *m,
   if (!me) goto fail;
 #ifdef ENABLE_COMPATIBLE_MM
   if (ctx->gc_enable) {
-    set_value_gc(ctx, me->u.local.var_ref->pvalue, val);
+    set_value_gc(ctx, js_var_ref_gc_pvalue(js_var_ref_gc(me->u.local.var_ref)),
+                 val);
   } else
 #endif
     set_value(ctx, me->u.local.var_ref->pvalue, val);
@@ -25140,8 +25767,8 @@ QJS_STATIC LEPUSValue js_build_module_ns(LEPUSContext *ctx, LEPUSModuleDef *m) {
               ctx, p, en->export_name,
               LEPUS_PROP_ENUMERABLE | LEPUS_PROP_WRITABLE | LEPUS_PROP_VARREF);
           if (!gc_pr) goto fail;
-          var_ref->header.ref_count++;
-          HeapObjStore(ctx, &gc_pr->u.var_ref, var_ref);
+          HeapObjStore(ctx, &gc_pr->u.value,
+                       js_property_gc_make_var_ref(var_ref));
           break;
         }
 #endif
@@ -25225,7 +25852,17 @@ int js_resolve_module(LEPUSContext *ctx, LEPUSModuleDef *m) {
   return 0;
 }
 
-JSVarRef *js_create_module_var(LEPUSContext *ctx, BOOL is_lexical) {
+JSVarRef *js_create_var_ref(LEPUSContext *ctx, BOOL is_lexical) {
+#ifdef ENABLE_COMPATIBLE_MM
+  if (ctx->gc_enable) {
+    auto *gc_var_ref = static_cast<JSVarRefGC *>(
+        lepus_malloc(ctx, sizeof(JSVarRefGC), ALLOC_TAG_JSVarRef));
+    if (!gc_var_ref) return nullptr;
+    gc_var_ref->value = is_lexical ? LEPUS_UNINITIALIZED : LEPUS_UNDEFINED;
+    js_var_ref_gc_init(gc_var_ref, &gc_var_ref->value, is_lexical, FALSE);
+    return reinterpret_cast<JSVarRef *>(gc_var_ref);
+  }
+#endif
   JSVarRef *var_ref;
   var_ref = static_cast<JSVarRef *>(
       lepus_malloc(ctx, sizeof(JSVarRef), ALLOC_TAG_JSVarRef));
@@ -25233,6 +25870,8 @@ JSVarRef *js_create_module_var(LEPUSContext *ctx, BOOL is_lexical) {
   var_ref->header.ref_count = 1;
   var_ref->gc_header.mark = 0;
   var_ref->is_detached = 1;
+  var_ref->is_lexical = is_lexical;
+  var_ref->is_const = 0;
   if (is_lexical)
     var_ref->value = LEPUS_UNINITIALIZED;
   else
@@ -25276,7 +25915,7 @@ int js_create_module_function(LEPUSContext *ctx, LEPUSModuleDef *m) {
       LEPUSClosureVar *cv = &b->closure_var[i];
       JSVarRef *var_ref;
       if (cv->is_local) {
-        var_ref = js_create_module_var(ctx, cv->is_lexical);
+        var_ref = js_create_var_ref(ctx, cv->is_lexical);
         if (!var_ref) goto fail;
 #ifdef DUMP_MODULE_RESOLVE
         printf("local %d: %p\n", i, var_ref);
@@ -25314,7 +25953,7 @@ int js_link_module(LEPUSContext *ctx, LEPUSModuleDef *m) {
     for (i = 0; i < m->export_entries_count; i++) {
       JSExportEntry *me = &m->export_entries[i];
       if (me->export_type == JS_EXPORT_TYPE_LOCAL) {
-        var_ref = js_create_module_var(ctx, FALSE);
+        var_ref = js_create_var_ref(ctx, FALSE);
         if (!var_ref) goto fail;
         HeapObjStore(ctx, &me->u.local.var_ref, var_ref);
       }
@@ -25385,7 +26024,7 @@ int js_link_module(LEPUSContext *ctx, LEPUSModuleDef *m) {
         if (LEPUS_IsException(val)) goto fail;
 #ifdef ENABLE_COMPATIBLE_MM
         if (ctx->gc_enable)
-          set_value_gc(ctx, &var_refs[mi->var_idx]->value, val);
+          set_value_gc(ctx, &js_var_ref_gc(var_refs[mi->var_idx])->value, val);
         else
 #endif
           set_value(ctx, &var_refs[mi->var_idx]->value, val);
@@ -25412,14 +26051,14 @@ int js_link_module(LEPUSContext *ctx, LEPUSModuleDef *m) {
           val = js_get_module_ns(ctx, m2);
           if (LEPUS_IsException(val)) goto fail;
           block_scope.PushHandle(&val, HANDLE_TYPE_LEPUS_VALUE);
-          var_ref = js_create_module_var(ctx, TRUE);
+          var_ref = js_create_var_ref(ctx, TRUE);
           if (!var_ref) {
             if (!ctx->gc_enable) LEPUS_FreeValue(ctx, val);
             goto fail;
           }
 #ifdef ENABLE_COMPATIBLE_MM
           if (ctx->gc_enable)
-            set_value_gc(ctx, &var_ref->value, val);
+            set_value_gc(ctx, &js_var_ref_gc(var_ref)->value, val);
           else
 #endif
             set_value(ctx, &var_ref->value, val);
@@ -25433,7 +26072,7 @@ int js_link_module(LEPUSContext *ctx, LEPUSModuleDef *m) {
             p1 = LEPUS_VALUE_GET_OBJ(res_m->func_obj);
             var_ref = p1->u.func.var_refs[res_me->u.local.var_idx];
           }
-          var_ref->header.ref_count++;
+          if (!ctx->gc_enable) var_ref->header.ref_count++;
           HeapObjStore(ctx, &var_refs[mi->var_idx], var_ref);
 #ifdef DUMP_MODULE_RESOLVE
           printf("local export (var_ref=%p)\n", var_ref);
@@ -25449,7 +26088,7 @@ int js_link_module(LEPUSContext *ctx, LEPUSModuleDef *m) {
       JSExportEntry *me = &m->export_entries[i];
       if (me->export_type == JS_EXPORT_TYPE_LOCAL) {
         var_ref = var_refs[me->u.local.var_idx];
-        var_ref->header.ref_count++;
+        if (!ctx->gc_enable) var_ref->header.ref_count++;
         HeapObjStore(ctx, &me->u.local.var_ref, var_ref);
       }
     }
@@ -25969,6 +26608,7 @@ QJS_STATIC JSFunctionDef *js_new_function_def(LEPUSContext *ctx,
   }
 
   fd->is_eval = is_eval;
+  fd->use_global_refs = parent ? parent->use_global_refs : FALSE;
   fd->is_func_expr = is_func_expr;
   js_dbuf_init(ctx, &fd->byte_code);
   fd->last_opcode_pos = -1;
@@ -26023,7 +26663,7 @@ QJS_STATIC void free_bytecode_atoms(LEPUSRuntime *rt, const uint8_t *bc_buf,
     if (use_short_opcodes)
       oi = &short_opcode_info(op);
     else
-      oi = &opcode_info[op];
+      oi = &compiler_opcode_info(op);
 
     len = oi->size;
     switch (oi->fmt) {
@@ -26131,7 +26771,8 @@ static void print_lines(const char *source, int line, int line1) {
 }
 
 static void dump_byte_code(LEPUSContext *ctx, int pass, const uint8_t *tab,
-                           int len, const JSVarDef *args, int arg_count,
+                           int len, const JSBytecodeVarDef *vardefs,
+                           const JSVarDef *args, int arg_count,
                            const JSVarDef *vars, int var_count,
                            const LEPUSClosureVar *closure_var,
                            int closure_var_count, const LEPUSValue *cpool,
@@ -26151,7 +26792,7 @@ static void dump_byte_code(LEPUSContext *ctx, int pass, const uint8_t *tab,
     if (use_short_opcodes)
       oi = &short_opcode_info(op);
     else
-      oi = &opcode_info[op];
+      oi = &compiler_opcode_info(op);
     pos_next = pos + oi->size;
     if (op < OP_COUNT) {
       switch (oi->fmt) {
@@ -26222,7 +26863,7 @@ static void dump_byte_code(LEPUSContext *ctx, int pass, const uint8_t *tab,
     if (use_short_opcodes)
       oi = &short_opcode_info(op);
     else
-      oi = &opcode_info[op];
+      oi = &compiler_opcode_info(op);
     size = oi->size;
     if (pos + size > len) {
       printf("truncated opcode (0x%02x)\n", op);
@@ -26360,7 +27001,8 @@ static void dump_byte_code(LEPUSContext *ctx, int pass, const uint8_t *tab,
       has_loc:
         printf(" %d: ", idx);
         if (idx < var_count) {
-          print_atom(ctx, vars[idx].var_name);
+          print_atom(ctx, vars ? vars[idx].var_name
+                               : vardefs[arg_count + idx].var_name);
         }
         break;
       case OP_FMT_none_arg:
@@ -26371,7 +27013,7 @@ static void dump_byte_code(LEPUSContext *ctx, int pass, const uint8_t *tab,
       has_arg:
         printf(" %d: ", idx);
         if (idx < arg_count) {
-          print_atom(ctx, args[idx].var_name);
+          print_atom(ctx, args ? args[idx].var_name : vardefs[idx].var_name);
         }
         break;
       case OP_FMT_none_var_ref:
@@ -26470,7 +27112,7 @@ static __attribute__((unused)) void js_dump_function_bytecode(
   if (b->var_count && b->vardefs) {
     printf("  locals:\n");
     for (i = 0; i < b->var_count; i++) {
-      JSVarDef *vd = &b->vardefs[b->arg_count + i];
+      JSBytecodeVarDef *vd = &b->vardefs[b->arg_count + i];
       printf("%5d: %s %s", i,
              vd->var_kind == JS_VAR_CATCH ? "catch"
              : (vd->var_kind == JS_VAR_FUNCTION_DECL ||
@@ -26500,10 +27142,10 @@ static __attribute__((unused)) void js_dump_function_bytecode(
   }
   printf("  stack_size: %d\n", b->stack_size);
   printf("  opcodes:\n");
-  dump_byte_code(ctx, 3, b->byte_code_buf, b->byte_code_len, b->vardefs,
-                 b->arg_count, b->vardefs ? b->vardefs + b->arg_count : NULL,
-                 b->var_count, b->closure_var, b->closure_var_count, b->cpool,
-                 b->cpool_count, b->has_debug ? b->debug.source : NULL,
+  dump_byte_code(ctx, 3, b->byte_code_buf, b->byte_code_len, b->vardefs, NULL,
+                 b->arg_count, NULL, b->var_count, b->closure_var,
+                 b->closure_var_count, b->cpool, b->cpool_count,
+                 b->has_debug ? b->debug.source : NULL,
                  b->has_debug ? b->debug.line_num : -1, NULL, b);
 #if defined(DUMP_BYTECODE) && (DUMP_BYTECODE & 32)
   if (b->has_debug)
@@ -26541,6 +27183,8 @@ int add_closure_var(LEPUSContext *ctx, JSFunctionDef *s, BOOL is_local,
   cv = &s->closure_var[s->closure_var_count++];
   cv->is_local = is_local;
   cv->is_arg = is_arg;
+  cv->closure_type =
+      is_local ? (is_arg ? JS_CLOSURE_ARG : JS_CLOSURE_LOCAL) : JS_CLOSURE_REF;
   cv->is_const = is_const;
   cv->is_lexical = is_lexical;
   cv->var_kind = var_kind;
@@ -26548,6 +27192,35 @@ int add_closure_var(LEPUSContext *ctx, JSFunctionDef *s, BOOL is_local,
   if (UNLIKELY(!ctx->gc_enable)) LEPUS_DupAtom(ctx, var_name);
   cv->var_name = var_name;
   return s->closure_var_count - 1;
+}
+
+QJS_STATIC int add_global_closure_var(LEPUSContext *ctx, JSFunctionDef *s,
+                                      JSClosureTypeEnum closure_type,
+                                      int var_idx, JSAtom var_name,
+                                      BOOL is_const, BOOL is_lexical,
+                                      JSVarKindEnum var_kind) {
+  int idx = add_closure_var(ctx, s, FALSE, FALSE, var_idx, var_name, is_const,
+                            is_lexical, var_kind);
+  if (idx >= 0) s->closure_var[idx].closure_type = closure_type;
+  return idx;
+}
+
+QJS_STATIC int get_global_closure_var(LEPUSContext *ctx, JSFunctionDef *s,
+                                      JSFunctionDef *owner, int var_idx,
+                                      JSAtom var_name, BOOL is_const,
+                                      BOOL is_lexical, JSVarKindEnum var_kind) {
+  if (owner != s->parent) {
+    var_idx = get_global_closure_var(ctx, s->parent, owner, var_idx, var_name,
+                                     is_const, is_lexical, var_kind);
+    if (var_idx < 0) return -1;
+  }
+  for (int i = 0; i < s->closure_var_count; i++) {
+    LEPUSClosureVar *cv = &s->closure_var[i];
+    if (cv->var_idx == var_idx && cv->closure_type == JS_CLOSURE_GLOBAL_REF)
+      return i;
+  }
+  return add_global_closure_var(ctx, s, JS_CLOSURE_GLOBAL_REF, var_idx,
+                                var_name, is_const, is_lexical, var_kind);
 }
 
 static int find_closure_var(LEPUSContext *ctx, JSFunctionDef *s,
@@ -26658,7 +27331,8 @@ QJS_STATIC int optimize_scope_make_ref(LEPUSContext *ctx, JSFunctionDef *s,
 QJS_STATIC int optimize_scope_make_global_ref(LEPUSContext *ctx,
                                               JSFunctionDef *s, DynBuf *bc,
                                               uint8_t *bc_buf, LabelSlot *ls,
-                                              int pos_next, JSAtom var_name) {
+                                              int pos_next, JSAtom var_name,
+                                              int global_ref_idx) {
   int label_pos, end_pos, pos, op;
   BOOL is_strict;
   is_strict = ((s->js_mode & JS_MODE_STRICT) != 0);
@@ -26676,9 +27350,14 @@ QJS_STATIC int optimize_scope_make_global_ref(LEPUSContext *ctx,
     /* XXX: need 2 extra OP_true if destructuring an array */
   }
   if (bc_buf[pos_next] == OP_get_ref_value) {
-    dbuf_putc(bc, OP_get_var);
-    if (!ctx->gc_enable) LEPUS_DupAtom(ctx, var_name);
-    dbuf_put_u32(bc, var_name);
+    if (global_ref_idx >= 0) {
+      dbuf_putc(bc, OP_get_global_ref);
+      dbuf_put_u16(bc, global_ref_idx);
+    } else {
+      dbuf_putc(bc, OP_get_var);
+      if (!ctx->gc_enable) LEPUS_DupAtom(ctx, var_name);
+      dbuf_put_u32(bc, var_name);
+    }
     pos_next++;
   }
   /* remove the OP_label to make room for replacement */
@@ -26770,7 +27449,7 @@ QJS_STATIC int resolve_scope_var(LEPUSContext *ctx, JSFunctionDef *s,
                                  JSAtom var_name, int scope_level, int op,
                                  DynBuf *bc, uint8_t *bc_buf, LabelSlot *ls,
                                  int pos_next) {
-  int idx, var_idx, is_put;
+  int idx, var_idx, is_put, global_idx;
   int label_done;
   JSFunctionDef *fd;
   JSVarDef *vd;
@@ -27073,12 +27752,24 @@ QJS_STATIC int resolve_scope_var(LEPUSContext *ctx, JSFunctionDef *s,
       LEPUSClosureVar *cv = &fd->closure_var[idx1];
       if (var_name == cv->var_name) {
         if (fd != s) {
-          idx = get_closure_var2(ctx, s, fd, FALSE, cv->is_arg, idx1,
-                                 cv->var_name, cv->is_const, cv->is_lexical,
-                                 static_cast<JSVarKindEnum>(cv->var_kind));
+          if (cv->closure_type == JS_CLOSURE_GLOBAL ||
+              cv->closure_type == JS_CLOSURE_GLOBAL_DECL ||
+              cv->closure_type == JS_CLOSURE_GLOBAL_REF) {
+            idx = get_global_closure_var(
+                ctx, s, fd, idx1, cv->var_name, cv->is_const, cv->is_lexical,
+                static_cast<JSVarKindEnum>(cv->var_kind));
+          } else {
+            idx = get_closure_var2(ctx, s, fd, FALSE, cv->is_arg, idx1,
+                                   cv->var_name, cv->is_const, cv->is_lexical,
+                                   static_cast<JSVarKindEnum>(cv->var_kind));
+          }
         } else {
           idx = idx1;
         }
+        if (cv->closure_type == JS_CLOSURE_GLOBAL ||
+            cv->closure_type == JS_CLOSURE_GLOBAL_DECL ||
+            cv->closure_type == JS_CLOSURE_GLOBAL_REF)
+          goto has_global_idx;
         goto has_idx;
       } else if ((cv->var_name == JS_ATOM__var_ ||
                   cv->var_name == atom_arg_var ||
@@ -27104,6 +27795,71 @@ QJS_STATIC int resolve_scope_var(LEPUSContext *ctx, JSFunctionDef *s,
       }
     }
   }
+
+  if (var_idx < 0 && s->use_global_refs) {
+    global_idx = add_global_closure_var(ctx, fd, JS_CLOSURE_GLOBAL, 0, var_name,
+                                        FALSE, FALSE, JS_VAR_NORMAL);
+    if (global_idx < 0) return -1;
+    if (fd != s) {
+      idx = get_global_closure_var(ctx, s, fd, global_idx, var_name, FALSE,
+                                   FALSE, JS_VAR_NORMAL);
+      if (idx < 0) return -1;
+    } else {
+      idx = global_idx;
+    }
+    goto has_global_idx;
+  }
+  goto no_global_idx;
+
+has_global_idx:
+  switch (op) {
+    case OP_scope_make_ref:
+      if (label_done == -1 && can_opt_put_global_ref_value(bc_buf, ls->pos)) {
+        if (s->js_mode & JS_MODE_STRICT) {
+          /* Preserve whether the binding existed before evaluating the RHS,
+             and recheck it when PutValue runs. */
+          pos_next = optimize_scope_make_global_ref(ctx, s, bc, bc_buf, ls,
+                                                    pos_next, var_name, idx);
+        } else {
+          pos_next = optimize_scope_make_ref(ctx, s, bc, bc_buf, ls, pos_next,
+                                             OP_get_global_ref, idx);
+        }
+      } else {
+        dbuf_putc(bc, OP_make_var_ref);
+        if (is_rc) LEPUS_DupAtom(ctx, var_name);
+        dbuf_put_u32(bc, var_name);
+      }
+      break;
+    case OP_scope_get_ref:
+      dbuf_putc(bc, OP_undefined);
+      dbuf_putc(bc, OP_get_global_ref);
+      dbuf_put_u16(bc, idx);
+      break;
+    case OP_scope_get_var_undef:
+      dbuf_putc(bc, OP_get_global_ref_undef);
+      dbuf_put_u16(bc, idx);
+      break;
+    case OP_scope_get_var:
+      dbuf_putc(bc, OP_get_global_ref);
+      dbuf_put_u16(bc, idx);
+      break;
+    case OP_scope_put_var:
+      dbuf_putc(bc, OP_put_global_ref);
+      dbuf_put_u16(bc, idx);
+      break;
+    case OP_scope_put_var_init:
+      dbuf_putc(bc, OP_put_global_ref_init);
+      dbuf_put_u16(bc, idx);
+      break;
+    case OP_scope_delete_var:
+      dbuf_putc(bc, OP_delete_var);
+      if (is_rc) LEPUS_DupAtom(ctx, var_name);
+      dbuf_put_u32(bc, var_name);
+      break;
+  }
+  goto done;
+
+no_global_idx:
 
   if (var_idx >= 0) {
     /* find the corresponding closure variable */
@@ -27208,7 +27964,7 @@ QJS_STATIC int resolve_scope_var(LEPUSContext *ctx, JSFunctionDef *s,
     case OP_scope_make_ref:
       if (label_done == -1 && can_opt_put_global_ref_value(bc_buf, ls->pos)) {
         pos_next = optimize_scope_make_global_ref(ctx, s, bc, bc_buf, ls,
-                                                  pos_next, var_name);
+                                                  pos_next, var_name, -1);
       } else {
         dbuf_putc(bc, OP_make_var_ref);
         if (is_rc) LEPUS_DupAtom(ctx, var_name);
@@ -27435,13 +28191,13 @@ QJS_STATIC void mark_eval_captured_variables(LEPUSContext *ctx,
   }
 }
 
-BOOL is_var_in_arg_scope(LEPUSContext *ctx, const JSVarDef *vd) {
+BOOL is_var_in_arg_scope(LEPUSContext *ctx, JSAtom var_name,
+                         JSVarKindEnum var_kind) {
   JSAtom atom_arg_var = LEPUS_NewAtom(ctx, "<arg_var>");
-  BOOL ret =
-      (vd->var_name == JS_ATOM_home_object ||
-       vd->var_name == JS_ATOM_this_active_func ||
-       vd->var_name == JS_ATOM_new_target || vd->var_name == JS_ATOM_this ||
-       vd->var_name == atom_arg_var || vd->var_kind == JS_VAR_FUNCTION_NAME);
+  BOOL ret = (var_name == JS_ATOM_home_object ||
+              var_name == JS_ATOM_this_active_func ||
+              var_name == JS_ATOM_new_target || var_name == JS_ATOM_this ||
+              var_name == atom_arg_var || var_kind == JS_VAR_FUNCTION_NAME);
   if (!ctx->gc_enable) LEPUS_FreeAtom(ctx, atom_arg_var);
   return ret;
 }
@@ -27552,7 +28308,9 @@ QJS_STATIC void add_eval_variables(LEPUSContext *ctx, JSFunctionDef *s) {
       for (i = 0; i < fd->var_count; i++) {
         vd = &fd->vars[i];
         /* do not close top level last result */
-        if (vd->scope_level == 0 && is_var_in_arg_scope(ctx, vd)) {
+        if (vd->scope_level == 0 &&
+            is_var_in_arg_scope(ctx, vd->var_name,
+                                static_cast<JSVarKindEnum>(vd->var_kind))) {
           get_closure_var(ctx, s, fd, FALSE, i, vd->var_name, FALSE,
                           vd->is_lexical, JS_VAR_NORMAL);
         }
@@ -27563,9 +28321,17 @@ QJS_STATIC void add_eval_variables(LEPUSContext *ctx, JSFunctionDef *s) {
           top level) */
         for (idx = 0; idx < fd->closure_var_count; idx++) {
           LEPUSClosureVar *cv = &fd->closure_var[idx];
-          get_closure_var2(ctx, s, fd, FALSE, cv->is_arg, idx, cv->var_name,
-                           cv->is_const, cv->is_lexical,
-                           static_cast<JSVarKindEnum>(cv->var_kind));
+          if (cv->closure_type == JS_CLOSURE_GLOBAL ||
+              cv->closure_type == JS_CLOSURE_GLOBAL_DECL ||
+              cv->closure_type == JS_CLOSURE_GLOBAL_REF) {
+            get_global_closure_var(ctx, s, fd, idx, cv->var_name, cv->is_const,
+                                   cv->is_lexical,
+                                   static_cast<JSVarKindEnum>(cv->var_kind));
+          } else {
+            get_closure_var2(ctx, s, fd, FALSE, cv->is_arg, idx, cv->var_name,
+                             cv->is_const, cv->is_lexical,
+                             static_cast<JSVarKindEnum>(cv->var_kind));
+          }
         }
       }
     }
@@ -27573,9 +28339,10 @@ QJS_STATIC void add_eval_variables(LEPUSContext *ctx, JSFunctionDef *s) {
 }
 
 QJS_STATIC void set_closure_from_var(LEPUSContext *ctx, LEPUSClosureVar *cv,
-                                     JSVarDef *vd, int var_idx) {
+                                     JSBytecodeVarDef *vd, int var_idx) {
   cv->is_local = TRUE;
   cv->is_arg = FALSE;
+  cv->closure_type = JS_CLOSURE_LOCAL;
   cv->is_const = vd->is_const;
   cv->is_lexical = vd->is_lexical;
   cv->var_kind = vd->var_kind;
@@ -27589,7 +28356,7 @@ QJS_STATIC void set_closure_from_var(LEPUSContext *ctx, LEPUSClosureVar *cv,
 __exception int add_closure_variables(LEPUSContext *ctx, JSFunctionDef *s,
                                       LEPUSFunctionBytecode *b, int scope_idx) {
   int i, count;
-  JSVarDef *vd;
+  JSBytecodeVarDef *vd;
   BOOL is_arg_scope;
 
   count = b->arg_count + b->var_count + b->closure_var_count;
@@ -27631,6 +28398,7 @@ __exception int add_closure_variables(LEPUSContext *ctx, JSFunctionDef *s,
       vd = &b->vardefs[i];
       cv->is_local = TRUE;
       cv->is_arg = TRUE;
+      cv->closure_type = JS_CLOSURE_ARG;
       cv->is_const = FALSE;
       cv->is_lexical = FALSE;
       cv->var_kind = JS_VAR_NORMAL;
@@ -27650,7 +28418,9 @@ __exception int add_closure_variables(LEPUSContext *ctx, JSFunctionDef *s,
     /* only add pseudo variables */
     for (i = 0; i < b->var_count; i++) {
       vd = &b->vardefs[b->arg_count + i];
-      if (vd->scope_level == 0 && is_var_in_arg_scope(ctx, vd)) {
+      if (vd->scope_level == 0 &&
+          is_var_in_arg_scope(ctx, vd->var_name,
+                              static_cast<JSVarKindEnum>(vd->var_kind))) {
         LEPUSClosureVar *cv = &s->closure_var[s->closure_var_count++];
         set_closure_from_var(ctx, cv, vd, i);
       }
@@ -27662,6 +28432,11 @@ add_closure_vars:
     LEPUSClosureVar *cv = &s->closure_var[s->closure_var_count++];
     cv->is_local = FALSE;
     cv->is_arg = cv0->is_arg;
+    cv->closure_type = (cv0->closure_type == JS_CLOSURE_GLOBAL ||
+                        cv0->closure_type == JS_CLOSURE_GLOBAL_DECL ||
+                        cv0->closure_type == JS_CLOSURE_GLOBAL_REF)
+                           ? JS_CLOSURE_GLOBAL_REF
+                           : JS_CLOSURE_REF;
     cv->is_const = cv0->is_const;
     cv->is_lexical = cv0->is_lexical;
     cv->var_kind = cv0->var_kind;
@@ -27696,7 +28471,7 @@ BOOL code_match(CodeContext *s, int pos, ...) {
     for (;;) {
       if (pos >= s->bc_len) goto done;
       op = tab[pos];
-      len = opcode_info[op].size;
+      len = compiler_opcode_info(op).size;
       pos_next = pos + len;
       if (pos_next > s->bc_len) goto done;
       // <Primjs begin>
@@ -27719,7 +28494,7 @@ BOOL code_match(CodeContext *s, int pos, ...) {
     }
 
     pos++;
-    switch (opcode_info[op].fmt) {
+    switch (compiler_opcode_info(op).fmt) {
       case OP_FMT_loc8:
       case OP_FMT_u8: {
         int idx = tab[pos];
@@ -27848,8 +28623,14 @@ QJS_STATIC void instantiate_hoisted_definitions(LEPUSContext *ctx,
     for (idx = 0; idx < s->closure_var_count; idx++) {
       LEPUSClosureVar *cv = &s->closure_var[idx];
       if (cv->var_name == hf->var_name) {
-        has_closure = 2;
-        force_init = FALSE;
+        if (cv->closure_type == JS_CLOSURE_GLOBAL ||
+            cv->closure_type == JS_CLOSURE_GLOBAL_DECL ||
+            cv->closure_type == JS_CLOSURE_GLOBAL_REF) {
+          has_closure = 3;
+        } else {
+          has_closure = 2;
+          force_init = FALSE;
+        }
         break;
       }
       if (cv->var_name == JS_ATOM__var_ || cv->var_name == atom_arg_var) {
@@ -27861,7 +28642,7 @@ QJS_STATIC void instantiate_hoisted_definitions(LEPUSContext *ctx,
       }
     }
     if (is_rc) LEPUS_FreeAtom(ctx, atom_arg_var);
-    if (!has_closure) {
+    if (!has_closure || has_closure == 3) {
       int flags;
 
       flags = 0;
@@ -27907,6 +28688,9 @@ QJS_STATIC void instantiate_hoisted_definitions(LEPUSContext *ctx,
       if (has_closure == 2) {
         dbuf_putc(bc, OP_put_var_ref);
         dbuf_put_u16(bc, idx);
+      } else if (has_closure == 3) {
+        dbuf_putc(bc, OP_put_global_ref_init);
+        dbuf_put_u16(bc, idx);
       } else if (has_closure == 1) {
         dbuf_putc(bc, OP_define_field);
         if (is_rc) LEPUS_DupAtom(ctx, hf->var_name);
@@ -27942,7 +28726,7 @@ int skip_dead_code(JSFunctionDef *s, const uint8_t *bc_buf, int bc_len, int pos,
 
   for (; pos < bc_len; pos += len) {
     op = bc_buf[pos];
-    len = opcode_info[op].size;
+    len = compiler_opcode_info(op).size;
     // <Primjs begin>
     if (op == OP_line_num) {
       *linep = get_u64(bc_buf + pos + 1);
@@ -27961,7 +28745,7 @@ int skip_dead_code(JSFunctionDef *s, const uint8_t *bc_buf, int bc_len, int pos,
     } else {
       /* XXX: output a warning for unreachable code? */
       JSAtom atom;
-      switch (opcode_info[op].fmt) {
+      switch (compiler_opcode_info(op).fmt) {
         case OP_FMT_label:
         case OP_FMT_label_u16:
           label = get_u32(bc_buf + pos + 1);
@@ -28038,10 +28822,15 @@ __exception int resolve_variables(LEPUSContext *ctx, JSFunctionDef *s) {
   for (i = 0; i < s->hoisted_def_count; i++) {
     JSHoistedDef *hf = &s->hoisted_def[i];
     int flags;
+    if (s->use_global_refs) continue;
 
     /* check if global variable (XXX: simplify) */
     for (idx = 0; idx < s->closure_var_count; idx++) {
       LEPUSClosureVar *cv = &s->closure_var[idx];
+      if (cv->closure_type == JS_CLOSURE_GLOBAL ||
+          cv->closure_type == JS_CLOSURE_GLOBAL_DECL ||
+          cv->closure_type == JS_CLOSURE_GLOBAL_REF)
+        continue;
       if (cv->var_name == hf->var_name) {
         if (s->eval_type == LEPUS_EVAL_TYPE_DIRECT && cv->is_lexical) {
           /* Check if a lexical variable is
@@ -28074,7 +28863,7 @@ __exception int resolve_variables(LEPUSContext *ctx, JSFunctionDef *s) {
   line_num = 0; /* avoid warning */
   for (pos = 0; pos < bc_len; pos = pos_next) {
     op = bc_buf[pos];
-    len = opcode_info[op].size;
+    len = compiler_opcode_info(op).size;
     pos_next = pos + len;
     switch (op) {
       case OP_line_num:
@@ -28225,7 +29014,7 @@ __exception int resolve_variables(LEPUSContext *ctx, JSFunctionDef *s) {
         label = get_u32(bc_buf + pos + 1);
         assert(label >= 0 && label < s->label_count);
         ls = &s->label_slots[label];
-        ls->pos2 = bc_out.size + opcode_info[op].size;
+        ls->pos2 = bc_out.size + compiler_opcode_info(op).size;
       }
         goto no_change;
 
@@ -28355,7 +29144,7 @@ fail:
   /* XXX: find a better solution ? */
   for (; pos < bc_len; pos = pos_next) {
     op = bc_buf[pos];
-    len = opcode_info[op].size;
+    len = compiler_opcode_info(op).size;
     pos_next = pos + len;
     dbuf_put(&bc_out, bc_buf + pos, len);
   }
@@ -28475,7 +29264,7 @@ int find_jump_target(JSFunctionDef *s, int label, int *pop,
           // <Primjs end>
           /* fall thru */
         case OP_label:
-          pos += opcode_info[op].size;
+          pos += compiler_opcode_info(op).size;
           continue;
         case OP_goto:
           label = get_u32(s->byte_code.buf + pos + 1);
@@ -28909,7 +29698,7 @@ __exception int resolve_labels(LEPUSContext *ctx, JSFunctionDef *s) {
   for (pos = 0; pos < bc_len; pos = pos_next) {
     int val;
     op = bc_buf[pos];
-    len = opcode_info[op].size;
+    len = compiler_opcode_info(op).size;
     pos_next = pos + len;
 #ifdef ENABLE_LEPUSNG_BYTECODE_OPT
     int cf_emit_start = bc_out.size; /* for constant fold tracking */
@@ -29979,6 +30768,37 @@ QJS_STATIC int add_module_variables(LEPUSContext *ctx, JSFunctionDef *fd) {
   return 0;
 }
 
+QJS_STATIC int add_runtime_global_variables(LEPUSContext *ctx,
+                                            JSFunctionDef *fd) {
+  BOOL need_global_closures = TRUE;
+  JSAtom atom_arg_var = LEPUS_NewAtom(ctx, "<arg_var>");
+  HandleScope scope(ctx->rt);
+  scope.PushLEPUSAtom(atom_arg_var);
+  if (fd->eval_type == LEPUS_EVAL_TYPE_DIRECT &&
+      !(fd->js_mode & JS_MODE_STRICT)) {
+    for (int i = 0; i < fd->closure_var_count; i++) {
+      LEPUSClosureVar *cv = &fd->closure_var[i];
+      if (cv->var_name == JS_ATOM__var_ || cv->var_name == atom_arg_var) {
+        need_global_closures = FALSE;
+        break;
+      }
+    }
+  }
+  if (!ctx->gc_enable) LEPUS_FreeAtom(ctx, atom_arg_var);
+  if (!need_global_closures) return 0;
+
+  for (int i = 0; i < fd->hoisted_def_count; i++) {
+    JSHoistedDef *hf = &fd->hoisted_def[i];
+    JSVarKindEnum kind = (hf->cpool_idx >= 0 && !hf->is_lexical)
+                             ? JS_VAR_GLOBAL_FUNCTION_DECL
+                             : JS_VAR_NORMAL;
+    if (add_global_closure_var(ctx, fd, JS_CLOSURE_GLOBAL_DECL, i, hf->var_name,
+                               hf->is_const, hf->is_lexical, kind) < 0)
+      return -1;
+  }
+  return 0;
+}
+
 #ifdef TEST_BYTECODE_REWRITE
 // Test only function.
 static LEPUSValue force_read_from_snapshot(LEPUSContext *ctx,
@@ -30043,6 +30863,8 @@ LEPUSValue js_create_function(LEPUSContext *ctx, JSFunctionDef *fd) {
   /* add the module global variables in the closure */
   if (fd->module) {
     if (add_module_variables(ctx, fd)) goto fail;
+  } else if (fd->is_eval && fd->use_global_refs) {
+    if (add_runtime_global_variables(ctx, fd)) goto fail;
   }
 
   /* first create all the child functions */
@@ -30062,10 +30884,11 @@ LEPUSValue js_create_function(LEPUSContext *ctx, JSFunctionDef *fd) {
 #if defined(DUMP_BYTECODE) && (DUMP_BYTECODE & 4)
   if (!(fd->js_mode & JS_MODE_STRIP)) {
     printf("pass 1\n");
-    dump_byte_code(ctx, 1, fd->byte_code.buf, fd->byte_code.size, fd->args,
-                   fd->arg_count, fd->vars, fd->var_count, fd->closure_var,
-                   fd->closure_var_count, fd->cpool, fd->cpool_count,
-                   fd->source, fd->line_num, fd->label_slots, NULL);
+    dump_byte_code(ctx, 1, fd->byte_code.buf, fd->byte_code.size, NULL,
+                   fd->args, fd->arg_count, fd->vars, fd->var_count,
+                   fd->closure_var, fd->closure_var_count, fd->cpool,
+                   fd->cpool_count, fd->source, fd->line_num, fd->label_slots,
+                   NULL);
     printf("\n");
   }
 #endif
@@ -30075,10 +30898,11 @@ LEPUSValue js_create_function(LEPUSContext *ctx, JSFunctionDef *fd) {
 #if defined(DUMP_BYTECODE) && (DUMP_BYTECODE & 2)
   if (!(fd->js_mode & JS_MODE_STRIP)) {
     printf("pass 2\n");
-    dump_byte_code(ctx, 2, fd->byte_code.buf, fd->byte_code.size, fd->args,
-                   fd->arg_count, fd->vars, fd->var_count, fd->closure_var,
-                   fd->closure_var_count, fd->cpool, fd->cpool_count,
-                   fd->source, fd->line_num, fd->label_slots, NULL);
+    dump_byte_code(ctx, 2, fd->byte_code.buf, fd->byte_code.size, NULL,
+                   fd->args, fd->arg_count, fd->vars, fd->var_count,
+                   fd->closure_var, fd->closure_var_count, fd->cpool,
+                   fd->cpool_count, fd->source, fd->line_num, fd->label_slots,
+                   NULL);
     printf("\n");
   }
 #endif
@@ -30113,6 +30937,8 @@ LEPUSValue js_create_function(LEPUSContext *ctx, JSFunctionDef *fd) {
 #endif
   b->function_id = 0;
   b->runtime_id = fd->runtime_id;
+  b->is_direct_or_indirect_eval = fd->eval_type == LEPUS_EVAL_TYPE_DIRECT ||
+                                  fd->eval_type == LEPUS_EVAL_TYPE_INDIRECT;
   if (ctx->debuginfo_outside == 1) {
     b->function_id = ctx->next_function_id++;
   }
@@ -30139,11 +30965,18 @@ LEPUSValue js_create_function(LEPUSContext *ctx, JSFunctionDef *fd) {
   b->func_name = fd->func_name;
   if (fd->arg_count + fd->var_count > 0) {
     if ((fd->js_mode & JS_MODE_STRIP) && !fd->has_eval_call) {
-      /* Strip variable definitions not needed at runtime */
+      /* Strip variable definitions not needed at runtime. Runtime global
+         references still need their names for dynamic property lookup. */
       int i;
+      auto is_runtime_global_ref = [](const LEPUSClosureVar &cv) {
+        return cv.closure_type == JS_CLOSURE_GLOBAL ||
+               cv.closure_type == JS_CLOSURE_GLOBAL_DECL ||
+               cv.closure_type == JS_CLOSURE_GLOBAL_REF;
+      };
       if (is_gc) {
         for (i = 0; i < fd->closure_var_count; i++) {
-          fd->closure_var[i].var_name = JS_ATOM_NULL;
+          if (!is_runtime_global_ref(fd->closure_var[i]))
+            fd->closure_var[i].var_name = JS_ATOM_NULL;
         }
       } else {
         for (i = 0; i < fd->var_count; i++) {
@@ -30153,15 +30986,28 @@ LEPUSValue js_create_function(LEPUSContext *ctx, JSFunctionDef *fd) {
           LEPUS_FreeAtom(ctx, fd->args[i].var_name);
         }
         for (i = 0; i < fd->closure_var_count; i++) {
-          LEPUS_FreeAtom(ctx, fd->closure_var[i].var_name);
-          fd->closure_var[i].var_name = JS_ATOM_NULL;
+          if (!is_runtime_global_ref(fd->closure_var[i])) {
+            LEPUS_FreeAtom(ctx, fd->closure_var[i].var_name);
+            fd->closure_var[i].var_name = JS_ATOM_NULL;
+          }
         }
       }
     } else {
-      b->vardefs = (JSVarDef *)((uint8_t *)b + vardefs_offset);
-      memcpy_no_ub(b->vardefs, fd->args, fd->arg_count * sizeof(fd->args[0]));
-      memcpy_no_ub(b->vardefs + fd->arg_count, fd->vars,
-                   fd->var_count * sizeof(fd->vars[0]));
+      b->vardefs = reinterpret_cast<JSBytecodeVarDef *>(
+          reinterpret_cast<uint8_t *>(b) + vardefs_offset);
+      auto copy_vardef = [](JSBytecodeVarDef *dst, const JSVarDef *src) {
+        dst->var_name = src->var_name;
+        dst->scope_level = static_cast<uint32_t>(src->scope_level);
+        dst->scope_next = src->scope_next;
+        dst->is_const = src->is_const;
+        dst->is_lexical = src->is_lexical;
+        dst->is_captured = src->is_captured;
+        dst->var_kind = src->var_kind;
+      };
+      for (int i = 0; i < fd->arg_count; ++i)
+        copy_vardef(&b->vardefs[i], &fd->args[i]);
+      for (int i = 0; i < fd->var_count; ++i)
+        copy_vardef(&b->vardefs[fd->arg_count + i], &fd->vars[i]);
     }
     b->var_count = fd->var_count;
     b->arg_count = fd->arg_count;
@@ -31292,6 +32138,10 @@ QJS_STATIC LEPUSValue __JS_EvalInternal(
   if (!fd) goto fail1;
   s->cur_func = fd;
   fd->runtime_id = b ? b->runtime_id : runtime_id;
+  /* Direct eval requires dynamic scope resolution through the caller. */
+  fd->use_global_refs = !(flags & LEPUS_EVAL_FLAG_COMPILE_ONLY) &&
+                        (eval_type == LEPUS_EVAL_TYPE_GLOBAL ||
+                         eval_type == LEPUS_EVAL_TYPE_INDIRECT);
   fd->eval_type = eval_type;
   fd->has_this_binding = (eval_type != LEPUS_EVAL_TYPE_DIRECT);
   if (eval_type == LEPUS_EVAL_TYPE_DIRECT) {
@@ -31857,6 +32707,24 @@ static int JS_WriteMap(BCWriterState *s, LEPUSValueConst obj) {
   uint8_t magic = p->class_id - JS_CLASS_MAP;
   bc_put_u8(s, magic);
   bool is_set = magic & MAGIC_SET;
+  if (ctx->gc_enable) {
+    LEPUSValue key = LEPUS_UNDEFINED;
+    LEPUSValue value = LEPUS_UNDEFINED;
+    HandleScope scope(ctx, &key, HANDLE_TYPE_LEPUS_VALUE);
+    scope.PushHandle(&value, HANDLE_TYPE_LEPUS_VALUE);
+    JSLinkedHashMap *table = static_cast<JSLinkedHashMap *>(p->u.opaque);
+    bc_put_u32(s, table->live_count);
+    uint32_t entry_used = table->entry_used;
+    for (uint32_t i = 0; i < entry_used; i++) {
+      JSLinkedHashMapEntry &entry = JSLinkedHashMapEntries(table)[i];
+      if (!JSLinkedHashMapEntryIsLive(&entry)) continue;
+      key = entry.key;
+      value = entry.value;
+      if (unlikely(JS_WriteObjectRec(s, key))) return -1;
+      if (!is_set && unlikely(JS_WriteObjectRec(s, value))) return -1;
+    }
+    return 0;
+  }
   JSMapState *ms = static_cast<JSMapState *>(p->u.opaque);
   bc_put_u32(s, ms->record_count);
   list_head *el;
@@ -31942,6 +32810,46 @@ static bool JS_ShouldStripVarInfo(LEPUSContext *ctx,
                          PRIMJS_STRIP_VARINFO_VERSION);
 }
 
+/* Non-shippable opcodes are deliberately appended after the stable bytecode
+   ABI.  Reject them before writing any function payload so runtime-only
+   compilation can never leak into a shipped snapshot. */
+static int JS_CheckFunctionBytecodeShippable(LEPUSContext *ctx,
+                                             LEPUSFunctionBytecode *b) {
+  int pos = 0;
+
+  while (pos < b->byte_code_len) {
+    uint8_t op = b->byte_code_buf[pos];
+    if (op >= OP_COUNT) {
+      LEPUS_ThrowInternalError(ctx,
+                               "cannot serialize invalid bytecode opcode %u",
+                               static_cast<unsigned>(op));
+      return -1;
+    }
+    switch (op) {
+      case OP_inc_coverage:
+      case OP_get_global_ref_undef:
+      case OP_get_global_ref:
+      case OP_put_global_ref:
+      case OP_put_global_ref_init:
+        LEPUS_ThrowInternalError(
+            ctx, "cannot serialize runtime-only bytecode opcode %u",
+            static_cast<unsigned>(op));
+        return -1;
+      default:
+        break;
+    }
+    int len = short_opcode_info(op).size;
+    if (len <= 0 || len > b->byte_code_len - pos) {
+      LEPUS_ThrowInternalError(ctx,
+                               "cannot serialize malformed bytecode opcode %u",
+                               static_cast<unsigned>(op));
+      return -1;
+    }
+    pos += len;
+  }
+  return 0;
+}
+
 static int JS_WriteFunction(BCWriterState *s, LEPUSValueConst obj) {
   uint8_t debuginfo_outside = s->ctx->debuginfo_outside;
   LEPUSFunctionBytecode *b =
@@ -31950,10 +32858,8 @@ static int JS_WriteFunction(BCWriterState *s, LEPUSValueConst obj) {
   int idx, i;
 
   if (!s->allow_bytecode) goto fail;
-  /* Coverage-instrumented functions embed OP_inc_coverage, which is not
-     recognized by runtimes that were built without this opcode.  Refuse to
-     serialize them so bytecode produced by LEPUS_Eval_WITH_COVERAGE can
-     never be shipped to older runtimes. */
+  /* Keep the established diagnostic for coverage bytecode. The opcode scan
+     below remains the definitive guard for every runtime-only opcode. */
   if (b->runtime_id >= 0) {
     LEPUS_ThrowInternalError(
         s->ctx,
@@ -31961,6 +32867,7 @@ static int JS_WriteFunction(BCWriterState *s, LEPUSValueConst obj) {
         b->runtime_id);
     goto fail;
   }
+  if (JS_CheckFunctionBytecodeShippable(s->ctx, b)) goto fail;
   bc_put_u8(s, BC_TAG_FUNCTION_BYTECODE);
   flags = idx = 0;
   bc_set_flags(&flags, &idx, b->has_prototype, 1);
@@ -31988,7 +32895,7 @@ static int JS_WriteFunction(BCWriterState *s, LEPUSValueConst obj) {
   if (b->vardefs && !JS_ShouldStripVarInfo(s->ctx, b)) {
     bc_put_leb128(s, b->arg_count + b->var_count);
     for (i = 0; i < b->arg_count + b->var_count; i++) {
-      JSVarDef *vd = &b->vardefs[i];
+      JSBytecodeVarDef *vd = &b->vardefs[i];
       bc_put_atom(s, vd->var_name);
       bc_put_leb128(s, vd->scope_level);
       bc_put_leb128(s, vd->scope_next + 1);
@@ -32578,6 +33485,23 @@ QJS_STATIC JSString *JS_ReadString(BCReaderState *s) {
   return p;
 }
 
+QJS_STATIC JSAtom JS_ReadAtomString(BCReaderState *s) {
+  uint32_t encoded_len;
+  if (bc_get_leb128(s, &encoded_len)) return JS_ATOM_NULL;
+
+  BOOL is_wide_char = encoded_len & 1;
+  size_t len = encoded_len >> 1;
+  size_t size = len << is_wide_char;
+  if (static_cast<size_t>(s->buf_end - s->ptr) < size) {
+    bc_read_error_end(s);
+    return JS_ATOM_NULL;
+  }
+
+  const uint8_t *str = s->ptr;
+  s->ptr += size;
+  return JS_NewAtomRawString(s->ctx, str, len, is_wide_char);
+}
+
 QJS_STATIC uint32_t bc_get_flags(uint32_t flags, int *pidx, int n) {
   uint32_t val;
   /* XXX: this does not work for n == 32 */
@@ -32608,7 +33532,7 @@ QJS_STATIC int JS_ReadFunctionBytecode(LEPUSContext *ctx, BCReaderState *s,
   pos = 0;
   while (pos < bc_len) {
     op = bc_buf[pos];
-    if (op == OP_invalid || op >= OP_COUNT) {
+    if (op == OP_invalid || op >= OP_SHIPPABLE_COUNT) {
       b->byte_code_len = pos;
       LEPUS_ThrowSyntaxError(ctx, "invalid opcode (op=%u pc=%d)", op, pos);
       return s->error_state = -1;
@@ -32856,13 +33780,17 @@ QJS_STATIC LEPUSValue JS_ReadFunction(BCReaderState *s) {
 
   if (local_count != 0) {
     bc_read_trace(s, "vars {\n");
-    b->vardefs = (JSVarDef *)((uint8_t *)b + vardefs_offset);
+    b->vardefs = reinterpret_cast<JSBytecodeVarDef *>(
+        reinterpret_cast<uint8_t *>(b) + vardefs_offset);
     for (i = 0; i < local_count; i++) {
-      JSVarDef *vd = &b->vardefs[i];
+      JSBytecodeVarDef *vd = &b->vardefs[i];
       if (bc_get_atom(s, &vd->var_name)) goto fail;
-      if (bc_get_leb128_int(s, &vd->scope_level)) goto fail;
+      int scope_level;
+      if (bc_get_leb128_int(s, &scope_level)) goto fail;
       if (bc_get_leb128_int(s, &vd->scope_next)) goto fail;
       vd->scope_next--;
+      if (scope_level < 0 || scope_level > 0xffffff) goto fail;
+      vd->scope_level = static_cast<uint32_t>(scope_level);
       if (bc_get_u8(s, &v8)) goto fail;
       idx = 0;
       vd->var_kind = bc_get_flags(v8, &idx, 4);
@@ -32890,6 +33818,9 @@ QJS_STATIC LEPUSValue JS_ReadFunction(BCReaderState *s) {
       idx = 0;
       cv->is_local = bc_get_flags(v8, &idx, 1);
       cv->is_arg = bc_get_flags(v8, &idx, 1);
+      cv->closure_type = cv->is_local
+                             ? (cv->is_arg ? JS_CLOSURE_ARG : JS_CLOSURE_LOCAL)
+                             : JS_CLOSURE_REF;
       cv->is_const = bc_get_flags(v8, &idx, 1);
       cv->is_lexical = bc_get_flags(v8, &idx, 1);
       cv->var_kind = bc_get_flags(v8, &idx, 4);
@@ -33550,10 +34481,6 @@ bool JS_CheckBytecodeVersion(uint64_t v64) {
 QJS_STATIC int JS_ReadObjectAtoms(BCReaderState *s) {
   uint8_t v8;
   uint64_t v64;
-  JSString *p = nullptr;
-#ifdef ENABLE_COMPATIBLE_MM
-  HandleScope func_scope(s->ctx, &p, HANDLE_TYPE_HEAP_OBJ);
-#endif
   int i;
   JSAtom atom;
 
@@ -33591,9 +34518,7 @@ QJS_STATIC int JS_ReadObjectAtoms(BCReaderState *s) {
     if (!s->idx_to_atom) return s->error_state = -1;
   }
   for (i = 0; i < s->idx_to_atom_count; i++) {
-    p = JS_ReadString(s);
-    if (!p) return -1;
-    atom = JS_NewAtomStr(s->ctx, p);
+    atom = JS_ReadAtomString(s);
     if (atom == JS_ATOM_NULL) return s->error_state = -1;
     s->idx_to_atom[i] = atom;
     if (s->is_rom_data && (atom != (i + s->first_atom)))
@@ -35057,8 +35982,12 @@ LEPUSValue LEPUS_DeepEqual(LEPUSContext *ctx, LEPUSValueConst obj1,
       if (pr2->atom == JS_ATOM_NULL && pr2->flags == 0) prop_count2--;
       if (atom != JS_ATOM_NULL && JS_AtomIsString(ctx, atom) &&
           (pr1->flags & LEPUS_PROP_ENUMERABLE)) {
-        /* TMASK properties store getset/varref/autoinit data, not a value */
-        if (pr1->flags & LEPUS_PROP_TMASK) goto fail;
+        /* DeepEqual is data-only: a helper slot (getset/var_ref/autoinit)
+         * cannot be read as a value and recursed on safely, so reject it
+         * without interpreting or executing it. The obj2 counterpart is still
+         * resolved through the normal property path so behavior does not
+         * depend on the property storage layout. */
+        if ((pr1->flags & LEPUS_PROP_TMASK) != LEPUS_PROP_NORMAL) goto fail;
         val2 = JS_GetPropertyInternal_RC(ctx, obj2, atom, obj2, 0);
         if (LEPUS_IsException(val2)) goto fail;
         val1 = p1->prop[i].u.value;
@@ -35631,10 +36560,7 @@ QJS_HIDE LEPUSValue js_function_toString(LEPUSContext *ctx,
     LEPUSValue name;
     const char *pref, *suff;
 
-    if (p->is_class) {
-      pref = "class ";
-      suff = " {\n    [native code]\n}";
-    } else {
+    {
       switch (func_kind) {
         default:
         case JS_FUNC_NORMAL:
@@ -39858,6 +40784,37 @@ QJS_STATIC LEPUSValue js_compile_regexp(LEPUSContext *ctx,
   return ret;
 }
 
+/* <Primjs begin> */
+/* Regexp bytecode compiled before the engine upgrade (see
+   lre_is_legacy_bytecode) is still embedded in precompiled templates. Every
+   path that turns (pattern, bytecode) into a RegExp object recognises it
+   here and recompiles it from the source pattern. */
+BOOL js_regexp_is_legacy_bytecode(LEPUSValueConst bc) {
+  JSString *p = LEPUS_VALUE_GET_STRING(bc);
+  return !p->is_wide_char && lre_is_legacy_bytecode(p->u.str8, p->len);
+}
+
+LEPUSValue js_regexp_recompile_legacy_bytecode(LEPUSContext *ctx,
+                                               LEPUSValueConst pattern,
+                                               LEPUSValueConst legacy_bc) {
+  int re_flags =
+      LEPUS_VALUE_GET_STRING(legacy_bc)->u.str8[0] & LRE_LEGACY_USER_FLAGS_MASK;
+  size_t len;
+  const char *str =
+      LEPUS_ToCStringLen2(ctx, &len, pattern, !(re_flags & LRE_FLAG_UNICODE));
+  if (!str) return LEPUS_EXCEPTION;
+  int re_bytecode_len;
+  char error_msg[64];
+  uint8_t *re_bytecode_buf = lre_compile(
+      &re_bytecode_len, error_msg, sizeof(error_msg), str, len, re_flags, ctx);
+  if (!ctx->gc_enable) LEPUS_FreeCString(ctx, str);
+  if (!re_bytecode_buf) return LEPUS_ThrowSyntaxError(ctx, "%s", error_msg);
+  LEPUSValue ret = js_new_string8(ctx, re_bytecode_buf, re_bytecode_len);
+  lre_free(re_bytecode_buf);
+  return ret;
+}
+/* <Primjs end> */
+
 /* create a RegExp object from a string containing the RegExp bytecode
    and the source pattern */
 LEPUSValue js_regexp_constructor_internal(LEPUSContext *ctx,
@@ -39886,6 +40843,12 @@ LEPUSValue js_regexp_constructor_internal(LEPUSContext *ctx,
     LEPUS_FreeValue(ctx, bc);
     LEPUS_FreeValue(ctx, pattern);
     return LEPUS_EXCEPTION;
+  }
+  if (unlikely(js_regexp_is_legacy_bytecode(bc))) {
+    LEPUSValue upgraded = js_regexp_recompile_legacy_bytecode(ctx, pattern, bc);
+    if (LEPUS_IsException(upgraded)) goto fail;
+    LEPUS_FreeValue(ctx, bc);
+    bc = upgraded;
   }
 
   obj = js_create_from_ctor(ctx, ctor, JS_CLASS_REGEXP);
@@ -40197,6 +41160,13 @@ BOOL lre_check_stack_overflow(void *opaque, size_t alloca_size) {
   return js_check_stack_overflow(ctx, alloca_size);
 }
 
+int lre_check_timeout(void *opaque) {
+  LEPUSContext *ctx = static_cast<LEPUSContext *>(opaque);
+  LEPUSRuntime *rt = ctx->rt;
+  return rt->interrupt_handler &&
+         rt->interrupt_handler(rt, rt->interrupt_opaque);
+}
+
 void *lre_realloc(void *opaque, void *ptr, size_t size) {
   LEPUSContext *ctx = static_cast<LEPUSContext *>(opaque);
   /* No LEPUS exception is raised here */
@@ -40237,7 +41207,7 @@ QJS_STATIC LEPUSValue js_regexp_exec(LEPUSContext *ctx,
   uint8_t *re_bytecode;
   int ret;
   uint8_t **capture, *str_buf;
-  int capture_count, shift, i, re_flags;
+  int alloc_count, capture_count, shift, i, re_flags;
   int64_t last_index;
   const char *group_name_ptr;
   LEPUSValue regexp_obj = LEPUS_UNDEFINED;
@@ -40258,10 +41228,11 @@ QJS_STATIC LEPUSValue js_regexp_exec(LEPUSContext *ctx,
   }
   str = LEPUS_VALUE_GET_STRING(str_val);
   capture_count = lre_get_capture_count(re_bytecode);
+  alloc_count = lre_get_alloc_count(re_bytecode);
   capture = NULL;
-  if (capture_count > 0) {
+  if (alloc_count > 0) {
     capture = static_cast<uint8_t **>(
-        lepus_malloc(ctx, sizeof(capture[0]) * capture_count * 2));
+        lepus_malloc(ctx, sizeof(capture[0]) * alloc_count));
     if (!capture) {
       LEPUS_FreeValue(ctx, str_val);
       return LEPUS_EXCEPTION;
@@ -40285,7 +41256,12 @@ QJS_STATIC LEPUSValue js_regexp_exec(LEPUSContext *ctx,
           goto fail;
       }
     } else {
-      LEPUS_ThrowInternalError(ctx, "out of memory in regexp execution");
+      if (ret == LRE_RET_TIMEOUT) {
+        LEPUS_ThrowInternalError(ctx, "interrupted");
+        JS_SetUncatchableError(ctx, ctx->rt->current_exception, TRUE);
+      } else {
+        LEPUS_ThrowInternalError(ctx, "out of memory in regexp execution");
+      }
       goto fail;
     }
     LEPUS_FreeValue(ctx, str_val);
@@ -40301,15 +41277,11 @@ QJS_STATIC LEPUSValue js_regexp_exec(LEPUSContext *ctx,
     obj = LEPUS_NewArray(ctx);
     if (LEPUS_IsException(obj)) goto fail;
     prop_flags = LEPUS_PROP_C_W_E | LEPUS_PROP_THROW;
-    group_name_ptr = NULL;
-    if (re_flags & LRE_FLAG_NAMED_GROUPS) {
-      uint32_t re_bytecode_len;
+    group_name_ptr = lre_get_groupnames(re_bytecode);
+    if (group_name_ptr) {
       groups = LEPUS_NewObjectProto(ctx, LEPUS_NULL);
       if (LEPUS_IsException(groups)) goto fail;
-      re_bytecode_len = get_u32(re_bytecode + 3);
-      group_name_ptr = (char *)(re_bytecode + 7 + re_bytecode_len);
     }
-
 #if defined(__WASI_SDK__) || defined(QJS_UNITTEST)
     static constexpr const char *regexp_capture_name[] = {
         "$&", "$1", "$2", "$3", "$4", "$5", "$6", "$7", "$8", "$9"};
@@ -40341,14 +41313,25 @@ QJS_STATIC LEPUSValue js_regexp_exec(LEPUSContext *ctx,
 
       if (group_name_ptr && i > 0) {
         if (*group_name_ptr) {
-          if (JS_DefinePropertyValueStr_RC(ctx, groups, group_name_ptr,
-                                           LEPUS_DupValue(ctx, val),
-                                           prop_flags) < 0) {
+          JSAtom group_name = LEPUS_NewAtom(ctx, group_name_ptr);
+          if (group_name == JS_ATOM_NULL) {
             LEPUS_FreeValue(ctx, val);
             goto fail;
           }
+          /* LEPUS_HasProperty() cannot fail for this plain object. */
+          if (!LEPUS_IsUndefined(val) ||
+              !LEPUS_HasProperty(ctx, groups, group_name)) {
+            if (JS_DefinePropertyValue_RC(ctx, groups, group_name,
+                                          LEPUS_DupValue(ctx, val),
+                                          prop_flags) < 0) {
+              LEPUS_FreeAtom(ctx, group_name);
+              LEPUS_FreeValue(ctx, val);
+              goto fail;
+            }
+          }
+          LEPUS_FreeAtom(ctx, group_name);
         }
-        group_name_ptr += strlen(group_name_ptr) + 1;
+        group_name_ptr += strlen(group_name_ptr) + LRE_GROUP_NAME_TRAILER_LEN;
       }
       if (JS_DefinePropertyValueUint32_RC(ctx, obj, i, val, prop_flags) < 0)
         goto fail;
@@ -40393,7 +41376,7 @@ QJS_STATIC LEPUSValue JS_RegExpDelete(LEPUSContext *ctx,
   uint8_t *re_bytecode;
   int ret;
   uint8_t **capture, *str_buf;
-  int capture_count, shift, re_flags;
+  int alloc_count, capture_count, shift, re_flags;
   int next_src_pos, start, end;
   int64_t last_index;
   StringBuffer b_s, *b = &b_s;
@@ -40417,9 +41400,10 @@ QJS_STATIC LEPUSValue JS_RegExpDelete(LEPUSContext *ctx,
       goto fail;
   }
   capture_count = lre_get_capture_count(re_bytecode);
-  if (capture_count > 0) {
+  alloc_count = lre_get_alloc_count(re_bytecode);
+  if (alloc_count > 0) {
     capture = static_cast<uint8_t **>(
-        lepus_malloc(ctx, sizeof(capture[0]) * capture_count * 2));
+        lepus_malloc(ctx, sizeof(capture[0]) * alloc_count));
     if (!capture) goto fail;
   }
   shift = str->is_wide_char;
@@ -40439,7 +41423,12 @@ QJS_STATIC LEPUSValue JS_RegExpDelete(LEPUSContext *ctx,
             goto fail;
         }
       } else {
-        LEPUS_ThrowInternalError(ctx, "out of memory in regexp execution");
+        if (ret == LRE_RET_TIMEOUT) {
+          LEPUS_ThrowInternalError(ctx, "interrupted");
+          JS_SetUncatchableError(ctx, ctx->rt->current_exception, TRUE);
+        } else {
+          LEPUS_ThrowInternalError(ctx, "out of memory in regexp execution");
+        }
         goto fail;
       }
       break;
@@ -45139,7 +46128,8 @@ QJS_STATIC LEPUSValue js_symbol_keyFor(LEPUSContext *ctx,
   if (!LEPUS_IsSymbol(argv[0]))
     return LEPUS_ThrowTypeError(ctx, "not a symbol");
   p = static_cast<JSAtomStruct *>(LEPUS_VALUE_GET_PTR(argv[0]));
-  if (p->atom_type != JS_ATOM_TYPE_GLOBAL_SYMBOL) return LEPUS_UNDEFINED;
+  if (js_string_meta(p)->atom_type != JS_ATOM_TYPE_GLOBAL_SYMBOL)
+    return LEPUS_UNDEFINED;
   return LEPUS_DupValue(ctx, LEPUS_MKPTR(LEPUS_TAG_STRING, p));
 }
 
@@ -45339,6 +46329,34 @@ fail:
   LEPUS_FreeValue(ctx, obj);
   return LEPUS_EXCEPTION;
 }
+
+#ifdef ENABLE_QUICKJS_DEBUGGER
+int JS_MapGetNextEntry(LEPUSContext *ctx, LEPUSValueConst obj, int magic,
+                       uint32_t *cursor, LEPUSValue *key, LEPUSValue *value) {
+#ifdef ENABLE_COMPATIBLE_MM
+  if (ctx->gc_enable) {
+    return JS_MapGetNextEntry_GC(ctx, obj, magic, cursor, key, value);
+  }
+#endif
+
+  JSMapState *s = static_cast<JSMapState *>(
+      LEPUS_GetOpaque2(ctx, obj, JS_CLASS_MAP + magic));
+  if (!s) return -1;
+
+  uint32_t live_index = 0;
+  struct list_head *el;
+  list_for_each(el, &s->records) {
+    JSMapRecord *record = list_entry(el, JSMapRecord, link);
+    if (record->empty) continue;
+    if (live_index++ != *cursor) continue;
+    ++*cursor;
+    *key = LEPUS_DupValue(ctx, record->key);
+    *value = LEPUS_DupValue(ctx, record->value);
+    return 1;
+  }
+  return 0;
+}
+#endif
 
 /* XXX: could normalize strings to speed up comparison */
 QJS_STATIC LEPUSValueConst map_normalize_key(LEPUSContext *ctx,
@@ -49175,7 +50193,14 @@ QJS_STATIC void JS_AddIntrinsicBasicObjects(LEPUSContext *ctx) {
   ctx->class_proto[JS_CLASS_BYTECODE_FUNCTION] =
       LEPUS_DupValue(ctx, ctx->function_proto);
   ctx->global_obj = JS_NewObjectProtoClassAlloc(
-      ctx, ctx->class_proto[JS_CLASS_OBJECT], JS_CLASS_OBJECT, 256);
+      ctx, ctx->class_proto[JS_CLASS_OBJECT], JS_CLASS_GLOBAL_OBJECT, 256);
+  if (LEPUS_IsException(ctx->global_obj)) return;
+  {
+    LEPUSObject *global = LEPUS_VALUE_GET_OBJ(ctx->global_obj);
+    global->u.global_object.uninitialized_vars =
+        JS_NewObjectProtoClassAlloc(ctx, LEPUS_NULL, JS_CLASS_OBJECT, 4);
+    if (LEPUS_IsException(global->u.global_object.uninitialized_vars)) return;
+  }
 
   ctx->global_var_obj =
       JS_NewObjectProtoClassAlloc(ctx, LEPUS_NULL, JS_CLASS_OBJECT, 256);
@@ -52624,15 +53649,23 @@ failed:
 
 const char *LEPUS_GetStringUtf8(LEPUSContext *ctx, const JSString *p) {
   if (p->is_wide_char) return nullptr;
+  if (js_string_meta(p)->ascii_state == JS_STRING_ASCII_YES) {
+    return reinterpret_cast<const char *>(p->u.str8);
+  }
+  if (js_string_meta(p)->ascii_state == JS_STRING_ASCII_NO) return nullptr;
+
   const uint8_t *src = p->u.str8;
   int count = 0;
   for (int pos = 0, len = p->len; pos < len; ++pos) {
     count += src[pos] >> 7;
   }
 
+  JSString *str = const_cast<JSString *>(p);
   if (count == 0) {
+    js_string_meta(str)->ascii_state = JS_STRING_ASCII_YES;
     return (const char *)(src);
   }
+  js_string_meta(str)->ascii_state = JS_STRING_ASCII_NO;
   return nullptr;
 }
 
@@ -52976,8 +54009,6 @@ pid_t get_tid() {
 
 void CheckObjectCtx(LEPUSContext *ctx, LEPUSValue obj) {
   if (unlikely(ctx->object_ctx_check)) {
-    /* objects created before object_ctx_check was turned on may reuse ctx/tid
-       as inline property slots; those cannot be checked. */
     LEPUSObject *object = nullptr;
     bool object_has_context_fields = false;
     if (LEPUS_VALUE_IS_OBJECT(obj)) {

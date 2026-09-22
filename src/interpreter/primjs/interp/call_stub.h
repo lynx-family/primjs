@@ -15,11 +15,10 @@ struct QuickStackFrame {
   struct QuickStackFrame *prev_frame; /* NULL if first stack frame */
   LEPUSValue
       cur_func; /* current function, LEPUS_UNDEFINED if the frame is detached */
-  LEPUSValue *arg_buf;           /* arguments */
-  LEPUSValue *var_buf;           /* variables */
-  struct list_head var_ref_list; /* list of JSVarRef.link */
-  const uint8_t *cur_pc;         /* only used in bytecode functions : PC of the
-                              instruction after the call */
+  LEPUSValue *arg_buf;   /* arguments */
+  LEPUSValue *var_buf;   /* variables */
+  const uint8_t *cur_pc; /* only used in bytecode functions : PC of the
+                      instruction after the call */
   int arg_count;
   int js_mode; /* for C functions: 0 */
   /* only used in generators. Current stack pointer value. NULL if
@@ -34,11 +33,10 @@ struct DebuggerQuickStackFrame {
   struct DebuggerQuickStackFrame *prev_frame; /* NULL if first stack frame */
   LEPUSValue
       cur_func; /* current function, LEPUS_UNDEFINED if the frame is detached */
-  LEPUSValue *arg_buf;           /* arguments */
-  LEPUSValue *var_buf;           /* variables */
-  struct list_head var_ref_list; /* list of JSVarRef.link */
-  const uint8_t *cur_pc;         /* only used in bytecode functions : PC of the
-                              instruction after the call */
+  LEPUSValue *arg_buf;   /* arguments */
+  LEPUSValue *var_buf;   /* variables */
+  const uint8_t *cur_pc; /* only used in bytecode functions : PC of the
+                      instruction after the call */
   int arg_count;
   int js_mode; /* for C functions: 0 */
   /* only used in generators. Current stack pointer value. NULL if

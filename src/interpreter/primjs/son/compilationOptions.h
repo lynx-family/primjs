@@ -32,6 +32,7 @@ class CompilationOptions {
     kSupportMutiTable = 1 << 4,
     kSupportVirtualSp = 1 << 5,
     kUseFastPath = 1 << 6,
+    kShareMultiTableFallback = 1 << 7,
   };
 
   CompilationOptions() : _flags(0), _target_arch(TargetArch::kAARCH64) {}
@@ -49,6 +50,9 @@ class CompilationOptions {
   bool SupportMultiTable() const { return GetFlag(kSupportMutiTable); }
   bool SupportVirtualSp() const { return GetFlag(kSupportVirtualSp); }
   bool UseFastPath() const { return GetFlag(kUseFastPath); }
+  bool ShareMultiTableFallback() const {
+    return GetFlag(kShareMultiTableFallback);
+  }
 
   bool Is32Bit() const {
     auto value = static_cast<uint32_t>(_target_arch);

@@ -52,6 +52,7 @@ force_inline void *StaticVisitRootLEPUSValue(LEPUSValue val) {
       return ptr;
     case LEPUS_TAG_SEPARABLE_STRING:
     case LEPUS_TAG_FUNCTION_BYTECODE:
+    case LEPUS_TAG_VAR_REF:
     case LEPUS_TAG_LEPUS_REF:
     case LEPUS_TAG_SYMBOL:
     case LEPUS_TAG_BIG_INT:
@@ -198,6 +199,28 @@ static force_inline uint8_t Acquire_Load8(void *fieldAddr) {
       std::memory_order_acquire);
 }
 
+static force_inline LEPUSValue *Acquire_LoadJSVarRefGCPValue(
+    JSVarRefGC *var_ref) {
+  uintptr_t value = std::atomic_load_explicit(
+      js_var_ref_gc_atomic_word(var_ref), std::memory_order_acquire);
+  return reinterpret_cast<LEPUSValue *>(value & ~JS_VAR_REF_GC_FLAG_MASK);
+}
+
+static force_inline void Release_StoreJSVarRefGCPValue(JSVarRefGC *var_ref,
+                                                       LEPUSValue *pvalue) {
+  assert((reinterpret_cast<uintptr_t>(pvalue) & JS_VAR_REF_GC_FLAG_MASK) == 0);
+  auto *word = js_var_ref_gc_atomic_word(var_ref);
+  uintptr_t old_value =
+      std::atomic_load_explicit(word, std::memory_order_relaxed);
+  uintptr_t new_value;
+  do {
+    new_value = reinterpret_cast<uintptr_t>(pvalue) |
+                (old_value & JS_VAR_REF_GC_FLAG_MASK);
+  } while (!std::atomic_compare_exchange_weak_explicit(
+      word, &old_value, new_value, std::memory_order_release,
+      std::memory_order_relaxed));
+}
+
 class Visitor {
  public:
   std::atomic<bool> doParallelScan{true};
@@ -248,6 +271,7 @@ class Visitor {
   static void VisitLEPUSFunctionBytecode(void *ptr,
                                          GCWorkStack &workStack) noexcept;
   static void VisitLEPUSObject(void *ptr, GCWorkStack &workStack) noexcept;
+  static void VisitJSString(void *ptr, GCWorkStack &workStack) noexcept;
   /* LEPUSValue with tag -> end */
   // LEPUS_TAG_BIG_INT
   /* LEPUSObject with class_id -> begin */
@@ -262,8 +286,7 @@ class Visitor {
       GCWorkStack &workStack) noexcept;  // normal_free
   static void VisitJSArrayBuffer(void *ptr, GCWorkStack &workStack) noexcept;
   static void VisitJSTypedArray(void *ptr, GCWorkStack &workStack) noexcept;
-  static void VisitJSMapState(void *ptr, GCWorkStack &workStack) noexcept;
-  static void VisitJSMapRecord(void *ptr, GCWorkStack &workStack) noexcept;
+  static void VisitJSLinkedHashMap(void *ptr, GCWorkStack &workStack) noexcept;
   static void VisitJSMapIteratorData(void *ptr,
                                      GCWorkStack &workStack) noexcept;
   static void VisitJSArrayIteratorData(
@@ -324,7 +347,6 @@ class Visitor {
                                       GCWorkStack &workStack) noexcept;
   static void VisitJSImportEntryArray(void *ptr,
                                       GCWorkStack &workStack) noexcept;
-  static void VisitValueSlotArray(void *ptr, GCWorkStack &workStack) noexcept;
   static void VisitJsonStrArray(void *ptr, GCWorkStack &workStack) noexcept;
   static void VisitLEPUSBreakpointArray(void *ptr,
                                         GCWorkStack &workStack) noexcept;
@@ -347,11 +369,6 @@ class Visitor {
                               GCWorkStack &workStack) noexcept;
 
   void DoFinalizer(void *ptr);
-
-  // tools
-  static bool IsConstString(void *ptr) {
-    return get_alloc_tag(ptr) == ALLOC_TAG_JSConstString;
-  }
 
   // field
  public:
@@ -400,7 +417,7 @@ class Finalizer {
   void BytecodeListFinalizer() noexcept;
   void JSArrayBufferFinalizer(void *ptr) noexcept;
   void JSTypedArrayFinalizer(void *ptr) noexcept;
-  void JSMapStateFinalizer(void *ptr) noexcept;
+  void JSLinkedHashMapFinalizer(void *ptr) noexcept;
   void JSMapIteratorDataFinalizer(void *ptr) noexcept;
   void JSModuleDefFinalizer(void *ptr) noexcept;
   void JSSeparableStringFinalizer(void *ptr) noexcept {}

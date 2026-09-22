@@ -314,7 +314,6 @@ test/built-ins/RegExp/match-indices/indices-groups-object-unmatched.js:17: Synta
 test/built-ins/RegExp/match-indices/indices-groups-object.js:24: SyntaxError: invalid regular expression flags
 test/built-ins/RegExp/match-indices/indices-groups-properties.js:18: SyntaxError: invalid regular expression flags
 test/built-ins/RegExp/match-indices/indices-property.js:24: SyntaxError: invalid regular expression flags
-test/built-ins/RegExp/named-groups/non-unicode-property-names-valid.js:46: SyntaxError: invalid group name
 test/built-ins/RegExp/property-escapes/generated/Alphabetic.js:16: Test262Error: `\p{Alphabetic}` should match U+000C5D (`ౝ`)
 test/built-ins/RegExp/property-escapes/generated/Assigned.js:16: Test262Error: `\p{Assigned}` should match U+000C5D (`ౝ`)
 test/built-ins/RegExp/property-escapes/generated/Bidi_Mirrored.js:16: Test262Error: `\p{Bidi_Mirrored}` should match U+002E55 (`⹕`)
@@ -683,14 +682,13 @@ test/language/computed-property-names/class/static/method-number-order.js:59: Te
 test/language/computed-property-names/class/static/method-string-order.js:59: Test262Error: Expected [length, prototype, name, a, b, c, d] and [length, name, prototype, a, b, c, d] to have the same contents. 
 test/language/computed-property-names/class/static/method-symbol-order.js:64: Test262Error: Expected [length, prototype, name, a, c] and [length, name, prototype, a, c] to have the same contents. 
 test/language/eval-code/indirect/realm.js:29: TypeError: $262.createRealm is not a function
-test/language/expressions/assignment/assignment-operator-calls-putvalue-lref--rval--1.js:20: Test262Error: Expected a ReferenceError to be thrown but no exception was thrown at all
 test/language/expressions/assignment/assignment-operator-calls-putvalue-lref--rval-.js:20: Test262Error: Expected a ReferenceError to be thrown but no exception was thrown at all
 test/language/expressions/assignment/target-member-computed-reference-null.js:32: Test262Error: Expected a DummyError but got a TypeError
 test/language/expressions/assignment/target-member-computed-reference-undefined.js:32: Test262Error: Expected a DummyError but got a TypeError
 test/language/expressions/async-generator/eval-body-proto-realm.js:32: TypeError: $262.createRealm is not a function
 test/language/expressions/call/eval-realm-indirect.js:21: TypeError: $262.createRealm is not a function
 test/language/expressions/call/tco-call-args.js:18: strict mode: InternalError: stack overflow
-test/language/expressions/call/tco-member-args.js:17: strict mode: InternalError: stack overflow
+test/language/expressions/call/tco-member-args.js:12: strict mode: InternalError: stack overflow
 test/language/expressions/call/tco-non-eval-function-dynamic.js:41: Test262Error: Expected SameValue(«0», «1») to be true
 test/language/expressions/call/tco-non-eval-function.js:41: Test262Error: Expected SameValue(«0», «1») to be true
 test/language/expressions/call/tco-non-eval-global.js:41: Test262Error: Expected SameValue(«0», «1») to be true
@@ -726,28 +724,17 @@ test/language/expressions/class/private-static-setter-multiple-evaluations-of-cl
 test/language/expressions/class/static-init-await-reference.js:18: SyntaxError: invalid property name
 test/language/expressions/coalesce/tco-pos-null.js:24: strict mode: InternalError: stack overflow
 test/language/expressions/coalesce/tco-pos-undefined.js:24: strict mode: InternalError: stack overflow
-test/language/expressions/comma/tco-final.js:17: strict mode: InternalError: stack overflow
-test/language/expressions/compound-assignment/compound-assignment-operator-calls-putvalue-lref--v--1.js:19: Test262Error: Expected a ReferenceError to be thrown but no exception was thrown at all
+test/language/expressions/comma/tco-final.js:12: strict mode: InternalError: stack overflow
 test/language/expressions/compound-assignment/compound-assignment-operator-calls-putvalue-lref--v--2.js:19: Test262Error: Expected a ReferenceError to be thrown but no exception was thrown at all
-test/language/expressions/compound-assignment/compound-assignment-operator-calls-putvalue-lref--v--3.js:19: Test262Error: Expected a ReferenceError to be thrown but no exception was thrown at all
 test/language/expressions/compound-assignment/compound-assignment-operator-calls-putvalue-lref--v--4.js:19: Test262Error: Expected a ReferenceError to be thrown but no exception was thrown at all
-test/language/expressions/compound-assignment/compound-assignment-operator-calls-putvalue-lref--v--5.js:19: Test262Error: Expected a ReferenceError to be thrown but no exception was thrown at all
 test/language/expressions/compound-assignment/compound-assignment-operator-calls-putvalue-lref--v--6.js:19: Test262Error: Expected a ReferenceError to be thrown but no exception was thrown at all
-test/language/expressions/compound-assignment/compound-assignment-operator-calls-putvalue-lref--v--7.js:19: Test262Error: Expected a ReferenceError to be thrown but no exception was thrown at all
 test/language/expressions/compound-assignment/compound-assignment-operator-calls-putvalue-lref--v--8.js:19: Test262Error: Expected a ReferenceError to be thrown but no exception was thrown at all
-test/language/expressions/compound-assignment/compound-assignment-operator-calls-putvalue-lref--v--9.js:19: Test262Error: Expected a ReferenceError to be thrown but no exception was thrown at all
 test/language/expressions/compound-assignment/compound-assignment-operator-calls-putvalue-lref--v--10.js:20: Test262Error: Expected a ReferenceError to be thrown but no exception was thrown at all
-test/language/expressions/compound-assignment/compound-assignment-operator-calls-putvalue-lref--v--11.js:19: Test262Error: Expected a ReferenceError to be thrown but no exception was thrown at all
 test/language/expressions/compound-assignment/compound-assignment-operator-calls-putvalue-lref--v--12.js:19: Test262Error: Expected a ReferenceError to be thrown but no exception was thrown at all
-test/language/expressions/compound-assignment/compound-assignment-operator-calls-putvalue-lref--v--13.js:19: Test262Error: Expected a ReferenceError to be thrown but no exception was thrown at all
 test/language/expressions/compound-assignment/compound-assignment-operator-calls-putvalue-lref--v--14.js:19: Test262Error: Expected a ReferenceError to be thrown but no exception was thrown at all
-test/language/expressions/compound-assignment/compound-assignment-operator-calls-putvalue-lref--v--15.js:19: Test262Error: Expected a ReferenceError to be thrown but no exception was thrown at all
 test/language/expressions/compound-assignment/compound-assignment-operator-calls-putvalue-lref--v--16.js:19: Test262Error: Expected a ReferenceError to be thrown but no exception was thrown at all
-test/language/expressions/compound-assignment/compound-assignment-operator-calls-putvalue-lref--v--17.js:19: Test262Error: Expected a ReferenceError to be thrown but no exception was thrown at all
 test/language/expressions/compound-assignment/compound-assignment-operator-calls-putvalue-lref--v--18.js:19: Test262Error: Expected a ReferenceError to be thrown but no exception was thrown at all
-test/language/expressions/compound-assignment/compound-assignment-operator-calls-putvalue-lref--v--19.js:19: Test262Error: Expected a ReferenceError to be thrown but no exception was thrown at all
 test/language/expressions/compound-assignment/compound-assignment-operator-calls-putvalue-lref--v--20.js:19: Test262Error: Expected a ReferenceError to be thrown but no exception was thrown at all
-test/language/expressions/compound-assignment/compound-assignment-operator-calls-putvalue-lref--v--21.js:19: Test262Error: Expected a ReferenceError to be thrown but no exception was thrown at all
 test/language/expressions/compound-assignment/compound-assignment-operator-calls-putvalue-lref--v-.js:19: Test262Error: Expected a ReferenceError to be thrown but no exception was thrown at all
 test/language/expressions/compound-assignment/left-hand-side-private-reference-accessor-property-add.js:59: Test262Error: The expression should evaluate to the result Expected SameValue(«undefined», «3») to be true
 test/language/expressions/compound-assignment/left-hand-side-private-reference-accessor-property-bitand.js:59: Test262Error: The expression should evaluate to the result Expected SameValue(«undefined», «0») to be true
@@ -870,21 +857,17 @@ test/language/expressions/object/method-definition/static-init-await-reference-g
 test/language/expressions/object/method-definition/static-init-await-reference-normal.js:18: SyntaxError: invalid property name
 test/language/expressions/object/object-spread-proxy-get-not-called-on-dontenum-keys.js:37: Test262Error: Expected [1, enumerableString, Symbol(enumerable_symbol)] and [Symbol(enumerable_symbol), enumerableString, 1] to have the same contents. 
 test/language/expressions/optional-chaining/optional-call-preserves-this.js:21: TypeError: cannot read property 'c' of undefined
-test/language/expressions/postfix-decrement/operator-x-postfix-decrement-calls-putvalue-lhs-newvalue--1.js:19: Test262Error: Expected a ReferenceError to be thrown but no exception was thrown at all
 test/language/expressions/postfix-decrement/operator-x-postfix-decrement-calls-putvalue-lhs-newvalue-.js:19: Test262Error: Expected a ReferenceError to be thrown but no exception was thrown at all
-test/language/expressions/postfix-increment/operator-x-postfix-increment-calls-putvalue-lhs-newvalue--1.js:19: Test262Error: Expected a ReferenceError to be thrown but no exception was thrown at all
 test/language/expressions/postfix-increment/operator-x-postfix-increment-calls-putvalue-lhs-newvalue-.js:19: Test262Error: Expected a ReferenceError to be thrown but no exception was thrown at all
-test/language/expressions/prefix-decrement/operator-prefix-decrement-x-calls-putvalue-lhs-newvalue--1.js:19: Test262Error: Expected a ReferenceError to be thrown but no exception was thrown at all
 test/language/expressions/prefix-decrement/operator-prefix-decrement-x-calls-putvalue-lhs-newvalue-.js:19: Test262Error: Expected a ReferenceError to be thrown but no exception was thrown at all
-test/language/expressions/prefix-increment/operator-prefix-increment-x-calls-putvalue-lhs-newvalue--1.js:19: Test262Error: Expected a ReferenceError to be thrown but no exception was thrown at all
 test/language/expressions/prefix-increment/operator-prefix-increment-x-calls-putvalue-lhs-newvalue-.js:19: Test262Error: Expected a ReferenceError to be thrown but no exception was thrown at all
 test/language/expressions/super/call-proto-not-ctor.js:33: Test262Error: performs ArgumentsListEvaluation
 test/language/expressions/super/realm.js:25: TypeError: $262.createRealm is not a function
 test/language/expressions/tagged-template/cache-realm.js:33: TypeError: $262.createRealm is not a function
 test/language/expressions/tagged-template/invalid-escape-sequences.js:8: Test262Error: Cooked template value should be undefined for illegal escape sequences Expected SameValue(«8», «undefined») to be true
 test/language/expressions/tagged-template/tco-call.js:21: strict mode: InternalError: stack overflow
-test/language/expressions/tagged-template/tco-member.js:18: strict mode: InternalError: stack overflow
-test/language/expressions/tco-pos.js:17: strict mode: InternalError: stack overflow
+test/language/expressions/tagged-template/tco-member.js:13: strict mode: InternalError: stack overflow
+test/language/expressions/tco-pos.js:12: strict mode: InternalError: stack overflow
 test/language/expressions/template-literal/invalid-legacy-octal-escape-sequence-8.js:25: unexpected error type: Test262: This statement should not be evaluated.
 test/language/expressions/template-literal/invalid-legacy-octal-escape-sequence-9.js:25: unexpected error type: Test262: This statement should not be evaluated.
 test/language/identifiers/part-unicode-13.0.0-class-escaped.js:19: SyntaxError: expecting ';'
@@ -1203,8 +1186,8 @@ test/language/module-code/top-level-await/top-level-ticks-2.js:43: SyntaxError: 
 test/language/module-code/top-level-await/top-level-ticks.js:43: SyntaxError: unexpected 'await' keyword
 test/language/module-code/top-level-await/void-await-expr.js:31: SyntaxError: unexpected 'await' keyword
 test/language/module-code/top-level-await/while-dynamic-evaluation.js:41: SyntaxError: unexpected 'await' keyword
-test/language/statements/block/tco-stmt-list.js:17: strict mode: InternalError: stack overflow
-test/language/statements/block/tco-stmt.js:17: strict mode: InternalError: stack overflow
+test/language/statements/block/tco-stmt-list.js:12: strict mode: InternalError: stack overflow
+test/language/statements/block/tco-stmt.js:12: strict mode: InternalError: stack overflow
 test/language/statements/class/cpn-class-decl-accessors-computed-property-name-from-assignment-expression-coalesce.js:40: SyntaxError: expecting ']'
 test/language/statements/class/cpn-class-decl-accessors-computed-property-name-from-assignment-expression-logical-and.js:40: SyntaxError: unexpected token in expression: '='
 test/language/statements/class/cpn-class-decl-accessors-computed-property-name-from-assignment-expression-logical-or.js:40: SyntaxError: unexpected token in expression: '='
@@ -1248,29 +1231,29 @@ test/language/statements/class/static-init-sequence.js:26: SyntaxError: invalid 
 test/language/statements/class/static-init-statement-list-optional.js:17: SyntaxError: invalid property name
 test/language/statements/class/static-init-super-property.js:19: SyntaxError: invalid property name
 test/language/statements/const/static-init-await-binding-valid.js:15: SyntaxError: invalid property name
-test/language/statements/do-while/tco-body.js:18: strict mode: InternalError: stack overflow
+test/language/statements/do-while/tco-body.js:12: strict mode: InternalError: stack overflow
 test/language/statements/for-await-of/async-gen-decl-dstr-array-elem-iter-rtrn-close-null.js:81: TypeError: $DONE() not called
 test/language/statements/for-of/head-lhs-async-invalid.js:14: unexpected error type: Test262: This statement should not be evaluated.
-test/language/statements/for/tco-const-body.js:18: strict mode: InternalError: stack overflow
-test/language/statements/for/tco-let-body.js:18: strict mode: InternalError: stack overflow
-test/language/statements/for/tco-lhs-body.js:19: strict mode: InternalError: stack overflow
-test/language/statements/for/tco-var-body.js:18: strict mode: InternalError: stack overflow
+test/language/statements/for/tco-const-body.js:12: strict mode: InternalError: stack overflow
+test/language/statements/for/tco-let-body.js:12: strict mode: InternalError: stack overflow
+test/language/statements/for/tco-lhs-body.js:12: strict mode: InternalError: stack overflow
+test/language/statements/for/tco-var-body.js:12: strict mode: InternalError: stack overflow
 test/language/statements/function/static-init-await-binding-valid.js:15: SyntaxError: invalid property name
-test/language/statements/if/tco-else-body.js:17: strict mode: InternalError: stack overflow
-test/language/statements/if/tco-if-body.js:17: strict mode: InternalError: stack overflow
-test/language/statements/labeled/tco.js:17: strict mode: InternalError: stack overflow
+test/language/statements/if/tco-else-body.js:12: strict mode: InternalError: stack overflow
+test/language/statements/if/tco-if-body.js:12: strict mode: InternalError: stack overflow
+test/language/statements/labeled/tco.js:12: strict mode: InternalError: stack overflow
 test/language/statements/let/static-init-await-binding-valid.js:15: SyntaxError: invalid property name
-test/language/statements/return/tco.js:17: strict mode: InternalError: stack overflow
-test/language/statements/switch/tco-case-body-dflt.js:17: strict mode: InternalError: stack overflow
-test/language/statements/switch/tco-case-body.js:17: strict mode: InternalError: stack overflow
-test/language/statements/switch/tco-dftl-body.js:17: strict mode: InternalError: stack overflow
+test/language/statements/return/tco.js:12: strict mode: InternalError: stack overflow
+test/language/statements/switch/tco-case-body-dflt.js:12: strict mode: InternalError: stack overflow
+test/language/statements/switch/tco-case-body.js:12: strict mode: InternalError: stack overflow
+test/language/statements/switch/tco-dftl-body.js:12: strict mode: InternalError: stack overflow
 test/language/statements/try/static-init-await-binding-valid.js:15: SyntaxError: invalid property name
-test/language/statements/try/tco-catch-finally.js:18: strict mode: InternalError: stack overflow
+test/language/statements/try/tco-catch-finally.js:12: strict mode: InternalError: stack overflow
 test/language/statements/try/tco-catch.js:20: strict mode: InternalError: stack overflow
-test/language/statements/try/tco-finally.js:18: strict mode: InternalError: stack overflow
+test/language/statements/try/tco-finally.js:12: strict mode: InternalError: stack overflow
 test/language/statements/variable/dstr/ary-ptrn-elem-id-static-init-await-valid.js:15: SyntaxError: invalid property name
 test/language/statements/variable/dstr/obj-ptrn-elem-id-static-init-await-valid.js:15: SyntaxError: invalid property name
 test/language/statements/variable/static-init-await-binding-valid.js:15: SyntaxError: invalid property name
-test/language/statements/while/tco-body.js:18: strict mode: InternalError: stack overflow
+test/language/statements/while/tco-body.js:12: strict mode: InternalError: stack overflow
 test/language/types/reference/get-value-prop-base-primitive-realm.js:20: TypeError: $262.createRealm is not a function
 test/language/types/reference/put-value-prop-base-primitive-realm.js:24: TypeError: $262.createRealm is not a function

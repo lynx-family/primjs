@@ -100,6 +100,13 @@ void dbuf_init2(DynBuf *s, void *opaque, DynBufReallocFunc *realloc_func) {
 
 void dbuf_init(DynBuf *s) { dbuf_init2(s, NULL, NULL); }
 
+/* Try to reserve 'len' additional bytes without changing the logical size. */
+int dbuf_claim(DynBuf *s, size_t len) {
+  size_t new_size = s->size + len;
+  if (new_size < len) return -1;
+  return dbuf_realloc(s, new_size);
+}
+
 /* return < 0 if error */
 int dbuf_realloc(DynBuf *s, size_t new_size, int alloc_tag) {
   size_t size;
@@ -142,7 +149,7 @@ int dbuf_put_self(DynBuf *s, size_t offset, size_t len) {
   return 0;
 }
 
-int dbuf_putc(DynBuf *s, uint8_t c) { return dbuf_put(s, &c, 1); }
+int __dbuf_putc(DynBuf *s, uint8_t c) { return dbuf_put(s, &c, 1); }
 
 int dbuf_putstr(DynBuf *s, const char *str) {
   return dbuf_put(s, (const uint8_t *)str, strlen(str));
