@@ -603,6 +603,7 @@ LEPUSRuntime *JS_NewRuntime2_GC(const LEPUSMallocFunctions *mf, void *opaque,
 #endif
   init_list_head(&rt->job_list);
   init_list_head(&rt->unhandled_rejections);
+  init_list_head(&rt->handled_rejections);
   init_list_head(&rt->coverage_list);
 
 #if defined(__aarch64__) && (defined(ANDROID) || defined(__ANDROID__)) && \
@@ -812,6 +813,7 @@ void JS_FreeRuntime_GC(LEPUSRuntime *rt) {
   init_list_head(&rt->context_list);
   init_list_head(&rt->job_list);
   init_list_head(&rt->unhandled_rejections);
+  init_list_head(&rt->handled_rejections);
   init_list_head(&rt->coverage_list);
 
   /* free the classes */
@@ -14661,6 +14663,10 @@ static const LEPUSCFunctionListEntry js_error_proto_funcs[] = {
                           LEPUS_PROP_WRITABLE | LEPUS_PROP_CONFIGURABLE),
 };
 
+static const LEPUSCFunctionListEntry js_error_funcs[] = {
+    LEPUS_CFUNC_DEF("captureStackTrace", 2, js_error_capture_stack_trace),
+};
+
 /* Array */
 
 static int JS_CopySubArray(LEPUSContext *ctx, LEPUSValueConst obj,
@@ -22308,6 +22314,56 @@ int JS_MoveUnhandledRejectionToException_GC(LEPUSContext *ctx) {
   return 1;
 }
 
+int JS_TakeUnhandledRejection_GC(LEPUSContext *ctx, LEPUSValue *promise,
+                                 LEPUSValue *reason, LEPUSValue *error) {
+  if (promise) *promise = LEPUS_UNDEFINED;
+  if (reason) *reason = LEPUS_UNDEFINED;
+  if (error) *error = LEPUS_UNDEFINED;
+  if (!LEPUS_IsNull(ctx->rt->current_exception)) {
+    LEPUS_FreeValue(ctx, LEPUS_GetException(ctx));
+  }
+  struct list_head *el = ctx->rt->unhandled_rejections.next;
+  if (el == &ctx->rt->unhandled_rejections) return 0;
+  JSUnhandledRejectionEntry *e =
+      list_entry(el, JSUnhandledRejectionEntry, link);
+  if (!LEPUS_IsNull(e->promise)) {
+    JSPromiseData *s = static_cast<JSPromiseData *>(
+        LEPUS_GetOpaque(e->promise, JS_CLASS_PROMISE));
+    if (s) {
+      s->is_unhandled_rejection_reported = TRUE;
+    }
+  }
+  if (promise) {
+    *promise = LEPUS_DupValue(ctx, e->promise);
+  }
+  if (reason) {
+    *reason = LEPUS_DupValue(ctx, e->reason);
+  }
+  if (error) {
+    *error = LEPUS_DupValue(ctx, e->error);
+  }
+  list_del(el);
+  return 1;
+}
+
+int JS_TakeHandledRejection_GC(LEPUSContext *ctx, LEPUSValue *promise,
+                               LEPUSValue *reason) {
+  if (promise) *promise = LEPUS_UNDEFINED;
+  if (reason) *reason = LEPUS_UNDEFINED;
+  struct list_head *el = ctx->rt->handled_rejections.next;
+  if (el == &ctx->rt->handled_rejections) return 0;
+  JSUnhandledRejectionEntry *e =
+      list_entry(el, JSUnhandledRejectionEntry, link);
+  if (promise) {
+    *promise = LEPUS_DupValue(ctx, e->promise);
+  }
+  if (reason) {
+    *reason = LEPUS_DupValue(ctx, e->reason);
+  }
+  list_del(el);
+  return 1;
+}
+
 static int js_create_resolving_functions(LEPUSContext *ctx, LEPUSValue *args,
                                          LEPUSValueConst promise);
 
@@ -22406,9 +22462,8 @@ static void fulfill_or_reject_promise(LEPUSContext *ctx,
     e = static_cast<JSUnhandledRejectionEntry *>(
         lepus_malloc_gc(ctx, sizeof(*e), ALLOC_TAG_WITHOUT_PTR));
     func_scope.PushHandle(e, HANDLE_TYPE_DIR_HEAP_OBJ);
-    // only promises handled later will use this value, thus its refcount
-    // always > 0 when using
     HeapObjStore(ctx, &e->promise, promise);
+    HeapObjStore(ctx, &e->reason, value);
 
     if (LEPUS_IsError(ctx, value)) {
       HeapObjStore(ctx, &e->error, value);
@@ -22428,6 +22483,20 @@ static void fulfill_or_reject_promise(LEPUSContext *ctx,
 static void reject_promise(LEPUSContext *ctx, LEPUSValueConst promise,
                            LEPUSValueConst value) {
   fulfill_or_reject_promise(ctx, promise, value, TRUE);
+}
+
+static int queue_handled_rejection(LEPUSContext *ctx, LEPUSValueConst promise,
+                                   LEPUSValueConst reason) {
+  HandleScope func_scope(ctx, &promise, HANDLE_TYPE_LEPUS_VALUE);
+  JSUnhandledRejectionEntry *e = static_cast<JSUnhandledRejectionEntry *>(
+      lepus_malloc_gc(ctx, sizeof(*e), ALLOC_TAG_WITHOUT_PTR));
+  if (!e) return -1;
+  func_scope.PushHandle(e, HANDLE_TYPE_DIR_HEAP_OBJ);
+  e->error = LEPUS_UNDEFINED;
+  HeapObjStore(ctx, &e->promise, promise);
+  HeapObjStore(ctx, &e->reason, reason);
+  list_add_tail(&e->link, &ctx->rt->handled_rejections);
+  return 0;
 }
 
 static LEPUSValue js_promise_resolve_thenable_job(LEPUSContext *ctx, int argc,
@@ -22579,6 +22648,7 @@ static LEPUSValue js_promise_constructor(LEPUSContext *ctx,
   if (!s) goto fail;
   s->promise_state = JS_PROMISE_PENDING;
   s->is_handled = FALSE;
+  s->is_unhandled_rejection_reported = FALSE;
   for (i = 0; i < 2; i++) init_list_head(&s->promise_reactions[i]);
   s->promise_result = LEPUS_UNDEFINED;
   LEPUS_SetHeapOpaque(ctx, obj, s);
@@ -23070,14 +23140,23 @@ static __exception int perform_promise_then(
 
   if (s->promise_state == JS_PROMISE_REJECTED) {
     struct list_head *el, *el1;
+    BOOL pending_unhandled = FALSE;
     list_for_each_safe(el, el1, &ctx->rt->unhandled_rejections) {
       JSUnhandledRejectionEntry *e =
           list_entry(el, JSUnhandledRejectionEntry, link);
       if (!LEPUS_IsNull(e->promise) &&
           LEPUS_GetOpaque(e->promise, JS_CLASS_PROMISE) == s) {
+        pending_unhandled = TRUE;
         list_del(el);
         break;
       }
+    }
+    if (!pending_unhandled && !s->is_handled &&
+        s->is_unhandled_rejection_reported) {
+      if (queue_handled_rejection(ctx, promise, s->promise_result) < 0) {
+        return -1;
+      }
+      s->is_unhandled_rejection_reported = FALSE;
     }
   }
 
@@ -24807,7 +24886,8 @@ QJS_STATIC void JS_AddIntrinsicBasicObjects_GC(LEPUSContext *ctx) {
   ft.generic_magic = js_error_constructor;
   obj = JS_NewCConstructor(ctx, JS_CLASS_ERROR, "Error", ft.generic, 1,
                            LEPUS_CFUNC_constructor_or_func_magic, -1,
-                           LEPUS_UNDEFINED, nullptr, 0, js_error_proto_funcs,
+                           LEPUS_UNDEFINED, js_error_funcs,
+                           countof(js_error_funcs), js_error_proto_funcs,
                            countof(js_error_proto_funcs), 0);
 
   for (i = 0; i < JS_NATIVE_ERROR_COUNT; i++) {
@@ -27056,6 +27136,7 @@ static LEPUSValue JS_StructuredClone(LEPUSContext *ctx, LEPUSValue src,
           if (!s) goto fail;
           s->promise_state = JS_PROMISE_PENDING;
           s->is_handled = FALSE;
+          s->is_unhandled_rejection_reported = FALSE;
           for (int i = 0; i < 2; i++) init_list_head(&s->promise_reactions[i]);
           s->promise_result = LEPUS_UNDEFINED;
           LEPUS_SetHeapOpaque(ctx, ret, s);
@@ -28396,6 +28477,17 @@ void Visitor::ScanRuntime(GCWorkStack &workStack, bool isFinalRemark,
     JSUnhandledRejectionEntry *e =
         list_entry(el, JSUnhandledRejectionEntry, link);
     PushObjLEPUSValue(e->error, workStack);
+    PushObjLEPUSValue(e->promise, workStack);
+    PushObjLEPUSValue(e->reason, workStack);
+    workStack.push_back((address_t)e);
+  }
+  // handled_rejections
+  list_for_each_safe(el, el1, &rt_->handled_rejections) {
+    JSUnhandledRejectionEntry *e =
+        list_entry(el, JSUnhandledRejectionEntry, link);
+    PushObjLEPUSValue(e->error, workStack);
+    PushObjLEPUSValue(e->promise, workStack);
+    PushObjLEPUSValue(e->reason, workStack);
     workStack.push_back((address_t)e);
   }
   workStack.push_back((address_t)rt_->atom_array);

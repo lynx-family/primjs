@@ -1084,6 +1084,7 @@ QJS_STATIC LEPUSRuntime *JS_NewRuntime_RC(const LEPUSMallocFunctions *mf,
 #endif
   init_list_head(&rt->job_list);
   init_list_head(&rt->unhandled_rejections);
+  init_list_head(&rt->handled_rejections);
   init_list_head(&rt->async_func_sf);
   rt->ptr_handles = new PtrHandles(rt);
 
@@ -1752,9 +1753,21 @@ void LEPUS_FreeRuntime(LEPUSRuntime *rt) {
     JSUnhandledRejectionEntry *e =
         list_entry(el, JSUnhandledRejectionEntry, link);
     LEPUS_FreeValueRT(rt, e->error);
+    LEPUS_FreeValueRT(rt, e->promise);
+    LEPUS_FreeValueRT(rt, e->reason);
     lepus_free_rt(rt, e);
   }
   init_list_head(&rt->unhandled_rejections);
+
+  list_for_each_safe(el, el1, &rt->handled_rejections) {
+    JSUnhandledRejectionEntry *e =
+        list_entry(el, JSUnhandledRejectionEntry, link);
+    LEPUS_FreeValueRT(rt, e->error);
+    LEPUS_FreeValueRT(rt, e->promise);
+    LEPUS_FreeValueRT(rt, e->reason);
+    lepus_free_rt(rt, e);
+  }
+  init_list_head(&rt->handled_rejections);
 
   if (rt->qjsvaluevalue_allocator) {
     delete rt->qjsvaluevalue_allocator;
@@ -2143,6 +2156,7 @@ static inline BOOL js_check_stack_overflow(LEPUSContext *ctx,
 
 LEPUSValue LEPUS_ThrowOutOfMemory(LEPUSContext *ctx) {
   LEPUSRuntime *rt = ctx->rt;
+  rt->out_of_memory_reported = TRUE;
   if (!rt->in_out_of_memory) {
     rt->in_out_of_memory = TRUE;
     LEPUS_ThrowInternalError(ctx, "out of memory");
@@ -7068,6 +7082,7 @@ LEPUSValue LEPUS_Throw(LEPUSContext *ctx, LEPUSValue obj) {
   LEPUSRuntime *rt = ctx->rt;
   if (!ctx->gc_enable) LEPUS_FreeValue(ctx, rt->current_exception);
   rt->current_exception = obj;
+  rt->current_exception_line_column = 0;
   rt->exception_needs_backtrace = LEPUS_IsError(ctx, obj);
   if (LEPUS_IsObject(rt->current_exception) &&
       find_own_property1(LEPUS_VALUE_GET_OBJ(rt->current_exception),
@@ -7076,12 +7091,35 @@ LEPUSValue LEPUS_Throw(LEPUSContext *ctx, LEPUSValue obj) {
   return LEPUS_EXCEPTION;
 }
 
+int LEPUS_GetExceptionLocation(LEPUSContext *ctx, int32_t *line,
+                               int64_t *column) {
+  int64_t line_column = ctx->rt->current_exception_line_column;
+  if (LEPUS_IsNull(ctx->rt->current_exception) || line_column <= 0 ||
+      line == NULL || column == NULL)
+    return 0;
+
+  int type = line_column >> LINE_COLUMN_TYPE_SHIFT;
+  if (type == 1) {
+    *line = line_column & (((uint64_t)1 << LINE_NUMBER_BITS_COUNT) - 1);
+    *column =
+        (line_column ^ ((uint64_t)1 << LINE_COLUMN_TYPE_SHIFT)) >>
+        LINE_NUMBER_BITS_COUNT;
+  } else if (type == 0) {
+    *line = line_column & (((uint64_t)1 << OLD_LINE_NUMBER_BITS_COUNT) - 1);
+    *column = line_column >> OLD_LINE_NUMBER_BITS_COUNT;
+  } else {
+    return 0;
+  }
+  return *line > 0;
+}
+
 /* return the pending exception (cannot be called twice). */
 LEPUSValue LEPUS_GetException(LEPUSContext *ctx) {
   LEPUSRuntime *rt = ctx->rt;
   LEPUSValue val;
   val = rt->current_exception;
   rt->current_exception = LEPUS_NULL;
+  rt->current_exception_line_column = 0;
   rt->exception_needs_backtrace = FALSE;
   return val;
 }
@@ -7367,7 +7405,8 @@ void build_backtrace(LEPUSContext *ctx, LEPUSValueConst error_obj,
                      const char *filename,
                      /* <Primjs begin> */ int64_t line_num, /* <Primjs end> */
                      const uint8_t *cur_pc, int backtrace_flags,
-                     uint8_t is_parse_error) {
+                     uint8_t is_parse_error,
+                     LEPUSValueConst frame_boundary) {
   BOOL is_debug_mode = FALSE;
 #ifdef ENABLE_QUICKJS_DEBUGGER
   is_debug_mode = ctx->debugger_mode;
@@ -7379,6 +7418,13 @@ void build_backtrace(LEPUSContext *ctx, LEPUSValueConst error_obj,
   DynBuf dbuf;
 
   ctx->rt->exception_needs_backtrace = FALSE;
+  if (filename && line_num > 0 &&
+      LEPUS_IsObject(error_obj) &&
+      LEPUS_IsObject(ctx->rt->current_exception) &&
+      LEPUS_VALUE_GET_OBJ(error_obj) ==
+          LEPUS_VALUE_GET_OBJ(ctx->rt->current_exception)) {
+    ctx->rt->current_exception_line_column = line_num;
+  }
   js_dbuf_init(ctx, &dbuf);
   func_scope.PushHandle(&dbuf.buf, HANDLE_TYPE_HEAP_OBJ);
   if (filename) {
@@ -7413,9 +7459,12 @@ void build_backtrace(LEPUSContext *ctx, LEPUSValueConst error_obj,
                               LEPUS_PROP_WRITABLE | LEPUS_PROP_CONFIGURABLE);
   }
 
-  get_backtrace(ctx, &dbuf, is_debug_mode, error_obj, cur_pc, backtrace_flags);
+  BOOL boundary_found =
+      get_backtrace(ctx, &dbuf, is_debug_mode, error_obj, cur_pc,
+                    backtrace_flags, frame_boundary);
 #ifdef BUILD_ASYNC_STACK
-  build_async_backtrace(ctx, cur_pc, &dbuf, is_debug_mode, error_obj);
+  if (boundary_found)
+    build_async_backtrace(ctx, cur_pc, &dbuf, is_debug_mode, error_obj);
 #endif
   dbuf_putc(&dbuf, '\0');
   if (dbuf_error(&dbuf))
@@ -7436,22 +7485,29 @@ void build_backtrace(LEPUSContext *ctx, LEPUSValueConst error_obj,
   // <Primjs end>
 }
 
-void get_backtrace(LEPUSContext *ctx, DynBuf *dbuf, BOOL is_debug_mode,
+BOOL get_backtrace(LEPUSContext *ctx, DynBuf *dbuf, BOOL is_debug_mode,
                    LEPUSValueConst error_obj, const uint8_t *cur_pc,
-                   int backtrace_flags) {
+                   int backtrace_flags, LEPUSValueConst frame_boundary) {
   LEPUSStackFrame *sf;
-  const char *func_name_str;
-  const char *str1;
-  LEPUSObject *p;
+  BOOL boundary_found = LEPUS_IsUndefined(frame_boundary);
 
   for (sf = ctx->rt->current_stack_frame; sf != NULL; sf = sf->prev_frame) {
     if (backtrace_flags & JS_BACKTRACE_FLAG_SKIP_FIRST_LEVEL) {
       backtrace_flags &= ~JS_BACKTRACE_FLAG_SKIP_FIRST_LEVEL;
       continue;
     }
+    if (!boundary_found) {
+      if (LEPUS_IsObject(sf->cur_func) &&
+          LEPUS_VALUE_GET_OBJ(sf->cur_func) ==
+              LEPUS_VALUE_GET_OBJ(frame_boundary)) {
+        boundary_found = TRUE;
+      }
+      continue;
+    }
     build_backtrace_frame(ctx, sf, dbuf, cur_pc, FALSE, is_debug_mode,
                           error_obj);
   }
+  return boundary_found;
 }
 
 LEPUSValue LEPUS_NewError(LEPUSContext *ctx) {
@@ -16879,6 +16935,13 @@ restart:
     }
   }
 exception:
+  if (rt->current_exception_line_column == 0 && b->has_debug &&
+      pc > b->byte_code_buf) {
+    int64_t line_column =
+        find_line_num(ctx, b, pc - b->byte_code_buf - 1);
+    if (line_column > 0)
+      rt->current_exception_line_column = line_column;
+  }
   if (rt->exception_needs_backtrace) {
     /* add the backtrace information now (it is not done
        before if the exception happens in a bytecode
@@ -16899,6 +16962,7 @@ exception:
         } else {
           *sp++ = rt->current_exception;
           rt->current_exception = LEPUS_NULL;
+          rt->current_exception_line_column = 0;
           pc = b->byte_code_buf + pos;
           goto restart;
         }
@@ -24672,6 +24736,13 @@ void LEPUS_SetModuleLoaderFunc(LEPUSRuntime *rt,
   rt->module_loader_opaque = opaque;
 }
 
+void LEPUS_SetModuleDynamicImportFunc(
+    LEPUSRuntime *rt, LEPUSModuleDynamicImportFunc *module_dynamic_import,
+    void *opaque) {
+  rt->module_dynamic_import_func = module_dynamic_import;
+  rt->module_dynamic_import_opaque = opaque;
+}
+
 /* default module filename normalizer */
 QJS_STATIC char *js_default_module_normalize_name(LEPUSContext *ctx,
                                                   const char *base_name,
@@ -25453,6 +25524,11 @@ int js_link_module(LEPUSContext *ctx, LEPUSModuleDef *m) {
         HeapObjStore(ctx, &me->u.local.var_ref, var_ref);
       }
     }
+
+    /* Initialize hoisted module bindings before evaluating dependencies. */
+    ret_val = LEPUS_Call(ctx, m->func_obj, LEPUS_TRUE, 0, NULL);
+    if (LEPUS_IsException(ret_val)) goto fail;
+    if (!ctx->gc_enable) LEPUS_FreeValue(ctx, ret_val);
   }
 
 #ifdef DUMP_MODULE_RESOLVE
@@ -25463,16 +25539,68 @@ fail:
   return -1;
 }
 
+QJS_STATIC LEPUSValue js_load_module_namespace(LEPUSContext *ctx,
+                                               JSAtom basename,
+                                               JSAtom filename) {
+  HandleScope func_scope(ctx);
+  LEPUSModuleDef *m;
+  LEPUSValue ret = LEPUS_UNDEFINED, func_obj, ns;
+  func_scope.PushHandle(&ret, HANDLE_TYPE_LEPUS_VALUE);
+
+  m = js_host_resolve_imported_module(ctx, basename, filename);
+  if (!m) return LEPUS_EXCEPTION;
+
+  if (js_resolve_module(ctx, m) < 0) {
+    if (!ctx->gc_enable) js_free_modules(ctx, JS_FREE_MODULE_NOT_RESOLVED);
+    return LEPUS_EXCEPTION;
+  }
+
+  /* Evaluate the module code */
+  func_obj = ctx->gc_enable
+                 ? LEPUS_MKPTR(LEPUS_TAG_MODULE, m)
+                 : LEPUS_DupValue(ctx, LEPUS_MKPTR(LEPUS_TAG_MODULE, m));
+  func_scope.PushHandle(&func_obj, HANDLE_TYPE_LEPUS_VALUE);
+  ret = LEPUS_EvalFunction(ctx, func_obj, ctx->global_obj);
+  if (LEPUS_IsException(ret)) return LEPUS_EXCEPTION;
+  if (!ctx->gc_enable) LEPUS_FreeValue(ctx, ret);
+
+  ns = js_get_module_ns(ctx, m);
+  return ns;
+}
+
+LEPUSValue LEPUS_LoadModuleNamespace(LEPUSContext *ctx,
+                                     const char *module_base_name,
+                                     const char *module_name) {
+  HandleScope func_scope(ctx);
+  if (!module_base_name || !module_name) {
+    return LEPUS_ThrowTypeError(ctx, "module name is unavailable");
+  }
+  JSAtom basename = LEPUS_NewAtom(ctx, module_base_name);
+  if (basename == JS_ATOM_NULL) return LEPUS_EXCEPTION;
+  func_scope.PushLEPUSAtom(basename);
+  JSAtom filename = LEPUS_NewAtom(ctx, module_name);
+  if (filename == JS_ATOM_NULL) {
+    if (!ctx->gc_enable) LEPUS_FreeAtom(ctx, basename);
+    return LEPUS_EXCEPTION;
+  }
+  func_scope.PushLEPUSAtom(filename);
+  LEPUSValue result = js_load_module_namespace(ctx, basename, filename);
+  if (!ctx->gc_enable) {
+    LEPUS_FreeAtom(ctx, basename);
+    LEPUS_FreeAtom(ctx, filename);
+  }
+  return result;
+}
+
 LEPUSValue js_dynamic_import(LEPUSContext *ctx, LEPUSValueConst specifier) {
   HandleScope func_scope(ctx);
   LEPUSStackFrame *sf;
   LEPUSFunctionBytecode *b;
   LEPUSObject *p;
-  LEPUSModuleDef *m;
   JSAtom basename, filename;
   LEPUSValue promise, resolving_funcs[2];
   func_scope.PushLEPUSValueArrayHandle(resolving_funcs, 2);
-  LEPUSValue specifierString, ret = LEPUS_UNDEFINED, func_obj, err, ns;
+  LEPUSValue specifierString, ret = LEPUS_UNDEFINED, err, ns;
   func_scope.PushHandle(&ret, HANDLE_TYPE_LEPUS_VALUE);
 
   promise = LEPUS_NewPromiseCapability(ctx, resolving_funcs);
@@ -25502,29 +25630,41 @@ LEPUSValue js_dynamic_import(LEPUSContext *ctx, LEPUSValueConst specifier) {
   if (filename == JS_ATOM_NULL) goto exception;
   func_scope.PushLEPUSAtom(filename);
 
-  m = js_host_resolve_imported_module(ctx, basename, filename);
+  if (ctx->rt->module_dynamic_import_func) {
+    const char *base_name = LEPUS_AtomToCString(ctx, basename);
+    if (!base_name) {
+      if (!ctx->gc_enable) LEPUS_FreeAtom(ctx, filename);
+      goto exception;
+    }
+    func_scope.PushHandle(&base_name, HANDLE_TYPE_CSTRING);
+    const char *module_name = LEPUS_AtomToCString(ctx, filename);
+    if (!module_name) {
+      if (!ctx->gc_enable) {
+        LEPUS_FreeCString(ctx, base_name);
+        LEPUS_FreeAtom(ctx, filename);
+      }
+      goto exception;
+    }
+    func_scope.PushHandle(&module_name, HANDLE_TYPE_CSTRING);
+    int accepted = ctx->rt->module_dynamic_import_func(
+        ctx, base_name, module_name, resolving_funcs[0], resolving_funcs[1],
+        ctx->rt->module_dynamic_import_opaque);
+    if (!ctx->gc_enable) {
+      LEPUS_FreeCString(ctx, base_name);
+      LEPUS_FreeCString(ctx, module_name);
+      LEPUS_FreeAtom(ctx, filename);
+    }
+    if (accepted < 0) goto exception;
+    if (!ctx->gc_enable) {
+      LEPUS_FreeValue(ctx, resolving_funcs[0]);
+      LEPUS_FreeValue(ctx, resolving_funcs[1]);
+    }
+    return promise;
+  }
+
+  ns = js_load_module_namespace(ctx, basename, filename);
   if (!ctx->gc_enable) LEPUS_FreeAtom(ctx, filename);
-  if (!m) {
-    goto exception;
-  }
-
-  if (js_resolve_module(ctx, m) < 0) {
-    if (!ctx->gc_enable) js_free_modules(ctx, JS_FREE_MODULE_NOT_RESOLVED);
-    goto exception;
-  }
-
-  /* Evaluate the module code */
-  func_obj = ctx->gc_enable
-                 ? LEPUS_MKPTR(LEPUS_TAG_MODULE, m)
-                 : LEPUS_DupValue(ctx, LEPUS_MKPTR(LEPUS_TAG_MODULE, m));
-  func_scope.PushHandle(&func_obj, HANDLE_TYPE_LEPUS_VALUE);
-  ret = LEPUS_EvalFunction(ctx, func_obj, ctx->global_obj);
-  if (LEPUS_IsException(ret)) goto exception;
-  if (!ctx->gc_enable) LEPUS_FreeValue(ctx, ret);
-
-  /* return the module namespace */
-  ns = js_get_module_ns(ctx, m);
-  if (LEPUS_IsException(ret)) goto exception;
+  if (LEPUS_IsException(ns)) goto exception;
   func_scope.PushHandle(&ns, HANDLE_TYPE_LEPUS_VALUE);
 
   ret = LEPUS_Call(ctx, resolving_funcs[0], LEPUS_UNDEFINED, 1,
@@ -35875,6 +36015,19 @@ exception:
   return LEPUS_EXCEPTION;
 }
 
+LEPUSValue js_error_capture_stack_trace(LEPUSContext *ctx,
+                                        LEPUSValueConst this_val, int argc,
+                                        LEPUSValueConst *argv) {
+  if (argc < 1 || !LEPUS_IsObject(argv[0]))
+    return JS_ThrowTypeErrorNotAnObject(ctx);
+
+  LEPUSValueConst frame_boundary = LEPUS_UNDEFINED;
+  if (argc > 1 && LEPUS_IsFunction(ctx, argv[1])) frame_boundary = argv[1];
+  build_backtrace(ctx, argv[0], NULL, 0, NULL,
+                  JS_BACKTRACE_FLAG_SKIP_FIRST_LEVEL, 0, frame_boundary);
+  return LEPUS_UNDEFINED;
+}
+
 QJS_STATIC LEPUSValue js_error_toString(LEPUSContext *ctx,
                                         LEPUSValueConst this_val, int argc,
                                         LEPUSValueConst *argv) {
@@ -35908,6 +36061,10 @@ static const LEPUSCFunctionListEntry js_error_proto_funcs[] = {
                           LEPUS_PROP_WRITABLE | LEPUS_PROP_CONFIGURABLE),
     LEPUS_PROP_STRING_DEF("message", "",
                           LEPUS_PROP_WRITABLE | LEPUS_PROP_CONFIGURABLE),
+};
+
+static const LEPUSCFunctionListEntry js_error_funcs[] = {
+    LEPUS_CFUNC_DEF("captureStackTrace", 2, js_error_capture_stack_trace),
 };
 
 /* Array */
@@ -46445,6 +46602,69 @@ int LEPUS_MoveUnhandledRejectionToException(LEPUSContext *ctx) {
   JSUnhandledRejectionEntry *e =
       list_entry(el, JSUnhandledRejectionEntry, link);
   ctx->rt->current_exception = e->error;
+  LEPUS_FreeValue(ctx, e->promise);
+  LEPUS_FreeValue(ctx, e->reason);
+  list_del(el);
+  lepus_free_rt(ctx->rt, el);
+  return 1;
+}
+
+int LEPUS_TakeUnhandledRejection(LEPUSContext *ctx, LEPUSValue *promise,
+                                 LEPUSValue *reason, LEPUSValue *error) {
+  CallGCFunc(JS_TakeUnhandledRejection_GC, ctx, promise, reason, error);
+  if (promise) *promise = LEPUS_UNDEFINED;
+  if (reason) *reason = LEPUS_UNDEFINED;
+  if (error) *error = LEPUS_UNDEFINED;
+  if (!LEPUS_IsNull(ctx->rt->current_exception)) {
+    LEPUS_FreeValue(ctx, LEPUS_GetException(ctx));
+  }
+  struct list_head *el = ctx->rt->unhandled_rejections.next;
+  if (el == &ctx->rt->unhandled_rejections) return 0;
+  JSUnhandledRejectionEntry *e =
+      list_entry(el, JSUnhandledRejectionEntry, link);
+  if (!LEPUS_IsNull(e->promise)) {
+    JSPromiseData *s = static_cast<JSPromiseData *>(
+        LEPUS_GetOpaque(e->promise, JS_CLASS_PROMISE));
+    if (s) {
+      s->is_unhandled_rejection_reported = TRUE;
+    }
+  }
+  if (promise) {
+    *promise = LEPUS_DupValue(ctx, e->promise);
+  }
+  if (reason) {
+    *reason = LEPUS_DupValue(ctx, e->reason);
+  }
+  if (error) {
+    *error = e->error;
+  } else {
+    LEPUS_FreeValue(ctx, e->error);
+  }
+  LEPUS_FreeValue(ctx, e->promise);
+  LEPUS_FreeValue(ctx, e->reason);
+  list_del(el);
+  lepus_free_rt(ctx->rt, el);
+  return 1;
+}
+
+int LEPUS_TakeHandledRejection(LEPUSContext *ctx, LEPUSValue *promise,
+                               LEPUSValue *reason) {
+  CallGCFunc(JS_TakeHandledRejection_GC, ctx, promise, reason);
+  if (promise) *promise = LEPUS_UNDEFINED;
+  if (reason) *reason = LEPUS_UNDEFINED;
+  struct list_head *el = ctx->rt->handled_rejections.next;
+  if (el == &ctx->rt->handled_rejections) return 0;
+  JSUnhandledRejectionEntry *e =
+      list_entry(el, JSUnhandledRejectionEntry, link);
+  if (promise) {
+    *promise = LEPUS_DupValue(ctx, e->promise);
+  }
+  if (reason) {
+    *reason = LEPUS_DupValue(ctx, e->reason);
+  }
+  LEPUS_FreeValue(ctx, e->error);
+  LEPUS_FreeValue(ctx, e->promise);
+  LEPUS_FreeValue(ctx, e->reason);
   list_del(el);
   lepus_free_rt(ctx->rt, el);
   return 1;
@@ -46456,6 +46676,13 @@ size_t LEPUS_GetHeapSize(LEPUSRuntime *rt) {
   } else {
     return rt->malloc_state.malloc_size;
   }
+}
+
+LEPUS_BOOL LEPUS_TakeOutOfMemorySignal(LEPUSRuntime *rt) {
+  if (!rt) return FALSE;
+  const LEPUS_BOOL reported = rt->out_of_memory_reported;
+  rt->out_of_memory_reported = FALSE;
+  return reported;
 }
 
 void LEPUS_ReportGCInfo(LEPUSRuntime *rt) {
@@ -46569,9 +46796,8 @@ QJS_STATIC void fulfill_or_reject_promise(LEPUSContext *ctx,
     /* Unhandled rejection detected */
     JSUnhandledRejectionEntry *e;
     e = static_cast<JSUnhandledRejectionEntry *>(lepus_malloc(ctx, sizeof(*e)));
-    // only promises handled later will use this value, thus its refcount always
-    // > 0 when using
-    e->promise = promise;
+    e->promise = LEPUS_DupValue(ctx, promise);
+    e->reason = LEPUS_DupValue(ctx, value);
 
     if (LEPUS_IsError(ctx, value)) {
       e->error = LEPUS_DupValue(ctx, value);
@@ -46586,6 +46812,8 @@ QJS_STATIC void fulfill_or_reject_promise(LEPUSContext *ctx,
       list_add_tail(&e->link, &ctx->rt->unhandled_rejections);
     } else {
       LEPUS_FreeValue(ctx, e->error);
+      LEPUS_FreeValue(ctx, e->promise);
+      LEPUS_FreeValue(ctx, e->reason);
       lepus_free(ctx, e);
     }
   }
@@ -46594,6 +46822,19 @@ QJS_STATIC void fulfill_or_reject_promise(LEPUSContext *ctx,
 QJS_STATIC void reject_promise(LEPUSContext *ctx, LEPUSValueConst promise,
                                LEPUSValueConst value) {
   fulfill_or_reject_promise(ctx, promise, value, TRUE);
+}
+
+QJS_STATIC int queue_handled_rejection(LEPUSContext *ctx,
+                                       LEPUSValueConst promise,
+                                       LEPUSValueConst reason) {
+  JSUnhandledRejectionEntry *e =
+      static_cast<JSUnhandledRejectionEntry *>(lepus_malloc(ctx, sizeof(*e)));
+  if (!e) return -1;
+  e->error = LEPUS_UNDEFINED;
+  e->promise = LEPUS_DupValue(ctx, promise);
+  e->reason = LEPUS_DupValue(ctx, reason);
+  list_add_tail(&e->link, &ctx->rt->handled_rejections);
+  return 0;
 }
 
 QJS_STATIC LEPUSValue js_promise_resolve_thenable_job(LEPUSContext *ctx,
@@ -46761,6 +47002,7 @@ QJS_STATIC void js_promise_finalizer(LEPUSRuntime *rt, LEPUSValue val) {
     JSUnhandledRejectionEntry *e =
         list_entry(el, JSUnhandledRejectionEntry, link);
     if (LEPUS_VALUE_GET_PTR(e->promise) == LEPUS_VALUE_GET_PTR(val)) {
+      LEPUS_FreeValueRT(rt, e->promise);
       e->promise = LEPUS_NULL;
       break;
     }
@@ -46806,6 +47048,7 @@ QJS_STATIC LEPUSValue js_promise_constructor(LEPUSContext *ctx,
   if (!s) goto fail;
   s->promise_state = JS_PROMISE_PENDING;
   s->is_handled = FALSE;
+  s->is_unhandled_rejection_reported = FALSE;
   for (i = 0; i < 2; i++) init_list_head(&s->promise_reactions[i]);
   s->promise_result = LEPUS_UNDEFINED;
   LEPUS_SetOpaque(obj, s);
@@ -47415,16 +47658,27 @@ QJS_STATIC __exception int perform_promise_then(
 
   if (s->promise_state == JS_PROMISE_REJECTED) {
     struct list_head *el, *el1;
+    BOOL pending_unhandled = FALSE;
     list_for_each_safe(el, el1, &ctx->rt->unhandled_rejections) {
       JSUnhandledRejectionEntry *e =
           list_entry(el, JSUnhandledRejectionEntry, link);
       if (!LEPUS_IsNull(e->promise) &&
           LEPUS_GetOpaque(e->promise, JS_CLASS_PROMISE) == s) {
+        pending_unhandled = TRUE;
         LEPUS_FreeValue(ctx, e->error);
+        LEPUS_FreeValue(ctx, e->promise);
+        LEPUS_FreeValue(ctx, e->reason);
         list_del(el);
         lepus_free_rt(ctx->rt, el);
         break;
       }
+    }
+    if (!pending_unhandled && !s->is_handled &&
+        s->is_unhandled_rejection_reported) {
+      if (queue_handled_rejection(ctx, promise, s->promise_result) < 0) {
+        return -1;
+      }
+      s->is_unhandled_rejection_reported = FALSE;
     }
   }
 
@@ -49282,7 +49536,8 @@ QJS_STATIC void JS_AddIntrinsicBasicObjects(LEPUSContext *ctx) {
   ft.generic_magic = js_error_constructor;
   obj = JS_NewCConstructor(ctx, JS_CLASS_ERROR, "Error", ft.generic, 1,
                            LEPUS_CFUNC_constructor_or_func_magic, -1,
-                           LEPUS_UNDEFINED, nullptr, 0, js_error_proto_funcs,
+                           LEPUS_UNDEFINED, js_error_funcs,
+                           countof(js_error_funcs), js_error_proto_funcs,
                            countof(js_error_proto_funcs), 0);
 
   for (i = 0; i < JS_NATIVE_ERROR_COUNT; i++) {
@@ -52495,6 +52750,7 @@ LEPUSValue JS_StructuredClone(LEPUSContext *ctx, LEPUSValue src,
           if (!s) goto fail;
           s->promise_state = JS_PROMISE_PENDING;
           s->is_handled = FALSE;
+          s->is_unhandled_rejection_reported = FALSE;
           for (int i = 0; i < 2; i++) init_list_head(&s->promise_reactions[i]);
           s->promise_result = LEPUS_UNDEFINED;
           LEPUS_SetOpaque(ret, s);

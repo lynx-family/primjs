@@ -861,7 +861,12 @@ void LEPUS_SetClassProto(LEPUSContext *ctx, LEPUSClassID class_id,
                          LEPUSValue obj);
 LEPUSValue LEPUS_GetClassProto(LEPUSContext *ctx, LEPUSClassID class_id);
 int LEPUS_MoveUnhandledRejectionToException(LEPUSContext *ctx);
+int LEPUS_TakeUnhandledRejection(LEPUSContext *ctx, LEPUSValue *promise,
+                                 LEPUSValue *reason, LEPUSValue *error);
+int LEPUS_TakeHandledRejection(LEPUSContext *ctx, LEPUSValue *promise,
+                               LEPUSValue *reason);
 size_t LEPUS_GetHeapSize(LEPUSRuntime *rt);
+LEPUS_BOOL LEPUS_TakeOutOfMemorySignal(LEPUSRuntime *rt);
 /* force to trigger memory usage report via callback registered by
  * LEPUS_SetGCObserver */
 void LEPUS_ReportGCInfo(LEPUSRuntime *rt);
@@ -1118,6 +1123,9 @@ static inline LEPUS_BOOL LEPUS_IsObject(LEPUSValueConst v) {
 }
 
 LEPUSValue LEPUS_Throw(LEPUSContext *ctx, LEPUSValue obj);
+/* Reads the 1-based location of the pending exception before it is consumed. */
+int LEPUS_GetExceptionLocation(LEPUSContext *ctx, int32_t *line,
+                               int64_t *column);
 LEPUSValue LEPUS_GetException(LEPUSContext *ctx);
 LEPUS_BOOL LEPUS_IsError(LEPUSContext *ctx, LEPUSValueConst val);
 #ifdef QJS_UNITTEST
@@ -1443,6 +1451,14 @@ typedef char *LEPUSModuleNormalizeFunc(LEPUSContext *ctx,
 typedef LEPUSModuleDef *LEPUSModuleLoaderFunc(LEPUSContext *ctx,
                                               const char *module_name,
                                               void *opaque);
+/* Return zero after retaining resolve/reject to complete the import later.
+   Return a negative value with a pending exception to reject immediately. */
+typedef int LEPUSModuleDynamicImportFunc(LEPUSContext *ctx,
+                                         const char *module_base_name,
+                                         const char *module_name,
+                                         LEPUSValueConst resolve,
+                                         LEPUSValueConst reject,
+                                         void *opaque);
 
 /* module_normalize = NULL is allowed and invokes the default module
    filename normalizer */
@@ -1450,6 +1466,12 @@ void LEPUS_SetModuleLoaderFunc(LEPUSRuntime *rt,
                                LEPUSModuleNormalizeFunc *module_normalize,
                                LEPUSModuleLoaderFunc *module_loader,
                                void *opaque);
+void LEPUS_SetModuleDynamicImportFunc(
+    LEPUSRuntime *rt, LEPUSModuleDynamicImportFunc *module_dynamic_import,
+    void *opaque);
+LEPUSValue LEPUS_LoadModuleNamespace(LEPUSContext *ctx,
+                                     const char *module_base_name,
+                                     const char *module_name);
 
 /* LEPUS Job support */
 

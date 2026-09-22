@@ -445,12 +445,15 @@ struct LEPUSRuntime {
   size_t stack_size; /* in bytes */
 
   LEPUSValue current_exception;
+  int64_t current_exception_line_column;
   /* true if a backtrace needs to be added to the current exception
      (the backtrace generation cannot be done immediately in a bytecode
      function) */
   BOOL exception_needs_backtrace;
   /* true if inside an out of memory error, to avoid recursing */
   BOOL in_out_of_memory : 8;
+  /* sticky until the embedding layer consumes the resource-limit signal */
+  BOOL out_of_memory_reported : 8;
 
   struct LEPUSStackFrame *current_stack_frame;
 
@@ -462,6 +465,8 @@ struct LEPUSRuntime {
   LEPUSModuleNormalizeFunc *module_normalize_func;
   LEPUSModuleLoaderFunc *module_loader_func;
   void *module_loader_opaque;
+  LEPUSModuleDynamicImportFunc *module_dynamic_import_func;
+  void *module_dynamic_import_opaque;
 
   BOOL can_block : 8; /* TRUE if Atomics.wait can block */
 
@@ -474,6 +479,7 @@ struct LEPUSRuntime {
 
   struct list_head
       unhandled_rejections;        // record the first unhandled rejection error
+  struct list_head handled_rejections;  // record reported rejections handled later
   struct list_head async_func_sf;  // record all async functions' stack frame.
 
 #ifdef BUILD_ASYNC_STACK
@@ -583,6 +589,7 @@ typedef struct JSUnhandledRejectionEntry {
   struct list_head link;
   LEPUSValue error;
   LEPUSValue promise;
+  LEPUSValue reason;
 } JSUnhandledRejectionEntry;
 
 struct LEPUSClass {
@@ -1896,7 +1903,10 @@ QJS_HIDE LEPUSValue JS_ThrowStackOverflow(LEPUSContext *ctx);
 QJS_HIDE void build_backtrace(
     LEPUSContext *ctx, LEPUSValueConst error_obj, const char *filename,
     /* <Primjs begin> */ int64_t line_num, /* <Primjs end> */
-    const uint8_t *cur_pc, int backtrace_flags, uint8_t is_parse_error = 0);
+    const uint8_t *cur_pc, int backtrace_flags, uint8_t is_parse_error = 0,
+    LEPUSValueConst frame_boundary = LEPUS_UNDEFINED);
+QJS_HIDE LEPUSValue JS_NewSymbolFromAtom(LEPUSContext *ctx, JSAtom descr,
+                                         int atom_type);
 QJS_HIDE LEPUSValue JS_NewSymbolFromAtom_GC(LEPUSContext *ctx, JSAtom descr,
                                             int atom_type);
 QJS_HIDE LEPUSValue JS_ToObject_GC(LEPUSContext *ctx, LEPUSValueConst val);
@@ -2202,6 +2212,10 @@ void JS_SetClassProto_GC(LEPUSContext *ctx, LEPUSClassID class_id,
                          LEPUSValue obj);
 LEPUSValue JS_GetClassProto_GC(LEPUSContext *ctx, LEPUSClassID class_id);
 int JS_MoveUnhandledRejectionToException_GC(LEPUSContext *ctx);
+int JS_TakeUnhandledRejection_GC(LEPUSContext *ctx, LEPUSValue *promise,
+                                 LEPUSValue *reason, LEPUSValue *error);
+int JS_TakeHandledRejection_GC(LEPUSContext *ctx, LEPUSValue *promise,
+                               LEPUSValue *reason);
 void JS_AddIntrinsicRegExpCompiler_GC(LEPUSContext *ctx);
 #ifdef QJS_UNITTEST
 LEPUSValue js_string_codePointRange_GC(LEPUSContext *ctx,
@@ -2870,9 +2884,13 @@ QJS_HIDE void build_backtrace_frame(LEPUSContext *ctx, LEPUSStackFrame *sf,
                                     DynBuf *dbuf, const uint8_t *cur_pc,
                                     BOOL is_async, BOOL is_debug_mode,
                                     LEPUSValueConst error_obj);
-QJS_HIDE void get_backtrace(LEPUSContext *ctx, DynBuf *dbuf, BOOL is_debug_mode,
-                            LEPUSValueConst error_obj, const uint8_t *cur_pc,
-                            int backtrace_flags);
+QJS_HIDE BOOL get_backtrace(LEPUSContext *ctx, DynBuf *dbuf,
+                            BOOL is_debug_mode, LEPUSValueConst error_obj,
+                            const uint8_t *cur_pc, int backtrace_flags,
+                            LEPUSValueConst frame_boundary = LEPUS_UNDEFINED);
+QJS_HIDE LEPUSValue js_error_capture_stack_trace(
+    LEPUSContext *ctx, LEPUSValueConst this_val, int argc,
+    LEPUSValueConst *argv);
 QJS_HIDE LEPUSValue JS_GetIterator(LEPUSContext *ctx, LEPUSValueConst obj,
                                    BOOL is_async);
 QJS_HIDE LEPUSValue JS_GetIterator2(LEPUSContext *ctx, LEPUSValueConst obj,
@@ -3211,6 +3229,7 @@ typedef struct JSPromiseData {
   /* 0=fulfill, 1=reject, list of * JSPromiseReactionData.link */
   struct list_head promise_reactions[2];
   BOOL is_handled; /* Note: only useful to debug */
+  BOOL is_unhandled_rejection_reported;
   LEPUSValue promise_result;
 } JSPromiseData;
 
