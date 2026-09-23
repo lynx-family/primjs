@@ -604,6 +604,9 @@ LEPUSRuntime *JS_NewRuntime2_GC(const LEPUSMallocFunctions *mf, void *opaque,
   init_list_head(&rt->job_list);
   init_list_head(&rt->unhandled_rejections);
   init_list_head(&rt->coverage_list);
+#ifdef ENABLE_LEPUSNG
+  init_list_head(&rt->lepus_ref_list);
+#endif
 
 #if defined(__aarch64__) && (defined(ANDROID) || defined(__ANDROID__)) && \
     !DISABLE_NANBOX
