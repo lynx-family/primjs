@@ -532,6 +532,10 @@ struct LEPUSRuntime {
   JSAtom single_character_string_table[kSingleCharacterStringTableSize];
   JSAtom two_digit_number_string_table[kTwoDigitNumberStringTableSize];
   JSStrCacheOrphan *str_cache_orphans;
+#ifdef ENABLE_LEPUSNG
+  /* Keep new fields at the end to preserve existing embedded-code offsets. */
+  struct list_head lepus_ref_list;
+#endif
 };
 
 // Temporarily attributes allocations to the Runtime-wide common memory slot.
@@ -1057,6 +1061,7 @@ enum {
   GC_MEMORY_POLICY_LEVEL_BIT0 = 0b1000000000000000000,
   GC_MEMORY_POLICY_LEVEL_BIT1 = 0b10000000000000000000,
   GC_MEMORY_POLICY_LEVEL_BIT2 = 0b100000000000000000000,
+  LEPUS_REF_CYCLE_CLEANUP_ENABLE = 0b1000000000000000000000,
 };
 
 inline int settingsFlag = 0;
