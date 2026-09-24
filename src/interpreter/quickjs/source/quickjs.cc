@@ -91,6 +91,17 @@ extern "C" {
 #include "quickjs/include/quickjs-inner.h"
 #include "quickjs/include/quickjs-opt-bytecode.h"
 
+#ifdef ENABLE_LEPUSNG
+struct JSLepusRefEntry {
+  LEPUSLepusRef ref;
+  struct list_head link;
+  bool finalizing;
+};
+
+static_assert(offsetof(JSLepusRefEntry, ref) == 0,
+              "LEPUSLepusRef must start the private allocation");
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -1075,6 +1086,9 @@ QJS_STATIC LEPUSRuntime *JS_NewRuntime_RC(const LEPUSMallocFunctions *mf,
   init_list_head(&rt->context_list);
   init_list_head(&rt->obj_list);
   // <Primjs begin>
+#ifdef ENABLE_LEPUSNG
+  init_list_head(&rt->lepus_ref_list);
+#endif
   init_list_head(&rt->gc_bytecode_list);
   init_list_head(&rt->gc_obj_list);
   // <Primjs end>
@@ -1166,6 +1180,9 @@ void JS_ResetRuntimeForEffect(LEPUSRuntime *rt, const LEPUSMallocFunctions *mf,
 
   init_list_head(&rt->obj_list);
   // <Primjs begin>
+#ifdef ENABLE_LEPUSNG
+  init_list_head(&rt->lepus_ref_list);
+#endif
   init_list_head(&rt->gc_bytecode_list);
   init_list_head(&rt->gc_obj_list);
   // <Primjs end>
@@ -1760,6 +1777,25 @@ void LEPUS_FreeRuntime(LEPUSRuntime *rt) {
     delete rt->qjsvaluevalue_allocator;
     rt->qjsvaluevalue_allocator = nullptr;
   }
+
+#ifdef ENABLE_LEPUSNG
+  /*
+   * A host ref-counted object may retain a JS object which in turn owns its
+   * LEPUSLepusRef. Ask the existing callback to drop only the host reference
+   * before the final RC collection. It must clear pref->p before releasing the
+   * payload. Releasing it may re-enter the VM and free this entry, so do not
+   * access the entry after invoking the callback.
+   */
+  while (rt->js_callbacks_.free_value && !list_empty(&rt->lepus_ref_list)) {
+    JSLepusRefEntry *entry =
+        list_entry(rt->lepus_ref_list.next, JSLepusRefEntry, link);
+    list_del(&entry->link);
+    if (entry->ref.p) {
+      rt->js_callbacks_.free_value(
+          rt, LEPUS_MKPTR(LEPUS_TAG_LEPUS_REF, &entry->ref));
+    }
+  }
+#endif
 
   LEPUS_RunGC(rt);
 
@@ -5625,18 +5661,28 @@ bool LEPUS_IsGCMode(LEPUSContext *ctx) { return ctx->gc_enable; }
 bool LEPUS_IsGCModeRT(LEPUSRuntime *rt) { return rt->gc_enable; }
 
 #ifdef ENABLE_LEPUSNG
-QJS_STATIC void JSRefFinalizer(LEPUSRuntime *rt, LEPUSValue val) {
-  auto &lepus_val =
-      reinterpret_cast<LEPUSLepusRef *>(LEPUS_VALUE_GET_PTR(val))->lepus_val;
-  if (LEPUS_IsObject(lepus_val)) {
-    auto *js_val_p = LEPUS_VALUE_GET_OBJ(lepus_val);
-    if (js_val_p->header.ref_count == 1) {
-      lepus_val = LEPUS_UNDEFINED;
-    }
+QJS_STATIC void JS_FreeLepusRef(LEPUSRuntime *rt, LEPUSValue val) {
+  auto *pref = reinterpret_cast<LEPUSLepusRef *>(LEPUS_VALUE_GET_PTR(val));
+  JSLepusRefEntry *entry = reinterpret_cast<JSLepusRefEntry *>(pref);
+  if (entry->finalizing) return;
+  entry->finalizing = true;
+  if (entry->link.next) list_del(&entry->link);
+
+  LEPUSValue lepus_val = pref->lepus_val;
+  pref->lepus_val = LEPUS_UNDEFINED;
+  BOOL in_gc_sweep = rt->in_gc_sweep;
+  if (in_gc_sweep && LEPUS_IsObject(lepus_val) &&
+      LEPUS_VALUE_GET_OBJ(lepus_val)->header.ref_count == 1) {
+    lepus_val = LEPUS_UNDEFINED;
   }
+
   rt->in_gc_sweep = FALSE;
-  rt->js_callbacks_.free_value(rt, val);
-  rt->in_gc_sweep = TRUE;
+  LEPUS_FreeValueRT(rt, lepus_val);
+  if (rt->js_callbacks_.free_value) {
+    rt->js_callbacks_.free_value(rt, val);
+  }
+  lepus_free_rt(rt, entry);
+  rt->in_gc_sweep = in_gc_sweep;
 }
 #endif
 
@@ -5698,13 +5744,7 @@ void __JS_FreeValueRT(LEPUSRuntime *rt, LEPUSValue v) {
 #ifdef ENABLE_LEPUSNG
     // <Primjs begin>
     case LEPUS_TAG_LEPUS_REF: {
-      if (rt->js_callbacks_.free_value) {
-        if (rt->in_gc_sweep) {
-          JSRefFinalizer(rt, v);
-          break;
-        }
-        rt->js_callbacks_.free_value(rt, v);
-      }
+      JS_FreeLepusRef(rt, v);
       break;
     }
     // <Primjs end>
@@ -12783,9 +12823,10 @@ LEPUSValue LEPUS_NewLepusWrap(LEPUSContext *ctx, void *p, int tag) {
 #ifdef ENABLE_COMPATIBLE_MM
   if (ctx->gc_enable) AddLepusRefCount(ctx);
 #endif
-  LEPUSLepusRef *pref;
-  pref = static_cast<LEPUSLepusRef *>(
-      lepus_mallocz(ctx, sizeof(*pref), ALLOC_TAG_LEPUSLepusRef));
+  size_t size =
+      ctx->gc_enable ? sizeof(LEPUSLepusRef) : sizeof(JSLepusRefEntry);
+  LEPUSLepusRef *pref = static_cast<LEPUSLepusRef *>(
+      lepus_mallocz(ctx, size, ALLOC_TAG_LEPUSLepusRef));
   if (!pref) return LEPUS_UNDEFINED;
   if (ctx->gc_enable) SetRunSlotHasFinalizer(ctx->rt, pref);
   pref->header.ref_count = 1;
@@ -12793,6 +12834,10 @@ LEPUSValue LEPUS_NewLepusWrap(LEPUSContext *ctx, void *p, int tag) {
   pref->tag = tag;
   pref->p = p;
   pref->lepus_val = LEPUS_UNDEFINED;
+  if (!ctx->gc_enable) {
+    JSLepusRefEntry *entry = reinterpret_cast<JSLepusRefEntry *>(pref);
+    list_add_tail(&entry->link, &ctx->rt->lepus_ref_list);
+  }
 
   return LEPUS_MKPTR(LEPUS_TAG_LEPUS_REF, pref);
 }
