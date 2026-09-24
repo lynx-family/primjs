@@ -753,6 +753,8 @@ typedef struct LEPUSLepusRef {
   LEPUSValue lepus_val;  // convert to lepusvalue cache, default is undefined
 } LEPUSLepusRef;
 
+typedef void LEPUSLepusRefReleasePayload(void *payload);
+
 void RegisterLepusType(LEPUSRuntime *rt, int32_t array_typeid,
                        int32_t table_typeid);
 
@@ -760,6 +762,8 @@ void RegisterGCInfoCallback(LEPUSRuntime *rt,
                             void (*func)(LEPUSContext *, const char *, int));
 
 void RegisterLepusRefCallbacks(LEPUSRuntime *rt, LEPUSLepusRefCallbacks *funcs);
+void LEPUS_SetLepusRefReleasePayloadCallback(
+    LEPUSRuntime *rt, LEPUSLepusRefReleasePayload *callback);
 
 void RegisterPrimJSCallbacks(LEPUSRuntime *rt, void **funcs,
                              int32_t callback_size);
