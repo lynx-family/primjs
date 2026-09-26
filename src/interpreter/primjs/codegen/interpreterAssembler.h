@@ -667,6 +667,7 @@ class InterpreterAssembler : public CodeAssembler {
   void CheckIntRetException(son::node::Node* value);
   void CheckAtomRetException(son::node::Node* value);
   void CheckStackOverflow(son::node::Node* sp);
+  void PollInterrupts();
   son::node::Node* PushStackFrame(son::node::Node* alloc_size,
                                   son::node::Node** sf_end = nullptr);
   void PopStackFrame(son::node::Node* prev_sf);
