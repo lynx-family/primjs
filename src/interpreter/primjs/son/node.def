@@ -83,6 +83,7 @@ DEF_MIR(ICmp, None, Meta1)
 
 DEF_MIR(Load, NoWrite, Meta0)
 DEF_MIR(Store, NoRead, Meta0)
+DEF_MIR(ReleaseStore, NoRead, Meta0)
 DEF_MIR(TailCall, None, Meta1)
 DEF_MIR(Call, None, Meta1)
 DEF_MIR(Return, None, Meta0)
@@ -153,6 +154,7 @@ DEF_NODE_CONSTANT(Dead, Dead, None, 0, 0, 0)
 
 DEF_NODE_CONSTANT(Load, Load, NoWrite, 1, 1, 2)
 DEF_NODE_CONSTANT(Store, Store, NoRead, 1, 1, 3)
+DEF_NODE_CONSTANT(ReleaseStore, ReleaseStore, NoRead, 1, 1, 3)
 DEF_NODE_CONSTANT(ExceptionReturn, ExceptionReturn, None, 1, 1, 0)
 
 #undef DEF_NODE_KIND

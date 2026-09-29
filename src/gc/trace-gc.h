@@ -56,6 +56,9 @@ class PtrHandles {
   void SetHeapObjIdx(int idx) { handle_idx = idx; }
   int GetHeapObjIdx() const { return handle_idx; }
   int GetHandleSize() const { return handle_size; }
+#ifdef ENABLE_COMPATIBLE_MM
+  LEPUSValue *AllocateValueSlots(size_t count);
+#endif
 
  private:
   int handle_idx;
