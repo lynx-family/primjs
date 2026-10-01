@@ -1794,6 +1794,7 @@ bool RosAllocImpl::ParallelFreeAllIf(MplThreadPool &threadPool) {
     }
   }
   if (task_count != 0) {
+    threadPool.SetMaxActiveThreadNum(threadCount - 1);
     threadPool.Start();
     threadPool.WaitFinish(true);
   }
@@ -1961,6 +1962,7 @@ bool RosAllocImpl::ParallelForEachObj(MplThreadPool &threadPool,
                                          onFinish));
       pageIndex += delta;
     }
+    threadPool.SetMaxActiveThreadNum(threadCount - 1);
     threadPool.Start();
     threadPool.WaitFinish(true);
   }
