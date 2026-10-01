@@ -124,15 +124,17 @@ static LEPUSValue js_std_load_file(LEPUSContext *ctx, LEPUSValueConst this_val,
                                    int argc, LEPUSValueConst *argv) {
   uint8_t *buf;
   const char *filename;
-  LEPUSValue ret;
+  LEPUSValue ret = LEPUS_NULL;
   size_t buf_len;
 
   filename = LEPUS_ToCString(ctx, argv[0]);
   if (!filename) return LEPUS_EXCEPTION;
   buf = lepus_load_file(ctx, &buf_len, filename);
+  if (buf) {
+    ret =
+        LEPUS_Eval(ctx, (char *)buf, buf_len, filename, LEPUS_EVAL_TYPE_GLOBAL);
+  }
   if (!ctx->rt->gc_enable) LEPUS_FreeCString(ctx, filename);
-  if (!buf) return LEPUS_NULL;
-  ret = LEPUS_Eval(ctx, (char *)buf, buf_len, filename, LEPUS_EVAL_TYPE_GLOBAL);
   free(buf);
   return ret;
 }
