@@ -227,7 +227,7 @@ void SendNotificationCB(LEPUSContext* ctx, const char* message) {
   if (IsRuntimeMethod(ctx, message)) {
     QjsDebugQueue::runtime_receive_queue_.push(message);
   }
-  std::cout << "notification message: " << message << std::endl;
+  // std::cout << "notification message: " << message << std::endl;
 }
 
 void ConsoleMessageCB(LEPUSContext* ctx, int tag, LEPUSValueConst* argv,
@@ -290,8 +290,8 @@ void SendNtfyCBWithViewID(LEPUSContext* ctx, const char* message,
   std::string view_id_str = std::to_string(view_id);
   QjsDebugQueue::GetReceiveMessageQueue().push(message);
   QjsDebugQueue::GetReceiveMessageQueue().push("view id: " + view_id_str);
-  std::cout << "notification message: " << message
-            << " with view id: " << view_id_str << std::endl;
+  // std::cout << "notification message: " << message
+  // << " with view id: " << view_id_str << std::endl;
 }
 
 void SetSessionEnableMapCB(LEPUSContext* ctx, int32_t view_id,
