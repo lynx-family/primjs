@@ -1,0 +1,5 @@
+Copyright 2024-2026 The Lynx Authors. All rights reserved.
+
+This directory contains the PrimJS N-API adapter test harness developed by The Lynx Authors and ports of the Node.js Node-API conformance tests under the MIT License.
+
+See THIRD-PARTY-NOTICES.md for detailed attributions and license texts.

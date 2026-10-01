@@ -1,0 +1,95 @@
+# Copyright (c) 2025 The Lynx Authors.
+# Licensed under the Apache License Version 2.0 that can be found in the LICENSE file in the root directory of this source tree.
+# Derived work includes upstream generated headers/content; see NOTICE.md for details.
+#
+# weak_node_api.gni — GN helper variables and guidance for integrating
+# @lynx-js/weak-node-api headers and prebuilt artifacts.
+#
+# Purpose
+# - Provide a consistent way to include the public headers (include/**, generated/**).
+# - Provide platform-specific paths to prebuilt libraries/frameworks for linking.
+# - Keep it simple: expose variables you can use inside your own BUILD.gn targets.
+#
+# Usage Examples (copy into your BUILD.gn and adjust paths as needed):
+#
+#   import("//third_party/weak-node-api/gn/weak_node_api.gni")
+#   # If you vendored the package elsewhere, override the package root:
+#   weak_node_api_pkg_root = "//third_party/weak-node-api"
+#
+#   executable("demo_app") {
+#     # 1) Headers-only (source-based integration)
+#     include_dirs += weak_node_api_include_dirs
+#     # Optionally add the upstream-generated sources if you prefer source build:
+#     sources += [ "${weak_node_api_pkg_root}/generated/weak_node_api.cpp" ]
+#
+#     # 2) Link with prebuilt binaries (after npm install release artifacts):
+#     if (is_mac) {
+#       frameworks += weak_node_api_mac_frameworks
+#       framework_dirs += weak_node_api_mac_framework_dirs
+#     } else if (is_win) {
+#       libs += weak_node_api_win_libs
+#       # At runtime, ensure WeakNodeAPI.dll is deployed alongside your binary.
+#     }
+#   }
+#
+# Notes
+# - You can switch prebuilt configuration by setting weak_node_api_prebuilt_config
+#   to either "Debug" or "Release" (default: "Release").
+# - The prebuilt folders are populated by the package's release script.
+#   See README.md for details.
+#
+# -----------------------------------------------------------------------------
+# Configuration variables you may override in your BUILD.gn before importing.
+# -----------------------------------------------------------------------------
+# The GN path to the package root. Change it if you vendor the package.
+weak_node_api_pkg_root = "//third_party/weak-node-api"
+
+# Choose which prebuilt config to link against: "Debug" or "Release".
+weak_node_api_prebuilt_config = "Release"
+
+# -----------------------------------------------------------------------------
+# Public headers and include directories
+# -----------------------------------------------------------------------------
+weak_node_api_public_headers = [
+  "${weak_node_api_pkg_root}/include/js_native_api_types.h",
+  "${weak_node_api_pkg_root}/include/js_native_api.h",
+  "${weak_node_api_pkg_root}/include/napi-inl.deprecated.h",
+  "${weak_node_api_pkg_root}/include/napi-inl.h",
+  "${weak_node_api_pkg_root}/include/napi.h",
+  "${weak_node_api_pkg_root}/include/node_api_types.h",
+  "${weak_node_api_pkg_root}/include/node_api.h",
+  "${weak_node_api_pkg_root}/include/weak_napi_defines.h",
+  "${weak_node_api_pkg_root}/include/weak_napi_undefs.h",
+  "${weak_node_api_pkg_root}/generated/NodeApiHost.hpp",
+  "${weak_node_api_pkg_root}/generated/weak_node_api.hpp",
+]
+
+weak_node_api_include_dirs = [
+  "${weak_node_api_pkg_root}",
+  "${weak_node_api_pkg_root}/include",
+  "${weak_node_api_pkg_root}/generated",
+]
+
+# -----------------------------------------------------------------------------
+# Prebuilt artifacts (populate via package release scripts)
+# -----------------------------------------------------------------------------
+# macOS — Frameworks
+weak_node_api_mac_framework_name = "WeakNodeAPI"
+weak_node_api_mac_framework_dirs = [
+  "${weak_node_api_pkg_root}/prebuilt/macos/${weak_node_api_prebuilt_config}",
+]
+# Framework names to add to `frameworks` inside a target
+weak_node_api_mac_frameworks = [ weak_node_api_mac_framework_name ]
+
+# Windows — x64 static import libraries and runtime DLLs
+weak_node_api_win_lib_dir = "${weak_node_api_pkg_root}/prebuilt/win/x64/${weak_node_api_prebuilt_config}"
+weak_node_api_win_libs = [
+  # Link the import library; ensure the DLL is on PATH at runtime.
+  "${weak_node_api_win_lib_dir}/WeakNodeAPI.lib",
+]
+# Optional: the DLL location for deployment (copy to output dir as needed)
+weak_node_api_win_dll = "${weak_node_api_win_lib_dir}/WeakNodeAPI.dll"
+
+# Windows public headers subset (if any); otherwise reuse include/.
+weak_node_api_win_include_dir = "${weak_node_api_pkg_root}/prebuilt/win/include"
+# Fallback note: If this directory is empty, use weak_node_api_include_dirs instead.
