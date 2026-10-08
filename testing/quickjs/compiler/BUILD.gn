@@ -72,6 +72,15 @@ unit_test("quickjs_unittest") {
   data_deps = [ ":test_cases_copy" ]
 }
 
+unit_test("finalization_registry_unittest") {
+  testonly = true
+  sources = [ "test_finalization_registry.cc" ]
+  public_configs = [ ":config" ]
+  public_deps = [ "../../../src:quickjs_lib" ]
+  cflags = [ "-Wno-c99-designator" ]
+  data_deps = [ ":quickjs_test_cases_copy" ]
+}
+
 unit_test("read_function_overflow_unittest") {
   testonly = true
   sources = [ "test_read_function_overflow.cc" ]

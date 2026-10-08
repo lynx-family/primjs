@@ -166,6 +166,167 @@ TEST_F(FinalizationRegistryTest, ClearWeakRefsBeforeCycleCleanupCallback) {
   LEPUS_FreeValue(ctx_, result);
 }
 
+static LEPUSValue js_force_gc(LEPUSContext* ctx, LEPUSValueConst this_val,
+                              int argc, LEPUSValueConst* argv) {
+  LEPUS_RunGC(ctx->rt);
+  return LEPUS_UNDEFINED;
+}
+
+class CollectionCleanupTest : public FinalizationRegistryTest {
+ protected:
+  void SetUp() override {
+    FinalizationRegistryTest::SetUp();
+    LEPUSValue global = LEPUS_GetGlobalObject(ctx_);
+    ASSERT_EQ(1, LEPUS_SetPropertyStr(
+                     ctx_, global, "forceGC",
+                     LEPUS_NewCFunction(ctx_, js_force_gc, "forceGC", 0)));
+    if (!LEPUS_IsGCMode(ctx_)) LEPUS_FreeValue(ctx_, global);
+  }
+
+  void Check(const char* source) {
+    LEPUSValue result = LEPUS_Eval(ctx_, source, strlen(source), "test.js",
+                                   LEPUS_EVAL_TYPE_GLOBAL);
+    ASSERT_FALSE(LEPUS_IsException(result)) << js_get_exception_string(ctx_);
+    EXPECT_TRUE(LEPUS_ToBool(ctx_, result));
+    LEPUS_FreeValue(ctx_, result);
+  }
+};
+
+TEST_F(CollectionCleanupTest, MapDeleteCommitsRecordBeforeCleanup) {
+  if (LEPUS_IsGCMode(ctx_)) GTEST_SKIP();
+  Check(R"(
+    (function() {
+      var map = new Map();
+      var calls = 0;
+      var sawCommittedState = false;
+      var registry = new FinalizationRegistry(function() {
+        calls++;
+        sawCommittedState = map.size === 0 && !map.has('victim');
+        map.clear();
+        map.set('added', 42);
+      });
+      (function() {
+        var target = {};
+        registry.register(target, 0);
+        map.set('victim', target);
+      })();
+      var deleted = map.delete('victim');
+      return deleted && calls === 1 && sawCommittedState && map.size === 1 &&
+             map.get('added') === 42;
+    })()
+  )");
+}
+
+TEST_F(CollectionCleanupTest, MapClearCommitsAllRecordsBeforeCleanup) {
+  if (LEPUS_IsGCMode(ctx_)) GTEST_SKIP();
+  Check(R"(
+    (function() {
+      var map = new Map();
+      var calls = 0;
+      var sawCommittedState = false;
+      var nestedDeleteResult = true;
+      var registry = new FinalizationRegistry(function() {
+        calls++;
+        sawCommittedState = map.size === 0 && !map.has('first') &&
+                            !map.has('second');
+        nestedDeleteResult = map.delete('second');
+        map.set('added', 42);
+      });
+      (function() {
+        var target = {};
+        registry.register(target, 0);
+        map.set('first', target);
+        map.set('second', 2);
+      })();
+      map.clear();
+      return calls === 1 && sawCommittedState && !nestedDeleteResult &&
+             map.size === 1 && map.get('added') === 42;
+    })()
+  )");
+}
+
+TEST_F(CollectionCleanupTest, SetClearCommitsAllRecordsBeforeCleanup) {
+  if (LEPUS_IsGCMode(ctx_)) GTEST_SKIP();
+  Check(R"(
+    (function() {
+      var set = new Set();
+      var calls = 0;
+      var sawCommittedState = false;
+      var registry = new FinalizationRegistry(function() {
+        calls++;
+        sawCommittedState = set.size === 0;
+        set.clear();
+        set.add('added');
+      });
+      (function() {
+        var target = {};
+        registry.register(target, 0);
+        set.add(target);
+        set.add(2);
+      })();
+      set.clear();
+      return calls === 1 && sawCommittedState && set.size === 1 &&
+             set.has('added');
+    })()
+  )");
+}
+
+TEST_F(CollectionCleanupTest, WeakMapDeleteHidesRetiringValueFromCycleGC) {
+  if (LEPUS_IsGCMode(ctx_)) GTEST_SKIP();
+  Check(R"(
+    (function() {
+      var weakMap = new WeakMap();
+      var key = {};
+      var calls = 0;
+      var sawCommittedState = false;
+      var registry = new FinalizationRegistry(function() {
+        calls++;
+        sawCommittedState = !weakMap.has(key);
+        forceGC();
+        weakMap.set(key, { replacement: true });
+      });
+      (function() {
+        var target = {};
+        registry.register(target, 0);
+        weakMap.set(key, target);
+      })();
+      var deleted = weakMap.delete(key);
+      return deleted && calls === 1 && sawCommittedState && weakMap.has(key) &&
+             weakMap.get(key).replacement;
+    })()
+  )");
+}
+
+TEST_F(CollectionCleanupTest, MapClearKeepsIteratorRecordsAliveDuringCleanup) {
+  if (LEPUS_IsGCMode(ctx_)) GTEST_SKIP();
+  Check(R"(
+    (function() {
+      var map = new Map();
+      var iterator;
+      var calls = 0;
+      var sawCommittedState = false;
+      var iteratorDone = false;
+      var registry = new FinalizationRegistry(function() {
+        calls++;
+        sawCommittedState = map.size === 0;
+        iteratorDone = iterator.next().done;
+        map.set('added', 42);
+      });
+      (function() {
+        var target = {};
+        registry.register(target, 0);
+        map.set('first', target);
+        map.set('second', 2);
+      })();
+      iterator = map.values();
+      iterator.next();
+      map.clear();
+      return calls === 1 && sawCommittedState && iteratorDone &&
+             map.size === 1 && map.get('added') === 42;
+    })()
+  )");
+}
+
 TEST_F(FinalizationRegistryTest, DefinePropertyCommitsFlagsBeforeCleanup) {
   if (LEPUS_IsGCMode(ctx_)) GTEST_SKIP();
 
