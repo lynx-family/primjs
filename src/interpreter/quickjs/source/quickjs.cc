@@ -45678,26 +45678,40 @@ QJS_STATIC void delete_weak_ref(LEPUSRuntime *rt, LEPUSObject *p, void *ptr) {
   return;
 }
 
-QJS_STATIC void map_delete_record(LEPUSRuntime *rt, JSMapState *s,
+QJS_STATIC void map_detach_record(LEPUSRuntime *rt, JSMapState *s,
                                   JSMapRecord *mr) {
-  if (mr->empty) return;
   list_del(&mr->hash_link);
   if (s->is_weak) {
     delete_weak_ref(rt, LEPUS_VALUE_GET_OBJ(mr->key), mr);
-  } else {
-    LEPUS_FreeValueRT(rt, mr->key);
   }
-  LEPUS_FreeValueRT(rt, mr->value);
+  mr->empty = TRUE;
+  s->record_count--;
+}
+
+QJS_STATIC void map_release_record(LEPUSRuntime *rt, JSMapState *s,
+                                   JSMapRecord *mr) {
+  LEPUSValue key = mr->key;
+  LEPUSValue value = mr->value;
+  BOOL is_weak = s->is_weak;
+
+  mr->key = LEPUS_UNDEFINED;
+  mr->value = LEPUS_UNDEFINED;
   if (--mr->ref_count == 0) {
     list_del(&mr->link);
     lepus_free_rt(rt, mr);
-  } else {
-    /* keep a zombie record for iterators */
-    mr->empty = TRUE;
-    mr->key = LEPUS_UNDEFINED;
-    mr->value = LEPUS_UNDEFINED;
   }
-  s->record_count--;
+
+  if (!is_weak) LEPUS_FreeValueRT(rt, key);
+  LEPUS_FreeValueRT(rt, value);
+}
+
+QJS_STATIC void map_delete_record(LEPUSRuntime *rt, JSMapState *s,
+                                  JSMapRecord *mr) {
+  if (mr->empty) return;
+  /* Commit the deletion before releasing values because their finalizers can
+     synchronously run user code that reenters this collection. */
+  map_detach_record(rt, s, mr);
+  map_release_record(rt, s, mr);
 }
 
 QJS_STATIC void map_decref_record(LEPUSRuntime *rt, JSMapRecord *mr) {
@@ -45881,12 +45895,28 @@ QJS_STATIC LEPUSValue js_map_clear(LEPUSContext *ctx, LEPUSValueConst this_val,
   JSMapState *s = static_cast<JSMapState *>(
       LEPUS_GetOpaque2(ctx, this_val, JS_CLASS_MAP + magic));
   struct list_head *el, *el1;
+  struct list_head records_to_release;
   JSMapRecord *mr;
 
   if (!s) return LEPUS_EXCEPTION;
-  list_for_each_safe(el, el1, &s->records) {
+  /* Detach every live record before releasing any key or value. A release can
+     synchronously run FinalizationRegistry cleanup code, which may delete the
+     next record, add new records, clear again, or advance an iterator. Use the
+     now-unused hash link as a private release list, and hold one temporary
+     reference so iterator advancement cannot free a staged record. */
+  init_list_head(&records_to_release);
+  list_for_each(el, &s->records) {
     mr = list_entry(el, JSMapRecord, link);
-    map_delete_record(ctx->rt, s, mr);
+    if (mr->empty) continue;
+    map_detach_record(ctx->rt, s, mr);
+    mr->ref_count++;
+    list_add_tail(&mr->hash_link, &records_to_release);
+  }
+  list_for_each_safe(el, el1, &records_to_release) {
+    mr = list_entry(el, JSMapRecord, hash_link);
+    list_del(&mr->hash_link);
+    map_release_record(ctx->rt, s, mr);
+    map_decref_record(ctx->rt, mr);
   }
   return LEPUS_UNDEFINED;
 }
