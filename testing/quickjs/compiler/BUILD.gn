@@ -45,6 +45,7 @@ unittest_set("quickjs_testset") {
     "test_coverage_perf.cc",
     "test_cpool_dedup.cc",
     "test_finalization_registry.cc",
+    "test_lookahead_column.cc",
     "test_parse_program.cc",
     "test_primjs_version.cc",
     "test_promise_rejection.cc",
