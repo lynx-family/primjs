@@ -266,6 +266,11 @@ static LEPUSValue HeapProfilerNoopJob(LEPUSContext*, int, LEPUSValueConst*) {
   return LEPUS_UNDEFINED;
 }
 
+static LEPUSValue HeapProfilerAutoInit(LEPUSContext* ctx, LEPUSObject*, JSAtom,
+                                       void*) {
+  return LEPUS_NewInt32(ctx, 1);
+}
+
 #ifdef ENABLE_QUICKJS_DEBUGGER
 class ScopedQjsDebugger {
  public:
@@ -346,7 +351,12 @@ TEST(HeapProfiler, HeapObjectSize) {
   (x2 = GetProperty(x, HeapGraphEdge::kProperty, "b"));
 
   ASSERT_TRUE(x2);
-  ASSERT_GT(x->self_size(), 0);
+  const size_t expected_object_size =
+      env.ctx->rt->gc_enable ? (CanInlineLEPUSObjectProperties(JS_CLASS_OBJECT)
+                                    ? GetLEPUSObjectAllocSize(JS_CLASS_OBJECT)
+                                    : LEPUS_OBJECT_SIZE)
+                             : sizeof(LEPUSObject);
+  ASSERT_EQ(x->self_size(), expected_object_size);
 
   ASSERT_GT(x1->self_size(), 0);
 
@@ -544,16 +554,65 @@ TEST(HeapProfiler, TracingGcRuntimeContainerNodes) {
   ASSERT_STREQ("system / shape_array", GetName(shape_array));
 }
 
+TEST(HeapProfiler, TracingGcPropertyHelperNodes) {
+  ::TestQjsContext env;
+#ifndef ENABLE_COMPATIBLE_MM
+  GTEST_SKIP();
+#else
+  if (!env.ctx->rt->gc_enable) GTEST_SKIP();
+
+  LEPUSValue ret = env.CompileAndRun(R"(
+    var helperOwner = {};
+    Object.defineProperty(helperOwner, "trackedAccessor", {
+      configurable: true,
+      enumerable: true,
+      get: function trackedGetter() { return 1; },
+      set: function trackedSetter(value) {}
+    });
+  )");
+  ASSERT_FALSE(LEPUS_IsException(ret));
+
+  LEPUSValue owner = env.GetGlobalPropery("helperOwner");
+  ASSERT_TRUE(LEPUS_IsObject(owner));
+  HandleScope owner_scope(env.ctx, &owner, HANDLE_TYPE_LEPUS_VALUE);
+  JSAtom autoinit_atom = LEPUS_NewAtom(env.ctx, "trackedAutoInit");
+  owner_scope.PushLEPUSAtom(autoinit_atom);
+  ASSERT_EQ(JS_DefineAutoInitProperty_GC(
+                env.ctx, owner, autoinit_atom, HeapProfilerAutoInit, nullptr,
+                LEPUS_PROP_CONFIGURABLE | LEPUS_PROP_ENUMERABLE),
+            1);
+
+  auto* snapshot = GetQjsHeapProfilerImplInstance().TakeHeapSnapshot(env.ctx);
+  ASSERT_TRUE(ValidateSnapshot(snapshot));
+
+  const auto* owner_entry =
+      GetGlobalProperty(snapshot, HeapGraphEdge::kProperty, "helperOwner");
+  ASSERT_TRUE(owner_entry);
+
+  const auto* getset = GetProperty(owner_entry, HeapGraphEdge::kInternal,
+                                   "(getset) trackedAccessor");
+  ASSERT_TRUE(getset);
+  EXPECT_EQ(HeapEntry::kNative, getset->type());
+  EXPECT_STREQ("system / property_getset", GetName(getset));
+  EXPECT_EQ(sizeof(JSPropertyGetSet), GetSize(getset));
+  EXPECT_TRUE(GetProperty(getset, HeapGraphEdge::kInternal, "getter"));
+  EXPECT_TRUE(GetProperty(getset, HeapGraphEdge::kInternal, "setter"));
+
+  const auto* autoinit = GetProperty(owner_entry, HeapGraphEdge::kInternal,
+                                     "(autoinit) trackedAutoInit");
+  ASSERT_TRUE(autoinit);
+  EXPECT_EQ(HeapEntry::kNative, autoinit->type());
+  EXPECT_STREQ("system / property_autoinit", GetName(autoinit));
+  EXPECT_EQ(sizeof(JSPropertyAutoInit), GetSize(autoinit));
+#endif
+}
+
 TEST(HeapProfiler, TracingGcTakeSnapshotPreservesConsoleMessages) {
   ::TestQjsContext env;
   if (!env.ctx->rt->gc_enable) GTEST_SKIP();
 
 #ifdef ENABLE_QUICKJS_DEBUGGER
   ScopedQjsDebugger debugger(env.ctx);
-#else
-  GTEST_SKIP();
-#endif
-
   auto* info = env.ctx->debugger_info;
   ASSERT_TRUE(info);
 
@@ -574,6 +633,9 @@ TEST(HeapProfiler, TracingGcTakeSnapshotPreservesConsoleMessages) {
   ASSERT_FALSE(LEPUS_IsUndefined(info->console.messages));
   ASSERT_EQ(messages_ptr, LEPUS_VALUE_GET_PTR(info->console.messages));
   ASSERT_EQ(messages_length, info->console.length);
+#else
+  GTEST_SKIP();
+#endif
 }
 
 TEST(HeapProfiler, TracingGcGlobalHandlesRoot) {

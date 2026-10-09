@@ -57,6 +57,8 @@ class HeapObjPtr {
       : ptr_{ptr}, type_{PtrType::kJSPropertyGetSet} {}
   explicit HeapObjPtr(const JSPropertyAutoInit* ptr)
       : ptr_{ptr}, type_{PtrType::kJSPropertyAutoInit} {}
+  explicit HeapObjPtr(const JSLinkedHashMap* ptr)
+      : ptr_{ptr}, type_{PtrType::kJSLinkedHashMap} {}
   explicit HeapObjPtr(const char* str)
       : ptr_{str}, type_{PtrType::kCString}, size_{strlen(str) + 1} {}
   explicit HeapObjPtr(const LEPUSContext* ctx)
