@@ -19203,22 +19203,19 @@ QJS_STATIC void emit_u32(JSParseState *s, uint32_t val) {
   dbuf_put_u32(&s->cur_func->byte_code, val);
 }
 
+void emit_line_num(JSParseState *s, bool is_get_var) {
+  JSFunctionDef *fd = s->cur_func;
+  DynBuf *bc = &fd->byte_code;
+
+  int64_t result = compute_column(s, is_get_var);  // val == OP_scope_get_var
+  dbuf_putc(bc, OP_line_num);
+  dbuf_put_u64(bc, result);
+}
+
 void emit_op(JSParseState *s, uint8_t val) {
   JSFunctionDef *fd = s->cur_func;
   DynBuf *bc = &fd->byte_code;
 
-  /* Use the line number of the last token used, not the next token,
-     nor the current offset in the source file.
-   */
-  // <Primjs begin>
-  if (unlikely(s->last_emit_ptr != s->last_ptr)) {
-    int64_t result = compute_column(s, val == OP_scope_get_var);
-    dbuf_putc(bc, OP_line_num);
-    dbuf_put_u64(bc, result);
-    s->last_emit_ptr = s->last_ptr;
-    fd->last_opcode_line_num = s->last_line_num;
-  }
-  // <Primjs end>
   fd->last_opcode_pos = bc->size;
   dbuf_putc(bc, val);
 }
@@ -22197,6 +22194,7 @@ QJS_STATIC __exception int js_parse_postfix_expr(JSParseState *s,
         if (next_token(s)) /* update line number before emitting code */
           return -1;
       do_get_var:
+        emit_line_num(s, true);
         emit_op(s, OP_scope_get_var);
         emit_u32(s, name);
         emit_u16(s, s->cur_func->scope_level);
@@ -22230,6 +22228,7 @@ QJS_STATIC __exception int js_parse_postfix_expr(JSParseState *s,
         emit_atom(s, JS_ATOM_new_target);
         emit_u16(s, 0);
       } else {
+        emit_line_num(s, false);
         caller_start = s->token.ptr;
         if (js_parse_postfix_expr(s, FALSE | PF_LASTEST_ISNEW)) return -1;
         is_parsing_newnew_pattern = parse_flags & PF_LASTEST_ISNEW;
@@ -22327,6 +22326,7 @@ QJS_STATIC __exception int js_parse_postfix_expr(JSParseState *s,
 
       if (call_type == FUNC_CALL_NORMAL) {
       parse_func_call2:
+        emit_line_num(s, false);
         switch (opcode = get_prev_opcode(fd)) {
           case OP_get_field:
             /* keep the object on the stack */
@@ -22932,6 +22932,7 @@ QJS_STATIC __exception int js_parse_expr_binary(JSParseState *s, int level,
         abort();
     }
     if (next_token(s)) return -1;
+    emit_line_num(s, false);
     if (js_parse_expr_binary(s, level - 1, parse_flags & ~PF_ARROW_FUNC))
       return -1;
     emit_op(s, opcode);
@@ -23876,6 +23877,7 @@ QJS_STATIC __exception int js_parse_statement_or_decl(JSParseState *s,
         js_parse_error(s, "line terminator not allowed after throw");
         goto fail;
       }
+      emit_line_num(s, false);
       if (js_parse_expr(s)) goto fail;
       emit_op(s, OP_throw);
       if (js_parse_expect_semi(s)) goto fail;
@@ -24462,6 +24464,7 @@ QJS_STATIC __exception int js_parse_statement_or_decl(JSParseState *s,
 
     default:
     hasexpr:
+      emit_line_num(s, false);
       if (js_parse_expr(s)) goto fail;
       if (s->cur_func->eval_ret_idx >= 0) {
         /* store the expression value so that it can be returned
