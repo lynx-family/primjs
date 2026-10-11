@@ -1713,14 +1713,21 @@ LBB54_2:                                ; %B2
 	.globl	_call_0_asm_h
 	.p2align	2
 _call_0_asm_h:                          ; @call_0_asm_h
-; %bb.0:                                ; %B2
-	ldrh	w8, [x19], #2
-	str	x20, [x23, #64]
+; %bb.0:                                ; %B9
+	sub	sp, sp, #16
+	ldrh	w9, [x19], #2
 	str	x19, [x23, #48]
+	str	x20, [x23, #64]
+	ldr	w8, [x24, #232]
+	sub	w8, w8, #1
+	cmp	w8, #0
+	str	w8, [x24, #232]
+	b.le	LBB55_3
+LBB55_1:                                ; %B2
+	sub	x20, x20, x9, lsl #3
 	mov	w27, #18                        ; =0x12
 	mov	w21, #18                        ; =0x12
-	sub	x20, x20, x8, lsl #3
-	mov	x0, x8
+	mov	x0, x9
 	ldur	x22, [x20, #-8]
 	bl	_common_call_asm_h
 	ldr	x19, [x23, #48]
@@ -1728,55 +1735,90 @@ _call_0_asm_h:                          ; @call_0_asm_h
 	cmp	x0, #130
 	ldp	x28, x27, [x23, #16]
 	ldr	x26, [x23, #120]
-	b.eq	LBB55_2
-; %bb.1:                                ; %B4
+	b.eq	LBB55_4
+; %bb.2:                                ; %B4
 	ldurh	w8, [x19, #-2]
 	add	w8, w8, #1
 	sub	x20, x20, w8, uxtw #3
 	str	x0, [x20], #8
 	ldrb	w8, [x19], #1
 	ldr	x1, [x25, x8, lsl #3]
+	add	sp, sp, #16
 	br	x1
-LBB55_2:                                ; %B3
+LBB55_3:                                ; %B5
+	mov	x0, x24
+	str	x20, [x23, #64]
+	str	x9, [sp, #8]                    ; 8-byte Folded Spill
+	bl	_prim_js_poll_interrupts_gc
+	ldr	x9, [sp, #8]                    ; 8-byte Folded Reload
+	tbz	w0, #31, LBB55_1
+LBB55_4:                                ; %B3
+	add	sp, sp, #16
 	b	_exception_asm_h
                                         ; -- End function
 	.private_extern	_tail_call_0_asm_h      ; -- Begin function tail_call_0_asm_h
 	.globl	_tail_call_0_asm_h
 	.p2align	2
 _tail_call_0_asm_h:                     ; @tail_call_0_asm_h
-; %bb.0:                                ; %B2
-	ldrh	w8, [x19], #2
-	str	x20, [x23, #64]
+; %bb.0:                                ; %B9
+	sub	sp, sp, #16
+	ldrh	w9, [x19], #2
 	str	x19, [x23, #48]
+	str	x20, [x23, #64]
+	ldr	w8, [x24, #232]
+	sub	w8, w8, #1
+	cmp	w8, #0
+	str	w8, [x24, #232]
+	b.le	LBB56_3
+LBB56_1:                                ; %B2
+	sub	x20, x20, x9, lsl #3
 	mov	w27, #18                        ; =0x12
 	mov	w21, #18                        ; =0x12
-	sub	x20, x20, x8, lsl #3
-	mov	x0, x8
+	mov	x0, x9
 	ldur	x22, [x20, #-8]
 	bl	_common_call_asm_h
 	cmp	x0, #130
-	b.eq	LBB56_2
-; %bb.1:                                ; %B4
+	b.eq	LBB56_5
+; %bb.2:                                ; %B4
 	ldr	x26, [x23, #120]
 	mov	x19, xzr
 	mov	x20, xzr
+	add	sp, sp, #16
 	b	_common_return_asm_h
-LBB56_2:                                ; %B3
+LBB56_3:                                ; %B5
+	mov	x0, x24
+	str	x20, [x23, #64]
+	str	x9, [sp, #8]                    ; 8-byte Folded Spill
+	bl	_prim_js_poll_interrupts_gc
+	ldr	x9, [sp, #8]                    ; 8-byte Folded Reload
+	tbz	w0, #31, LBB56_1
+; %bb.4:                                ; %B6
+	add	sp, sp, #16
+	b	_exception_asm_h
+LBB56_5:                                ; %B3
 	mov	x19, xzr
 	mov	x20, xzr
+	add	sp, sp, #16
 	b	_exception_asm_h
                                         ; -- End function
 	.private_extern	_call_method_0_asm_h    ; -- Begin function call_method_0_asm_h
 	.globl	_call_method_0_asm_h
 	.p2align	2
 _call_method_0_asm_h:                   ; @call_method_0_asm_h
-; %bb.0:                                ; %B2
-	ldrh	w8, [x19], #2
-	str	x20, [x23, #64]
+; %bb.0:                                ; %B9
+	sub	sp, sp, #16
+	ldrh	w9, [x19], #2
 	str	x19, [x23, #48]
+	str	x20, [x23, #64]
+	ldr	w8, [x24, #232]
+	sub	w8, w8, #1
+	cmp	w8, #0
+	str	w8, [x24, #232]
+	b.le	LBB57_3
+LBB57_1:                                ; %B2
+	sub	x20, x20, x9, lsl #3
 	mov	w27, #18                        ; =0x12
-	sub	x20, x20, x8, lsl #3
-	mov	x0, x8
+	mov	x0, x9
 	ldp	x21, x22, [x20, #-16]
 	bl	_common_call_asm_h
 	ldr	x19, [x23, #48]
@@ -1784,41 +1826,69 @@ _call_method_0_asm_h:                   ; @call_method_0_asm_h
 	cmp	x0, #130
 	ldp	x28, x27, [x23, #16]
 	ldr	x26, [x23, #120]
-	b.eq	LBB57_2
-; %bb.1:                                ; %B4
+	b.eq	LBB57_4
+; %bb.2:                                ; %B4
 	ldurh	w8, [x19, #-2]
 	add	w8, w8, #2
 	sub	x20, x20, w8, uxtw #3
 	str	x0, [x20], #8
 	ldrb	w8, [x19], #1
 	ldr	x1, [x25, x8, lsl #3]
+	add	sp, sp, #16
 	br	x1
-LBB57_2:                                ; %B3
+LBB57_3:                                ; %B5
+	mov	x0, x24
+	str	x20, [x23, #64]
+	str	x9, [sp, #8]                    ; 8-byte Folded Spill
+	bl	_prim_js_poll_interrupts_gc
+	ldr	x9, [sp, #8]                    ; 8-byte Folded Reload
+	tbz	w0, #31, LBB57_1
+LBB57_4:                                ; %B3
+	add	sp, sp, #16
 	b	_exception_asm_h
                                         ; -- End function
 	.private_extern	_tail_call_method_0_asm_h ; -- Begin function tail_call_method_0_asm_h
 	.globl	_tail_call_method_0_asm_h
 	.p2align	2
 _tail_call_method_0_asm_h:              ; @tail_call_method_0_asm_h
-; %bb.0:                                ; %B2
-	ldrh	w8, [x19], #2
-	str	x20, [x23, #64]
+; %bb.0:                                ; %B9
+	sub	sp, sp, #16
+	ldrh	w9, [x19], #2
 	str	x19, [x23, #48]
+	str	x20, [x23, #64]
+	ldr	w8, [x24, #232]
+	sub	w8, w8, #1
+	cmp	w8, #0
+	str	w8, [x24, #232]
+	b.le	LBB58_3
+LBB58_1:                                ; %B2
+	sub	x20, x20, x9, lsl #3
 	mov	w27, #18                        ; =0x12
-	sub	x20, x20, x8, lsl #3
-	mov	x0, x8
+	mov	x0, x9
 	ldp	x21, x22, [x20, #-16]
 	bl	_common_call_asm_h
 	cmp	x0, #130
-	b.eq	LBB58_2
-; %bb.1:                                ; %B4
+	b.eq	LBB58_5
+; %bb.2:                                ; %B4
 	ldr	x26, [x23, #120]
 	mov	x19, xzr
 	mov	x20, xzr
+	add	sp, sp, #16
 	b	_common_return_asm_h
-LBB58_2:                                ; %B3
+LBB58_3:                                ; %B5
+	mov	x0, x24
+	str	x20, [x23, #64]
+	str	x9, [sp, #8]                    ; 8-byte Folded Spill
+	bl	_prim_js_poll_interrupts_gc
+	ldr	x9, [sp, #8]                    ; 8-byte Folded Reload
+	tbz	w0, #31, LBB58_1
+; %bb.4:                                ; %B6
+	add	sp, sp, #16
+	b	_exception_asm_h
+LBB58_5:                                ; %B3
 	mov	x19, xzr
 	mov	x20, xzr
+	add	sp, sp, #16
 	b	_exception_asm_h
                                         ; -- End function
 	.private_extern	_array_from_0_asm_h     ; -- Begin function array_from_0_asm_h
@@ -1848,8 +1918,14 @@ LBB59_2:                                ; %B2
 	.globl	_apply_0_asm_h
 	.p2align	2
 _apply_0_asm_h:                         ; @apply_0_asm_h
-; %bb.0:                                ; %B1
+; %bb.0:                                ; %B9
 	sub	sp, sp, #16
+	ldr	w8, [x24, #232]
+	sub	w8, w8, #1
+	cmp	w8, #0
+	str	w8, [x24, #232]
+	b.le	LBB60_3
+LBB60_1:                                ; %B5
 	ldrh	w4, [x19]
 	ldur	x1, [x20, #-24]
 	sub	x3, x20, #16
@@ -1859,8 +1935,8 @@ _apply_0_asm_h:                         ; @apply_0_asm_h
 	str	x3, [sp, #8]                    ; 8-byte Folded Spill
 	bl	_js_function_apply_gc
 	cmp	x0, #130
-	b.eq	LBB60_2
-; %bb.1:                                ; %B3
+	b.eq	LBB60_4
+; %bb.2:                                ; %B7
 	stur	x0, [x20, #-24]
 	ldr	x20, [sp, #8]                   ; 8-byte Folded Reload
 	ldrb	w8, [x19, #2]
@@ -1868,7 +1944,12 @@ _apply_0_asm_h:                         ; @apply_0_asm_h
 	ldr	x1, [x25, x8, lsl #3]
 	add	sp, sp, #16
 	br	x1
-LBB60_2:                                ; %B2
+LBB60_3:                                ; %B1
+	mov	x0, x24
+	str	x20, [x23, #64]
+	bl	_prim_js_poll_interrupts_gc
+	tbz	w0, #31, LBB60_1
+LBB60_4:                                ; %B6
 	add	sp, sp, #16
 	b	_exception_asm_h
                                         ; -- End function
@@ -8649,110 +8730,154 @@ _goto16_0_asm_h:                        ; @goto16_0_asm_h
 	.globl	_call0_0_asm_h
 	.p2align	2
 _call0_0_asm_h:                         ; @call0_0_asm_h
-; %bb.0:                                ; %B2
+; %bb.0:                                ; %B9
 	str	x19, [x23, #48]
+	str	x20, [x23, #64]
+	ldr	w8, [x24, #232]
+	sub	w8, w8, #1
+	cmp	w8, #0
+	str	w8, [x24, #232]
+	b.le	LBB256_3
+LBB256_1:                               ; %B6
+	ldur	x22, [x20, #-8]
 	mov	w27, #18                        ; =0x12
 	mov	w21, #18                        ; =0x12
-	str	x20, [x23, #64]
 	mov	x0, xzr
-	ldur	x22, [x20, #-8]
 	bl	_common_call_asm_h
 	ldr	x19, [x23, #48]
 	ldr	x20, [x23, #64]
 	cmp	x0, #130
 	ldp	x28, x27, [x23, #16]
 	ldr	x26, [x23, #120]
-	b.eq	LBB256_2
-; %bb.1:                                ; %B4
+	b.eq	LBB256_4
+; %bb.2:                                ; %B8
 	stur	x0, [x20, #-8]
 	ldrb	w8, [x19], #1
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB256_2:                               ; %B3
+LBB256_3:                               ; %B1
+	mov	x0, x24
+	str	x20, [x23, #64]
+	bl	_prim_js_poll_interrupts_gc
+	tbz	w0, #31, LBB256_1
+LBB256_4:                               ; %B7
 	b	_exception_asm_h
                                         ; -- End function
 	.private_extern	_call1_0_asm_h          ; -- Begin function call1_0_asm_h
 	.globl	_call1_0_asm_h
 	.p2align	2
 _call1_0_asm_h:                         ; @call1_0_asm_h
-; %bb.0:                                ; %B2
+; %bb.0:                                ; %B9
 	str	x19, [x23, #48]
-	mov	w27, #18                        ; =0x12
-	mov	w21, #18                        ; =0x12
 	str	x20, [x23, #64]
-	mov	w0, #1                          ; =0x1
+	ldr	w8, [x24, #232]
+	sub	w8, w8, #1
+	cmp	w8, #0
+	str	w8, [x24, #232]
+	b.le	LBB257_3
+LBB257_1:                               ; %B6
 	ldur	x22, [x20, #-16]
 	sub	x20, x20, #8
+	mov	w27, #18                        ; =0x12
+	mov	w21, #18                        ; =0x12
+	mov	w0, #1                          ; =0x1
 	bl	_common_call_asm_h
 	ldr	x19, [x23, #48]
 	ldr	x20, [x23, #64]
 	cmp	x0, #130
 	ldp	x28, x27, [x23, #16]
 	ldr	x26, [x23, #120]
-	b.eq	LBB257_2
-; %bb.1:                                ; %B4
+	b.eq	LBB257_4
+; %bb.2:                                ; %B8
 	stur	x0, [x20, #-16]
 	sub	x20, x20, #8
 	ldrb	w8, [x19], #1
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB257_2:                               ; %B3
+LBB257_3:                               ; %B1
+	mov	x0, x24
+	str	x20, [x23, #64]
+	bl	_prim_js_poll_interrupts_gc
+	tbz	w0, #31, LBB257_1
+LBB257_4:                               ; %B7
 	b	_exception_asm_h
                                         ; -- End function
 	.private_extern	_call2_0_asm_h          ; -- Begin function call2_0_asm_h
 	.globl	_call2_0_asm_h
 	.p2align	2
 _call2_0_asm_h:                         ; @call2_0_asm_h
-; %bb.0:                                ; %B2
+; %bb.0:                                ; %B9
 	str	x19, [x23, #48]
-	mov	w27, #18                        ; =0x12
-	mov	w21, #18                        ; =0x12
 	str	x20, [x23, #64]
-	mov	w0, #2                          ; =0x2
+	ldr	w8, [x24, #232]
+	sub	w8, w8, #1
+	cmp	w8, #0
+	str	w8, [x24, #232]
+	b.le	LBB258_3
+LBB258_1:                               ; %B6
 	ldur	x22, [x20, #-24]
 	sub	x20, x20, #16
+	mov	w27, #18                        ; =0x12
+	mov	w21, #18                        ; =0x12
+	mov	w0, #2                          ; =0x2
 	bl	_common_call_asm_h
 	ldr	x19, [x23, #48]
 	ldr	x20, [x23, #64]
 	cmp	x0, #130
 	ldp	x28, x27, [x23, #16]
 	ldr	x26, [x23, #120]
-	b.eq	LBB258_2
-; %bb.1:                                ; %B4
+	b.eq	LBB258_4
+; %bb.2:                                ; %B8
 	stur	x0, [x20, #-24]
 	sub	x20, x20, #16
 	ldrb	w8, [x19], #1
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB258_2:                               ; %B3
+LBB258_3:                               ; %B1
+	mov	x0, x24
+	str	x20, [x23, #64]
+	bl	_prim_js_poll_interrupts_gc
+	tbz	w0, #31, LBB258_1
+LBB258_4:                               ; %B7
 	b	_exception_asm_h
                                         ; -- End function
 	.private_extern	_call3_0_asm_h          ; -- Begin function call3_0_asm_h
 	.globl	_call3_0_asm_h
 	.p2align	2
 _call3_0_asm_h:                         ; @call3_0_asm_h
-; %bb.0:                                ; %B2
+; %bb.0:                                ; %B9
 	str	x19, [x23, #48]
-	mov	w27, #18                        ; =0x12
-	mov	w21, #18                        ; =0x12
 	str	x20, [x23, #64]
-	mov	w0, #3                          ; =0x3
+	ldr	w8, [x24, #232]
+	sub	w8, w8, #1
+	cmp	w8, #0
+	str	w8, [x24, #232]
+	b.le	LBB259_3
+LBB259_1:                               ; %B6
 	ldur	x22, [x20, #-32]
 	sub	x20, x20, #24
+	mov	w27, #18                        ; =0x12
+	mov	w21, #18                        ; =0x12
+	mov	w0, #3                          ; =0x3
 	bl	_common_call_asm_h
 	ldr	x19, [x23, #48]
 	ldr	x20, [x23, #64]
 	cmp	x0, #130
 	ldp	x28, x27, [x23, #16]
 	ldr	x26, [x23, #120]
-	b.eq	LBB259_2
-; %bb.1:                                ; %B4
+	b.eq	LBB259_4
+; %bb.2:                                ; %B8
 	stur	x0, [x20, #-32]
 	sub	x20, x20, #24
 	ldrb	w8, [x19], #1
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB259_2:                               ; %B3
+LBB259_3:                               ; %B1
+	mov	x0, x24
+	str	x20, [x23, #64]
+	bl	_prim_js_poll_interrupts_gc
+	tbz	w0, #31, LBB259_1
+LBB259_4:                               ; %B7
 	b	_exception_asm_h
                                         ; -- End function
 	.private_extern	_is_undefined_0_asm_h   ; -- Begin function is_undefined_0_asm_h
