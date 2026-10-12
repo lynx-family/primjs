@@ -821,8 +821,10 @@ LEPUS_BOOL LEPUS_IsMemorySlotTrackingEnabled(LEPUSRuntime *rt);
  * Runtime. Must be called from the Runtime's owning thread. */
 int32_t LEPUS_AllocateMemorySlot(LEPUSRuntime *rt);
 /* Copies the current per-slot memory usage without freeing the Runtime.
- * Must be called from the Runtime's owning thread when concurrent GC is not
- * running. Returns max_slot_index. */
+ * Must be called from the Runtime's owning thread. Pending GC allocations are
+ * flushed before copying. During concurrent GC, each slot is sampled
+ * atomically, but collection may advance between slots. Returns max_slot_index.
+ */
 int32_t LEPUS_DumpMemorySlots(
     LEPUSRuntime *rt, size_t memory_size_slots[LEPUS_MEMORY_SIZE_SLOTS]);
 /* info lifetime must exceed that of rt */

@@ -1465,9 +1465,12 @@ int32_t LEPUS_DumpMemorySlots(
     LEPUSRuntime *rt, size_t memory_size_slots[LEPUS_MEMORY_SIZE_SLOTS]) {
 #ifdef ENABLE_COMPATIBLE_MM
   if (rt->gc_enable && rt->ros_->HasMemoryTracking()) {
-    assert(!rt->ros_->GetConcurrentMarkState());
-    assert(!rt->ros_->GetConcurrentSweepState());
     rt->ros_->FlushPendingMemorySlotAllocations();
+    for (size_t slot = 0; slot < LEPUS_MEMORY_SIZE_SLOTS; ++slot) {
+      memory_size_slots[slot] = __atomic_load_n(
+          &rt->malloc_state.memory_size_slots[slot], __ATOMIC_RELAXED);
+    }
+    return rt->malloc_state.max_slot_index;
   }
 #endif
   memcpy(memory_size_slots, rt->malloc_state.memory_size_slots,

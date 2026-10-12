@@ -41,6 +41,53 @@ struct MemorySlotCheckState {
   size_t checkpoint_count;
 };
 
+#ifdef ENABLE_COMPATIBLE_MM
+struct MemorySlotDumpSnapshot {
+  bool concurrent_mark;
+  bool concurrent_sweep;
+  int32_t max_slot;
+  int32_t selected_slot;
+  size_t selected_slot_bytes;
+};
+
+class MemorySlotDumpObserver final : public GCObserver {
+ public:
+  MemorySlotDumpObserver(LEPUSRuntime *rt, int32_t *selected_slot)
+      : rt_(rt), selected_slot_(selected_slot) {}
+
+  void OnGC(std::string) override {
+    size_t slots[LEPUS_MEMORY_SIZE_SLOTS] = {};
+    MemorySlotDumpSnapshot snapshot = {
+        rt_->ros_->GetConcurrentMarkState(),
+        rt_->ros_->GetConcurrentSweepState(),
+        LEPUS_DumpMemorySlots(rt_, slots),
+        *selected_slot_,
+        0,
+    };
+    snapshot.selected_slot_bytes = slots[snapshot.selected_slot];
+    snapshots.push_back(snapshot);
+  }
+
+  std::vector<MemorySlotDumpSnapshot> snapshots;
+
+ private:
+  LEPUSRuntime *rt_;
+  int32_t *selected_slot_;
+};
+
+class ScopedGCObserverRegistration {
+ public:
+  ScopedGCObserverRegistration(LEPUSRuntime *rt, GCObserver *observer)
+      : rt_(rt) {
+    LEPUS_SetGCObserver(rt_, observer);
+  }
+  ~ScopedGCObserverRegistration() { LEPUS_SetGCObserver(rt_, nullptr); }
+
+ private:
+  LEPUSRuntime *rt_;
+};
+#endif
+
 static size_t LoadCommittedMemorySlot(LEPUSRuntime *rt, int32_t slot) {
   EXPECT_GE(slot, LEPUS_MEMORY_CATEGORY_UNKNOWN);
   EXPECT_LT(slot, LEPUS_MEMORY_SIZE_SLOTS);
@@ -1061,6 +1108,71 @@ TEST(HeapMemorySlotTest, GCBatchesAllocationsUntilSlotChangeOrDump) {
             LoadCommittedMemorySlot(rt, second_slot));
 
   LEPUS_FreeRuntime(rt);
+}
+
+TEST(HeapMemorySlotTest, GCDumpsFromAllocationObserverDuringConcurrentPhases) {
+  int32_t current_slot = LEPUS_MEMORY_CATEGORY_UNKNOWN;
+  std::unique_ptr<LEPUSRuntime, decltype(&LEPUS_FreeRuntime)> runtime(
+      JS_NewRuntime_GC(0, &current_slot), LEPUS_FreeRuntime);
+  auto *rt = runtime.get();
+  ASSERT_NE(rt, nullptr);
+
+  const int32_t dead_slot = LEPUS_AllocateMemorySlot(rt);
+  current_slot = dead_slot;
+  LEPUS_SetGCPauseSuppressionMode(rt, true);
+  AllocateSlotGarbage(rt);
+  LEPUS_SetGCPauseSuppressionMode(rt, false);
+
+  void *during_mark = nullptr;
+  void *during_sweep = nullptr;
+  HandleScope roots(rt);
+  roots.PushHandle(&during_mark, HANDLE_TYPE_HEAP_OBJ);
+  roots.PushHandle(&during_sweep, HANDLE_TYPE_HEAP_OBJ);
+
+  MemorySlotDumpObserver observer(rt, &current_slot);
+  ScopedGCObserverRegistration observer_registration(rt, &observer);
+  LEPUS_SetGCInfoThreshold(rt, 64 * 1024);
+
+  rt->ros_->GetGCTracer()->SetGCTaskType(ROS_GC::GCTaskType::kDoConMark);
+  rt->collector_->RunFullCollection();
+  ASSERT_TRUE(rt->ros_->GetConcurrentMarkState());
+  LEPUS_SetGCPauseSuppressionMode(rt, true);
+
+  const int32_t mark_slot = LEPUS_AllocateMemorySlot(rt);
+  current_slot = mark_slot;
+  during_mark = rt->js_malloc_rt(rt, 64 * 1024, ALLOC_TAG_WITHOUT_PTR);
+  ASSERT_NE(during_mark, nullptr);
+  ASSERT_EQ(observer.snapshots.size(), 1u);
+  EXPECT_TRUE(observer.snapshots[0].concurrent_mark);
+  EXPECT_FALSE(observer.snapshots[0].concurrent_sweep);
+  EXPECT_GE(observer.snapshots[0].max_slot, mark_slot);
+  EXPECT_EQ(observer.snapshots[0].selected_slot, mark_slot);
+  EXPECT_GT(observer.snapshots[0].selected_slot_bytes, 0u);
+  EXPECT_EQ(observer.snapshots[0].selected_slot_bytes,
+            LoadCommittedMemorySlot(rt, mark_slot));
+
+  LEPUS_SetGCPauseSuppressionMode(rt, false);
+  ASSERT_TRUE(rt->collector_->TriggerConcurrentSweep(0));
+  ASSERT_TRUE(rt->ros_->GetConcurrentSweepState());
+  LEPUS_SetGCPauseSuppressionMode(rt, true);
+
+  const int32_t sweep_slot = LEPUS_AllocateMemorySlot(rt);
+  current_slot = sweep_slot;
+  during_sweep = rt->js_malloc_rt(rt, 64 * 1024, ALLOC_TAG_WITHOUT_PTR);
+  ASSERT_NE(during_sweep, nullptr);
+  ASSERT_EQ(observer.snapshots.size(), 2u);
+  EXPECT_FALSE(observer.snapshots[1].concurrent_mark);
+  EXPECT_TRUE(observer.snapshots[1].concurrent_sweep);
+  EXPECT_GE(observer.snapshots[1].max_slot, sweep_slot);
+  EXPECT_EQ(observer.snapshots[1].selected_slot, sweep_slot);
+  EXPECT_GT(observer.snapshots[1].selected_slot_bytes, 0u);
+  EXPECT_EQ(observer.snapshots[1].selected_slot_bytes,
+            LoadCommittedMemorySlot(rt, sweep_slot));
+
+  LEPUS_SetGCPauseSuppressionMode(rt, false);
+  ASSERT_TRUE(rt->collector_->EnureConcurrentIsCompleted());
+  EXPECT_EQ(LoadMemorySlot(rt, dead_slot), 0u);
+  ExpectSlotSumMatchesAllocator(rt);
 }
 
 TEST(HeapMemorySlotTest, GCHeaderSupports31BitPayloadAndEightBitSlot) {
