@@ -1,0 +1,71 @@
+# Copyright 2024 The Lynx Authors. All rights reserved.
+# Licensed under the Apache License Version 2.0 that can be found in the
+# LICENSE file in the root directory of this source tree.
+import("//testing/test.gni")
+
+unittest_set("napi_adapter_testset") {
+  defines = [ "JS_ENGINE_QJS", "JS_ENGINE_V8" ]
+  cflags_cc = [
+    "-std=c++17",
+    "-mmacosx-version-min=10.15"
+  ]
+  public_deps = [ "../../src/napi:napi_v8" ]
+  deps = [
+    "../../src/napi:napi",
+    "../../src/napi:napi_env",
+    "../../src/napi:napi_quickjs",
+    "../../src/napi:napi_runtime",
+    "../../src/napi/adapter",
+    "../../third_party/weak-node-api:weak_node_api_source",
+  ]
+  deps += [
+    "js_native_api:js_native_api",
+    "js_native_api/2_function_arguments",
+    "js_native_api/3_callbacks",
+    "js_native_api/3_callbacks_primjs_extra_tests",
+    "js_native_api/4_object_factory",
+    "js_native_api/5_function_factory",
+    "js_native_api/6_object_wrap",
+    "js_native_api/7_factory_wrap",
+    "js_native_api/8_passing_wrapped",
+    "js_native_api/test_array",
+    "js_native_api/test_bigint",
+    "js_native_api/test_constructor",
+    "js_native_api/test_class_inheritance",
+    "js_native_api/test_conversions",
+    "js_native_api/test_dataview",
+    "js_native_api/test_error",
+    "js_native_api/test_exception",
+    "js_native_api/test_function",
+    "js_native_api/test_general",
+    "js_native_api/test_handle_scope",
+    "js_native_api/test_instance_data",
+    "js_native_api/test_new_target",
+    "js_native_api/test_number",
+    "js_native_api/test_object",
+    "js_native_api/test_reference",
+    "js_native_api/test_string",
+    "js_native_api/test_symbol",
+    "js_native_api/test_typedarray",
+    "js_native_api/test_date",
+    "js_native_api/test_properties",
+    "js_native_api/test_promise",
+    "js_native_api/test_threadsafe_function",
+  ]
+  if (target_os == "mac") {
+    defines += [ "JS_ENGINE_JSC" ]
+    deps += [ "../../src/napi:napi_jsc" ]
+  }
+  sources = [ 
+    "napi_adapter_unittests.h",
+    "napi_adapter_unittests.cc"
+   ]
+}
+
+unit_test("napi_adapter_unittest") {
+  testonly = true
+
+  sources = []
+
+  public_deps = [ ":napi_adapter_testset" ]
+}
