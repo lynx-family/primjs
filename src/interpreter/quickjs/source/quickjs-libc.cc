@@ -39,10 +39,6 @@
 
 #if defined(_WIN32)
 #include <io.h>
-#if defined(_MSC_VER)
-#include <BaseTsd.h>
-typedef SSIZE_T ssize_t;
-#endif
 #include <winsock.h>
 #else
 #if !defined(__WASI_SDK__)
