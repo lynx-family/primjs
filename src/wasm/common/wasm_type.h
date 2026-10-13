@@ -8,6 +8,7 @@
 #include "one_of.h"
 #include "prism/wasm_c_api.h"
 #include "wasm3/wasm3.h"
+#include "wasm_runtime_type.h"
 
 namespace primjs {
 template <typename ValueType>
@@ -36,8 +37,6 @@ using WasmValue = typename WasmValueT<ValueType>::Value;
 
 template <typename ValueType>
 using WasmValueType = typename WasmValueT<ValueType>::Type;
-
-enum class WasmRuntimeType { WASM3 = 0, PRISM };
 
 enum class ValueType {
   kTypeNone = 0,
