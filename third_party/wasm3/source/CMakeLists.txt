@@ -91,4 +91,11 @@ install (FILES
     ${CMAKE_CURRENT_SOURCE_DIR}/wasm3.h
     ${CMAKE_CURRENT_SOURCE_DIR}/wasm3_defs.h
     DESTINATION include/wasm3)
+# Keep the explicit header list in sync with source/*.h; CheckHeaders.cmake
+# enforces the complete set and unchanged bytes at install time.
+install(CODE "
+    include(\"${CMAKE_CURRENT_SOURCE_DIR}/CheckHeaders.cmake\")
+    wasm3_check_headers(\"${CMAKE_CURRENT_SOURCE_DIR}\"
+        \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/include\" TRUE)
+")
 # <Primjs end>
