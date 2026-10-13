@@ -20,8 +20,15 @@ set(WASM3_ANDROID_SRC_DIR ${WASM3_ROOT}/source)
 set(WASM3_HEADER_ALIAS_DIR ${CMAKE_CURRENT_BINARY_DIR}/wasm3_headers)
 file(MAKE_DIRECTORY ${WASM3_HEADER_ALIAS_DIR})
 # Create symlink: ${WASM3_HEADER_ALIAS_DIR}/wasm3 -> ${WASM3_ANDROID_SRC_DIR}
-execute_process(COMMAND ${CMAKE_COMMAND} -E create_symlink ${WASM3_ANDROID_SRC_DIR} ${WASM3_HEADER_ALIAS_DIR}/wasm3)
+execute_process(COMMAND ${CMAKE_COMMAND} -E create_symlink
+                "${WASM3_ANDROID_SRC_DIR}" "${WASM3_HEADER_ALIAS_DIR}/wasm3"
+                RESULT_VARIABLE WASM3_HEADER_ALIAS_RESULT)
+if(NOT WASM3_HEADER_ALIAS_RESULT EQUAL 0)
+  message(FATAL_ERROR "Could not prepare the wasm3 header namespace")
+endif()
 set(WASM3_HEADER_DIR ${WASM3_HEADER_ALIAS_DIR})
+include("${WASM3_ANDROID_SRC_DIR}/CheckHeaders.cmake")
+wasm3_check_headers("${WASM3_ANDROID_SRC_DIR}" "${WASM3_HEADER_DIR}" FALSE)
 
 add_definitions(-DANDROID -Wno-format-security)
 if (CMAKE_BUILD_TYPE MATCHES "Debug")

@@ -7,7 +7,7 @@
 
 #include <atomic>
 
-#include "../common/wasm_type.h"
+#include "../common/wasm_runtime_type.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
