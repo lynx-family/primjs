@@ -37,6 +37,14 @@ extern "C" {
 #include <math.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <sys/types.h>
+#if defined(_MSC_VER)
+#include <BaseTsd.h>
+#ifndef _SSIZE_T_DEFINED
+#define _SSIZE_T_DEFINED
+typedef SSIZE_T ssize_t;
+#endif
+#endif
 
 #include "base_export.h"
 #include "list.h"
@@ -844,6 +852,26 @@ void LEPUS_MarkValue(LEPUSRuntime *rt, LEPUSValueConst val,
 void LEPUS_RunGC(LEPUSRuntime *rt);
 void LEPUS_RunAllGC();
 LEPUS_BOOL LEPUS_IsInGCSweep(LEPUSRuntime *rt);
+
+// <Primjs begin>
+/* Host uswap page-out callback, run on the runtime thread; < 0 on failure. */
+typedef ssize_t (*uswap_pageout_func)(void *addr, size_t len);
+/* Process-wide and shared by every runtime; NULL disables page-out. */
+void LEPUS_SetUswapFunctions(uswap_pageout_func pageout_func);
+/* -1 is never returned: older engines used it for every failure. */
+typedef enum LEPUSPageOutResult {
+  LEPUS_PAGE_OUT_OK = 0,
+  LEPUS_PAGE_OUT_NULL_RUNTIME = -2,
+  LEPUS_PAGE_OUT_NO_CALLBACKS = -3,
+  LEPUS_PAGE_OUT_REENTERED = -4,
+  LEPUS_PAGE_OUT_GC_FORBIDDEN = -5,
+  LEPUS_PAGE_OUT_GC_PAUSE_SUPPRESSED = -6,
+  /* -7 is retired and not reused. */
+  LEPUS_PAGE_OUT_PAGEOUT_FAILED = -8,
+} LEPUSPageOutResult;
+/* Pages out each normal page group of rt without running GC first. */
+int LEPUS_PageOutGCMemory(LEPUSRuntime *rt);
+// <Primjs end>
 
 LEPUSContext *LEPUS_NewContext(LEPUSRuntime *rt);
 void LEPUS_FreeContext(LEPUSContext *s);

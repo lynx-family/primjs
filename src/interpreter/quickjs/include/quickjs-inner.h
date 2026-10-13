@@ -537,6 +537,7 @@ struct LEPUSRuntime {
   /* Keep new fields at the end to preserve existing embedded-code offsets. */
   struct list_head lepus_ref_list;
 #endif
+  bool uswap_in_progress;
 };
 
 // Temporarily attributes allocations to the Runtime-wide common memory slot.
@@ -2193,6 +2194,7 @@ void JS_SetGCMemoryPolicyLevel_GC(LEPUSRuntime *rt,
                                   LEPUSGCMemoryPolicyLevel level);
 LEPUSGCMemoryPolicyLevel JS_GetGCMemoryPolicyLevel_GC(LEPUSRuntime *rt);
 void JS_RunGC_GC(LEPUSRuntime *rt);
+int JS_PageOutGCMemory_GC(LEPUSRuntime *rt, uswap_pageout_func pageout);
 
 void JS_AddIntrinsicBaseObjects_GC(LEPUSContext *ctx);
 void JS_AddIntrinsicDate_GC(LEPUSContext *ctx);

@@ -37,10 +37,6 @@
 #include <string.h>
 
 #if defined(_WIN32)
-#if defined(_MSC_VER)
-#include <BaseTsd.h>
-typedef SSIZE_T ssize_t;
-#endif
 #include <windows.h>
 #include <winsock.h>
 extern "C" {
@@ -2700,6 +2696,35 @@ void JS_MarkValue_GC(LEPUSRuntime *rt, LEPUSValueConst val,
 
 void JS_RunGC_GC(LEPUSRuntime *rt) {
   rt->collector_->RunFullCollection(0, ROS_GC::kEagerLevelMin, true);
+}
+
+// Hands each group out whole, header page included, as one 512 KiB block.
+int JS_PageOutGCMemory_GC(LEPUSRuntime *rt, uswap_pageout_func pageout) {
+  if (!pageout) return LEPUS_PAGE_OUT_NO_CALLBACKS;
+  if (rt->uswap_in_progress) return LEPUS_PAGE_OUT_REENTERED;
+  ROS_GC::MarkSweepCollector *collector = rt->collector_;
+  if (collector->IsForbidGC()) return LEPUS_PAGE_OUT_GC_FORBIDDEN;
+  if (rt->ros_->InGCPauseSuppressionMode()) {
+    return LEPUS_PAGE_OUT_GC_PAUSE_SUPPRESSED;
+  }
+  rt->uswap_in_progress = true;
+  // Otherwise GC workers would swap the blocks straight back in.
+  collector->EnureConcurrentIsCompleted();
+  collector->SetForbidGC();
+  int result = LEPUS_PAGE_OUT_OK;
+  for (const ROS_GC::PageGroup &group :
+       rt->ros_->GetPageGroups().GetGroupArray()) {
+    if (!group.IsInitialized() || group.IsHugeObj()) continue;
+    auto *block = reinterpret_cast<void *>(ROS_GC::AllocUtilRndDown(
+        group.GetBegin(), ROS_GC::kRosDefaultPageGroupSize));
+    if (pageout(block, ROS_GC::kRosDefaultPageGroupSize) < 0) {
+      result = LEPUS_PAGE_OUT_PAGEOUT_FAILED;
+      break;
+    }
+  }
+  collector->ResetForbidGC();
+  rt->uswap_in_progress = false;
+  return result;
 }
 
 void LEPUS_RunAllGC() {

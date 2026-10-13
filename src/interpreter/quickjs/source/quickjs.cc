@@ -38,10 +38,6 @@
 #include <string.h>
 
 #if defined(_WIN32)
-#if defined(_MSC_VER)
-#include <BaseTsd.h>
-typedef SSIZE_T ssize_t;
-#endif
 #include <windows.h>
 #include <winsock.h>
 extern "C" {
@@ -6445,6 +6441,28 @@ void LEPUS_RunGC(LEPUSRuntime *rt) {
 
 /* Return true during the GC sweep phase (can be useful inside in finalizer) */
 BOOL LEPUS_IsInGCSweep(LEPUSRuntime *rt) { return rt->in_gc_sweep; }
+
+// <Primjs begin>
+// Set by the host on its own thread and read on every runtime thread.
+static std::atomic<uswap_pageout_func> js_uswap_pageout_func{nullptr};
+
+void LEPUS_SetUswapFunctions(uswap_pageout_func pageout_func) {
+#if defined(ANDROID) || defined(__ANDROID__)
+  __android_log_print(ANDROID_LOG_INFO, "PRIMJS_GC",
+                      "LEPUS_SetUswapFunctions called, pageout_func: %p",
+                      reinterpret_cast<void *>(pageout_func));
+#endif
+  js_uswap_pageout_func.store(pageout_func, std::memory_order_release);
+}
+
+int LEPUS_PageOutGCMemory(LEPUSRuntime *rt) {
+  if (!rt) return LEPUS_PAGE_OUT_NULL_RUNTIME;
+  CallGCFunc(JS_PageOutGCMemory_GC, rt,
+             js_uswap_pageout_func.load(std::memory_order_acquire));
+  /* An RC runtime owns no page groups, so there is nothing to page out. */
+  return LEPUS_PAGE_OUT_OK;
+}
+// <Primjs end>
 
 /* Return false if not an object or if the object has already been
    freed (zombie objects are visible in finalizers when freeing
