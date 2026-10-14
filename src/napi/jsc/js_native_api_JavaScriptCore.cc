@@ -2015,25 +2015,24 @@ napi_status napi_get_new_target(napi_env env, napi_callback_info cbinfo,
 static napi_status napi_call_function_internal(napi_env env, napi_value recv,
                                                napi_value func, size_t argc,
                                                const napi_value* argv,
-                                               napi_value* result,
-                                               bool spec_compliant) {
+                                               napi_value* result) {
   if (argc > 0) {
     CHECK_ARG(env, argv);
   }
 
   JSValueRef exception{};
-  JSObjectRef recv_ref = nullptr;
-  if (spec_compliant) {
-    // To comply with the NAPI standard, we cast recv to JSObjectRef here, even
-    // if it may be undefined, string, number, etc. recv will be passed back to
-    // JS transparently.
-    recv_ref = ToJSObject(recv);
-  } else {
-    recv_ref = recv ? JSValueIsUndefined(env->ctx->context, ToJSValue(recv))
-                          ? nullptr
-                          : ToJSObject(recv)
-                    : nullptr;
-  }
+  // N-API requires an undefined receiver to remain undefined, which is
+  // observable as `this` in strict functions. However, JSObjectCallAsFunction
+  // only accepts a JSObjectRef or nullptr for its receiver. Reinterpreting an
+  // undefined JSValueRef as a JSObjectRef can make JSC dereference the tagged
+  // primitive as an object and crash. Map undefined to nullptr on all JSC
+  // versions, accepting JSC's legacy global-object `this` semantics for this
+  // case.
+  JSObjectRef recv_ref =
+      recv ? JSValueIsUndefined(env->ctx->context, ToJSValue(recv))
+                 ? nullptr
+                 : ToJSObject(recv)
+           : nullptr;
   JSValueRef return_value{
       JSObjectCallAsFunction(env->ctx->context, ToJSObject(func), recv_ref,
                              argc, ToJSValues(argv), &exception)};
@@ -2049,8 +2048,7 @@ static napi_status napi_call_function_internal(napi_env env, napi_value recv,
 napi_status napi_call_function(napi_env env, napi_value recv, napi_value func,
                                size_t argc, const napi_value* argv,
                                napi_value* result) {
-  return napi_call_function_internal(env, recv, func, argc, argv, result,
-                                     false);
+  return napi_call_function_internal(env, recv, func, argc, argv, result);
 }
 
 napi_status napi_call_function_spec_compliant(napi_env env, napi_value recv,
@@ -2058,7 +2056,7 @@ napi_status napi_call_function_spec_compliant(napi_env env, napi_value recv,
                                               const napi_value* argv,
                                               napi_value* result) {
   CHECK_ARG(env, recv);
-  return napi_call_function_internal(env, recv, func, argc, argv, result, true);
+  return napi_call_function_internal(env, recv, func, argc, argv, result);
 }
 
 napi_status napi_get_global(napi_env env, napi_value* result) {
