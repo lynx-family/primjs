@@ -172,7 +172,7 @@ namespace test {
 using RuntimeFactory =
     std::pair<std::string, std::function<std::unique_ptr<NAPIRuntime>()>>;
 
-RuntimeFactory runtimeFactory[] = {
+inline RuntimeFactory runtimeFactory[] = {
 #ifdef JS_ENGINE_V8
     {"V8",
      [] {
