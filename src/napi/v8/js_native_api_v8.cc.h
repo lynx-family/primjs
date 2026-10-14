@@ -590,8 +590,15 @@ class CallbackWrapperBase : public CallbackWrapper {
 
     // All other pointers we need are stored in `_bundle`
     napi_env env = _bundle->env;
-    napi_callback cb = _bundle->*FunctionField;
 
+    // A queued V8 callback may run after napi_detach_v8() has detached the
+    // N-API context. Do not dereference the detached context or invoke a
+    // callback with an environment that can no longer enter JavaScript.
+    if (env == nullptr || env->ctx == nullptr) {
+      return;
+    }
+
+    napi_callback cb = _bundle->*FunctionField;
     napi_value result;
     env->ctx->CallIntoModule(
         [&](napi_env env) { result = cb(env, cbinfo_wrapper); });
