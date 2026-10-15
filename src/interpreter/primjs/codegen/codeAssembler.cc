@@ -31,6 +31,16 @@ void CodeAssembler::StoreHeapObject(son::node::Node* ctx,
   WriteBarrier(ctx, object, offset, value);
 }
 
+void CodeAssembler::StoreShapeRef(son::node::Node* ctx, son::node::Node* object,
+                                  son::node::Node* shape) {
+  FieldAccess access(son::node::MachineType::kRawType,
+                     AccessBuilder::shape_offset(), Is32Bit());
+  auto offset = IntValue(access.offset());
+  ReleaseStoreImpl(son::node::MachineType::kRawType, object, offset, shape);
+  WriteBarrier(ctx, object, offset,
+               MakeValue(LEPUS_TAG_SHAPE, CastRawToInt64(shape)));
+}
+
 void CodeAssembler::Store(son::node::MachineType type, son::node::Node* object,
                           son::node::Node* offset, son::node::Node* value) {
   StoreImpl(type, object, offset, value);
@@ -73,6 +83,31 @@ void CodeAssembler::CopyArgs(son::node::Node* local_buf,
       Jump(&loop);
     }
   }
+  Bind(&done);
+}
+
+void CodeAssembler::CopyHeapArgs(son::node::Node* ctx,
+                                 son::node::Node* local_buf,
+                                 son::node::Node* buf_end,
+                                 son::node::Node* argv) {
+  son::node::Label done(this);
+  son::node::Label next(this);
+  son::node::Label loop(this, true);
+  son::node::Variable dst(this, son::node::NodeType::RawType(), local_buf);
+  son::node::Variable src(this, son::node::NodeType::RawType(), argv);
+
+  BindLoop(&loop, 2);
+  Branch(LessThan(*dst, buf_end), &next, &done, son::node::BranchHint::kTrue);
+
+  Bind(&next);
+  auto value = LoadLepusVal(*src, IntValue(0));
+  StoreHeapVal(ctx, *dst, IntValue(0), value);
+  dst = CastToRaw(
+      IntPtrAdd(CastRawToIntPtr(*dst), IntPtrValue(sizeof(LEPUSValue))));
+  src = CastToRaw(
+      IntPtrAdd(CastRawToIntPtr(*src), IntPtrValue(sizeof(LEPUSValue))));
+  Jump(&loop);
+
   Bind(&done);
 }
 

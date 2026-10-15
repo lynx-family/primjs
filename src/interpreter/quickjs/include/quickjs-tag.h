@@ -59,7 +59,7 @@ DEFTAG(JSSTDFile, "JSSTDFile")
 
 deftag(JSSymbol, "JSSymbol")
 deftag(JSValueArray, "JSValueArray")
-deftag(JSConstString, "JSConstString")
+deftag(JSStringWithAux, "JSStringWithAux")
 deftag(JsonStrArray, "JsonStrArray")
 // array
 deftag(LabelSlotArray, "LabelSlotArray")
@@ -73,10 +73,10 @@ deftag(JSResolveEntryArray, "JSResolveEntryArray")
 
 deftag(LEPUSBreakpointArray, "LEPUSBreakpointArray")
 deftag(JSPropertyArray, "JSPropertyArray")
-deftag(ValueSlotArray, "ValueSlotArray")
 deftag(AtomArray, "AtomArray")
 
 deftag(JSAsyncGeneratorRequest, "JSAsyncGeneratorRequest")
 deftag(JSAsyncVarRef, "JSAsyncVarRef")
+deftag(JSLinkedHashMap, "JSLinkedHashMap")
 #undef deftag
 #endif

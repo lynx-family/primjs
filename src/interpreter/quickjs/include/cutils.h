@@ -236,20 +236,61 @@ typedef struct DynBuf {
 QJS_HIDE void dbuf_init(DynBuf *s);
 QJS_HIDE void dbuf_init2(DynBuf *s, void *opaque,
                          DynBufReallocFunc *realloc_func);
+QJS_HIDE int dbuf_claim(DynBuf *s, size_t len);
 QJS_HIDE int dbuf_realloc(DynBuf *s, size_t new_size, int alloc_tag = 1);
 QJS_HIDE int dbuf_put(DynBuf *s, const uint8_t *data, size_t len);
 QJS_HIDE int dbuf_put_self(DynBuf *s, size_t offset, size_t len);
-QJS_HIDE int dbuf_putc(DynBuf *s, uint8_t c);
+QJS_HIDE int __dbuf_putc(DynBuf *s, uint8_t c);
 QJS_HIDE int dbuf_putstr(DynBuf *s, const char *str);
-QJS_HIDE static inline int dbuf_put_u16(DynBuf *s, uint16_t val) {
+QJS_HIDE static inline int __dbuf_put_u16(DynBuf *s, uint16_t val) {
   return dbuf_put(s, (uint8_t *)&val, 2);
 }
-QJS_HIDE static inline int dbuf_put_u32(DynBuf *s, uint32_t val) {
+QJS_HIDE static inline int __dbuf_put_u32(DynBuf *s, uint32_t val) {
   return dbuf_put(s, (uint8_t *)&val, 4);
 }
-QJS_HIDE static inline int dbuf_put_u64(DynBuf *s, uint64_t val) {
+QJS_HIDE static inline int __dbuf_put_u64(DynBuf *s, uint64_t val) {
   return dbuf_put(s, (uint8_t *)&val, 8);
 }
+
+QJS_HIDE inline int dbuf_putc(DynBuf *s, uint8_t val) {
+  if (unlikely((s->allocated_size - s->size) < 1)) {
+    return __dbuf_putc(s, val);
+  } else {
+    s->buf[s->size++] = val;
+    return 0;
+  }
+}
+
+QJS_HIDE inline int dbuf_put_u16(DynBuf *s, uint16_t val) {
+  if (unlikely((s->allocated_size - s->size) < 2)) {
+    return __dbuf_put_u16(s, val);
+  } else {
+    put_u16(s->buf + s->size, val);
+    s->size += 2;
+    return 0;
+  }
+}
+
+QJS_HIDE inline int dbuf_put_u32(DynBuf *s, uint32_t val) {
+  if (unlikely((s->allocated_size - s->size) < 4)) {
+    return __dbuf_put_u32(s, val);
+  } else {
+    put_u32(s->buf + s->size, val);
+    s->size += 4;
+    return 0;
+  }
+}
+
+static inline int dbuf_put_u64(DynBuf *s, uint64_t val) {
+  if (unlikely((s->allocated_size - s->size) < 8)) {
+    return __dbuf_put_u64(s, val);
+  } else {
+    put_u64(s->buf + s->size, val);
+    s->size += 8;
+    return 0;
+  }
+}
+
 int __attribute__((format(printf, 2, 3))) QJS_HIDE dbuf_printf(DynBuf *s,
                                                                const char *fmt,
                                                                ...);
