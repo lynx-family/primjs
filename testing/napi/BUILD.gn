@@ -21,6 +21,7 @@ unittest_set("napi_testset") {
   sources = [
     "async_work_unittests.cc",
     "testlib.cc",
+    "v8_lifecycle_unittests.cc",
   ]
   if (enable_codecache) {
     sources += [
