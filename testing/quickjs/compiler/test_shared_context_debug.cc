@@ -7,6 +7,17 @@
 #include "test_debug_base.h"
 
 namespace qjs_debug_test {
+TEST(QjsSharedDebugMethodsTest, DeleteScriptWithoutDebuggerInfo) {
+  LEPUSRuntime* rt = LEPUS_NewRuntime();
+  LEPUSContext* ctx = LEPUS_NewContext(rt);
+
+  ASSERT_EQ(GetDebuggerInfo(ctx), nullptr);
+  DeleteScriptByURL(ctx, "untracked.js");
+
+  LEPUS_FreeContext(ctx);
+  LEPUS_FreeRuntime(rt);
+}
+
 class QjsSharedDebugMethods : public ::testing::Test {
  protected:
   QjsSharedDebugMethods() = default;
