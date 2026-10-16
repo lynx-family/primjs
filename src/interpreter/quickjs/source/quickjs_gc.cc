@@ -12388,9 +12388,12 @@ LEPUSValue JS_Eval_GC(LEPUSContext *ctx, const char *input, size_t input_len,
 LEPUSValue JS_EvalBinary_GC(LEPUSContext *ctx, const uint8_t *buf,
                             size_t buf_len, int flags) {
   LEPUSValue obj;
+  auto *gc_tracer = ctx->rt->ros_->GetGCTracer();
+  const auto bulk_load_mark = gc_tracer->MarkBulkLoadStart();
   obj = LEPUS_ReadObject(ctx, buf, buf_len, LEPUS_READ_OBJ_BYTECODE);
   if (LEPUS_IsException(obj)) return obj;
   HandleScope func_scope(ctx, &obj, HANDLE_TYPE_LEPUS_VALUE);
+  gc_tracer->ReserveHeadroomAfterBulkLoad(bulk_load_mark);
   if (flags & LEPUS_EVAL_BINARY_LOAD_ONLY) {
     return obj;
   } else {

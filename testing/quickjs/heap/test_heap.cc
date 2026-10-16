@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
 #include <atomic>
 #include <memory>
 #include <mutex>
@@ -1374,5 +1375,223 @@ TEST(HeapMemorySlotTest, GCConcurrentCollectionTracksCurrentSlot) {
   }
 }
 #endif
+
+static std::string MakeScriptWithFunctions(int function_count) {
+  std::string source;
+  for (int i = 0; i < function_count; ++i) {
+    const std::string id = std::to_string(i);
+    source += "function f" + id + "(a, b) { var s" + id + " = 'value_" + id +
+              "_' + a; return s" + id + " + b + " + id + "; }\n";
+  }
+  return source;
+}
+
+static std::vector<uint8_t> CompileToBytecode(LEPUSContext *ctx,
+                                              const std::string &source) {
+  LEPUSValue func =
+      LEPUS_Eval(ctx, source.c_str(), source.length(), "bulk_load.js",
+                 LEPUS_EVAL_FLAG_COMPILE_ONLY | LEPUS_EVAL_TYPE_GLOBAL);
+  if (LEPUS_IsException(func)) return {};
+  HandleScope func_scope(ctx, &func, HANDLE_TYPE_LEPUS_VALUE);
+  size_t length = 0;
+  uint8_t *buf =
+      LEPUS_WriteObject(ctx, &length, func, LEPUS_WRITE_OBJ_BYTECODE);
+  if (!buf) return {};
+  std::vector<uint8_t> bytecode(buf, buf + length);
+  if (!LEPUS_IsGCMode(ctx)) lepus_free(ctx, buf);
+  return bytecode;
+}
+
+// Returns how many bytes `rt` can allocate in small chunks before its next
+// full collection starts.
+static size_t AllocatableBeforeNextCollection(LEPUSRuntime *rt) {
+  constexpr size_t kChunkSize = 1024;
+  constexpr size_t kMaxProbeSize = 256 * 1024 * 1024;
+  const int collections = rt->ros_->gc_cnt;
+  const size_t start = rt->ros_->GetAllocatedSize();
+  size_t reached = start;
+  while (reached - start < kMaxProbeSize) {
+    if (!rt->js_malloc_rt(rt, kChunkSize, ALLOC_TAG_WITHOUT_PTR)) break;
+    if (rt->ros_->gc_cnt != collections) break;
+    reached = rt->ros_->GetAllocatedSize();
+  }
+  return reached - start;
+}
+
+using RuntimePtr = std::unique_ptr<LEPUSRuntime, decltype(&LEPUS_FreeRuntime)>;
+using ContextPtr = std::unique_ptr<LEPUSContext, decltype(&LEPUS_FreeContext)>;
+
+TEST_F(HeapTest, BulkLoadedBytecodeKeepsStartupHeadroom) {
+  if (!ctx->gc_enable) {
+    GTEST_SKIP() << "heap limit policy is specific to tracing GC";
+  }
+  // Only whole page groups of the reserved headroom can be mapped.
+  constexpr size_t kTolerance = ROS_GC::kRosDefaultPageGroupSize;
+
+  std::vector<uint8_t> bytecode =
+      CompileToBytecode(ctx, MakeScriptWithFunctions(8000));
+  ASSERT_FALSE(bytecode.empty());
+
+  size_t startup_heap_size = 0;
+  size_t startup_headroom = 0;
+  {
+    RuntimePtr fresh_rt(LEPUS_NewRuntime(), LEPUS_FreeRuntime);
+    ContextPtr fresh_ctx(LEPUS_NewContext(fresh_rt.get()), LEPUS_FreeContext);
+    startup_heap_size = fresh_rt->ros_->GetHeapSize();
+    startup_headroom = AllocatableBeforeNextCollection(fresh_rt.get());
+  }
+
+  RuntimePtr runtime(LEPUS_NewRuntime(), LEPUS_FreeRuntime);
+  ContextPtr reader(LEPUS_NewContext(runtime.get()), LEPUS_FreeContext);
+  LEPUSRuntime *rt = runtime.get();
+  LEPUSValue func =
+      LEPUS_EvalBinary(reader.get(), bytecode.data(), bytecode.size(),
+                       LEPUS_EVAL_BINARY_LOAD_ONLY);
+  ASSERT_FALSE(LEPUS_IsException(func));
+  HandleScope func_scope(reader.get(), &func, HANDLE_TYPE_LEPUS_VALUE);
+  // Without extra headroom the bytecode would visibly shrink the room left
+  // for the first render.
+  ASSERT_GT(rt->ros_->GetAllocatedSize(), startup_heap_size / 4);
+
+  EXPECT_GE(AllocatableBeforeNextCollection(rt) + kTolerance, startup_headroom);
+}
+
+TEST_F(HeapTest, MemorySavingPolicyReservesLessHeadroomForBulkLoads) {
+  if (!ctx->gc_enable) {
+    GTEST_SKIP() << "heap limit policy is specific to tracing GC";
+  }
+  std::vector<uint8_t> bytecode =
+      CompileToBytecode(ctx, MakeScriptWithFunctions(8000));
+  ASSERT_FALSE(bytecode.empty());
+
+  RuntimePtr runtime(LEPUS_NewRuntime(), LEPUS_FreeRuntime);
+  LEPUSRuntime *rt = runtime.get();
+  const size_t startup_heap_size = rt->ros_->GetHeapSize();
+  ASSERT_EQ(LEPUS_SetGCMemoryPolicyLevel(rt, LEPUS_GC_MEMORY_POLICY_MIN_MEMORY),
+            0);
+  ContextPtr reader(LEPUS_NewContext(rt), LEPUS_FreeContext);
+  const int collections = rt->ros_->gc_cnt;
+  const size_t allocated_size_before_load = rt->ros_->GetAllocatedSize();
+  const size_t heap_size_before_load = rt->ros_->GetHeapSize();
+
+  LEPUSValue func =
+      LEPUS_EvalBinary(reader.get(), bytecode.data(), bytecode.size(),
+                       LEPUS_EVAL_BINARY_LOAD_ONLY);
+  ASSERT_FALSE(LEPUS_IsException(func));
+  HandleScope func_scope(reader.get(), &func, HANDLE_TYPE_LEPUS_VALUE);
+  ASSERT_EQ(rt->ros_->gc_cnt, collections);
+  ASSERT_GT(rt->ros_->GetAllocatedSize() - allocated_size_before_load,
+            startup_heap_size / 4);
+
+  // The minimum memory level keeps a quarter of the headroom, so a bulk load
+  // reserves at most a quarter of a start-up heap.
+  EXPECT_LE(rt->ros_->GetHeapSize() - heap_size_before_load,
+            startup_heap_size / 4);
+}
+
+#ifdef ENABLE_COMPATIBLE_MM
+TEST_F(HeapTest, BulkLoadKeepsHeadroomLeftByCollectionDuringIt) {
+  if (!ctx->gc_enable) {
+    GTEST_SKIP() << "heap limit policy is specific to tracing GC";
+  }
+  constexpr size_t kChunkSize = 1024;
+  constexpr size_t kLoadedAfterCollection = 256 * 1024;
+  static const char kLongLivedScript[] =
+      "var kept = []; for (var i = 0; i < 50000; ++i) kept.push('item' + i);";
+
+  RuntimePtr runtime(LEPUS_NewRuntime(), LEPUS_FreeRuntime);
+  ContextPtr loader(LEPUS_NewContext(runtime.get()), LEPUS_FreeContext);
+  LEPUSRuntime *rt = runtime.get();
+  ROS_GC::GCTracer *tracer = rt->ros_->GetGCTracer();
+  const size_t allocated_size_before_load = rt->ros_->GetAllocatedSize();
+
+  const ROS_GC::GCTracer::BulkLoadMark mark = tracer->MarkBulkLoadStart();
+  ASSERT_FALSE(LEPUS_IsException(
+      LEPUS_Eval(loader.get(), kLongLivedScript, sizeof(kLongLivedScript) - 1,
+                 "long_lived.js", LEPUS_EVAL_TYPE_GLOBAL)));
+  // The collection sizes the limit from the data loaded so far.
+  LEPUS_RunGC(rt);
+  const size_t loaded_before_collection =
+      rt->ros_->GetAllocatedSize() - allocated_size_before_load;
+  const int collections = rt->ros_->gc_cnt;
+  const size_t heap_size_after_collection = rt->ros_->GetHeapSize();
+  for (size_t size = 0; size < kLoadedAfterCollection; size += kChunkSize) {
+    ASSERT_NE(rt->js_malloc_rt(rt, kChunkSize, ALLOC_TAG_WITHOUT_PTR), nullptr);
+  }
+  ASSERT_EQ(rt->ros_->gc_cnt, collections);
+  tracer->ReserveHeadroomAfterBulkLoad(mark);
+
+  const size_t reserved_size =
+      rt->ros_->GetHeapSize() - heap_size_after_collection;
+  EXPECT_GE(reserved_size, kLoadedAfterCollection);
+  EXPECT_LT(reserved_size, kLoadedAfterCollection + loaded_before_collection);
+}
+#endif
+
+TEST_F(HeapTest, RepeatedBytecodeLoadsStillCollectGarbage) {
+  if (!ctx->gc_enable) {
+    GTEST_SKIP() << "heap limit policy is specific to tracing GC";
+  }
+  constexpr int kLoadCount = 32;
+  constexpr size_t kChunkSize = 1024;
+  // Less than one start-up heap, as between the scripts or dynamic components
+  // that a page loads from bytecode one after another.
+  constexpr size_t kGarbagePerLoad = 2 * 1024 * 1024;
+
+  std::vector<uint8_t> bytecode =
+      CompileToBytecode(ctx, MakeScriptWithFunctions(200));
+  ASSERT_FALSE(bytecode.empty());
+
+  RuntimePtr runtime(LEPUS_NewRuntime(), LEPUS_FreeRuntime);
+  ContextPtr reader(LEPUS_NewContext(runtime.get()), LEPUS_FreeContext);
+  LEPUSRuntime *rt = runtime.get();
+  const size_t startup_heap_size = rt->ros_->GetHeapSize();
+  size_t peak_allocated_size = 0;
+  for (int i = 0; i < kLoadCount; ++i) {
+    LEPUSValue func =
+        LEPUS_EvalBinary(reader.get(), bytecode.data(), bytecode.size(),
+                         LEPUS_EVAL_BINARY_LOAD_ONLY);
+    ASSERT_FALSE(LEPUS_IsException(func));
+    for (size_t size = 0; size < kGarbagePerLoad; size += kChunkSize) {
+      rt->js_malloc_rt(rt, kChunkSize, ALLOC_TAG_WITHOUT_PTR);
+    }
+    peak_allocated_size =
+        std::max(peak_allocated_size, rt->ros_->GetAllocatedSize());
+  }
+
+  // Without collections the garbage would add up to kLoadCount times
+  // kGarbagePerLoad.
+  EXPECT_LT(peak_allocated_size, 2 * startup_heap_size);
+}
+
+TEST_F(HeapTest, DiscardedBytecodeLoadsAreCollected) {
+  if (!ctx->gc_enable) {
+    GTEST_SKIP() << "heap limit policy is specific to tracing GC";
+  }
+  // Loads only, without other garbage: each dropped load is the garbage.
+  constexpr int kLoadCount = 200;
+
+  std::vector<uint8_t> bytecode =
+      CompileToBytecode(ctx, MakeScriptWithFunctions(1000));
+  ASSERT_FALSE(bytecode.empty());
+
+  RuntimePtr runtime(LEPUS_NewRuntime(), LEPUS_FreeRuntime);
+  ContextPtr reader(LEPUS_NewContext(runtime.get()), LEPUS_FreeContext);
+  LEPUSRuntime *rt = runtime.get();
+  const size_t startup_heap_size = rt->ros_->GetHeapSize();
+  size_t peak_allocated_size = 0;
+  for (int i = 0; i < kLoadCount; ++i) {
+    LEPUSValue func =
+        LEPUS_EvalBinary(reader.get(), bytecode.data(), bytecode.size(),
+                         LEPUS_EVAL_BINARY_LOAD_ONLY);
+    ASSERT_FALSE(LEPUS_IsException(func));
+    peak_allocated_size =
+        std::max(peak_allocated_size, rt->ros_->GetAllocatedSize());
+  }
+
+  // Without collections the loads would add up to kLoadCount times the size
+  // of one.
+  EXPECT_LT(peak_allocated_size, 2 * startup_heap_size);
+}
 
 }  // namespace heap_test
