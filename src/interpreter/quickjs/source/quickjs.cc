@@ -6649,10 +6649,11 @@ void LEPUS_ComputeMemoryUsageInternal(LEPUSRuntime *rt, LEPUSMemoryUsage *s,
     }
 
     if (rt->ros_ != nullptr) {
-      gc_base_size += sizeof(ROS_GC::RosAllocImpl);
+      gc_base_size +=
+          sizeof(ROS_GC::RosAllocImpl) + ROS_GC::PageGroups::kSlotStorageSize;
       std::vector<VMPssRange> ranges;
       auto &page_groups = rt->ros_->GetPageGroups();
-      auto &groups = page_groups.GetGroupArray();
+      auto groups = page_groups.GetGroupArray();
       for (size_t i = 0; i < page_groups.GetGroupsNum(); ++i) {
         auto &group = groups[i];
         if (!group.IsInitialized()) continue;
