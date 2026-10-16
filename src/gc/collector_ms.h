@@ -60,8 +60,7 @@ class MarkSweepCollector {
   bool EnureConcurrentIsCompleted();
 
   inline void ResetBitmap() {
-    auto &groups = ros->GetPageGroups().GetGroupArray();
-    for (PageGroup &group : groups) {
+    for (PageGroup &group : ros->GetPageGroups().GetGroupArray()) {
       if (group.IsInitialized()) group.GetBitmap()->ResetBitmap();
     }
   }

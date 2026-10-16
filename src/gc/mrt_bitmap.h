@@ -37,23 +37,14 @@ class Bitmap {
 
   void Initialize(size_t maxHeapBytes, size_t start_, size_t spaceCapacity,
                   bool isForHuge);
+  // Clears only the indexed prefix: the rest of the page-rounded bitmap is
+  // never written, so leaving it untouched keeps it from becoming resident.
+  // A memset is used instead of madvise(MADV_DONTNEED), which costs a syscall
+  // per group plus a page fault per group on the next marking.
   __attribute__((always_inline)) void ResetBitmap() {
     if (bitmapBegin != nullptr) {
-#ifdef __ANDROID__
-      int result = madvise(bitmapBegin, bitmapSize, MADV_ARGUMENT);
-      if (result != 0) {
-        // must terminate process, bitmap reset fail will cause unpredictable
-        // behavior
-        abort();
-        size_t curBitmapSize =
-            kBitMapSize;  // GetBitmapSizeByHeap(curEnd - spaceStart);
-        memset(reinterpret_cast<void *>(bitmapBegin), 0, curBitmapSize);
-      }
-#else
-      size_t curBitmapSize =
-          bitmapSize;  // GetBitmapSizeByHeap(curEnd - spaceStart);
-      (void)memset(reinterpret_cast<void *>(bitmapBegin), 0, curBitmapSize);
-#endif
+      (void)memset(reinterpret_cast<void *>(bitmapBegin), 0,
+                   kBitMapIndexedSize);
     }
   }
 
@@ -63,8 +54,9 @@ class Bitmap {
     uint32_t bitMask;
     GetLocation(addr, lineIndex, bitMask,
                 AllocUtilRndDown(addr, kRosDefaultPageGroupSize));
+    ROSIMPL_ASSERT(lineIndex < kBitMapIndexedSize / sizeof(uint32_t),
+                   "line index beyond the bitmap cleared by ResetBitmap");
     std::atomic<uint32_t> *line = bitmapBegin + lineIndex;
-    ROSIMPL_ASSERT(line < (bitmapBegin + bitmapSize), "invalide line addr");
     uint32_t old;
     uint32_t old_cas;
     do {
@@ -86,8 +78,9 @@ class Bitmap {
     uint32_t bitMask;
     GetLocation(addr, lineIndex, bitMask,
                 AllocUtilRndDown(addr, kRosDefaultPageGroupSize));
+    ROSIMPL_ASSERT(lineIndex < kBitMapIndexedSize / sizeof(uint32_t),
+                   "line index beyond the bitmap cleared by ResetBitmap");
     std::atomic<uint32_t> *line = bitmapBegin + lineIndex;
-    ROSIMPL_ASSERT(line < (bitmapBegin + bitmapSize), "invalide line addr");
     uint32_t old;
     uint32_t old_cas;
     do {

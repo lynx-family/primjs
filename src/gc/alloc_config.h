@@ -90,8 +90,11 @@ constexpr size_t kGCPolicyThreshold =
                                            // policy decisions
 constexpr size_t kRosPageIdxBitsCount = 32 - kRosPageGroupBitsCount;
 constexpr size_t kRosDefaultPageGroupNums = 1 << kRosPageGroupBitsCount;
-constexpr size_t kBitMapSize = ROS_GC::AllocUtilRndUp(
-    kRosDefaultPageGroupSize / 8 / 16, ALLOCUTIL_PAGE_SIZE);
+// Bytes of mark bits a page group can index: one bit per 16-byte granule,
+// counted from the group's 512KB-aligned header (see Bitmap::GetLocation).
+constexpr size_t kBitMapIndexedSize = kRosDefaultPageGroupSize / 8 / 16;
+constexpr size_t kBitMapSize =
+    ROS_GC::AllocUtilRndUp(kBitMapIndexedSize, ALLOCUTIL_PAGE_SIZE);
 constexpr size_t kRosDefaultPageGroupValidSize =
     kRosDefaultPageGroupSize - kBitMapSize - ALLOCUTIL_PAGE_SIZE -
     ALLOCUTIL_PAGE_SIZE;
