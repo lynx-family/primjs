@@ -82,6 +82,8 @@ void GCTracer::Stop() {
     RecomputeHeapSizeLimitForPolicyChange();
     policy_recompute_pending_ = false;
   }
+  allocated_page_size_at_gc_stop_ = space_->allocatedPageSize;
+  gc_stop_count_++;
   gc_event_is_running_ = false;
 }
 
@@ -200,6 +202,55 @@ void GCTracer::SetHeadroomScaleQuarters(uint8_t quarters) {
   }
 
   RecomputeHeapSizeLimitForPolicyChange();
+}
+
+GCTracer::BulkLoadMark GCTracer::MarkBulkLoadStart() const {
+  return {space_->allocatedPageSize, gc_stop_count_};
+}
+
+void GCTracer::ReserveHeadroomAfterBulkLoad(const BulkLoadMark &mark) {
+  // A running collection sizes the limit from the live data when it stops.
+  if (gc_event_is_running_) return;
+  // A collection that stopped during the load has already set the headroom
+  // for the pages loaded before it, so only the pages loaded after it count.
+  const size_t load_start_page_size = gc_stop_count_ == mark.gc_stop_count
+                                          ? mark.allocated_page_size
+                                          : allocated_page_size_at_gc_stop_;
+  if (space_->usedMemSize == 0 ||
+      space_->allocatedPageSize <= load_start_page_size) {
+    return;
+  }
+
+  // Bulk-loaded bytecode usually survives every collection, so letting it
+  // consume the headroom would only force a full GC soon after, e.g. during
+  // the first render. Only the pages added by this load are reserved:
+  // reserving above all allocated pages would count garbage as well. A load
+  // that its caller drops becomes garbage too, so the reservations of all loads
+  // stop at one start-up heap; otherwise repeated loads would keep postponing
+  // collection. The memory-saving policy levels lower that bound as they lower
+  // the headroom. The limit is compared against mapped page groups, which
+  // include metadata, so the pages are scaled to the same unit.
+  const size_t loaded_page_size =
+      space_->allocatedPageSize - load_start_page_size;
+  const size_t loaded_heap_size =
+      static_cast<size_t>(static_cast<double>(loaded_page_size) *
+                          space_->usedHeapSize / space_->usedMemSize);
+  const size_t reservation_limit = ScaleByQuarters(
+      space_->heapStartSize,
+      std::min(headroom_scale_quarters_, kDefaultHeadroomScaleQuarters));
+  const size_t reservable_size =
+      reservation_limit > bulk_load_reserved_size_
+          ? reservation_limit - bulk_load_reserved_size_
+          : 0;
+  const size_t new_heap_size =
+      std::min(SaturatingAdd(space_->heapSize,
+                             std::min(loaded_heap_size, reservable_size)),
+               space_->heapGrowthLimit);
+  if (new_heap_size <= space_->heapSize) return;
+
+  bulk_load_reserved_size_ += new_heap_size - space_->heapSize;
+  space_->UpdateHeapSizeLimit(kPolicyChange, 0,
+                              ros_->GetAllocatedInternalSize(), new_heap_size);
 }
 
 void GCTracer::RecomputeHeapSizeLimitForPolicyChange() {
