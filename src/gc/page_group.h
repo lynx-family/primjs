@@ -1,7 +1,9 @@
 #ifndef QUICKJS_INCLUDE_PAGE_GROUP_H_
 #define QUICKJS_INCLUDE_PAGE_GROUP_H_
 
+#include <memory>
 #include <mutex>
+#include <new>
 #include <unordered_map>
 
 #include "gc/alloc_config.h"
@@ -117,6 +119,20 @@ class PageGroup {
   char space_tag[30] = "quickjs_heap_";
 };
 
+// A contiguous view of the page group slots constructed so far.
+template <typename Group>
+class PageGroupRange {
+ public:
+  PageGroupRange(Group *first, size_t size) : first_(first), size_(size) {}
+  Group *begin() const { return first_; }
+  Group *end() const { return first_ + size_; }
+  Group &operator[](size_t idx) const { return first_[idx]; }
+
+ private:
+  Group *first_;
+  size_t size_;
+};
+
 class PageGroups {
  private:
 #if defined(ENABLE_DEBUG)
@@ -132,14 +148,21 @@ class PageGroups {
 #endif  // defined(ENABLE_DEBUG)
 
  public:
-  explicit PageGroups(SpacePageManager &space_man) : page_manager{space_man} {
-    for (uint32_t i = 0; i < kRosDefaultPageGroupNums; ++i) {
-      groups[i].idx = i;
-      groups[i].next_free_idx = i + 1;
-    }
-    return;
+  // Allocated for all kRosDefaultPageGroupNums slots when the runtime is
+  // created, outside both the managed heap and RosAllocImpl, so memory usage
+  // has to count it separately.
+  static constexpr size_t kSlotStorageSize =
+      sizeof(PageGroup) * kRosDefaultPageGroupNums;
+
+  explicit PageGroups(SpacePageManager &space_man)
+      : groups{std::allocator<PageGroup>().allocate(kRosDefaultPageGroupNums)},
+        page_manager{space_man} {}
+  virtual ~PageGroups() {
+    for (PageGroup &group : GetGroupArray()) group.~PageGroup();
+    std::allocator<PageGroup>().deallocate(groups, kRosDefaultPageGroupNums);
   }
-  virtual ~PageGroups() = default;
+  PageGroups(const PageGroups &) = delete;
+  PageGroups &operator=(const PageGroups &) = delete;
 
   inline PageGroup &GetGroup(address_t addr) {
     // todo
@@ -325,10 +348,21 @@ class PageGroups {
     return GetGroup(addr).page_map->ClearLargeObjPageAndCount(addr, is_release);
   }
 
-  auto &GetGroupArray() { return groups; }
-  const auto &GetGroupArray() const { return groups; }
+  PageGroupRange<PageGroup> GetGroupArray() {
+    return {groups, constructed_count_};
+  }
+  PageGroupRange<const PageGroup> GetGroupArray() const {
+    return {groups, constructed_count_};
+  }
   auto &GetGroupByIdx(int32_t index) { return groups[index]; }
-  inline size_t GetGroupsNum() const { return kRosDefaultPageGroupNums; }
+  inline size_t GetGroupsNum() const { return constructed_count_; }
+
+  // Also applies to groups constructed later, so that a group created during
+  // concurrent marking does not miss the write barrier.
+  void SetConcurrentMarkForAll(bool flag) {
+    concurrent_marking_ = flag;
+    for (PageGroup &group : GetGroupArray()) group.SetConcurrentMark(flag);
+  }
 
   inline PageList &GetPageList() { return pageList_; }
   inline PageList::Node *GetPageListNode() { return node; }
@@ -344,8 +378,27 @@ class PageGroups {
 
  private:
   friend class PageGroup;
+
+  // Slots are constructed on first use so that creating a runtime does not
+  // touch the metadata of all kRosDefaultPageGroupNums groups. The free list
+  // only ever points to a constructed slot or to the next unconstructed one.
+  PageGroup &EnsureConstructed(size_t idx) {
+    ROSIMPL_ASSERT(idx <= constructed_count_,
+                   "page group slots must be constructed in order");
+    if (idx == constructed_count_) {
+      PageGroup *group = new (&groups[idx]) PageGroup();
+      group->idx = static_cast<int32_t>(idx);
+      group->next_free_idx = idx + 1;
+      group->SetConcurrentMark(concurrent_marking_);
+      ++constructed_count_;
+    }
+    return groups[idx];
+  }
+
   size_t current_idx = 0;
-  PageGroup groups[kRosDefaultPageGroupNums];
+  PageGroup *groups;
+  size_t constructed_count_ = 0;
+  bool concurrent_marking_ = false;
   SortedGroups sorted_groups;
   SortedGroups sorted_groups_snapshot;
   SpacePageManager &page_manager;

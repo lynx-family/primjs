@@ -1373,6 +1373,86 @@ TEST(HeapMemorySlotTest, GCConcurrentCollectionTracksCurrentSlot) {
     }
   }
 }
+
+// ResetBitmap clears only the indexed prefix of each bitmap, so the mark bits
+// of a group's first and last granules must both fall inside it.
+TEST(HeapBitmapTest, ResetClearsFirstAndLastGranuleOfEveryGroup) {
+  std::unique_ptr<LEPUSRuntime, decltype(&LEPUS_FreeRuntime)> runtime(
+      JS_NewRuntime_GC(0, nullptr), LEPUS_FreeRuntime);
+  auto *rt = runtime.get();
+  ASSERT_NE(rt, nullptr);
+  LEPUS_SetGCPauseSuppressionMode(rt, true);
+  void *huge =
+      rt->js_malloc_rt(rt, kHugeArrayBufferLength, ALLOC_TAG_WITHOUT_PTR);
+  ASSERT_NE(huge, nullptr);
+
+  constexpr address_t kGranule = address_t{1} << ROS_GC::kLogObjAlignment;
+  int normal_groups = 0;
+  int huge_groups = 0;
+  for (ROS_GC::PageGroup &group : rt->ros_->GetPageGroups().GetGroupArray()) {
+    if (!group.IsInitialized()) continue;
+    group.IsHugeObj() ? ++huge_groups : ++normal_groups;
+    ROS_GC::Bitmap *bitmap = group.GetBitmap();
+    const address_t first = group.GetBegin();
+    const address_t last = first + group.GetMaxCapacity() - kGranule;
+    for (address_t addr : {first, last}) {
+      EXPECT_FALSE(bitmap->MarkObject(addr));
+      EXPECT_TRUE(bitmap->IsObjectMarked(addr));
+    }
+    bitmap->ResetBitmap();
+    for (address_t addr : {first, last}) {
+      EXPECT_FALSE(bitmap->IsObjectMarked(addr))
+          << "group " << group.GetGroupIdx() << " offset " << addr - first;
+    }
+  }
+  EXPECT_GT(normal_groups, 0);
+  EXPECT_GT(huge_groups, 0);
+  LEPUS_SetGCPauseSuppressionMode(rt, false);
+}
 #endif
+
+TEST_F(HeapTest, PageGroupSlotsAreConstructedOnDemand) {
+  if (!ctx->gc_enable) {
+    GTEST_SKIP() << "page groups are specific to tracing GC";
+  }
+  const ROS_GC::PageGroups &page_groups = ctx->rt->ros_->GetPageGroups();
+  size_t initialized_groups = 0;
+  for (const ROS_GC::PageGroup &group : page_groups.GetGroupArray()) {
+    if (group.IsInitialized()) ++initialized_groups;
+  }
+  EXPECT_EQ(page_groups.GetGroupsNum(), initialized_groups);
+  EXPECT_LT(page_groups.GetGroupsNum(), ROS_GC::kRosDefaultPageGroupNums);
+}
+
+TEST_F(HeapTest, MemoryUsageCountsAllPageGroupSlots) {
+  if (!ctx->gc_enable) {
+    GTEST_SKIP() << "page groups are specific to tracing GC";
+  }
+#ifndef ENABLE_QUICKJS_DEBUGGER
+  GTEST_SKIP() << "memory usage is only computed in debugger builds";
+#else
+  LEPUSMemoryUsage usage;
+  LEPUS_ComputeMemoryUsage(ctx->rt, &usage);
+  // The slots of all groups are allocated up front, constructed or not.
+  EXPECT_GE(static_cast<size_t>(usage.base_malloc_size),
+            sizeof(ROS_GC::RosAllocImpl) +
+                sizeof(ROS_GC::PageGroup) * ROS_GC::kRosDefaultPageGroupNums);
+#endif
+}
+
+TEST_F(HeapTest, PageGroupCreatedDuringConcurrentMarkHasBarrierEnabled) {
+  if (!ctx->gc_enable) {
+    GTEST_SKIP() << "page groups are specific to tracing GC";
+  }
+  ROS_GC::PageGroups &page_groups = ctx->rt->ros_->GetPageGroups();
+  page_groups.SetConcurrentMarkForAll(true);
+  ROS_GC::PageGroup &group = page_groups.NewPageGroup();
+  EXPECT_TRUE(
+      ROS_GC::PageGroups::GetIsConcurrentMarkingFromAddr(group.GetBegin()));
+
+  page_groups.SetConcurrentMarkForAll(false);
+  EXPECT_FALSE(
+      ROS_GC::PageGroups::GetIsConcurrentMarkingFromAddr(group.GetBegin()));
+}
 
 }  // namespace heap_test

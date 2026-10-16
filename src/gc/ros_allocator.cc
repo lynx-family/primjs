@@ -1467,7 +1467,7 @@ address_t RosAllocImpl::ReallocateObjWithMemorySlot(LEPUSRuntime *rt, void *ptr,
 // used for concurrent step2
 bool RosAllocImpl::SweepHugeObjs(
     std::function<bool(address_t, ROS_GC::Bitmap *)> shouldFree) {
-  auto &groups = allocSpace.page_groups.GetGroupArray();
+  auto groups = allocSpace.page_groups.GetGroupArray();
   bool released = false;
   for (auto &group : groups) {
     if (!group.IsInitialized()) continue;
@@ -1696,12 +1696,11 @@ void RosAllocImpl::ConSweepPrologue() {
   // worker threads begin releasing slot bytes.
   FlushPendingMemorySlotAllocations();
   concurrent_sweep_is_running = true;
-  auto &groups = allocSpace.page_groups.GetGroupArray();
-  std::for_each(groups, groups + kRosDefaultPageGroupNums,
-                [](PageGroup &group) {
-                  if (!group.IsInitialized() || group.IsHugeObj()) return;
-                  group.GetPageMap()->PrepareForConcurrentSweep();
-                });
+  auto groups = allocSpace.page_groups.GetGroupArray();
+  std::for_each(groups.begin(), groups.end(), [](PageGroup &group) {
+    if (!group.IsInitialized() || group.IsHugeObj()) return;
+    group.GetPageMap()->PrepareForConcurrentSweep();
+  });
   GetGCTracer()->StartCurrentSweeping();
   std::atomic_thread_fence(std::memory_order_seq_cst);
 }
@@ -1713,24 +1712,17 @@ void RosAllocImpl::ConMarkPrologue() {
 
   // init each group's con-marking state, write-barrier will work when this
   // state is enabled
-  auto &groups = allocSpace.page_groups.GetGroupArray();
-  std::for_each(groups, groups + kRosDefaultPageGroupNums,
-                [](PageGroup &group) {
-                  // should not skip non-initialized or huge group, or the new
-                  // create group will lost cm state
-                  group.SetConcurrentMark(true);
-                });
+  allocSpace.page_groups.SetConcurrentMarkForAll(true);
   std::atomic_thread_fence(std::memory_order_seq_cst);
   MarkPrologue();
 }
 
 void RosAllocImpl::ConSweepEpilogue() {
-  auto &groups = allocSpace.page_groups.GetGroupArray();
-  std::for_each(groups, groups + kRosDefaultPageGroupNums,
-                [](PageGroup &group) {
-                  if (!group.IsInitialized() || group.IsHugeObj()) return;
-                  group.GetPageMap()->ClearForConcurrentSweep();
-                });
+  auto groups = allocSpace.page_groups.GetGroupArray();
+  std::for_each(groups.begin(), groups.end(), [](PageGroup &group) {
+    if (!group.IsInitialized() || group.IsHugeObj()) return;
+    group.GetPageMap()->ClearForConcurrentSweep();
+  });
   concurrent_sweep_is_running = false;
   GetGCTracer()->StopCurrentSweeping(true);
   std::atomic_thread_fence(std::memory_order_seq_cst);
@@ -1738,13 +1730,7 @@ void RosAllocImpl::ConSweepEpilogue() {
 
 void RosAllocImpl::ConMarkEpilogue() {
   SetConcurrentMarkState(false);
-  auto &groups = allocSpace.page_groups.GetGroupArray();
-  std::for_each(groups, groups + kRosDefaultPageGroupNums,
-                [](PageGroup &group) {
-                  // should not skip non-initialized or huge group, or the new
-                  // create group will lost cm state
-                  group.SetConcurrentMark(false);
-                });
+  allocSpace.page_groups.SetConcurrentMarkForAll(false);
   std::atomic_thread_fence(std::memory_order_seq_cst);
 
   MarkEpilogue();
@@ -1757,7 +1743,7 @@ bool RosAllocImpl::ParallelFreeAllIf(MplThreadPool &threadPool) {
   FlushPendingMemorySlotAllocations();
   const int32_t threadCount = threadPool.GetMaxThreadNum() + 1;
   auto &page_groups = allocSpace.page_groups;
-  auto &groups = page_groups.GetGroupArray();
+  auto groups = page_groups.GetGroupArray();
   int task_count = 0;
   for (auto &group : groups) {
     if (!group.IsInitialized()) continue;
@@ -1802,7 +1788,7 @@ bool RosAllocImpl::ParallelFreeAllIf(MplThreadPool &threadPool) {
 
 void RosAllocImpl::ReleaseAllPageGroups() {
   auto &page_groups = allocSpace.page_groups;
-  auto &groups = page_groups.GetGroupArray();
+  auto groups = page_groups.GetGroupArray();
   for (auto &group : groups) {
     if (!group.IsInitialized()) continue;
     group.ReleaseMemory();
@@ -1812,7 +1798,7 @@ void RosAllocImpl::ReleaseAllPageGroups() {
 bool RosAllocImpl::ConcurrentSweep(MplThreadPool &threadPool) {
   const int32_t threadCount = threadPool.GetMaxThreadNum() + 1;
   auto &page_groups = allocSpace.page_groups;
-  auto &groups = page_groups.GetGroupArray();
+  auto groups = page_groups.GetGroupArray();
   int task_count = 0;
   for (auto &group : groups) {
     if (!group.IsInitialized() || group.IsHugeObj()) {
@@ -1931,7 +1917,7 @@ bool RosAllocImpl::ParallelForEachObj(MplThreadPool &threadPool,
     return visitor;
   };
 #endif
-  auto &groups = allocSpace.page_groups.GetGroupArray();
+  auto groups = allocSpace.page_groups.GetGroupArray();
   for (auto &group : groups) {
     if (!group.IsInitialized()) continue;
     if (UNLIKELY(group.IsHugeObj())) {
@@ -1969,7 +1955,7 @@ bool RosAllocImpl::ParallelForEachObj(MplThreadPool &threadPool,
 
 void RosAllocImpl::ForEachObj(HeapAliveObjsVisitor &visitor) {
   PageLabel pageType = kPReleased;
-  auto &groups = allocSpace.page_groups.GetGroupArray();
+  auto groups = allocSpace.page_groups.GetGroupArray();
   for (auto &group : groups) {
     if (!group.IsInitialized()) continue;
     if (UNLIKELY(group.IsHugeObj())) {

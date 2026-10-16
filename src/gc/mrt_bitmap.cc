@@ -25,6 +25,8 @@ void Bitmap::Initialize(size_t maxHeapBytes, size_t start_,
   spaceEnd = spaceStart + maxHeapBytes;
   curEnd = spaceStart + spaceCapacity;
 
+  static_assert(kBitMapIndexedSize <= kPageSize,
+                "huge-object bitmaps must hold every indexable mark bit");
   // todo, this may result in some memory wastage
   if (isForHuge)
     bitmapSize = kPageSize;

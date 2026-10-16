@@ -104,7 +104,7 @@ void PageGroups::Init(size_t max_heap_size, size_t group_cnt,
 PageGroup &PageGroups::NewPageGroup(uint8_t *req_beg) {
   ROSIMPL_ASSERT(current_idx < kRosDefaultPageGroupNums,
                  "current page_groups is full");
-  auto &cur_group = groups[current_idx];
+  auto &cur_group = EnsureConstructed(current_idx);
   cur_group.Init(pageList_, node, req_beg);
   {
     DLOCK_GUARD();
@@ -123,7 +123,7 @@ PageGroup &PageGroups::NewPageGroup(uint8_t *req_beg) {
 PageGroup &PageGroups::NewHugeMem(size_t &req_size, uint8_t *req_beg) {
   ROSIMPL_ASSERT(current_idx < kRosDefaultPageGroupNums,
                  "current page_groups is full");
-  auto &cur_group = groups[current_idx];
+  auto &cur_group = EnsureConstructed(current_idx);
   cur_group.Init(pageList_, node, req_beg, req_size);
   req_size = cur_group.GetMaxCapacity();
   {
