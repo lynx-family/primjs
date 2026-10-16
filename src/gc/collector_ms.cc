@@ -526,12 +526,7 @@ void MarkSweepCollector::DoOnlyFinalizer() {
   finalizer->DoGlobalFinalizer();
 
   auto rt = ros->GetRuntime();
-  for (auto it = rt->finalizerSet->begin(); it != rt->finalizerSet->end();
-       it++) {
-    auto val = *it;
-    finalizer->DoFinalizer2(val);
-  }
-  rt->finalizerSet->clear();
+  rt->finalizerSet->Drain([this](void *val) { finalizer->DoFinalizer2(val); });
 
   if (rt->obj_finalizer_recoder) {
     auto &set = *rt->obj_finalizer_recoder;
@@ -748,20 +743,17 @@ void MarkSweepCollector::DoFinalizerPhase(bool is_concurrent_gc) {
 #endif
 
   GCWorkStack &markStack = marking.GetWorkStack(0);
-  for (auto it = visitor->rt_->finalizerSet->begin();
-       it != visitor->rt_->finalizerSet->end();) {
-    auto val = *it;
+  visitor->rt_->finalizerSet->RetainIf([this, &markStack](void *val) {
     if (!ros->IsObjectMarked((address_t)(val)-kHeaderSize)) {
-      it = visitor->rt_->finalizerSet->erase(it);
       visitor->DoFinalizer(val);
-    } else {
-      if (get_alloc_tag(val) == ALLOC_TAG_LEPUSLepusRef &&
-          reinterpret_cast<LEPUSLepusRef *>(val)->tag == Value_RefCounted) {
-        visitor->VisitLEPUSLepusRef((void *)(val), markStack);
-      }
-      it++;
+      return false;
     }
-  }
+    if (get_alloc_tag(val) == ALLOC_TAG_LEPUSLepusRef &&
+        reinterpret_cast<LEPUSLepusRef *>(val)->tag == Value_RefCounted) {
+      visitor->VisitLEPUSLepusRef(val, markStack);
+    }
+    return true;
+  });
   if (!markStack.empty()) {
     workerThreadPool->Start();
     markStack.RetireNode();

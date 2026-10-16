@@ -27,7 +27,7 @@ struct JSToken;
 struct ValueBuffer;
 
 force_inline void SetRunSlotHasFinalizer(LEPUSRuntime *rt, void *ptr) {
-  rt->finalizerSet->insert(ptr);
+  rt->finalizerSet->Insert(ptr);
 }
 
 static no_inline void CombinedWriteBarrier(address_t new_field_value) {

@@ -1375,4 +1375,59 @@ TEST(HeapMemorySlotTest, GCConcurrentCollectionTracksCurrentSlot) {
 }
 #endif
 
+static std::string MakeScriptWithFunctions(int function_count) {
+  std::string source;
+  for (int i = 0; i < function_count; ++i) {
+    const std::string id = std::to_string(i);
+    source += "function f" + id + "(a, b) { var s" + id + " = 'value_" + id +
+              "_' + a; return s" + id + " + b + " + id + "; }\n";
+  }
+  return source;
+}
+
+static std::vector<uint8_t> CompileToBytecode(LEPUSContext *ctx,
+                                              const std::string &source) {
+  LEPUSValue func =
+      LEPUS_Eval(ctx, source.c_str(), source.length(), "bulk_load.js",
+                 LEPUS_EVAL_FLAG_COMPILE_ONLY | LEPUS_EVAL_TYPE_GLOBAL);
+  if (LEPUS_IsException(func)) return {};
+  HandleScope func_scope(ctx, &func, HANDLE_TYPE_LEPUS_VALUE);
+  size_t length = 0;
+  uint8_t *buf =
+      LEPUS_WriteObject(ctx, &length, func, LEPUS_WRITE_OBJ_BYTECODE);
+  if (!buf) return {};
+  std::vector<uint8_t> bytecode(buf, buf + length);
+  if (!LEPUS_IsGCMode(ctx)) lepus_free(ctx, buf);
+  return bytecode;
+}
+
+TEST_F(HeapTest, LoadingBytecodeDoesNotRegisterFunctionsForFinalization) {
+  if (!ctx->gc_enable) {
+    GTEST_SKIP() << "finalizer registrations are specific to tracing GC";
+  }
+  constexpr int kFunctionCount = 2000;
+
+  std::vector<uint8_t> bytecode =
+      CompileToBytecode(ctx, MakeScriptWithFunctions(kFunctionCount));
+  ASSERT_FALSE(bytecode.empty());
+
+  LEPUSRuntime *rt = LEPUS_NewRuntime();
+  LEPUSContext *reader = LEPUS_NewContext(rt);
+  const size_t registrations_before = rt->finalizerSet->Size();
+  {
+    LEPUSValue func = LEPUS_EvalBinary(reader, bytecode.data(), bytecode.size(),
+                                       LEPUS_EVAL_BINARY_LOAD_ONLY);
+    ASSERT_FALSE(LEPUS_IsException(func));
+    HandleScope func_scope(reader, &func, HANDLE_TYPE_LEPUS_VALUE);
+
+    // Function bytecode has no finalizer; the debugger unlinks dead functions
+    // in BytecodeListFinalizer. Registering every function read would only
+    // slow down each load and each collection.
+    EXPECT_LT(rt->finalizerSet->Size() - registrations_before,
+              static_cast<size_t>(kFunctionCount));
+  }
+  LEPUS_FreeContext(reader);
+  LEPUS_FreeRuntime(rt);
+}
+
 }  // namespace heap_test

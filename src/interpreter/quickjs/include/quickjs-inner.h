@@ -43,6 +43,7 @@ extern "C" {
 #endif
 #include "gc/allocator.h"
 #include "gc/collector_ms.h"
+#include "gc/pointer_set.h"
 #include "quickjs/include/dtoa.h"
 #include "quickjs/include/primjs_monitor.h"
 #include "quickjs/include/quickjs.h"
@@ -523,7 +524,7 @@ struct LEPUSRuntime {
   void *(*js_malloc_rt)(LEPUSRuntime *rt, size_t size, int alloc_tag);
   void *(*js_realloc_rt)(LEPUSRuntime *rt, void *ptr, size_t size,
                          int alloc_tag);
-  std::unordered_set<void *> *finalizerSet;
+  ROS_GC::PointerSet *finalizerSet;
   std::unordered_set<void *> *async_obj_recoder;
   std::unordered_set<LEPUSObject *> *obj_finalizer_recoder;
   std::unordered_set<FinalizationRegistryData *> *fr_data_finalizer_recoder;
