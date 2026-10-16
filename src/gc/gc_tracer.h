@@ -103,6 +103,21 @@ class GCTracer {
   void SetHeadroomScaleQuarters(uint8_t quarters);
   uint8_t GetHeadroomScaleQuarters() const { return headroom_scale_quarters_; }
 
+  // The allocation state before a bulk load of long-lived data such as
+  // bytecode, taken by MarkBulkLoadStart().
+  struct BulkLoadMark {
+    size_t allocated_page_size;
+    size_t gc_stop_count;
+  };
+  BulkLoadMark MarkBulkLoadStart() const;
+
+  // Raises the heap limit by the heap space the bulk load since `mark`
+  // occupies, so that the load leaves the headroom it found, or the headroom
+  // that a collection stopping during the load left. All loads of a runtime
+  // together raise it by at most one start-up heap, scaled down by the
+  // memory-saving GC memory policy levels. Never lowers the limit.
+  void ReserveHeadroomAfterBulkLoad(const BulkLoadMark &mark);
+
   double GetGcSpeed() {
     if (gcSpeedCache_ != 0.0) {
       return gcSpeedCache_;
@@ -234,6 +249,9 @@ class GCTracer {
   bool gc_event_is_running_{false};
   bool policy_recompute_pending_{false};
   uint8_t headroom_scale_quarters_{kDefaultHeadroomScaleQuarters};
+  size_t bulk_load_reserved_size_{0};
+  size_t gc_stop_count_{0};
+  size_t allocated_page_size_at_gc_stop_{0};
 
   RecordBuffer allocationRecordBuffer_;
   RecordBuffer gcRecordBuffer_;
