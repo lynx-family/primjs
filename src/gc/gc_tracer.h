@@ -118,6 +118,13 @@ class GCTracer {
   // memory-saving GC memory policy levels. Never lowers the limit.
   void ReserveHeadroomAfterBulkLoad(const BulkLoadMark &mark);
 
+  // Raises the heap limit to `limit` until the first collection sizes the
+  // heap from the live data. Unlike the start-up heap, the raised part is
+  // mapped only when it is used, so creating the runtime costs no more.
+  // Memory policy changes before that collection keep at least this limit.
+  // Does nothing once a collection has started. Never lowers the limit.
+  void RaiseStartupHeapLimit(size_t limit);
+
   double GetGcSpeed() {
     if (gcSpeedCache_ != 0.0) {
       return gcSpeedCache_;
@@ -252,6 +259,7 @@ class GCTracer {
   size_t bulk_load_reserved_size_{0};
   size_t gc_stop_count_{0};
   size_t allocated_page_size_at_gc_stop_{0};
+  size_t startup_heap_limit_{0};
 
   RecordBuffer allocationRecordBuffer_;
   RecordBuffer gcRecordBuffer_;

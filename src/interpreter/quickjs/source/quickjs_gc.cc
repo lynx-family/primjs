@@ -737,6 +737,10 @@ void JS_SetMemoryLimit_GC(LEPUSRuntime *rt, size_t limit) {
   rt->ros_->SetHeapGrowthLimit(limit);
 }
 
+void JS_RaiseStartupHeapLimit_GC(LEPUSRuntime *rt, size_t limit) {
+  rt->ros_->GetGCTracer()->RaiseStartupHeapLimit(limit);
+}
+
 /* return 0 if OK, < 0 if exception */
 int JS_EnqueueJob_GC(LEPUSContext *ctx, LEPUSJobFunc *job_func, int argc,
                      LEPUSValueConst *argv) {

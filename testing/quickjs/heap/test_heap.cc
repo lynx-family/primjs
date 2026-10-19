@@ -1674,4 +1674,86 @@ TEST_F(HeapTest, PageGroupCreatedDuringConcurrentMarkHasBarrierEnabled) {
       ROS_GC::PageGroups::GetIsConcurrentMarkingFromAddr(group.GetBegin()));
 }
 
+// Creates a runtime named `info` that sees `settings` besides the loaded
+// ones. Creating a runtime reloads the settings, so they are added after it.
+static RuntimePtr NewNamedRuntime(const char *info, int settings) {
+  RuntimePtr runtime(LEPUS_NewRuntime(), LEPUS_FreeRuntime);
+  const int loaded_settings = settingsFlag;
+  settingsFlag |= settings;
+  LEPUS_SetRuntimeInfo(runtime.get(), info);
+  settingsFlag = loaded_settings;
+  return runtime;
+}
+
+TEST_F(HeapTest, LepusNGHeapSettingsRaiseStartupLimitWithoutMappingIt) {
+  if (!ctx->gc_enable) {
+    GTEST_SKIP() << "heap limit policy is specific to tracing GC";
+  }
+  RuntimePtr plain_rt(LEPUS_NewRuntime(), LEPUS_FreeRuntime);
+  const size_t default_heap_size = plain_rt->ros_->GetHeapSize();
+  const size_t default_group_count =
+      plain_rt->ros_->GetPageGroups().GetGroupsNum();
+  EXPECT_EQ(NewNamedRuntime("Lynx_LepusNG", 0)->ros_->GetHeapSize(),
+            default_heap_size);
+
+  const struct {
+    int setting;
+    size_t heap_size;
+  } kCases[] = {
+      {LEPUSNG_HEAP_16, 16 * MB},
+      {LEPUSNG_HEAP_24, 24 * MB},
+      {LEPUSNG_HEAP_32, 32 * MB},
+  };
+  for (const auto &test_case : kCases) {
+    RuntimePtr rt = NewNamedRuntime("Lynx_LepusNG", test_case.setting);
+    EXPECT_EQ(rt->ros_->GetHeapSize(), test_case.heap_size);
+    // Mapping the limit up front would slow down creating the runtime.
+    EXPECT_EQ(rt->ros_->GetPageGroups().GetGroupsNum(), default_group_count);
+  }
+}
+
+TEST_F(HeapTest, LepusNGHeapSettingsKeepOtherRuntimesStartupLimit) {
+  if (!ctx->gc_enable) {
+    GTEST_SKIP() << "heap limit policy is specific to tracing GC";
+  }
+  RuntimePtr plain_rt(LEPUS_NewRuntime(), LEPUS_FreeRuntime);
+  RuntimePtr js_rt = NewNamedRuntime("Lynx_JS", LEPUSNG_HEAP_32);
+
+  EXPECT_EQ(js_rt->ros_->GetHeapSize(), plain_rt->ros_->GetHeapSize());
+}
+
+TEST_F(HeapTest, LepusNGStartupLimitPostponesFirstCollection) {
+  if (!ctx->gc_enable) {
+    GTEST_SKIP() << "heap limit policy is specific to tracing GC";
+  }
+  RuntimePtr default_rt = NewNamedRuntime("Lynx_LepusNG", 0);
+  ContextPtr default_ctx(LEPUS_NewContext(default_rt.get()), LEPUS_FreeContext);
+  const size_t default_headroom =
+      AllocatableBeforeNextCollection(default_rt.get());
+
+  RuntimePtr raised_rt = NewNamedRuntime("Lynx_LepusNG", LEPUSNG_HEAP_32);
+  ContextPtr raised_ctx(LEPUS_NewContext(raised_rt.get()), LEPUS_FreeContext);
+
+  // 32MB is four times the default 8MB start-up heap.
+  EXPECT_GT(AllocatableBeforeNextCollection(raised_rt.get()),
+            3 * default_headroom);
+}
+
+TEST_F(HeapTest, MemoryPolicyKeepsLepusNGStartupLimitUntilFirstCollection) {
+  if (!ctx->gc_enable) {
+    GTEST_SKIP() << "heap limit policy is specific to tracing GC";
+  }
+  RuntimePtr rt = NewNamedRuntime("Lynx_LepusNG", LEPUSNG_HEAP_32);
+  ContextPtr context(LEPUS_NewContext(rt.get()), LEPUS_FreeContext);
+
+  ASSERT_EQ(
+      LEPUS_SetGCMemoryPolicyLevel(rt.get(), LEPUS_GC_MEMORY_POLICY_MIN_MEMORY),
+      0);
+  EXPECT_EQ(rt->ros_->GetHeapSize(), 32 * MB);
+
+  // From the first collection on, the heap is sized from the live data.
+  LEPUS_RunGC(rt.get());
+  EXPECT_LT(rt->ros_->GetHeapSize(), 32 * MB);
+}
+
 }  // namespace heap_test

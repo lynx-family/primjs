@@ -999,27 +999,21 @@ bool gc_enabled() {
 #endif
 }
 
-enum {
-  INITIAL_HEAP_12 = 1,
-  INITIAL_HEAP_20,
-  INITIAL_HEAP_24,
-};
-
-int get_lepusng_heap_mode() {
 #ifdef ENABLE_COMPATIBLE_MM
-  if (LEPUSNG_HEAP_12 & settingsFlag) {
-    return INITIAL_HEAP_12;
-  } else if (LEPUSNG_HEAP_20 & settingsFlag) {
-    return INITIAL_HEAP_20;
+// Returns the start-up heap limit that the settings select for LepusNG
+// runtimes, or 0 to keep the default one. LepusNG renders the first screen,
+// which a larger limit lets finish before the first collection.
+static size_t get_lepusng_startup_heap_limit() {
+  if (LEPUSNG_HEAP_16 & settingsFlag) {
+    return 16 * MB;
+  } else if (LEPUSNG_HEAP_32 & settingsFlag) {
+    return 32 * MB;
   } else if (LEPUSNG_HEAP_24 & settingsFlag) {
-    return INITIAL_HEAP_24;
-  } else {
-    return 0;
+    return 24 * MB;
   }
-#else
   return 0;
-#endif
 }
+#endif
 
 bool effect_enabled() {
 #ifdef ENABLE_COMPATIBLE_MM
@@ -1733,6 +1727,13 @@ void LEPUS_SetRuntimeInfo(LEPUSRuntime *rt, const char *s) {
         JS_FreeRuntimeForEffect(rt);
         JS_ResetRuntimeForEffect(rt, &def_malloc_funcs, NULL);
       }
+#ifdef ENABLE_COMPATIBLE_MM
+      // A reset runtime counts references and has no GC heap to raise.
+      const size_t startup_heap_limit = get_lepusng_startup_heap_limit();
+      if (rt->gc_enable && rt->is_lepusng && startup_heap_limit != 0) {
+        JS_RaiseStartupHeapLimit_GC(rt, startup_heap_limit);
+      }
+#endif
     }
     MonitorEvent(MODULE_QUICK, s, "SetRuntimeInfo", MODULE_QUICK);
   }

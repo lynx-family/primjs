@@ -253,8 +253,21 @@ void GCTracer::ReserveHeadroomAfterBulkLoad(const BulkLoadMark &mark) {
                               ros_->GetAllocatedInternalSize(), new_heap_size);
 }
 
+void GCTracer::RaiseStartupHeapLimit(size_t limit) {
+  if (gcStartCount_ != 0) return;
+  startup_heap_limit_ = std::max(startup_heap_limit_, limit);
+  if (startup_heap_limit_ <= space_->heapSize) return;
+  space_->UpdateHeapSizeLimit(
+      kPolicyChange, 0, ros_->GetAllocatedInternalSize(), startup_heap_limit_);
+}
+
 void GCTracer::RecomputeHeapSizeLimitForPolicyChange() {
-  const size_t new_heap_size = CalculateHeapSizeLimit();
+  size_t new_heap_size = CalculateHeapSizeLimit();
+  // Before the first collection the policy can only scale the headroom of the
+  // mapped heap, which would undo a raised start-up limit.
+  if (gcStartCount_ == 0) {
+    new_heap_size = std::max(new_heap_size, startup_heap_limit_);
+  }
   space_->UpdateHeapSizeLimit(kPolicyChange, 0,
                               ros_->GetAllocatedInternalSize(), new_heap_size);
 }
