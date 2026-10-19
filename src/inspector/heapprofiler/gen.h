@@ -77,6 +77,7 @@ class HeapSnapshotGenerator {
   HeapSnapshotGenerator& operator=(const HeapSnapshotGenerator&) = delete;
 
   void GenerateSnapshot();
+  bool GenerateSnapshotForSlot();
 
   HeapEntry* FindEntry(HeapThing ptr) {
     auto it = entries_map_.find(ptr);

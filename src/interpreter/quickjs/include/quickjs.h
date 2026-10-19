@@ -1791,7 +1791,34 @@ void *LEPUS_GetGCObserver(LEPUSRuntime *rt);
 
 // Returned pointer should be released with js_profile_free_heap_snapshot().
 // If heap profiler or debugger is not enabled, nullptr will be returned.
+// Both snapshot APIs inspect ctx's Runtime, including all its live Contexts.
+// The supplied Context selects the directly exposed global roots. Keep it
+// fixed when comparing snapshots to avoid global-root/name presentation
+// changes.
 const char *js_profile_take_heap_snapshot(LEPUSContext *ctx);
+/* GC-only snapshot of allocations charged to slot, with strong retainer paths
+ * from other slots retained as zero-size context nodes. Sizes are allocator-
+ * consumed bytes after a full GC. Requires slot tracking and a valid Context
+ * on the Runtime's owning thread. Returns NULL for RC, invalid slots, disabled
+ * profiling/tracking, or when GC is forbidden or pause-suppressed.
+ * Node names include stable [slot=N] and [holder slot=N] labels.
+ * [cross-slot] and [root path uncovered] are zero-size diagnostic groups with
+ * weak member edges; changes in these states do not rename allocation nodes.
+ * include_internal_allocations=0 excludes shape, backing stores, bytecode and
+ * class state from the charged targets. Required internal retainer nodes stay
+ * in the graph without size/slot labels. JS objects, strings, symbols, ropes
+ * and bigints keep their physical allocation sizes. The sum of node self_size
+ * includes only displayed charges; use LEPUS_DumpMemorySlots for the complete
+ * slot total. summarize_diagnostics!=0 projects debugger-only storage/retained
+ * objects (including console.messages) and coverage storage into [debugger]
+ * and [coverage] accounting leaves, without modifying the Runtime. Objects
+ * independently reachable from non-diagnostic roots remain visible. Summary
+ * sizes include all target-slot physical charges even in compact mode.
+ * Both C and C++ calls must pass all four arguments.
+ * Release the returned buffer with js_profile_free_heap_snapshot(). */
+const char *js_profile_take_heap_snapshot_for_slot(
+    LEPUSContext *ctx, int32_t slot, LEPUS_BOOL include_internal_allocations,
+    LEPUS_BOOL summarize_diagnostics);
 void js_profile_free_heap_snapshot(const char *snapshot);
 
 // Coverage `ranges` are encoded as [startOffset, endOffset, count] tuples.

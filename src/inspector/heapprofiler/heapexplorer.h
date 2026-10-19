@@ -65,12 +65,29 @@ class QjsHeapExplorer : public HeapEntriesAllocator {
     return AddEntry(ctx, value);
   }
   HeapEntry* AllocateEntry(LEPUSContext* ctx, const HeapObjPtr& obj) override {
-    return AddEntry(ctx, obj);
+    return snapshot_->is_slot_snapshot() ? AddEntryForSlot(ctx, obj)
+                                         : AddEntry(ctx, obj);
   }
 
   void IterateAndExtractReference(HeapSnapshotGenerator* generator);
+  // Slot-only: reuse semantic traversal and expose separately allocated
+  // storage.
+  void ExtractAllocationReferences(const HeapObjPtr& obj);
+  void ExtractRuntimeAllocationReferences();
 
  private:
+  static std::string AtomName(LEPUSContext* ctx, JSAtom atom);
+  HeapEntry* AddEntryForSlot(LEPUSContext*, const HeapObjPtr&);
+  void SetAllocationReference(HeapEntry*, const char* name, const void* ptr,
+                              const char* allocation_name = nullptr);
+  void SetDiagnosticAllocationReference(HeapEntry*, const char* name,
+                                        const void* ptr,
+                                        HeapSnapshot::Diagnostic,
+                                        const char* allocation_name = nullptr);
+  void ExtractObjectStorageReferences(HeapEntry*, const LEPUSObject*);
+  void ExtractBytecodeStorageReferences(HeapEntry*,
+                                        const LEPUSFunctionBytecode*);
+  void ExtractAllocationStateReferences(HeapEntry*, const HeapObjPtr&);
   // used for a new object(node)
   HeapEntry* GetEntry(LEPUSContext*, const LEPUSValue&);
   HeapEntry* GetEntry(LEPUSContext*, const HeapObjPtr&);
@@ -85,6 +102,8 @@ class QjsHeapExplorer : public HeapEntriesAllocator {
     }
     return;
   }
+  void SetInternalReference(HeapEntry* parent, const char* name,
+                            HeapEntry* child);
 
   void SetElementReference(HeapEntry* parent_entry, uint32_t index,
                            HeapEntry* child);  // for array
@@ -124,7 +143,7 @@ class QjsHeapExplorer : public HeapEntriesAllocator {
   void ExtractFunctionBytecodeReference(LEPUSContext*, HeapEntry*,
                                         const LEPUSFunctionBytecode*);
   void ExtractValueArrayReference(LEPUSContext*, HeapEntry*, const LEPUSValue*,
-                                  size_t);
+                                  size_t, bool from_allocation = false);
   void ExtractLepusRefReference(LEPUSContext*, HeapEntry*,
                                 const LEPUSLepusRef*);
   void ExtractModuleReference(LEPUSContext*, HeapEntry*, const LEPUSModuleDef*);
@@ -140,6 +159,9 @@ class QjsHeapExplorer : public HeapEntriesAllocator {
   // class-specific object reference extraction, mirrors GC's VisitXxx.
   void ExtractClassSpecificReference(LEPUSContext*, HeapEntry*,
                                      const LEPUSObject*);
+  void ExtractBoundFunctionReference(LEPUSContext*, HeapEntry*,
+                                     const JSBoundFunction*);
+  void ExtractProxyReference(LEPUSContext*, HeapEntry*, const JSProxyData*);
   void ExtractMapReference(LEPUSContext*, HeapEntry*, const JSMapState*);
   void ExtractMapRecordReference(LEPUSContext*, HeapEntry*, const JSMapRecord*,
                                  bool weak_key);
@@ -171,12 +193,16 @@ class QjsHeapExplorer : public HeapEntriesAllocator {
   void SetAndExtractValue(LEPUSContext*, HeapEntry* parent,
                           const std::string& name, const LEPUSValue& value,
                           HeapGraphEdge::Type = HeapGraphEdge::kInternal);
+  void SetAndExtractValue(LEPUSContext*, HeapEntry* parent, const char* name,
+                          const LEPUSValue& value,
+                          HeapGraphEdge::Type = HeapGraphEdge::kInternal);
 
-  bool HasBeExtracted(const HeapPtr& ptr) {
+  // Keep hash-table operations out of the individual extraction methods.
+  no_inline bool HasBeExtracted(const HeapPtr& ptr) {
     return has_extractedobj_.find(ptr) != has_extractedobj_.end();
   }
 
-  void InsertExtractedObj(const HeapPtr& ptr) {
+  no_inline void InsertExtractedObj(const HeapPtr& ptr) {
     has_extractedobj_.emplace(ptr);
     return;
   }

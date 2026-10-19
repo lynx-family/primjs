@@ -72,6 +72,7 @@ extern "C" {
 #include "gc/collector.h"
 #include "gc/gc_safe_list.h"
 #include "gc/global-handles.h"
+#include "inspector/heapprofiler/runtime_hooks.h"
 #include "quickjs/include/bignum.h"
 #include "quickjs/include/quickjs-inner.h"
 
@@ -836,6 +837,9 @@ void JS_FreeRuntime_GC(LEPUSRuntime *rt) {
   rt->atom_hash = NULL;
   rt->shape_hash = NULL;
 
+#if defined(ENABLE_HEAPPROFILER) || defined(ENABLE_QUICKJS_DEBUGGER)
+  js_profile_remove_runtime(rt);
+#endif
   rt->ros_->ReleaseAllPageGroups();
 
   // free trace_gc data
@@ -882,6 +886,9 @@ void JS_FreeRuntime_GC(LEPUSRuntime *rt) {
 }
 
 void JS_FreeRuntimeForEffect(LEPUSRuntime *rt) {
+#if defined(ENABLE_HEAPPROFILER) || defined(ENABLE_QUICKJS_DEBUGGER)
+  js_profile_remove_runtime(rt);
+#endif
   pthread_mutex_lock(&runtime_mutex);
   std::unordered_set<LEPUSRuntime *> *g_rt_set = js_get_rt_set();
   if (g_rt_set->find(rt) != g_rt_set->end()) g_rt_set->erase(rt);

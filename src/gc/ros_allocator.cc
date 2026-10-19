@@ -1981,6 +1981,21 @@ void RosAllocImpl::ForEachObj(HeapAliveObjsVisitor &visitor) {
   return;
 }
 
+#if defined(ENABLE_HEAPPROFILER) || defined(ENABLE_QUICKJS_DEBUGGER)
+size_t RosAllocImpl::GetAllocatedObjectSize(address_t header) {
+  auto &group = allocSpace.page_groups.GetGroup(header);
+  if (group.IsHugeObj()) return group.GetCurrSize();
+  auto *page_map = group.GetPageMap();
+  auto type = page_map->GetTypeForAddr(header);
+  if (type == kPLargeObj) {
+    return ALLOCUTIL_PAGE_CNT2BYTE(page_map->LargeObjPageCount(header));
+  }
+  ROSIMPL_ASSERT(type == kPRun || type == kPRunRem, "not an allocated object");
+  auto run_addr = page_map->GetRunStartFromAddr(header);
+  return reinterpret_cast<RunSlots *>(run_addr)->GetRunSize();
+}
+#endif
+
 // AccurateIsValidObjAddr and AccurateIsValidObjAddrConcurrent are used in
 // conservative stack scan to identify valid obj addresses from random numbers
 //
