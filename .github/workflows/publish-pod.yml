@@ -11,6 +11,13 @@ on:
         required: false
         type: string
 
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-pod-${{ github.event.inputs.version || github.ref_name }}
+  cancel-in-progress: false
+
 jobs:
   get-version:
     runs-on: lynx-ubuntu-22.04-medium
@@ -42,6 +49,8 @@ jobs:
     steps:
       - name: Download Source
         uses: actions/checkout@v4.2.2
+        with:
+          persist-credentials: false
       - name: Python Setup
         uses: actions/setup-python@v5
         with:
@@ -60,11 +69,75 @@ jobs:
       - name: Bundle Install
         run: |-
           SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk bundle install --path .bundle
-      - name: Publish to CocoaPods Repo
+      - name: Create Specs repo GitHub App token
+        id: specs_app_token
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3
+        with:
+          app-id: ${{ vars.SPECS_REPO_APP_ID }}
+          private-key: ${{ secrets.SPECS_REPO_APP_PRIVATE_KEY }}
+          owner: lynx-family
+          repositories: Specs
+          permission-contents: write
+      - name: Download Specs Repo
+        uses: actions/checkout@v4.2.2
+        with:
+          repository: lynx-family/Specs
+          token: ${{ steps.specs_app_token.outputs.token }}
+          path: .specs
+          fetch-depth: 0
+      - name: Publish to Lynx Specs Repo
         env:
-          COCOAPODS_TRUNK_TOKEN: ${{ secrets.REPO_PRIMJS_COCOAPODS_TRUNK_TOKEN }}
           POD_VERSION: ${{ needs.get-version.outputs.version }}
           PRIMJS_COMMIT_ID: ${{ github.sha }}
         run: |-
-          pod repo add-cdn trunk https://cdn.cocoapods.org/
-          COCOAPODS_TRUNK_TOKEN=$COCOAPODS_TRUNK_TOKEN POD_VERSION=$POD_VERSION PRIMJS_COMMIT_ID=$PRIMJS_COMMIT_ID pod trunk push PrimJS.podspec  --skip-import-validation --allow-warnings
+          set -euo pipefail
+
+          bundle exec pod ipc spec PrimJS.podspec > PrimJS.podspec.json
+
+          bundle exec pod spec lint PrimJS.podspec.json \
+            --sources=https://github.com/lynx-family/Specs.git,https://cdn.cocoapods.org/ \
+            --skip-import-validation \
+            --allow-warnings
+
+          spec_path="PrimJS/$POD_VERSION/PrimJS.podspec.json"
+          target_path=".specs/$spec_path"
+          if [ -e "$target_path" ]; then
+            if cmp --silent PrimJS.podspec.json "$target_path"; then
+              echo "PrimJS $POD_VERSION is already published with identical content."
+              exit 0
+            fi
+            echo "PrimJS $POD_VERSION already exists with different content."
+            exit 1
+          fi
+
+          mkdir -p "$(dirname "$target_path")"
+          cp PrimJS.podspec.json "$target_path"
+
+          git -C .specs config user.name "lynx.authors"
+          git -C .specs config user.email "lynx.authors@users.noreply.github.com"
+          git -C .specs add "$spec_path"
+          git -C .specs commit -m "[Update] PrimJS ($POD_VERSION)"
+
+          for attempt in 1 2 3; do
+            git -C .specs fetch origin master
+
+            if git -C .specs cat-file -e "origin/master:$spec_path" 2>/dev/null; then
+              git -C .specs show "origin/master:$spec_path" > remote-podspec.json
+              if cmp --silent PrimJS.podspec.json remote-podspec.json; then
+                echo "PrimJS $POD_VERSION was published concurrently with identical content."
+                exit 0
+              fi
+              echo "PrimJS $POD_VERSION was published concurrently with different content."
+              exit 1
+            fi
+
+            git -C .specs rebase origin/master
+            if git -C .specs push origin HEAD:master; then
+              exit 0
+            fi
+
+            echo "Push attempt $attempt failed; retrying."
+          done
+
+          echo "Failed to publish PrimJS $POD_VERSION after 3 attempts."
+          exit 1
