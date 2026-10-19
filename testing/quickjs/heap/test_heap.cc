@@ -1756,4 +1756,33 @@ TEST_F(HeapTest, MemoryPolicyKeepsLepusNGStartupLimitUntilFirstCollection) {
   EXPECT_LT(rt->ros_->GetHeapSize(), 32 * MB);
 }
 
+TEST_F(HeapTest, LoadingBytecodeDoesNotRegisterFunctionsForFinalization) {
+  if (!ctx->gc_enable) {
+    GTEST_SKIP() << "finalizer registrations are specific to tracing GC";
+  }
+  constexpr int kFunctionCount = 2000;
+
+  std::vector<uint8_t> bytecode =
+      CompileToBytecode(ctx, MakeScriptWithFunctions(kFunctionCount));
+  ASSERT_FALSE(bytecode.empty());
+
+  LEPUSRuntime *rt = LEPUS_NewRuntime();
+  LEPUSContext *reader = LEPUS_NewContext(rt);
+  const size_t registrations_before = rt->finalizerSet->Size();
+  {
+    LEPUSValue func = LEPUS_EvalBinary(reader, bytecode.data(), bytecode.size(),
+                                       LEPUS_EVAL_BINARY_LOAD_ONLY);
+    ASSERT_FALSE(LEPUS_IsException(func));
+    HandleScope func_scope(reader, &func, HANDLE_TYPE_LEPUS_VALUE);
+
+    // Function bytecode has no finalizer; the debugger unlinks dead functions
+    // in BytecodeListFinalizer. Registering every function read would only
+    // slow down each load and each collection.
+    EXPECT_LT(rt->finalizerSet->Size() - registrations_before,
+              static_cast<size_t>(kFunctionCount));
+  }
+  LEPUS_FreeContext(reader);
+  LEPUS_FreeRuntime(rt);
+}
+
 }  // namespace heap_test

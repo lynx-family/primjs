@@ -6626,7 +6626,7 @@ void LEPUS_ComputeMemoryUsageInternal(LEPUSRuntime *rt, LEPUSMemoryUsage *s,
     if (rt->global_handles_ != nullptr) {
       common_base_size += rt->global_handles_->TotalSize();
     }
-    common_base_size += EstimateUnorderedSetUsage(rt->finalizerSet);
+    if (rt->finalizerSet) common_base_size += rt->finalizerSet->MemoryUsage();
     common_base_size += EstimateUnorderedSetUsage(rt->async_obj_recoder);
     common_base_size += EstimateUnorderedSetUsage(rt->obj_finalizer_recoder);
     common_base_size +=
@@ -32985,9 +32985,6 @@ QJS_STATIC LEPUSValue JS_ReadFunction(BCReaderState *s) {
   b = static_cast<LEPUSFunctionBytecode *>(
       lepus_mallocz(ctx, function_size, ALLOC_TAG_LEPUSFunctionBytecode));
   if (!b) return LEPUS_EXCEPTION;
-#ifdef ENABLE_QUICKJS_DEBUGGER
-  if (ctx->gc_enable) SetRunSlotHasFinalizer(ctx->rt, b);
-#endif
   func_scope.PushHandle(b, HANDLE_TYPE_DIR_HEAP_OBJ);
 
   memcpy(b, &bc, offsetof(LEPUSFunctionBytecode, debug));

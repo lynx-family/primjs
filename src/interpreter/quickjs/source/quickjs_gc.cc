@@ -591,7 +591,7 @@ LEPUSRuntime *JS_NewRuntime2_GC(const LEPUSMallocFunctions *mf, void *opaque,
   rt->ptr_handles = new PtrHandles(rt);
   rt->global_handles_ = new GlobalHandles(rt);
   rt->qjsvaluevalue_allocator = new QJSValueValueSpace(rt);
-  rt->finalizerSet = new std::unordered_set<void *>();
+  rt->finalizerSet = new ROS_GC::PointerSet();
   rt->async_obj_recoder = new std::unordered_set<void *>();
   rt->obj_finalizer_recoder = new std::unordered_set<LEPUSObject *>();
   rt->fr_data_finalizer_recoder =

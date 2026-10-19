@@ -21,6 +21,7 @@ unittest_set("heap_tests") {
   sources = [
     "test_base.cc",
     "test_heap.cc",
+    "test_pointer_set.cc",
   ]
   cflags = [ "-Wno-c99-designator" ]
 }
