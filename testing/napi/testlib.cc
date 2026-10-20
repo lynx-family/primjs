@@ -1342,8 +1342,8 @@ TEST_P(NAPITest, NapiCreateExteranArrayBuffer) {
 }
 
 TEST_P(NAPITest, NapiDetachArrayBuffer) {
-  if (std::get<0>(GetParam()) != "QJS") {
-    GTEST_SKIP() << "napi_detach_arraybuffer is only attached by QuickJS";
+  if (std::get<0>(GetParam()) == "JSC") {
+    GTEST_SKIP() << "JSC does not attach napi_detach_arraybuffer";
   }
 
   HandleScope hscope(env);
@@ -1405,11 +1405,67 @@ TEST_P(NAPITest, NapiDetachArrayBuffer) {
                                      static_cast<napi_value>(Object::New(env))),
       napi_arraybuffer_expected);
 
+  // V8 does not treat a SharedArrayBuffer as an ArrayBuffer, as in Node-API.
+  napi_status shared_array_buffer_status =
+      std::get<0>(GetParam()) == "V8" ? napi_arraybuffer_expected
+                                      : napi_detachable_arraybuffer_expected;
   Value shared_array_buffer = env.RunScript("new SharedArrayBuffer(8)");
   EXPECT_EQ(napi_detach_arraybuffer_primjs(
                 static_cast<napi_env>(env),
                 static_cast<napi_value>(shared_array_buffer)),
-            napi_detachable_arraybuffer_expected);
+            shared_array_buffer_status);
+}
+
+TEST_P(NAPITest, ArrayBufferDetachDetachesBuffer) {
+  if (std::get<0>(GetParam()) == "JSC") {
+    GTEST_SKIP() << "JSC does not attach napi_detach_arraybuffer";
+  }
+
+  HandleScope hscope(env);
+  std::array<uint8_t, 8> external_data = {};
+  ArrayBuffer array_buffer =
+      ArrayBuffer::New(env, external_data.data(), external_data.size());
+
+  array_buffer.Detach();
+
+  EXPECT_FALSE(env.IsExceptionPending());
+  auto has_zero_byte_length =
+      env.RunScript("(function(value) { return value.byteLength === 0; })")
+          .As<Function>();
+  EXPECT_TRUE(has_zero_byte_length.Call({array_buffer}).ToBoolean());
+}
+
+TEST_P(NAPITest, ArrayBufferDetachThrowsWhenAlreadyDetached) {
+  if (std::get<0>(GetParam()) == "JSC") {
+    GTEST_SKIP() << "JSC does not attach napi_detach_arraybuffer";
+  }
+
+  HandleScope hscope(env);
+  std::array<uint8_t, 8> external_data = {};
+  ArrayBuffer array_buffer =
+      ArrayBuffer::New(env, external_data.data(), external_data.size());
+  array_buffer.Detach();
+
+  array_buffer.Detach();
+
+  EXPECT_TRUE(env.IsExceptionPending());
+  env.GetAndClearPendingException();
+}
+
+TEST_P(NAPITest, ArrayBufferDetachDoesNotThrowWithoutEngineSupport) {
+  if (std::get<0>(GetParam()) != "JSC") {
+    GTEST_SKIP() << "Only JSC lacks napi_detach_arraybuffer";
+  }
+
+  HandleScope hscope(env);
+  std::array<uint8_t, 8> external_data = {};
+  ArrayBuffer array_buffer =
+      ArrayBuffer::New(env, external_data.data(), external_data.size());
+
+  array_buffer.Detach();
+
+  EXPECT_FALSE(env.IsExceptionPending());
+  EXPECT_EQ(array_buffer.ByteLength(), external_data.size());
 }
 
 TEST_P(NAPITest, NapiTypedArrayTest) {

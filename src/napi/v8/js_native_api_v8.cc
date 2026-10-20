@@ -99,6 +99,25 @@ static napi_status napi_get_arraybuffer_info(napi_env env,
   return napi_clear_last_error(env);
 }
 
+static napi_status napi_detach_arraybuffer(napi_env env,
+                                           napi_value arraybuffer) {
+  v8::Local<v8::Value> value =
+      primjs::v8impl::V8LocalValueFromJsValue(arraybuffer);
+  RETURN_STATUS_IF_FALSE(env, value->IsArrayBuffer(),
+                         napi_arraybuffer_expected);
+
+  v8::Local<v8::ArrayBuffer> buffer = value.As<v8::ArrayBuffer>();
+  RETURN_STATUS_IF_FALSE(env, buffer->IsDetachable() && !buffer->WasDetached(),
+                         napi_detachable_arraybuffer_expected);
+
+  // Omit NAPI_PREAMBLE so that detaching still works while an exception is
+  // pending, but keep the TypeError thrown when the detach key mismatches.
+  primjs::v8impl::TryCatch try_catch(env);
+  v8::Maybe<bool> detached = buffer->Detach(v8::Local<v8::Value>());
+  CHECK_MAYBE_NOTHING_WITH_PREAMBLE(env, detached, napi_generic_failure);
+  return napi_clear_last_error(env);
+}
+
 static napi_status napi_create_external_arraybuffer(
     napi_env env, void* external_data, size_t byte_length,
     napi_finalize finalize_cb, void* finalize_hint, napi_value* result) {
@@ -263,6 +282,7 @@ void napi_attach_v8(napi_env env, v8::Local<v8::Context> ctx) {
 
 #undef SET_METHOD
 
+  env->napi_detach_arraybuffer = &napi_detach_arraybuffer;
   env->ctx = new napi_context__v8(env, ctx);
 }
 
