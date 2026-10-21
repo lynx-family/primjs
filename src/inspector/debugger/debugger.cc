@@ -2453,10 +2453,11 @@ QJS_HIDE void DebuggerFreeScript(LEPUSContext *ctx, LEPUSScriptSource *script) {
 
 // for shared context qjs debugger: delete qjs debugger script by URL
 void DeleteScriptByURL(LEPUSContext *ctx, const char *filename) {
+  if (!ctx || !ctx->debugger_info || !filename) return;
   struct list_head *el, *el1;
   list_for_each_safe(el, el1, &ctx->debugger_info->script_list) {
     auto script = list_entry(el, LEPUSScriptSource, link);
-    if (script->url && filename && strcmp(script->url, filename) == 0) {
+    if (script->url && strcmp(script->url, filename) == 0) {
       DebuggerFreeScript(ctx, script);
     }
   }
