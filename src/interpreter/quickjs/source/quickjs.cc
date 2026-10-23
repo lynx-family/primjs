@@ -12184,6 +12184,12 @@ __exception int js_post_inc_slow(LEPUSContext *ctx, LEPUSValue *sp,
 
   /* XXX: allow custom operators */
   op1 = sp[-1];
+  if (LEPUS_VALUE_IS_INT(op1)) {
+    int64_t value = LEPUS_VALUE_GET_INT(op1);
+    value += 2 * (op - OP_post_dec) - 1;
+    sp[0] = LEPUS_NewInt64(ctx, value);
+    return 0;
+  }
   op1 = JS_ToNumericFree(ctx, op1);
   if (LEPUS_IsException(op1)) {
     sp[-1] = LEPUS_UNDEFINED;
