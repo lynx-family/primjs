@@ -89,6 +89,8 @@ DEF_CALL_OPERATOR2(prim_js_operator_delete_gc)
 DEF_CALL_OPERATOR2(JS_GetPrivateField_GC)
 DEF_CALL_OPERATOR2(JS_ConcatString_GC)
 
+DEF_CALL_R_DESC_1(prim_js_poll_interrupts_gc, kInt32, kRawType)
+
 DEF_CALL_OPERATOR2_OPCODE(prim_js_relation_slow_gc)
 DEF_CALL_OPERATOR2_OPCODE(prim_js_binary_arith_slow_gc)
 DEF_CALL_OPERATOR2_OPCODE(prim_js_binary_logic_slow_gc)
