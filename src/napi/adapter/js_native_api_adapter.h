@@ -435,10 +435,9 @@ NAPI_ADAPTER_EXTERN void napi_module_register_primjs(
 NAPI_ADAPTER_EXTERN bool napi_find_module_primjs(const char* name,
                                                  napi_module_spec_compl* out);
 
-NAPI_ADAPTER_EXTERN void napi_fatal_error_primjs(const char* location,
-                                                 size_t location_len,
-                                                 const char* message,
-                                                 size_t message_len);
+NAPI_ADAPTER_EXTERN NAPI_NO_RETURN void napi_fatal_error_primjs(
+    const char* location, size_t location_len, const char* message,
+    size_t message_len);
 
 NAPI_ADAPTER_EXTERN napi_status napi_get_all_property_names_primjs(
     napi_env env, napi_value object, napi_key_collection_mode key_mode,
