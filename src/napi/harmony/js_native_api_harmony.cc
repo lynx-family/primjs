@@ -25,22 +25,23 @@
 #if ENABLE_UNITTESTS
 static std::string ConvertValueToStr(JSVM_Env env, JSVM_Value obj) {
   JSVM_Value json, str;
-  OH_JSVM_JsonStringify(env, obj, &json);
+  PRIMJS_JSVM_CALL(OH_JSVM_JsonStringify, env, obj, &json);
 
-  OH_JSVM_CoerceToString(env, json, &str);
+  PRIMJS_JSVM_CALL(OH_JSVM_CoerceToString, env, json, &str);
   size_t len;
-  OH_JSVM_GetValueStringUtf8(env, str, nullptr, 0, &len);
+  PRIMJS_JSVM_CALL(OH_JSVM_GetValueStringUtf8, env, str, nullptr, 0, &len);
   std::string result;
   result.resize(len + 1);
-  OH_JSVM_GetValueStringUtf8(env, str, result.data(), result.size(), nullptr);
+  PRIMJS_JSVM_CALL(OH_JSVM_GetValueStringUtf8, env, str, result.data(),
+                   result.size(), nullptr);
   return result;
 }
 
 [[maybe_unused]] static void LogAllproperties(JSVM_Env env, JSVM_Value object) {
   JSVM_Value names;
-  OH_JSVM_GetAllPropertyNames(env, object, JSVM_KEY_INCLUDE_PROTOTYPES,
-                              JSVM_KEY_ALL_PROPERTIES,
-                              JSVM_KEY_NUMBERS_TO_STRINGS, &names);
+  PRIMJS_JSVM_CALL(OH_JSVM_GetAllPropertyNames, env, object,
+                   JSVM_KEY_INCLUDE_PROTOTYPES, JSVM_KEY_ALL_PROPERTIES,
+                   JSVM_KEY_NUMBERS_TO_STRINGS, &names);
   LOGE(ConvertValueToStr(env, names));
   return;
 }
@@ -52,32 +53,35 @@ static std::string GetExceptionMessage(JSVM_Env env, JSVM_Value exception) {
   std::string ret;
   JSVM_Value stack = nullptr, message = nullptr;
   bool is_string = false;
-  if ((OH_JSVM_GetNamedProperty(env, exception, "stack", &stack) == JSVM_OK) &&
-      (OH_JSVM_GetNamedProperty(env, exception, "message", &message) ==
-       JSVM_OK) &&
+  if ((PRIMJS_JSVM_CALL(OH_JSVM_GetNamedProperty, env, exception, "stack",
+                        &stack) == JSVM_OK) &&
+      (PRIMJS_JSVM_CALL(OH_JSVM_GetNamedProperty, env, exception, "message",
+                        &message) == JSVM_OK) &&
       stack && message) {
-    OH_JSVM_IsString(env, message, &is_string);
+    PRIMJS_JSVM_CALL(OH_JSVM_IsString, env, message, &is_string);
     ret = "exception message: ";
     if (is_string) {
       size_t length;
-      OH_JSVM_GetValueStringUtf8(env, message, nullptr, 0, &length);
+      PRIMJS_JSVM_CALL(OH_JSVM_GetValueStringUtf8, env, message, nullptr, 0,
+                       &length);
       if (length) {
         std::string message_str(length + 1, '\0');
-        OH_JSVM_GetValueStringUtf8(env, message, message_str.data(), length,
-                                   nullptr);
+        PRIMJS_JSVM_CALL(OH_JSVM_GetValueStringUtf8, env, message,
+                         message_str.data(), length, nullptr);
         ret += message_str;
       }
     }
     ret += "\nstack:\n";
     is_string = false;
-    OH_JSVM_IsString(env, stack, &is_string);
+    PRIMJS_JSVM_CALL(OH_JSVM_IsString, env, stack, &is_string);
     if (is_string) {
       size_t length;
-      OH_JSVM_GetValueStringUtf8(env, stack, nullptr, 0, &length);
+      PRIMJS_JSVM_CALL(OH_JSVM_GetValueStringUtf8, env, stack, nullptr, 0,
+                       &length);
       if (length) {
         std::string stack_str(length + 1, '\0');
-        OH_JSVM_GetValueStringUtf8(env, stack, stack_str.data(), length,
-                                   nullptr);
+        PRIMJS_JSVM_CALL(OH_JSVM_GetValueStringUtf8, env, stack,
+                         stack_str.data(), length, nullptr);
         ret += stack_str;
       }
     }
@@ -120,7 +124,7 @@ ExternalNativeInfo *ExternalNativeInfo::Create(napi_env env, napi_finalize fcb,
 }
 
 Reference::Reference(napi_env env, JSVM_Value ref, uint32_t rc) : env_{env} {
-  OH_JSVM_CreateReference(env->ctx->vm_env_, ref, rc, &ref_);
+  PRIMJS_JSVM_CALL(OH_JSVM_CreateReference, env->ctx->vm_env_, ref, rc, &ref_);
   iter_ = env->ctx->AddReference(this);
   return;
 }
@@ -138,21 +142,22 @@ Reference::~Reference() {
 uint32_t Reference::Ref() {
   uint32_t rc = 0;
   if (ref_) {
-    OH_JSVM_ReferenceRef(env_->ctx->vm_env_, ref_, &rc);
+    PRIMJS_JSVM_CALL(OH_JSVM_ReferenceRef, env_->ctx->vm_env_, ref_, &rc);
   }
   return rc;
 }
 
 uint32_t Reference::UnRef() {
   uint32_t rc = 0;
-  if (ref_) OH_JSVM_ReferenceUnref(env_->ctx->vm_env_, ref_, &rc);
+  if (ref_)
+    PRIMJS_JSVM_CALL(OH_JSVM_ReferenceUnref, env_->ctx->vm_env_, ref_, &rc);
   return rc;
 }
 
 JSVM_Value Reference::GetValue() {
   JSVM_Value val = nullptr;
   if (ref_) {
-    OH_JSVM_GetReferenceValue(env_->ctx->vm_env_, ref_, &val);
+    PRIMJS_JSVM_CALL(OH_JSVM_GetReferenceValue, env_->ctx->vm_env_, ref_, &val);
   }
   return val;
 }
@@ -161,7 +166,7 @@ void Reference::ClearReference() {
   if (ref_) {
     JSVM_Ref old_ref = std::exchange(ref_, nullptr);
     env_->ctx->DeleteReference(iter_);
-    OH_JSVM_DeleteReference(env_->ctx->vm_env_, old_ref);
+    PRIMJS_JSVM_CALL(OH_JSVM_DeleteReference, env_->ctx->vm_env_, old_ref);
   }
   return;
 }
@@ -186,8 +191,8 @@ struct FunctionWrapper {
   static JSVM_Value NapiFunctionCallbackWrapper(JSVM_Env env,
                                                 JSVM_CallbackInfo info) {
     FunctionWrapper *data;
-    OH_JSVM_GetCbInfo(env, info, nullptr, nullptr, nullptr,
-                      reinterpret_cast<void **>(&data));
+    PRIMJS_JSVM_CALL(OH_JSVM_GetCbInfo, env, info, nullptr, nullptr, nullptr,
+                     reinterpret_cast<void **>(&data));
     return data->Call(info);
   }
 
@@ -288,14 +293,15 @@ struct ConstructorWrapper {
   JSVM_Value CallNapiConstructor(JSVM_CallbackInfo cbinfo) {
     // JSVM_Value thiz;
     // auto *js_env = env_->ctx->js_vm_env_;
-    // OH_JSVM_CreateObject(js_env, &thiz);
+    // PRIMJS_JSVM_CALL(OH_JSVM_CreateObject, js_env, &thiz);
     napi_callback_info__harmony napi_cbinfo = {
         .jsvm_cb_info = cbinfo, .napi_data = data_, .thiz = nullptr};
     auto ret = NapiValueToJS(
         FunctionWrapper::CallNapiFunction(env_, constructor_, &napi_cbinfo));
 
     if (ret) {
-      OH_JSVM_ObjectSetPrototypeOf(env_->ctx->vm_env_, ret, proto_->GetValue());
+      PRIMJS_JSVM_CALL(OH_JSVM_ObjectSetPrototypeOf, env_->ctx->vm_env_, ret,
+                       proto_->GetValue());
     }
     return ret;
   }
@@ -303,8 +309,8 @@ struct ConstructorWrapper {
   static JSVM_Value ConstructorCallbackWrapper(JSVM_Env env,
                                                JSVM_CallbackInfo cbinfo) {
     ConstructorWrapper *class_data;
-    OH_JSVM_GetCbInfo(env, cbinfo, nullptr, nullptr, nullptr,
-                      (void **)&class_data);
+    PRIMJS_JSVM_CALL(OH_JSVM_GetCbInfo, env, cbinfo, nullptr, nullptr, nullptr,
+                     (void **)&class_data);
     return class_data->CallNapiConstructor(cbinfo);
   }
 
@@ -322,7 +328,7 @@ static napi_status CheckAndSetException(napi_env env, JSVM_Status status,
                                         const char *func) {
   auto *vm_env = env->ctx->vm_env_;
   const JSVM_ExtendedErrorInfo *error;
-  OH_JSVM_GetLastErrorInfo(vm_env, &error);
+  PRIMJS_JSVM_CALL(OH_JSVM_GetLastErrorInfo, vm_env, &error);
   std::string error_message;
   if (error->errorMessage) {
     error_message = std::string(error->errorMessage);
@@ -344,21 +350,22 @@ static napi_status CheckAndSetException(napi_env env, JSVM_Status status,
 
 static napi_status napi_get_undefined(napi_env env, napi_value *result) {
   JSVM_Value js_undef;
-  CALL_JSVM(OH_JSVM_GetUndefined(env->ctx->vm_env_, &js_undef))
+  CALL_JSVM(
+      PRIMJS_JSVM_CALL(OH_JSVM_GetUndefined, env->ctx->vm_env_, &js_undef))
   *result = JSValueToNapi(js_undef);
   return napi_clear_last_error(env);
 }
 
 static napi_status napi_get_null(napi_env env, napi_value *result) {
   JSVM_Value js_nul;
-  CALL_JSVM(OH_JSVM_GetNull(env->ctx->vm_env_, &js_nul));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_GetNull, env->ctx->vm_env_, &js_nul));
   *result = JSValueToNapi(js_nul);
   return napi_clear_last_error(env);
 }
 
 static napi_status napi_get_global(napi_env env, napi_value *result) {
   JSVM_Value global;
-  CALL_JSVM(OH_JSVM_GetGlobal(env->ctx->vm_env_, &global));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_GetGlobal, env->ctx->vm_env_, &global));
   *result = JSValueToNapi(global);
   return napi_clear_last_error(env);
 }
@@ -366,21 +373,22 @@ static napi_status napi_get_global(napi_env env, napi_value *result) {
 static napi_status napi_get_boolean(napi_env env, bool value,
                                     napi_value *result) {
   JSVM_Value boolean;
-  CALL_JSVM(OH_JSVM_GetBoolean(env->ctx->vm_env_, value, &boolean));
+  CALL_JSVM(
+      PRIMJS_JSVM_CALL(OH_JSVM_GetBoolean, env->ctx->vm_env_, value, &boolean));
   *result = JSValueToNapi(boolean);
   return napi_clear_last_error(env);
 }
 
 static napi_status napi_create_object(napi_env env, napi_value *result) {
   JSVM_Value object;
-  CALL_JSVM(OH_JSVM_CreateObject(env->ctx->vm_env_, &object));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_CreateObject, env->ctx->vm_env_, &object));
   *result = JSValueToNapi(object);
   return napi_clear_last_error(env);
 }
 
 static napi_status napi_create_array(napi_env env, napi_value *result) {
   JSVM_Value object;
-  CALL_JSVM(OH_JSVM_CreateArray(env->ctx->vm_env_, &object));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_CreateArray, env->ctx->vm_env_, &object));
   *result = JSValueToNapi(object);
   return napi_clear_last_error(env);
 }
@@ -388,7 +396,8 @@ static napi_status napi_create_array(napi_env env, napi_value *result) {
 static napi_status napi_create_array_with_length(napi_env env, size_t length,
                                                  napi_value *result) {
   JSVM_Value array;
-  CALL_JSVM(OH_JSVM_CreateArrayWithLength(env->ctx->vm_env_, length, &array))
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_CreateArrayWithLength, env->ctx->vm_env_,
+                             length, &array))
   *result = JSValueToNapi(array);
   return napi_clear_last_error(env);
 }
@@ -396,7 +405,8 @@ static napi_status napi_create_array_with_length(napi_env env, size_t length,
 static napi_status napi_create_double(napi_env env, double value,
                                       napi_value *result) {
   JSVM_Value ret;
-  CALL_JSVM(OH_JSVM_CreateDouble(env->ctx->vm_env_, value, &ret));
+  CALL_JSVM(
+      PRIMJS_JSVM_CALL(OH_JSVM_CreateDouble, env->ctx->vm_env_, value, &ret));
   *result = JSValueToNapi(ret);
   return napi_clear_last_error(env);
 }
@@ -404,7 +414,8 @@ static napi_status napi_create_double(napi_env env, double value,
 static napi_status napi_create_int32(napi_env env, int32_t value,
                                      napi_value *result) {
   JSVM_Value ret;
-  CALL_JSVM(OH_JSVM_CreateInt32(env->ctx->vm_env_, value, &ret));
+  CALL_JSVM(
+      PRIMJS_JSVM_CALL(OH_JSVM_CreateInt32, env->ctx->vm_env_, value, &ret));
   *result = JSValueToNapi(ret);
   return napi_clear_last_error(env);
 }
@@ -412,7 +423,8 @@ static napi_status napi_create_int32(napi_env env, int32_t value,
 static napi_status napi_create_uint32(napi_env env, uint32_t value,
                                       napi_value *result) {
   JSVM_Value ret;
-  CALL_JSVM(OH_JSVM_CreateUint32(env->ctx->vm_env_, value, &ret));
+  CALL_JSVM(
+      PRIMJS_JSVM_CALL(OH_JSVM_CreateUint32, env->ctx->vm_env_, value, &ret));
   *result = JSValueToNapi(ret);
   return napi_clear_last_error(env);
 }
@@ -420,7 +432,8 @@ static napi_status napi_create_uint32(napi_env env, uint32_t value,
 static napi_status napi_create_int64(napi_env env, int64_t value,
                                      napi_value *result) {
   JSVM_Value ret;
-  CALL_JSVM(OH_JSVM_CreateInt64(env->ctx->vm_env_, value, &ret));
+  CALL_JSVM(
+      PRIMJS_JSVM_CALL(OH_JSVM_CreateInt64, env->ctx->vm_env_, value, &ret));
   *result = JSValueToNapi(ret);
   return napi_clear_last_error(env);
 }
@@ -429,7 +442,8 @@ static napi_status napi_create_string_latin1(napi_env env, const char *str,
                                              size_t length,
                                              napi_value *result) {
   JSVM_Value ret;
-  CALL_JSVM(OH_JSVM_CreateStringLatin1(env->ctx->vm_env_, str, length, &ret));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_CreateStringLatin1, env->ctx->vm_env_, str,
+                             length, &ret));
   *result = JSValueToNapi(ret);
   return napi_clear_last_error(env);
 }
@@ -437,7 +451,8 @@ static napi_status napi_create_string_latin1(napi_env env, const char *str,
 static napi_status napi_create_string_utf8(napi_env env, const char *str,
                                            size_t length, napi_value *result) {
   JSVM_Value ret;
-  CALL_JSVM(OH_JSVM_CreateStringUtf8(env->ctx->vm_env_, str, length, &ret));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_CreateStringUtf8, env->ctx->vm_env_, str,
+                             length, &ret));
   *result = JSValueToNapi(ret);
   return napi_clear_last_error(env);
 }
@@ -445,7 +460,8 @@ static napi_status napi_create_string_utf8(napi_env env, const char *str,
 static napi_status napi_create_string_utf16(napi_env env, const char16_t *str,
                                             size_t length, napi_value *result) {
   JSVM_Value ret;
-  CALL_JSVM(OH_JSVM_CreateStringUtf16(env->ctx->vm_env_, str, length, &ret));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_CreateStringUtf16, env->ctx->vm_env_, str,
+                             length, &ret));
   *result = JSValueToNapi(ret);
   return napi_clear_last_error(env);
 }
@@ -453,8 +469,8 @@ static napi_status napi_create_string_utf16(napi_env env, const char16_t *str,
 static napi_status napi_create_symbol(napi_env env, napi_value descripton,
                                       napi_value *result) {
   JSVM_Value ret;
-  CALL_JSVM(
-      OH_JSVM_CreateSymbol(env->ctx->vm_env_, NapiValueToJS(descripton), &ret));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_CreateSymbol, env->ctx->vm_env_,
+                             NapiValueToJS(descripton), &ret));
   *result = JSValueToNapi(ret);
   return napi_clear_last_error(env);
 }
@@ -465,10 +481,11 @@ static napi_status napi_create_function(napi_env env, const char *utf8name,
   JSVM_Value func;
   auto *jsvm_cb = FunctionWrapper::CreateVMCallback(env, cb, data);
 
-  CALL_JSVM(OH_JSVM_CreateFunction(env->ctx->vm_env_, utf8name, length, jsvm_cb,
-                                   &func));
-  CALL_JSVM(OH_JSVM_AddFinalizer(
-      env->ctx->vm_env_, func, reinterpret_cast<void *>(jsvm_cb),
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_CreateFunction, env->ctx->vm_env_,
+                             utf8name, length, jsvm_cb, &func));
+  CALL_JSVM(PRIMJS_JSVM_CALL(
+      OH_JSVM_AddFinalizer, env->ctx->vm_env_, func,
+      reinterpret_cast<void *>(jsvm_cb),
       [](JSVM_Env env, void *data, void *hint) {
         FunctionWrapper::VMCallbackFinalizer(data);
       },
@@ -480,8 +497,9 @@ static napi_status napi_create_function(napi_env env, const char *utf8name,
 static napi_status napi_create_error(napi_env env, napi_value code,
                                      napi_value msg, napi_value *result) {
   JSVM_Value js_result;
-  CALL_JSVM(OH_JSVM_CreateError(env->ctx->vm_env_, NapiValueToJS(code),
-                                NapiValueToJS(msg), &js_result));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_CreateError, env->ctx->vm_env_,
+                             NapiValueToJS(code), NapiValueToJS(msg),
+                             &js_result));
   *result = JSValueToNapi(js_result);
   return napi_clear_last_error(env);
 }
@@ -489,8 +507,9 @@ static napi_status napi_create_error(napi_env env, napi_value code,
 static napi_status napi_create_type_error(napi_env env, napi_value code,
                                           napi_value msg, napi_value *result) {
   JSVM_Value js_result;
-  CALL_JSVM(OH_JSVM_CreateTypeError(env->ctx->vm_env_, NapiValueToJS(code),
-                                    NapiValueToJS(msg), &js_result));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_CreateTypeError, env->ctx->vm_env_,
+                             NapiValueToJS(code), NapiValueToJS(msg),
+                             &js_result));
   *result = JSValueToNapi(js_result);
   return napi_clear_last_error(env);
 }
@@ -498,8 +517,9 @@ static napi_status napi_create_type_error(napi_env env, napi_value code,
 static napi_status napi_create_range_error(napi_env env, napi_value code,
                                            napi_value msg, napi_value *result) {
   JSVM_Value js_result;
-  CALL_JSVM(OH_JSVM_CreateRangeError(env->ctx->vm_env_, NapiValueToJS(code),
-                                     NapiValueToJS(msg), &js_result));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_CreateRangeError, env->ctx->vm_env_,
+                             NapiValueToJS(code), NapiValueToJS(msg),
+                             &js_result));
   *result = JSValueToNapi(js_result);
   return napi_clear_last_error(env);
 }
@@ -507,198 +527,211 @@ static napi_status napi_create_range_error(napi_env env, napi_value code,
 static napi_status napi_typeof(napi_env env, napi_value value,
                                napi_valuetype *result) {
   JSVM_ValueType type;
-  CALL_JSVM(OH_JSVM_Typeof(env->ctx->vm_env_, NapiValueToJS(value), &type));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_Typeof, env->ctx->vm_env_,
+                             NapiValueToJS(value), &type));
   *result = NapiValueTypeFromJSValueType(type);
   return napi_clear_last_error(env);
 }
 
 static napi_status napi_get_value_double(napi_env env, napi_value value,
                                          double *result) {
-  CALL_JSVM(
-      OH_JSVM_GetValueDouble(env->ctx->vm_env_, NapiValueToJS(value), result));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_GetValueDouble, env->ctx->vm_env_,
+                             NapiValueToJS(value), result));
   return napi_clear_last_error(env);
 }
 
 static napi_status napi_get_value_int32(napi_env env, napi_value value,
                                         int32_t *result) {
-  CALL_JSVM(
-      OH_JSVM_GetValueInt32(env->ctx->vm_env_, NapiValueToJS(value), result));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_GetValueInt32, env->ctx->vm_env_,
+                             NapiValueToJS(value), result));
   return napi_clear_last_error(env);
 }
 
 static napi_status napi_get_value_uint32(napi_env env, napi_value value,
                                          uint32_t *result) {
-  CALL_JSVM(
-      OH_JSVM_GetValueUint32(env->ctx->vm_env_, NapiValueToJS(value), result));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_GetValueUint32, env->ctx->vm_env_,
+                             NapiValueToJS(value), result));
   return napi_clear_last_error(env);
 }
 
 static napi_status napi_get_value_int64(napi_env env, napi_value value,
                                         int64_t *result) {
-  CALL_JSVM(
-      OH_JSVM_GetValueInt64(env->ctx->vm_env_, NapiValueToJS(value), result));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_GetValueInt64, env->ctx->vm_env_,
+                             NapiValueToJS(value), result));
   return napi_clear_last_error(env);
 }
 
 static napi_status napi_get_value_bool(napi_env env, napi_value value,
                                        bool *result) {
-  CALL_JSVM(
-      OH_JSVM_GetValueBool(env->ctx->vm_env_, NapiValueToJS(value), result));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_GetValueBool, env->ctx->vm_env_,
+                             NapiValueToJS(value), result));
   return napi_clear_last_error(env);
 }
 
 static napi_status napi_get_value_string_latin1(napi_env env, napi_value value,
                                                 char *buf, size_t bufsize,
                                                 size_t *result) {
-  CALL_JSVM(OH_JSVM_GetValueStringLatin1(
-      env->ctx->vm_env_, NapiValueToJS(value), buf, bufsize, result));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_GetValueStringLatin1, env->ctx->vm_env_,
+                             NapiValueToJS(value), buf, bufsize, result));
   return napi_clear_last_error(env);
 }
 
 static napi_status napi_get_value_string_utf8(napi_env env, napi_value value,
                                               char *buf, size_t bufsize,
                                               size_t *result) {
-  CALL_JSVM(OH_JSVM_GetValueStringUtf8(env->ctx->vm_env_, NapiValueToJS(value),
-                                       buf, bufsize, result));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_GetValueStringUtf8, env->ctx->vm_env_,
+                             NapiValueToJS(value), buf, bufsize, result));
   return napi_clear_last_error(env);
 }
 
 static napi_status napi_get_value_string_utf16(napi_env env, napi_value value,
                                                char16_t *buf, size_t bufsize,
                                                size_t *result) {
-  CALL_JSVM(OH_JSVM_GetValueStringUtf16(env->ctx->vm_env_, NapiValueToJS(value),
-                                        buf, bufsize, result));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_GetValueStringUtf16, env->ctx->vm_env_,
+                             NapiValueToJS(value), buf, bufsize, result));
   return napi_clear_last_error(env);
 }
 
 static napi_status napi_coerce_to_bool(napi_env env, napi_value value,
                                        napi_value *result) {
   JSVM_Value js_result;
-  CALL_JSVM(
-      OH_JSVM_CoerceToBool(env->ctx->vm_env_, NapiValueToJS(value), &js_result))
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_CoerceToBool, env->ctx->vm_env_,
+                             NapiValueToJS(value), &js_result))
   *result = JSValueToNapi(js_result);
   return napi_clear_last_error(env);
 }
 
 static napi_status napi_coerce_to_number(napi_env env, napi_value value,
                                          napi_value *result) {
-  CALL_JSVM(OH_JSVM_CoerceToNumber(env->ctx->vm_env_, NapiValueToJS(value),
-                                   reinterpret_cast<JSVM_Value *>(result)));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_CoerceToNumber, env->ctx->vm_env_,
+                             NapiValueToJS(value),
+                             reinterpret_cast<JSVM_Value *>(result)));
   return napi_clear_last_error(env);
 }
 
 static napi_status napi_coerce_to_object(napi_env env, napi_value value,
                                          napi_value *result) {
-  CALL_JSVM(OH_JSVM_CoerceToObject(env->ctx->vm_env_, NapiValueToJS(value),
-                                   reinterpret_cast<JSVM_Value *>(result)));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_CoerceToObject, env->ctx->vm_env_,
+                             NapiValueToJS(value),
+                             reinterpret_cast<JSVM_Value *>(result)));
   return napi_clear_last_error(env);
 }
 
 static napi_status napi_coerce_to_string(napi_env env, napi_value value,
                                          napi_value *result) {
-  CALL_JSVM(OH_JSVM_CoerceToString(env->ctx->vm_env_, NapiValueToJS(value),
-                                   reinterpret_cast<JSVM_Value *>(result)));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_CoerceToString, env->ctx->vm_env_,
+                             NapiValueToJS(value),
+                             reinterpret_cast<JSVM_Value *>(result)));
   return napi_clear_last_error(env);
 }
 
 static napi_status napi_get_prototype(napi_env env, napi_value object,
                                       napi_value *result) {
-  CALL_JSVM(OH_JSVM_GetPrototype(env->ctx->vm_env_, NapiValueToJS(object),
-                                 NapiValuePointerToJS(result)));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_GetPrototype, env->ctx->vm_env_,
+                             NapiValueToJS(object),
+                             NapiValuePointerToJS(result)));
   return napi_clear_last_error(env);
 }
 
 static napi_status napi_get_property_names(napi_env env, napi_value object,
                                            napi_value *result) {
-  CALL_JSVM(OH_JSVM_GetPropertyNames(env->ctx->vm_env_, NapiValueToJS(object),
-                                     NapiValuePointerToJS(result)));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_GetPropertyNames, env->ctx->vm_env_,
+                             NapiValueToJS(object),
+                             NapiValuePointerToJS(result)));
   return napi_clear_last_error(env);
 }
 
 static napi_status napi_set_property(napi_env env, napi_value object,
                                      napi_value key, napi_value value) {
-  CALL_JSVM(OH_JSVM_SetProperty(env->ctx->vm_env_, NapiValueToJS(object),
-                                NapiValueToJS(key), NapiValueToJS(value)));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_SetProperty, env->ctx->vm_env_,
+                             NapiValueToJS(object), NapiValueToJS(key),
+                             NapiValueToJS(value)));
   return napi_clear_last_error(env);
 }
 
 static napi_status napi_has_property(napi_env env, napi_value object,
                                      napi_value key, bool *result) {
-  CALL_JSVM(OH_JSVM_HasProperty(env->ctx->vm_env_, NapiValueToJS(object),
-                                NapiValueToJS(key), result));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_HasProperty, env->ctx->vm_env_,
+                             NapiValueToJS(object), NapiValueToJS(key),
+                             result));
   return napi_clear_last_error(env);
 }
 
 static napi_status napi_get_property(napi_env env, napi_value object,
                                      napi_value key, napi_value *result) {
-  CALL_JSVM(OH_JSVM_GetProperty(env->ctx->vm_env_, NapiValueToJS(object),
-                                NapiValueToJS(key),
-                                NapiValuePointerToJS(result)));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_GetProperty, env->ctx->vm_env_,
+                             NapiValueToJS(object), NapiValueToJS(key),
+                             NapiValuePointerToJS(result)));
   return napi_clear_last_error(env);
 }
 
 static napi_status napi_delete_property(napi_env env, napi_value object,
                                         napi_value key, bool *result) {
-  CALL_JSVM(OH_JSVM_DeleteProperty(env->ctx->vm_env_, NapiValueToJS(object),
-                                   NapiValueToJS(key), result));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_DeleteProperty, env->ctx->vm_env_,
+                             NapiValueToJS(object), NapiValueToJS(key),
+                             result));
   return napi_clear_last_error(env);
 }
 
 static napi_status napi_has_own_property(napi_env env, napi_value object,
                                          napi_value key, bool *result) {
-  CALL_JSVM(OH_JSVM_HasOwnProperty(env->ctx->vm_env_, NapiValueToJS(object),
-                                   NapiValueToJS(key), result));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_HasOwnProperty, env->ctx->vm_env_,
+                             NapiValueToJS(object), NapiValueToJS(key),
+                             result));
   return napi_clear_last_error(env);
 }
 
 static napi_status napi_set_named_property(napi_env env, napi_value object,
                                            const char *utf8name,
                                            napi_value value) {
-  CALL_JSVM(OH_JSVM_SetNamedProperty(env->ctx->vm_env_, NapiValueToJS(object),
-                                     utf8name, NapiValueToJS(value)));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_SetNamedProperty, env->ctx->vm_env_,
+                             NapiValueToJS(object), utf8name,
+                             NapiValueToJS(value)));
   return napi_clear_last_error(env);
 }
 
 static napi_status napi_has_named_property(napi_env env, napi_value object,
                                            const char *utf8name, bool *result) {
-  CALL_JSVM(OH_JSVM_HasNamedProperty(env->ctx->vm_env_, NapiValueToJS(object),
-                                     utf8name, result));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_HasNamedProperty, env->ctx->vm_env_,
+                             NapiValueToJS(object), utf8name, result));
   return napi_clear_last_error(env);
 }
 
 static napi_status napi_get_named_property(napi_env env, napi_value object,
                                            const char *utf8name,
                                            napi_value *result) {
-  CALL_JSVM(OH_JSVM_GetNamedProperty(env->ctx->vm_env_, NapiValueToJS(object),
-                                     utf8name, NapiValuePointerToJS(result)));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_GetNamedProperty, env->ctx->vm_env_,
+                             NapiValueToJS(object), utf8name,
+                             NapiValuePointerToJS(result)));
   return napi_clear_last_error(env);
 }
 
 static napi_status napi_set_element(napi_env env, napi_value object,
                                     uint32_t idx, napi_value value) {
-  CALL_JSVM(OH_JSVM_SetElement(env->ctx->vm_env_, NapiValueToJS(object), idx,
-                               NapiValueToJS(value)));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_SetElement, env->ctx->vm_env_,
+                             NapiValueToJS(object), idx, NapiValueToJS(value)));
   return napi_clear_last_error(env);
 }
 
 static napi_status napi_get_element(napi_env env, napi_value object,
                                     uint32_t idx, napi_value *resutl) {
-  CALL_JSVM(OH_JSVM_GetElement(env->ctx->vm_env_, NapiValueToJS(object), idx,
-                               NapiValuePointerToJS(resutl)));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_GetElement, env->ctx->vm_env_,
+                             NapiValueToJS(object), idx,
+                             NapiValuePointerToJS(resutl)));
   return napi_clear_last_error(env);
 }
 
 static napi_status napi_has_element(napi_env env, napi_value object,
                                     uint32_t idx, bool *result) {
-  CALL_JSVM(OH_JSVM_HasElement(env->ctx->vm_env_, NapiValueToJS(object), idx,
-                               result));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_HasElement, env->ctx->vm_env_,
+                             NapiValueToJS(object), idx, result));
   return napi_clear_last_error(env);
 }
 
 static napi_status napi_delete_element(napi_env env, napi_value object,
                                        uint32_t idx, bool *result) {
-  CALL_JSVM(OH_JSVM_DeleteElement(env->ctx->vm_env_, NapiValueToJS(object), idx,
-                                  result));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_DeleteElement, env->ctx->vm_env_,
+                             NapiValueToJS(object), idx, result));
   return napi_clear_last_error(env);
 }
 
@@ -717,11 +750,13 @@ static napi_status napi_define_properties(
   auto *finalize_data =
       new js_define_props_data{property_count, property_descs};
 
-  CALL_JSVM(OH_JSVM_DefineProperties(env->ctx->vm_env_, NapiValueToJS(object),
-                                     property_count, property_descs));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_DefineProperties, env->ctx->vm_env_,
+                             NapiValueToJS(object), property_count,
+                             property_descs));
 
-  CALL_JSVM(OH_JSVM_AddFinalizer(
-      env->ctx->vm_env_, NapiValueToJS(object), finalize_data,
+  CALL_JSVM(PRIMJS_JSVM_CALL(
+      OH_JSVM_AddFinalizer, env->ctx->vm_env_, NapiValueToJS(object),
+      finalize_data,
       [](JSVM_Env env, void *finalizeData, void *finalizeHint) {
         auto *data = reinterpret_cast<js_define_props_data *>(finalizeData);
         for (size_t i = 0; i < data->size; ++i) {
@@ -741,21 +776,22 @@ static napi_status napi_define_properties_spec_compliant(
 }
 
 static napi_status napi_is_array(napi_env env, napi_value value, bool *result) {
-  CALL_JSVM(OH_JSVM_IsArray(env->ctx->vm_env_, NapiValueToJS(value), result));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_IsArray, env->ctx->vm_env_,
+                             NapiValueToJS(value), result));
   return napi_clear_last_error(env);
 }
 
 static napi_status napi_get_array_length(napi_env env, napi_value value,
                                          uint32_t *result) {
-  CALL_JSVM(
-      OH_JSVM_GetArrayLength(env->ctx->vm_env_, NapiValueToJS(value), result));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_GetArrayLength, env->ctx->vm_env_,
+                             NapiValueToJS(value), result));
   return napi_clear_last_error(env);
 }
 
 static napi_status napi_strict_equals(napi_env env, napi_value lhs,
                                       napi_value rhs, bool *result) {
-  CALL_JSVM(OH_JSVM_StrictEquals(env->ctx->vm_env_, NapiValueToJS(lhs),
-                                 NapiValueToJS(rhs), result));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_StrictEquals, env->ctx->vm_env_,
+                             NapiValueToJS(lhs), NapiValueToJS(rhs), result));
   return napi_clear_last_error(env);
 }
 
@@ -763,9 +799,10 @@ static napi_status napi_call_function(napi_env env, napi_value recv,
                                       napi_value func, size_t argc,
                                       const napi_value *argv,
                                       napi_value *result) {
-  CALL_JSVM(OH_JSVM_CallFunction(
-      env->ctx->vm_env_, NapiValueToJS(recv), NapiValueToJS(func), argc,
-      ConstNapiValuePointerToJS(argv), NapiValuePointerToJS(result)));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_CallFunction, env->ctx->vm_env_,
+                             NapiValueToJS(recv), NapiValueToJS(func), argc,
+                             ConstNapiValuePointerToJS(argv),
+                             NapiValuePointerToJS(result)));
   return napi_clear_last_error(env);
 }
 
@@ -778,16 +815,17 @@ static napi_status napi_call_function_spec_compliant(
 static napi_status napi_new_instance(napi_env env, napi_value constructor,
                                      size_t argc, const napi_value *argv,
                                      napi_value *result) {
-  CALL_JSVM(OH_JSVM_NewInstance(env->ctx->vm_env_, NapiValueToJS(constructor),
-                                argc, ConstNapiValuePointerToJS(argv),
-                                NapiValuePointerToJS(result)));
+  CALL_JSVM(PRIMJS_JSVM_CALL(
+      OH_JSVM_NewInstance, env->ctx->vm_env_, NapiValueToJS(constructor), argc,
+      ConstNapiValuePointerToJS(argv), NapiValuePointerToJS(result)));
   return napi_clear_last_error(env);
 }
 
 static napi_status napi_instanceof(napi_env env, napi_value object,
                                    napi_value constructor, bool *result) {
-  CALL_JSVM(OH_JSVM_Instanceof(env->ctx->vm_env_, NapiValueToJS(object),
-                               NapiValueToJS(constructor), result));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_Instanceof, env->ctx->vm_env_,
+                             NapiValueToJS(object), NapiValueToJS(constructor),
+                             result));
   return napi_clear_last_error(env);
 }
 
@@ -799,13 +837,14 @@ static napi_status napi_get_cb_info(napi_env env, napi_callback_info cbinfo,
   }
 
   if (cbinfo->thiz) {
-    CALL_JSVM(OH_JSVM_GetCbInfo(env->ctx->vm_env_, cbinfo->jsvm_cb_info, argc,
-                                NapiValuePointerToJS(argv), nullptr, nullptr));
+    CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_GetCbInfo, env->ctx->vm_env_,
+                               cbinfo->jsvm_cb_info, argc,
+                               NapiValuePointerToJS(argv), nullptr, nullptr));
     if (this_arg) *this_arg = JSValueToNapi(cbinfo->thiz);
   } else {
-    CALL_JSVM(OH_JSVM_GetCbInfo(env->ctx->vm_env_, cbinfo->jsvm_cb_info, argc,
-                                NapiValuePointerToJS(argv),
-                                NapiValuePointerToJS(this_arg), nullptr));
+    CALL_JSVM(PRIMJS_JSVM_CALL(
+        OH_JSVM_GetCbInfo, env->ctx->vm_env_, cbinfo->jsvm_cb_info, argc,
+        NapiValuePointerToJS(argv), NapiValuePointerToJS(this_arg), nullptr));
   }
 
   return napi_clear_last_error(env);
@@ -813,8 +852,9 @@ static napi_status napi_get_cb_info(napi_env env, napi_callback_info cbinfo,
 
 static napi_status napi_get_new_target(napi_env env, napi_callback_info cbinfo,
                                        napi_value *result) {
-  CALL_JSVM(OH_JSVM_GetNewTarget(env->ctx->vm_env_, cbinfo->jsvm_cb_info,
-                                 NapiValuePointerToJS(result)));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_GetNewTarget, env->ctx->vm_env_,
+                             cbinfo->jsvm_cb_info,
+                             NapiValuePointerToJS(result)));
   return napi_clear_last_error(env);
 }
 
@@ -831,12 +871,13 @@ static napi_status napi_define_class(napi_env env, const char *utf8name,
 
   JSVM_Value result_clazz;
 
-  CALL_JSVM(OH_JSVM_DefineClass(
-      js_env, utf8name, length, native_class_data->GetJsConstructorCallBack(),
-      property_count, native_class_data->GetProperties(), &result_clazz));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_DefineClass, js_env, utf8name, length,
+                             native_class_data->GetJsConstructorCallBack(),
+                             property_count, native_class_data->GetProperties(),
+                             &result_clazz));
 
-  CALL_JSVM(OH_JSVM_AddFinalizer(
-      js_env, result_clazz, native_class_data,
+  CALL_JSVM(PRIMJS_JSVM_CALL(
+      OH_JSVM_AddFinalizer, js_env, result_clazz, native_class_data,
       [](JSVM_Env env, void *finalize_data, void *finalize_hint) {
         ConstructorWrapper::Finalizer(finalize_data);
       },
@@ -844,14 +885,14 @@ static napi_status napi_define_class(napi_env env, const char *utf8name,
 
   JSVM_Value prototype;
   static const char *proto_name = "prototype";
-  CALL_JSVM(
-      OH_JSVM_GetNamedProperty(js_env, result_clazz, proto_name, &prototype));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_GetNamedProperty, js_env, result_clazz,
+                             proto_name, &prototype));
 
   if (super_clazz) {
-    OH_JSVM_ObjectSetPrototypeOf(js_env, result_clazz,
-                                 super_clazz->GetFunction());
-    OH_JSVM_ObjectSetPrototypeOf(js_env, prototype,
-                                 super_clazz->GetPrototype());
+    PRIMJS_JSVM_CALL(OH_JSVM_ObjectSetPrototypeOf, js_env, result_clazz,
+                     super_clazz->GetFunction());
+    PRIMJS_JSVM_CALL(OH_JSVM_ObjectSetPrototypeOf, js_env, prototype,
+                     super_clazz->GetPrototype());
   }
 
   *result = new napi_class__harmony(js_env, result_clazz, prototype);
@@ -886,9 +927,9 @@ static napi_status napi_wrap(napi_env env, napi_value js_object,
   auto *napi_wrap_data = ExternalNativeInfo::Create(
       env, finalize_cb, native_object, finalize_hint);
   JSVM_Ref ref;
-  CALL_JSVM(OH_JSVM_Wrap(env->ctx->vm_env_, NapiValueToJS(js_object),
-                         napi_wrap_data, ExternalNativeInfo::Delete, nullptr,
-                         &ref));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_Wrap, env->ctx->vm_env_,
+                             NapiValueToJS(js_object), napi_wrap_data,
+                             ExternalNativeInfo::Delete, nullptr, &ref));
   if (result) *result = JSRefToNapi(new Reference(env, ref));
 
   return napi_clear_last_error(env);
@@ -908,8 +949,9 @@ static napi_status napi_unwrap(napi_env env, napi_value js_object,
   if (result == nullptr) return napi_clear_last_error(env);
   ExternalNativeInfo *napi_finalizer = nullptr;
   *result = nullptr;
-  auto status = OH_JSVM_Unwrap(env->ctx->vm_env_, NapiValueToJS(js_object),
-                               (void **)&napi_finalizer);
+  auto status =
+      PRIMJS_JSVM_CALL(OH_JSVM_Unwrap, env->ctx->vm_env_,
+                       NapiValueToJS(js_object), (void **)&napi_finalizer);
   if (status == JSVM_OK && napi_finalizer) {
     *result = (void *)napi_finalizer->Data();
   }
@@ -925,8 +967,9 @@ static napi_status napi_unwrap_spec_compliant(napi_env env,
 static napi_status napi_remove_wrap(napi_env env, napi_value js_object,
                                     void **result) {
   ExternalNativeInfo *native_info;
-  CALL_JSVM(OH_JSVM_RemoveWrap(env->ctx->vm_env_, NapiValueToJS(js_object),
-                               (void **)(&native_info)));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_RemoveWrap, env->ctx->vm_env_,
+                             NapiValueToJS(js_object),
+                             (void **)(&native_info)));
   if (result) {
     *result = native_info->Data();
   }
@@ -947,8 +990,8 @@ static napi_status napi_create_external(napi_env env, void *data,
                                         napi_value *result) {
   JSVM_Value js_value;
 
-  CALL_JSVM(OH_JSVM_CreateExternal(
-      env->ctx->vm_env_,
+  CALL_JSVM(PRIMJS_JSVM_CALL(
+      OH_JSVM_CreateExternal, env->ctx->vm_env_,
       ExternalNativeInfo::Create(env, finalize_cb, data, finalize_hint),
       ExternalNativeInfo::Delete, nullptr, &js_value));
 
@@ -959,8 +1002,8 @@ static napi_status napi_create_external(napi_env env, void *data,
 static napi_status napi_get_value_external(napi_env env, napi_value value,
                                            void **result) {
   ExternalNativeInfo *native_info;
-  CALL_JSVM(OH_JSVM_GetValueExternal(env->ctx->vm_env_, NapiValueToJS(value),
-                                     (void **)&native_info));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_GetValueExternal, env->ctx->vm_env_,
+                             NapiValueToJS(value), (void **)&native_info));
   *result = native_info->Data();
   return napi_clear_last_error(env);
 }
@@ -1000,7 +1043,8 @@ static napi_status napi_get_reference_value(napi_env env, napi_ref ref,
 static napi_status napi_open_handle_scope(napi_env env,
                                           napi_handle_scope *result) {
   JSVM_HandleScope handle;
-  CALL_JSVM(OH_JSVM_OpenHandleScope(env->ctx->vm_env_, &handle));
+  CALL_JSVM(
+      PRIMJS_JSVM_CALL(OH_JSVM_OpenHandleScope, env->ctx->vm_env_, &handle));
   *result = JSHandleScopeToNapi(handle);
   env->ctx->open_handle_scopes_++;
   return napi_clear_last_error(env);
@@ -1009,7 +1053,8 @@ static napi_status napi_open_handle_scope(napi_env env,
 static napi_status napi_close_handle_scope(napi_env env,
                                            napi_handle_scope result) {
   JSVM_HandleScope js_handle = NapiHandleScopeToJS(result);
-  CALL_JSVM(OH_JSVM_CloseHandleScope(env->ctx->vm_env_, js_handle));
+  CALL_JSVM(
+      PRIMJS_JSVM_CALL(OH_JSVM_CloseHandleScope, env->ctx->vm_env_, js_handle));
   env->ctx->open_handle_scopes_--;
   return napi_clear_last_error(env);
 }
@@ -1017,7 +1062,8 @@ static napi_status napi_close_handle_scope(napi_env env,
 static napi_status napi_open_escapable_handle_scope(
     napi_env env, napi_escapable_handle_scope *result) {
   JSVM_EscapableHandleScope handle;
-  CALL_JSVM(OH_JSVM_OpenEscapableHandleScope(env->ctx->vm_env_, &handle));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_OpenEscapableHandleScope,
+                             env->ctx->vm_env_, &handle));
   *result = JSEscapableHandleToNapi(handle);
 
   env->ctx->open_handle_scopes_++;
@@ -1028,7 +1074,8 @@ static napi_status napi_close_escapable_handle_scope(
     napi_env env, napi_escapable_handle_scope result) {
   JSVM_EscapableHandleScope js_handle = NapiEscapableHandleToJS(result);
 
-  CALL_JSVM(OH_JSVM_CloseEscapableHandleScope(env->ctx->vm_env_, js_handle));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_CloseEscapableHandleScope,
+                             env->ctx->vm_env_, js_handle));
   env->ctx->open_handle_scopes_--;
   return napi_clear_last_error(env);
 }
@@ -1037,57 +1084,63 @@ static napi_status napi_escape_handle(napi_env env,
                                       napi_escapable_handle_scope scope,
                                       napi_value escape, napi_value *result) {
   JSVM_Value ret;
-  CALL_JSVM(OH_JSVM_EscapeHandle(env->ctx->vm_env_,
-                                 NapiEscapableHandleToJS(scope),
-                                 NapiValueToJS(escape), &ret));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_EscapeHandle, env->ctx->vm_env_,
+                             NapiEscapableHandleToJS(scope),
+                             NapiValueToJS(escape), &ret));
   *result = JSValueToNapi(ret);
   return napi_clear_last_error(env);
 }
 
 static napi_status napi_throw_(napi_env env, napi_value error) {
-  CALL_JSVM(OH_JSVM_Throw(env->ctx->vm_env_, NapiValueToJS(error)));
+  CALL_JSVM(
+      PRIMJS_JSVM_CALL(OH_JSVM_Throw, env->ctx->vm_env_, NapiValueToJS(error)));
 
   return napi_clear_last_error(env);
 }
 
 static napi_status napi_throw_error(napi_env env, const char *code,
                                     const char *msg) {
-  CALL_JSVM(OH_JSVM_ThrowError(env->ctx->vm_env_, code, msg));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_ThrowError, env->ctx->vm_env_, code, msg));
   return napi_clear_last_error(env);
 }
 
 static napi_status napi_throw_type_error(napi_env env, const char *code,
                                          const char *msg) {
-  CALL_JSVM(OH_JSVM_ThrowTypeError(env->ctx->vm_env_, code, msg));
+  CALL_JSVM(
+      PRIMJS_JSVM_CALL(OH_JSVM_ThrowTypeError, env->ctx->vm_env_, code, msg));
   return napi_clear_last_error(env);
 }
 
 static napi_status napi_throw_range_error(napi_env env, const char *code,
                                           const char *msg) {
-  CALL_JSVM(OH_JSVM_ThrowRangeError(env->ctx->vm_env_, code, msg));
+  CALL_JSVM(
+      PRIMJS_JSVM_CALL(OH_JSVM_ThrowRangeError, env->ctx->vm_env_, code, msg));
   return napi_clear_last_error(env);
 }
 
 static napi_status napi_is_error(napi_env env, napi_value value, bool *result) {
-  CALL_JSVM(OH_JSVM_IsError(env->ctx->vm_env_, NapiValueToJS(value), result));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_IsError, env->ctx->vm_env_,
+                             NapiValueToJS(value), result));
   return napi_clear_last_error(env);
 }
 
 static napi_status napi_is_exception_pending(napi_env env, bool *result) {
-  CALL_JSVM(OH_JSVM_IsExceptionPending(env->ctx->vm_env_, result));
+  CALL_JSVM(
+      PRIMJS_JSVM_CALL(OH_JSVM_IsExceptionPending, env->ctx->vm_env_, result));
   return napi_clear_last_error(env);
 }
 
 static napi_status napi_get_and_clear_last_exception(napi_env env,
                                                      napi_value *result) {
   bool is_pending = false;
-  OH_JSVM_IsExceptionPending(env->ctx->vm_env_, &is_pending);
+  PRIMJS_JSVM_CALL(OH_JSVM_IsExceptionPending, env->ctx->vm_env_, &is_pending);
   if (!is_pending) {
     return napi_get_undefined(env, result);
   }
 
   JSVM_Value ret;
-  CALL_JSVM(OH_JSVM_GetAndClearLastException(env->ctx->vm_env_, &ret));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_GetAndClearLastException,
+                             env->ctx->vm_env_, &ret));
 
   *result = JSValueToNapi(ret);
   LOGE("JSVM Exception: " << GetExceptionMessage(env->ctx->vm_env_, ret));
@@ -1096,8 +1149,8 @@ static napi_status napi_get_and_clear_last_exception(napi_env env,
 
 static napi_status napi_is_arraybuffer(napi_env env, napi_value value,
                                        bool *result) {
-  CALL_JSVM(
-      OH_JSVM_IsArraybuffer(env->ctx->vm_env_, NapiValueToJS(value), result))
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_IsArraybuffer, env->ctx->vm_env_,
+                             NapiValueToJS(value), result))
   return napi_clear_last_error(env);
 }
 
@@ -1105,8 +1158,8 @@ static napi_status napi_create_arraybuffer(napi_env env, size_t byte_length,
                                            void **data, napi_value *result) {
   JSVM_Value ab;
   void *data_buffer = nullptr;
-  CALL_JSVM(OH_JSVM_CreateArraybuffer(env->ctx->vm_env_, byte_length,
-                                      &data_buffer, &ab))
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_CreateArraybuffer, env->ctx->vm_env_,
+                             byte_length, &data_buffer, &ab))
 
   if (result) *result = JSValueToNapi(ab);
   if (data) *data = data_buffer;
@@ -1122,15 +1175,15 @@ static napi_status napi_create_external_arraybuffer(
 static napi_status napi_get_arraybuffer_info(napi_env env,
                                              napi_value arraybuffer,
                                              void **data, size_t *byte_length) {
-  CALL_JSVM(OH_JSVM_GetArraybufferInfo(
-      env->ctx->vm_env_, NapiValueToJS(arraybuffer), data, byte_length));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_GetArraybufferInfo, env->ctx->vm_env_,
+                             NapiValueToJS(arraybuffer), data, byte_length));
   return napi_clear_last_error(env);
 }
 
 static napi_status napi_is_typedarray(napi_env env, napi_value value,
                                       bool *result) {
-  CALL_JSVM(
-      OH_JSVM_IsTypedarray(env->ctx->vm_env_, NapiValueToJS(value), result));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_IsTypedarray, env->ctx->vm_env_,
+                             NapiValueToJS(value), result));
   return napi_clear_last_error(env);
 }
 
@@ -1138,9 +1191,9 @@ static napi_status napi_create_typedarray(
     napi_env env, napi_typedarray_type type, size_t length,
     napi_value array_buffer, size_t byte_offset, napi_value *result) {
   JSVM_Value ta;
-  CALL_JSVM(OH_JSVM_CreateTypedarray(
-      env->ctx->vm_env_, NapiTypedarrTypeToJSTypedarrType(type), length,
-      NapiValueToJS(array_buffer), byte_offset, &ta));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_CreateTypedarray, env->ctx->vm_env_,
+                             NapiTypedarrTypeToJSTypedarrType(type), length,
+                             NapiValueToJS(array_buffer), byte_offset, &ta));
   *result = JSValueToNapi(ta);
   return napi_clear_last_error(env);
 }
@@ -1149,9 +1202,9 @@ static napi_status napi_is_typedarray_of(napi_env env, napi_value typedarray,
                                          napi_typedarray_type napi_type,
                                          bool *result) {
   JSVM_TypedarrayType type;
-  CALL_JSVM(OH_JSVM_GetTypedarrayInfo(env->ctx->vm_env_,
-                                      NapiValueToJS(typedarray), &type, nullptr,
-                                      nullptr, nullptr, nullptr));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_GetTypedarrayInfo, env->ctx->vm_env_,
+                             NapiValueToJS(typedarray), &type, nullptr, nullptr,
+                             nullptr, nullptr));
   *result = (type == NapiTypedarrTypeToJSTypedarrType(napi_type));
   return napi_clear_last_error(env);
 }
@@ -1164,9 +1217,9 @@ static napi_status napi_get_typedarray_info(napi_env env,
                                             size_t *byte_offset) {
   JSVM_TypedarrayType js_type;
   JSVM_Value arr_buf;
-  CALL_JSVM(OH_JSVM_GetTypedarrayInfo(env->ctx->vm_env_,
-                                      NapiValueToJS(typed_array), &js_type,
-                                      length, data, &arr_buf, byte_offset));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_GetTypedarrayInfo, env->ctx->vm_env_,
+                             NapiValueToJS(typed_array), &js_type, length, data,
+                             &arr_buf, byte_offset));
   if (type) {
     *type = JSTypedarrTypeToNapiType(js_type);
   }
@@ -1181,17 +1234,17 @@ static napi_status napi_create_dataview(napi_env env, size_t length,
                                         size_t byte_offset,
                                         napi_value *result) {
   JSVM_Value dataview;
-  CALL_JSVM(OH_JSVM_CreateDataview(env->ctx->vm_env_, length,
-                                   NapiValueToJS(arraybuffer), byte_offset,
-                                   &dataview));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_CreateDataview, env->ctx->vm_env_, length,
+                             NapiValueToJS(arraybuffer), byte_offset,
+                             &dataview));
   *result = JSValueToNapi(dataview);
   return napi_clear_last_error(env);
 }
 
 static napi_status napi_is_dataview(napi_env env, napi_value value,
                                     bool *result) {
-  CALL_JSVM(
-      OH_JSVM_IsDataview(env->ctx->vm_env_, NapiValueToJS(value), result));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_IsDataview, env->ctx->vm_env_,
+                             NapiValueToJS(value), result));
   return napi_clear_last_error(env);
 }
 
@@ -1200,8 +1253,9 @@ static napi_status napi_get_dataview_info(napi_env env, napi_value dataview,
                                           napi_value *array_buffer,
                                           size_t *byte_offset) {
   JSVM_Value js_ab;
-  CALL_JSVM(OH_JSVM_GetDataviewInfo(env->ctx->vm_env_, NapiValueToJS(dataview),
-                                    byteLength, data, &js_ab, byte_offset));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_GetDataviewInfo, env->ctx->vm_env_,
+                             NapiValueToJS(dataview), byteLength, data, &js_ab,
+                             byte_offset));
   *array_buffer = JSValueToNapi(js_ab);
   return napi_clear_last_error(env);
 }
@@ -1210,7 +1264,8 @@ static napi_status napi_create_promise(napi_env env, napi_deferred *deferred,
                                        napi_value *result) {
   JSVM_Deferred js_deferred;
   JSVM_Value promise;
-  CALL_JSVM(OH_JSVM_CreatePromise(env->ctx->vm_env_, &js_deferred, &promise));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_CreatePromise, env->ctx->vm_env_,
+                             &js_deferred, &promise));
   *deferred = JSDeferredToNapi(js_deferred);
   *result = JSValueToNapi(promise);
   return napi_clear_last_error(env);
@@ -1221,14 +1276,14 @@ static napi_status napi_release_deferred(napi_env env, napi_deferred deferred,
                                          napi_deferred_release_mode mode) {
   switch (mode) {
     case napi_deferred_resolve: {
-      CALL_JSVM(OH_JSVM_ResolveDeferred(env->ctx->vm_env_,
-                                        NapiDeferredToJS(deferred),
-                                        NapiValueToJS(resolution)));
+      CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_ResolveDeferred, env->ctx->vm_env_,
+                                 NapiDeferredToJS(deferred),
+                                 NapiValueToJS(resolution)));
     } break;
     case napi_deferred_reject: {
-      CALL_JSVM(OH_JSVM_RejectDeferred(env->ctx->vm_env_,
-                                       NapiDeferredToJS(deferred),
-                                       NapiValueToJS(resolution)));
+      CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_RejectDeferred, env->ctx->vm_env_,
+                                 NapiDeferredToJS(deferred),
+                                 NapiValueToJS(resolution)));
     } break;
     default:
       break;
@@ -1238,7 +1293,8 @@ static napi_status napi_release_deferred(napi_env env, napi_deferred deferred,
 
 static napi_status napi_is_promise(napi_env env, napi_value value,
                                    bool *result) {
-  CALL_JSVM(OH_JSVM_IsPromise(env->ctx->vm_env_, NapiValueToJS(value), result));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_IsPromise, env->ctx->vm_env_,
+                             NapiValueToJS(value), result));
   return napi_clear_last_error(env);
 }
 
@@ -1247,21 +1303,24 @@ static napi_status_primjs napi_run_script(napi_env env, const char *script,
                                           napi_value *result) {
   JSVM_Value sourceCodeValue, js_result;
   JSVM_Script js_script;
-  CALL_JSVM(OH_JSVM_CreateStringUtf8(env->ctx->vm_env_, script, length,
-                                     &sourceCodeValue));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_CreateStringUtf8, env->ctx->vm_env_,
+                             script, length, &sourceCodeValue));
   if (filename == nullptr) {
-    CALL_JSVM(OH_JSVM_CompileScript(env->ctx->vm_env_, sourceCodeValue, nullptr,
-                                    0, true, nullptr, &js_script));
+    CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_CompileScript, env->ctx->vm_env_,
+                               sourceCodeValue, nullptr, 0, true, nullptr,
+                               &js_script));
   } else {
     JSVM_ScriptOrigin origin{.sourceMapUrl = nullptr,
                              .resourceName = filename,
                              .resourceLineOffset = 0,
                              .resourceColumnOffset = 0};
-    OH_JSVM_CompileScriptWithOrigin(env->ctx->vm_env_, sourceCodeValue, nullptr,
-                                    0, true, nullptr, &origin, &js_script);
+    PRIMJS_JSVM_CALL(OH_JSVM_CompileScriptWithOrigin, env->ctx->vm_env_,
+                     sourceCodeValue, nullptr, 0, true, nullptr, &origin,
+                     &js_script);
   }
 
-  CALL_JSVM(OH_JSVM_RunScript(env->ctx->vm_env_, js_script, &js_result));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_RunScript, env->ctx->vm_env_, js_script,
+                             &js_result));
   *result = JSValueToNapi(js_result);
   return napi_clear_last_error(env);
 }
@@ -1269,8 +1328,8 @@ static napi_status_primjs napi_run_script(napi_env env, const char *script,
 static napi_status napi_adjust_external_memory(napi_env env,
                                                int64_t change_in_bytes,
                                                int64_t *adjusted_value) {
-  CALL_JSVM(OH_JSVM_AdjustExternalMemory(env->ctx->vm_env_, change_in_bytes,
-                                         adjusted_value));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_AdjustExternalMemory, env->ctx->vm_env_,
+                             change_in_bytes, adjusted_value));
   return napi_clear_last_error(env);
 }
 
@@ -1281,9 +1340,9 @@ static napi_status napi_add_finalizer(napi_env env, napi_value js_object,
   auto *napi_finalizer_data = ExternalNativeInfo::Create(
       env, finalize_cb, native_object, finalize_hint);
   JSVM_Ref ref;
-  CALL_JSVM(OH_JSVM_AddFinalizer(env->ctx->vm_env_, NapiValueToJS(js_object),
-                                 napi_finalizer_data,
-                                 ExternalNativeInfo::Delete, nullptr, &ref));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_AddFinalizer, env->ctx->vm_env_,
+                             NapiValueToJS(js_object), napi_finalizer_data,
+                             ExternalNativeInfo::Delete, nullptr, &ref));
   if (result) {
     *result = JSRefToNapi(new Reference(env, ref));
   }
@@ -1346,8 +1405,8 @@ static napi_status_legacy napi_close_context_scope(napi_env env,
 
 static napi_status napi_equals(napi_env env, napi_value lhs, napi_value rhs,
                                bool *result) {
-  CALL_JSVM(OH_JSVM_Equals(env->ctx->vm_env_, NapiValueToJS(lhs),
-                           NapiValueToJS(rhs), result));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_Equals, env->ctx->vm_env_,
+                             NapiValueToJS(lhs), NapiValueToJS(rhs), result));
   return napi_clear_last_error(env);
 }
 
@@ -1374,20 +1433,21 @@ static napi_status napi_get_own_property_descriptor(napi_env env,
 
 static napi_status napi_create_date(napi_env env, double time,
                                     napi_value *result) {
-  CALL_JSVM(OH_JSVM_CreateDate(env->ctx->vm_env_, time,
-                               NapiValuePointerToJS(result)));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_CreateDate, env->ctx->vm_env_, time,
+                             NapiValuePointerToJS(result)));
   return napi_clear_last_error(env);
 }
 
 static napi_status napi_is_date(napi_env env, napi_value value, bool *is_date) {
-  CALL_JSVM(OH_JSVM_IsDate(env->ctx->vm_env_, NapiValueToJS(value), is_date));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_IsDate, env->ctx->vm_env_,
+                             NapiValueToJS(value), is_date));
   return napi_clear_last_error(env);
 }
 
 static napi_status napi_get_date_value(napi_env env, napi_value value,
                                        double *result) {
-  CALL_JSVM(
-      OH_JSVM_GetDateValue(env->ctx->vm_env_, NapiValueToJS(value), result));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_GetDateValue, env->ctx->vm_env_,
+                             NapiValueToJS(value), result));
   return napi_clear_last_error(env);
 }
 
@@ -1395,56 +1455,58 @@ static napi_status napi_get_all_property_names(
     napi_env env, napi_value object, napi_key_collection_mode key_mode,
     napi_key_filter key_filter, napi_key_conversion key_conversion,
     napi_value *result) {
-  CALL_JSVM(OH_JSVM_GetAllPropertyNames(
-      env->ctx->vm_env_, NapiValueToJS(object),
-      static_cast<JSVM_KeyCollectionMode>(key_mode),
-      static_cast<JSVM_KeyFilter>(key_filter),
-      static_cast<JSVM_KeyConversion>(key_conversion),
-      NapiValuePointerToJS(result)));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_GetAllPropertyNames, env->ctx->vm_env_,
+                             NapiValueToJS(object),
+                             static_cast<JSVM_KeyCollectionMode>(key_mode),
+                             static_cast<JSVM_KeyFilter>(key_filter),
+                             static_cast<JSVM_KeyConversion>(key_conversion),
+                             NapiValuePointerToJS(result)));
   return napi_clear_last_error(env);
 }
 
 napi_status napi_create_bigint_int64(napi_env env, int64_t value,
                                      napi_value *result) {
-  CALL_JSVM(OH_JSVM_CreateBigintInt64(env->ctx->vm_env_, value,
-                                      NapiValuePointerToJS(result)));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_CreateBigintInt64, env->ctx->vm_env_,
+                             value, NapiValuePointerToJS(result)));
   return napi_clear_last_error(env);
 }
 
 napi_status napi_create_bigint_uint64(napi_env env, uint64_t value,
                                       napi_value *result) {
-  CALL_JSVM(OH_JSVM_CreateBigintUint64(env->ctx->vm_env_, value,
-                                       NapiValuePointerToJS(result)));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_CreateBigintUint64, env->ctx->vm_env_,
+                             value, NapiValuePointerToJS(result)));
   return napi_clear_last_error(env);
 }
 
 napi_status napi_get_value_bigint_int64(napi_env env, napi_value value,
                                         int64_t *result, bool *lossless) {
-  CALL_JSVM(OH_JSVM_GetValueBigintInt64(env->ctx->vm_env_, NapiValueToJS(value),
-                                        result, lossless));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_GetValueBigintInt64, env->ctx->vm_env_,
+                             NapiValueToJS(value), result, lossless));
   return napi_clear_last_error(env);
 }
 
 napi_status napi_get_value_bigint_uint64(napi_env env, napi_value value,
                                          uint64_t *result, bool *lossless) {
-  CALL_JSVM(OH_JSVM_GetValueBigintUint64(
-      env->ctx->vm_env_, NapiValueToJS(value), result, lossless));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_GetValueBigintUint64, env->ctx->vm_env_,
+                             NapiValueToJS(value), result, lossless));
   return napi_clear_last_error(env);
 }
 
 napi_status napi_create_bigint_words(napi_env env, int sign_bit,
                                      size_t word_count, const uint64_t *words,
                                      napi_value *result) {
-  CALL_JSVM(OH_JSVM_CreateBigintWords(env->ctx->vm_env_, sign_bit, word_count,
-                                      words, NapiValuePointerToJS(result)));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_CreateBigintWords, env->ctx->vm_env_,
+                             sign_bit, word_count, words,
+                             NapiValuePointerToJS(result)));
   return napi_clear_last_error(env);
 }
 
 napi_status napi_get_value_bigint_words(napi_env env, napi_value value,
                                         int *sign_bit, size_t *word_count,
                                         uint64_t *words) {
-  CALL_JSVM(OH_JSVM_GetValueBigintWords(env->ctx->vm_env_, NapiValueToJS(value),
-                                        sign_bit, word_count, words));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_GetValueBigintWords, env->ctx->vm_env_,
+                             NapiValueToJS(value), sign_bit, word_count,
+                             words));
   return napi_clear_last_error(env);
 }
 
@@ -1455,12 +1517,14 @@ static napi_status napi_compile_code_cache(napi_env env, const char *script,
                                            const uint8_t **data, int *length) {
   JSVM_Value sourcecode;
   JSVM_Script js_script;
-  CALL_JSVM(OH_JSVM_CreateStringUtf8(env->ctx->vm_env_, script, script_len,
-                                     &sourcecode));
-  CALL_JSVM(OH_JSVM_CompileScript(env->ctx->vm_env_, sourcecode, nullptr, 0,
-                                  true, nullptr, &js_script));
-  CALL_JSVM(OH_JSVM_CreateCodeCache(env->ctx->vm_env_, js_script, data,
-                                    reinterpret_cast<size_t *>(length)));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_CreateStringUtf8, env->ctx->vm_env_,
+                             script, script_len, &sourcecode));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_CompileScript, env->ctx->vm_env_,
+                             sourcecode, nullptr, 0, true, nullptr,
+                             &js_script));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_CreateCodeCache, env->ctx->vm_env_,
+                             js_script, data,
+                             reinterpret_cast<size_t *>(length)));
   return napi_clear_last_error(env);
 }
 
@@ -1486,11 +1550,11 @@ static napi_status napi_run_code_cache(napi_env env, const uint8_t *data,
                               }},
   };
   JSVM_Script script;
-  CALL_JSVM(OH_JSVM_CompileScriptWithOptions(
-      env->ctx->vm_env_, nullptr, sizeof(options) / sizeof(options[0]), options,
-      &script));
-  CALL_JSVM(OH_JSVM_RunScript(env->ctx->vm_env_, script,
-                              NapiValuePointerToJS(result)));
+  CALL_JSVM(PRIMJS_JSVM_CALL(
+      OH_JSVM_CompileScriptWithOptions, env->ctx->vm_env_, nullptr,
+      sizeof(options) / sizeof(options[0]), options, &script));
+  CALL_JSVM(PRIMJS_JSVM_CALL(OH_JSVM_RunScript, env->ctx->vm_env_, script,
+                             NapiValuePointerToJS(result)));
   return napi_clear_last_error(env);
 }
 
@@ -1517,15 +1581,40 @@ static napi_status napi_run_script_cache(napi_env env, const char *script,
 
 EXTERN_C_START
 
-void napi_attach_harmony(napi_env env, JSVM_Env js_env) {
+bool napi_is_harmony_available(void) {
+  return primjs::harmony::JSVMDynamicLoader::GetInstance().GetFunctions() !=
+         nullptr;
+}
+
+napi_status napi_try_attach_harmony(napi_env env, JSVM_Env js_env) {
+  if (!env) {
+    return napi_invalid_arg;
+  }
+  if (!js_env || env->ctx) {
+    return napi_set_last_error(env, napi_invalid_arg);
+  }
+  if (!napi_is_harmony_available()) {
+    return napi_set_last_error(env, napi_generic_failure);
+  }
+  auto *context = new napi_context__harmony(env, js_env);
 #define SET_METHOD(API) env->napi_##API = &harmonyimpl::napi_##API;
   FOR_EACH_NAPI_ENGINE_CALL(SET_METHOD)
 #undef SET_METHOD
-  env->ctx = new napi_context__harmony(env, js_env);
-  return;
+  env->ctx = context;
+  return napi_clear_last_error(env);
+}
+
+void napi_attach_harmony(napi_env env, JSVM_Env js_env) {
+  if (napi_try_attach_harmony(env, js_env) != napi_ok) {
+    LOGE("Unable to attach JSVM: "
+         << primjs::harmony::JSVMDynamicLoader::GetInstance().GetError());
+  }
 }
 
 void napi_detach_harmony(napi_env env) {
+  if (!env) {
+    return;
+  }
   delete env->ctx;
   env->ctx = nullptr;
   return;

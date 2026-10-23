@@ -236,10 +236,15 @@ set(napi_sources
     ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/napi_module.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/napi.cc)
 
-if(ENABLE_PRIMJS_HARMONY)
-  set(primjs_harmony_napi_source
-      ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/harmony/js_native_api_harmony.cc)
-  set(napi_sources ${napi_sources} ${primjs_harmony_napi_source})
+option(ENABLE_JSVM "Build the optional dynamically loaded JSVM backend" ON)
+if(ENABLE_PRIMJS_HARMONY AND ENABLE_JSVM)
+  list(APPEND napi_sources
+       ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/harmony/js_native_api_harmony.cc
+       ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/harmony/jsvm_dynamic_loader.cc)
+elseif(ENABLE_PRIMJS_HARMONY)
+  # Export the same JSVM entry points as unavailable stubs.
+  list(APPEND napi_sources
+       ${CMAKE_CURRENT_SOURCE_DIR}/src/napi/harmony/js_native_api_harmony_stub.cc)
 endif()
 
 if(${ENABLE_CODECACHE})
@@ -332,6 +337,9 @@ set_source_files_properties(
     "${CMAKE_CXX_FLAGS} -fvisibility=hidden -fvisibility-inlines-hidden")
 add_library(quickjs STATIC ${quickjs_sources})
 add_library(napi_static STATIC ${napi_sources})
+if(ENABLE_PRIMJS_HARMONY AND ENABLE_JSVM)
+  target_link_libraries(napi_static PUBLIC ${CMAKE_DL_LIBS})
+endif()
 
 set_target_properties(
   quickjs PROPERTIES ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR} OUTPUT_NAME
@@ -363,7 +371,10 @@ if(ENABLE_BUILD_AAR)
   target_link_libraries(quick ${log_lib})
   target_link_libraries(napi quick ${log_lib})
   if(ENABLE_PRIMJS_HARMONY)
-    target_link_libraries(napi ${libm} libace_napi.z.so libjsvm.so)
+    target_link_libraries(napi ${libm} libace_napi.z.so)
+    if(ENABLE_JSVM)
+      target_link_libraries(napi ${CMAKE_DL_LIBS})
+    endif()
   endif()
   target_include_directories(napi_v8 PRIVATE ${JS_V8_HEADERS})
   target_link_libraries(napi_v8 PUBLIC ${JS_V8_LIBRARY})

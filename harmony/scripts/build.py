@@ -121,6 +121,41 @@ def packJsPrimjsHeaderFiles():
     cmd = " && ".join(cmds)
     check_call(cmd, shell=True, cwd=weak_node_api_dest)
 
+
+def resolve_native_sdk(args, parser):
+    if args.sdk_native_dir:
+        native_dir = os.path.abspath(os.path.expanduser(args.sdk_native_dir))
+        toolchain = os.path.join(native_dir, 'build/cmake/ohos.toolchain.cmake')
+    else:
+        harmony_home = os.getenv('HARMONY_HOME')
+        if not harmony_home:
+            parser.error('set HARMONY_HOME or pass --sdk-native-dir /path/to/native')
+        sdk_dir = os.path.join(os.path.abspath(os.path.expanduser(harmony_home)), 'default')
+        native_dir = os.path.join(sdk_dir, 'openharmony/native')
+        toolchain = os.path.join(sdk_dir, 'hms/native/build/cmake/hmos.toolchain.cmake')
+
+    cmake = os.path.join(native_dir, 'build-tools/cmake/bin/cmake')
+    required_files = [toolchain, cmake,
+                      os.path.join(native_dir, 'llvm/bin/clang'),
+                      os.path.join(native_dir, 'llvm/bin/clang++')]
+    missing = [file for file in required_files if not os.path.isfile(file)]
+    if not os.path.isdir(os.path.join(native_dir, 'sysroot')):
+        missing.append(os.path.join(native_dir, 'sysroot'))
+    if missing:
+        parser.error('incomplete native SDK; missing: ' + ', '.join(missing))
+    tools = [cmake, os.path.join(native_dir, 'llvm/bin/clang'),
+             os.path.join(native_dir, 'llvm/bin/clang++')]
+    not_executable = [tool for tool in tools if not os.access(tool, os.X_OK)]
+    if not_executable:
+        parser.error('native SDK tools are not executable: ' + ', '.join(not_executable))
+    if not args.disable_jsvm:
+        jsvm_headers = os.path.join(native_dir, 'sysroot/usr/include/ark_runtime')
+        if not all(os.path.isfile(os.path.join(jsvm_headers, name))
+                   for name in ('jsvm.h', 'jsvm_types.h')):
+            parser.error('native SDK has no JSVM headers; pass --disable_jsvm for a PrimJS-only build')
+    return native_dir, cmake, toolchain
+
+
 def main(argv):
     parser = argparse.ArgumentParser()
     parser.add_argument("--verbose", action="store_true", default=False, help="verbose print")
@@ -135,24 +170,22 @@ def main(argv):
     parser.add_argument("--build_worker", action="store_true", required=False, help="build libworker.so")
     parser.add_argument("--build_type", type=str, default="Debug", required=False, help="cmake build type")
     parser.add_argument("--enable_ut", type=bool, default=False, required=False, help="Enable Unittests")
-    args = parser.parse_args()
+    parser.add_argument("--disable_jsvm", action="store_true", help="omit the optional JSVM backend and JSVM-specific tests")
+    parser.add_argument("--sdk-native-dir", help="standalone OpenHarmony native SDK directory (uses ohos.toolchain.cmake)")
+    args = parser.parse_args(argv)
+    if not args.no_build:
+        harmony_ndk_root, harmony_cmake, harmony_toolchain_file = resolve_native_sdk(args, parser)
+    enable_jsvm_tests = args.enable_ut and not args.disable_jsvm
+    if args.enable_ut and args.disable_jsvm:
+        print('JSVM is disabled; skipping JSVM-specific unit tests')
     commit_hash = os.popen('git rev-parse HEAD').read().strip()
     if not args.no_build:
-        harmony_home = os.getenv('HARMONY_HOME')
-        if not harmony_home:
-            raise Exception('HARMONY_HOME is not set')
-        harmony_sdk_version = 'default'
-        harmony_sdk = f'{harmony_home}/{harmony_sdk_version}'
-        harmony_ndk_root=f'{harmony_sdk}/openharmony/native'
-        harmony_cmake = f'{harmony_ndk_root}/build-tools/cmake/bin/cmake'
-        harmony_toolchain_file=f'{harmony_sdk}/hms/native/build/cmake/hmos.toolchain.cmake'
         abis = ['arm64-v8a', 'x86_64'] # temporarily build arm64
         with tempfile.TemporaryDirectory() as temp_dir:
             for abi in abis:
                 # 1. create native lib dir
                 native_lib_dir = os.path.join(temp_dir, abi)
-                create_dir_cmd = f"mkdir -p {native_lib_dir}"
-                check_call(create_dir_cmd, shell=True, cwd=temp_dir)
+                os.makedirs(native_lib_dir, exist_ok=True)
                 if args.build_type != "Debug":
                     args.build_type = "Release"
                 # build harmony native libs
@@ -171,14 +204,14 @@ def main(argv):
                     f"-LH",
                     f'-DENABLE_BUILD_AAR=true',
                     f'-DENABLE_PRIMJS_HARMONY=true', 
+                    f"-DENABLE_JSVM={'OFF' if args.disable_jsvm else 'ON'}",
                     f"-DCMAKE_EXPORT_COMPILE_COMMANDS=ON",
-                    f"-DENABLE_UNITTESTS={args.enable_ut}",
+                    f"-DENABLE_UNITTESTS={enable_jsvm_tests}",
                     f"-DENABLE_NAPI_ADAPTER=true" if args.build_napi_adapter else "-DENABLE_NAPI_ADAPTER=false",
                     f"-DUSE_WEAK_SUFFIX_NAPI=true",
                     f"{PRIMJS_DIR}/harmony/primjs",
                 ]
-                cmake_cmd = " ".join(cmake_cmd)
-                check_call(cmake_cmd, shell=True, cwd=native_lib_dir)
+                check_call(cmake_cmd, cwd=native_lib_dir)
                 make_cmd = "make napi quick"
                 libs = ["libquick.so", "libnapi.so"]
                 if args.build_napi_v8:
@@ -190,7 +223,7 @@ def main(argv):
                 if args.build_worker:
                     make_cmd = f'{make_cmd} worker'
                     libs.append("libworker.so")
-                if args.enable_ut:
+                if enable_jsvm_tests:
                     make_cmd = f'{make_cmd} napi_test'
                     libs.append("libnapi_test.so")
                 make_cmd = make_cmd + " VERBOSE=1"
@@ -234,4 +267,4 @@ def main(argv):
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv))
+    sys.exit(main(sys.argv[1:]))
