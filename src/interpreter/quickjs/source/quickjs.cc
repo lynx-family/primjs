@@ -11577,10 +11577,10 @@ QJS_STATIC LEPUSValue JS_ToStringInternal(LEPUSContext *ctx,
       return JS_GetSeparableStringContent(ctx, val);
     case LEPUS_TAG_STRING:
       return LEPUS_DupValue(ctx, val);
-    case LEPUS_TAG_INT:
-      snprintf(buf, sizeof(buf), "%d", LEPUS_VALUE_GET_INT(val));
-      str = buf;
-      goto new_string;
+    case LEPUS_TAG_INT: {
+      size_t len = i64toa_radix(buf, LEPUS_VALUE_GET_INT(val), 10);
+      return js_new_string8(ctx, buf, len);
+    }
     case LEPUS_TAG_BOOL:
       return LEPUS_AtomToString(
           ctx, LEPUS_VALUE_GET_BOOL(val) ? JS_ATOM_true : JS_ATOM_false);
