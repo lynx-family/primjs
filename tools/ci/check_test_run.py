@@ -13,7 +13,7 @@ test_case = ["", "_snapshot", "_bytecode_opt"]
 
 
 def CheckUnitTestRun():
-    print("Check unittest cases...")
+    print("Check unittest cases...", flush=True)
     cwd = os.getcwd()
     for case in test_case:
         info = ""
@@ -21,7 +21,6 @@ def CheckUnitTestRun():
             info = "quickjs"
         else:
             info = "primjs" + case
-        print("{}: Check quickjs test cases...".format(info))
         binary_dir = "./out/Default{}/".format(case)
         os.environ["LLVM_PROFILE_FILE"] = binary_dir + "qjs.profraw"
 
@@ -38,7 +37,10 @@ def CheckUnitTestRun():
                 "heap_unittest",
             ]
         for unittest in unittest_cases:
-            print("{}: Check %s cases...".format(info) % unittest)
+            print(
+                "{}: Check %s cases...".format(info) % unittest,
+                flush=True,
+            )
             os.environ["LLVM_PROFILE_FILE"] = (
                 binary_dir + "%s.profraw" % unittest
             )
@@ -54,6 +56,7 @@ def CheckUnitTestRun():
 
         # run js test using qjs (skip for bytecode_opt)
         if case != "_bytecode_opt":
+            print("{}: Check quickjs test cases...".format(info), flush=True)
             output = subprocess.run(
                 ["python3", "tools/ci/run_quickjs_unittests.py", "-b", binary_dir],
                 text=True,
@@ -62,6 +65,7 @@ def CheckUnitTestRun():
                 check=True,
             )
         # run test262
+        print("{}: Check test262 cases...".format(info), flush=True)
         output = subprocess.run(
             [
                 binary_dir + "run_test262",
@@ -75,7 +79,7 @@ def CheckUnitTestRun():
             stderr= sys.stderr,
             check=True,
         )
-        print("Congratulations! All %s tests are passed.\n" % info)
+    print("Congratulations! All tests are passed.\n", flush=True)
 
 
 def main():
