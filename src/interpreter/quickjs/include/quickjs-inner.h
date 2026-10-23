@@ -1824,6 +1824,8 @@ typedef struct JSSeparableString {
 
 class CStack {
   using element = JSSeparableString *;
+  static constexpr size_t INLINE_SIZE = 8;
+  element inline_storage_[INLINE_SIZE];
   element *base_ = nullptr;
   element *top_ = nullptr;
   size_t stack_size_ = 0;
@@ -1833,18 +1835,30 @@ class CStack {
  public:
   explicit CStack(LEPUSRuntime *rt, uint32_t depth = STACK_INIT_SIZE) {
     runtime_ = rt;
-    base_ = static_cast<element *>(system_malloc(sizeof(element) * depth));
+    stack_size_ = depth <= INLINE_SIZE ? INLINE_SIZE : depth;
+    base_ =
+        depth <= INLINE_SIZE
+            ? inline_storage_
+            : static_cast<element *>(system_malloc(sizeof(element) * depth));
     if (!base_) return;
     top_ = base_;
-    stack_size_ = depth;
   }
 
-  ~CStack() { system_free(base_); }
+  ~CStack() {
+    if (base_ != inline_storage_) system_free(base_);
+  }
 
   void Push(element node) {
     if (static_cast<size_t>(top_ - base_) >= stack_size_) {
-      base_ = static_cast<element *>(
-          system_realloc(base_, 2 * stack_size_ * sizeof(element)));
+      if (base_ == inline_storage_) {
+        base_ = static_cast<element *>(
+            system_malloc(2 * stack_size_ * sizeof(element)));
+        if (base_)
+          memcpy(base_, inline_storage_, stack_size_ * sizeof(element));
+      } else {
+        base_ = static_cast<element *>(
+            system_realloc(base_, 2 * stack_size_ * sizeof(element)));
+      }
       if (!base_) {
         stack_size_ = 0;
         top_ = nullptr;
