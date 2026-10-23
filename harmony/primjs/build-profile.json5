@@ -5,6 +5,7 @@
       "debugSymbol": {
         "strip": true
       },
+      "headerPath": "src/main/napi/include",
     }
   },
   "buildOptionSet": [

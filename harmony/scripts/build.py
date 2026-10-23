@@ -2,6 +2,7 @@
 
 import argparse
 import os
+import shutil
 import sys
 from subprocess import check_call
 import tempfile
@@ -120,6 +121,39 @@ def packJsPrimjsHeaderFiles():
     ]
     cmd = " && ".join(cmds)
     check_call(cmd, shell=True, cwd=weak_node_api_dest)
+
+    # Copy the PrimJS N-API adapter headers with the same relative layout used
+    # by consumers. The C++ wrapper includes the C adapter through ../ and
+    # resolves the PrimJS symbol remapping headers from this include root.
+    napi_dest = os.path.join(HARMONY_DIR, 'primjs/src/main/napi/include')
+    os.makedirs(napi_dest, exist_ok=True)
+    napi_headers = [
+        'src/napi/js_native_api_types.h',
+        'src/napi/js_native_api.h',
+        'src/napi/shim_js_native_api.h',
+        'src/napi/napi_module.h',
+        'src/napi/adapter/js_native_api_adapter.h',
+        'src/napi/internal/primjs_napi_defines.h',
+        'src/napi/internal/primjs_napi_undefs.h',
+    ]
+    for header in napi_headers:
+        shutil.copy2(os.path.join(PRIMJS_DIR, header), napi_dest)
+
+    cpp_api_src = os.path.join(PRIMJS_DIR, 'src/napi/adapter/cpp_api')
+    cpp_api_dest = os.path.join(napi_dest, 'cpp_api')
+    shutil.copytree(cpp_api_src, cpp_api_dest, dirs_exist_ok=True)
+
+    logging_dest = os.path.join(napi_dest, 'basic/log')
+    os.makedirs(logging_dest, exist_ok=True)
+    shutil.copy2(
+        os.path.join(PRIMJS_DIR, 'src/basic/log/logging.h'), logging_dest)
+
+    quickjs_dest = os.path.join(napi_dest, 'quickjs/include')
+    os.makedirs(quickjs_dest, exist_ok=True)
+    shutil.copy2(
+        os.path.join(PRIMJS_DIR,
+                     'src/interpreter/quickjs/include/base_export.h'),
+        quickjs_dest)
 
 def main(argv):
     parser = argparse.ArgumentParser()
