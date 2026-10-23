@@ -2,12 +2,13 @@
 #ifndef NAPI_HARMONY_JS_NATIVE_API_HARMONY_H_
 #define NAPI_HARMONY_JS_NATIVE_API_HARMONY_H_
 
-#include <ark_runtime/jsvm.h>
 #include <assert.h>
 
 #include <functional>
 #include <list>
 #include <vector>
+
+#include "napi/harmony/jsvm_dynamic_loader.h"
 
 #define NAPI_COMPILE_UNIT harmony
 
@@ -27,26 +28,26 @@ struct napi_callback_info__harmony {
 struct napi_class__harmony {
   napi_class__harmony(JSVM_Env env, JSVM_Value clazz, JSVM_Value proto) {
     env_ = env;
-    OH_JSVM_CreateReference(env, clazz, 1, &clazz_);
-    OH_JSVM_CreateReference(env, proto, 1, &proto_);
+    PRIMJS_JSVM_CALL(OH_JSVM_CreateReference, env, clazz, 1, &clazz_);
+    PRIMJS_JSVM_CALL(OH_JSVM_CreateReference, env, proto, 1, &proto_);
     return;
   }
 
   ~napi_class__harmony() {
-    OH_JSVM_DeleteReference(env_, proto_);
-    OH_JSVM_DeleteReference(env_, clazz_);
+    PRIMJS_JSVM_CALL(OH_JSVM_DeleteReference, env_, proto_);
+    PRIMJS_JSVM_CALL(OH_JSVM_DeleteReference, env_, clazz_);
     return;
   }
 
   JSVM_Value GetFunction() {
     JSVM_Value func;
-    OH_JSVM_GetReferenceValue(env_, clazz_, &func);
+    PRIMJS_JSVM_CALL(OH_JSVM_GetReferenceValue, env_, clazz_, &func);
     return func;
   }
 
   JSVM_Value GetPrototype() {
     JSVM_Value prototype;
-    OH_JSVM_GetReferenceValue(env_, proto_, &prototype);
+    PRIMJS_JSVM_CALL(OH_JSVM_GetReferenceValue, env_, proto_, &prototype);
     return prototype;
   }
 
@@ -60,10 +61,12 @@ namespace harmonyimpl {
 class ContextScopeWrapper {
  public:
   explicit ContextScopeWrapper(JSVM_Env env) : jsvm_env_{env} {
-    OH_JSVM_OpenEnvScope(env, &jsvm_env_scope);
+    PRIMJS_JSVM_CALL(OH_JSVM_OpenEnvScope, env, &jsvm_env_scope);
   }
 
-  ~ContextScopeWrapper() { OH_JSVM_CloseEnvScope(jsvm_env_, jsvm_env_scope); }
+  ~ContextScopeWrapper() {
+    PRIMJS_JSVM_CALL(OH_JSVM_CloseEnvScope, jsvm_env_, jsvm_env_scope);
+  }
 
   ContextScopeWrapper(const ContextScopeWrapper&) = delete;
   ContextScopeWrapper& operator=(const ContextScopeWrapper&) = delete;
@@ -78,10 +81,12 @@ class ContextScopeWrapper {
 class HandleScopeWrapper {
  public:
   explicit HandleScopeWrapper(JSVM_Env env) : jsvm_env{env} {
-    OH_JSVM_OpenHandleScope(env, &jsvm_handle);
+    PRIMJS_JSVM_CALL(OH_JSVM_OpenHandleScope, env, &jsvm_handle);
   }
 
-  ~HandleScopeWrapper() { OH_JSVM_CloseHandleScope(jsvm_env, jsvm_handle); }
+  ~HandleScopeWrapper() {
+    PRIMJS_JSVM_CALL(OH_JSVM_CloseHandleScope, jsvm_env, jsvm_handle);
+  }
 
   HandleScopeWrapper(const HandleScopeWrapper&) = delete;
   HandleScopeWrapper& operator=(const HandleScopeWrapper&) = delete;
