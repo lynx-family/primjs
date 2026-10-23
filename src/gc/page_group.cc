@@ -53,9 +53,6 @@ void PageGroup::Init(PageList &bb, PageList::Node *&node, uint8_t *req_beg,
   initialized = true;
 
   address_t header = AllocUtilRndDown(beg, kRosDefaultPageGroupSize);
-  // this is necessary because this virtual-memory page will be accessed quite
-  // frequently, and overall, only a few pages of physical memory will be wasted
-  mlock((void *)header, ALLOCUTIL_PAGE_SIZE);
   // fill pagegroup header
   *(address_t *)(mark_bitmap_offset + header) = (address_t)mark_bitmap;
 
