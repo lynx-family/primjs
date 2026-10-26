@@ -4,6 +4,7 @@
 
 #include <iostream>
 #include <thread>
+#include <utility>
 
 #include "gtest/gtest.h"
 #ifdef __cplusplus
@@ -70,6 +71,78 @@ class CommonQjsTest : public ::testing::Test {
   LEPUSContext* ctx_;
   LEPUSRuntime* rt_;
 };
+
+TEST_F(CommonQjsTest, RCCycleGCReportsAfterSweepWithoutReentrantNotifications) {
+  if (rt_->gc_enable) GTEST_SKIP() << "RC cycle collection only";
+  LEPUS_SetGCThreshold(rt_, SIZE_MAX);
+  ASSERT_EQ(rt_->gc_info_threshold, 0u);
+
+  const char* source = R"(
+    (() => {
+      const object = { payload: new ArrayBuffer(64 * 1024) };
+      object.self = object;
+    })();
+  )";
+  auto result = LEPUS_Eval(ctx_, source, strlen(source), "gc-info.js",
+                           LEPUS_EVAL_TYPE_GLOBAL);
+  ASSERT_FALSE(LEPUS_IsException(result));
+  LEPUS_FreeValue(ctx_, result);
+  const size_t before = LEPUS_GetHeapSize(rt_);
+
+  class Observer final : public GCObserver {
+   public:
+    explicit Observer(LEPUSRuntime* rt) : rt_(rt) {
+      LEPUS_SetGCObserver(rt_, this);
+    }
+    ~Observer() override { LEPUS_SetGCObserver(rt_, nullptr); }
+    void OnGC(std::string info) override {
+      ++calls;
+      message = std::move(info);
+      heap_size = LEPUS_GetHeapSize(rt_);
+      in_sweep = LEPUS_IsInGCSweep(rt_);
+      if (reenter) {
+        reenter = false;
+        LEPUS_RunGC(rt_);
+      }
+    }
+
+    int calls = 0;
+    std::string message;
+    size_t heap_size = 0;
+    bool in_sweep = false;
+    bool reenter = false;
+
+   private:
+    LEPUSRuntime* rt_;
+  } observer(rt_);
+
+  EXPECT_EQ(LEPUS_GetGCObserver(rt_), &observer);
+  LEPUS_RunGC(rt_);
+  ASSERT_EQ(observer.calls, 1);
+  EXPECT_FALSE(observer.in_sweep);
+  const size_t after = LEPUS_GetHeapSize(rt_);
+  EXPECT_EQ(observer.heap_size, after);
+  ASSERT_LT(after, before);
+  EXPECT_GE(before - after, 64u * 1024);
+  EXPECT_NE(observer.message.find("\"is_full_gc\": true"), std::string::npos);
+  EXPECT_NE(observer.message.find(
+                "\"heapsize_after\": " + std::to_string(after / 1024) + ","),
+            std::string::npos);
+
+  // An empty collection still reports, independently of allocation thresholds.
+  LEPUS_SetGCInfoThreshold(rt_, SIZE_MAX);
+  observer.reenter = true;
+  LEPUS_RunGC(rt_);
+  EXPECT_EQ(observer.calls, 2);
+  EXPECT_FALSE(observer.in_sweep);
+  EXPECT_EQ(observer.heap_size, after);
+  EXPECT_EQ(rt_->gc_depth, 0);
+
+  LEPUS_SetGCObserver(rt_, nullptr);
+  EXPECT_EQ(LEPUS_GetGCObserver(rt_), nullptr);
+  LEPUS_RunGC(rt_);
+  EXPECT_EQ(observer.calls, 2);
+}
 
 static void js_print(LEPUSContext* ctx, LEPUSValueConst this_val, int argc,
                      LEPUSValueConst* argv, std::string& result) {

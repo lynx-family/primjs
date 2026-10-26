@@ -21,6 +21,7 @@ primjs_source_set("inspector") {
     "heapprofiler/heapexplorer.cc",
     "heapprofiler/heapprofiler.cc",
     "heapprofiler/serialize.cc",
+    "heapprofiler/slot_snapshot.cc",
     "heapprofiler/snapshot.cc",
     "protocols.cc",
     "runtime/runtime.cc",

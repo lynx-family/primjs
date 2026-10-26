@@ -33,7 +33,10 @@ class HeapProfiler {
   HeapProfiler& operator=(const HeapProfiler&) = delete;
 
   HeapSnapshot* TakeSnapshot(LEPUSContext* ctx,
-                             ProgressReportInterface* reporter);
+                             ProgressReportInterface* reporter,
+                             int32_t slot = -1,
+                             bool include_internal_allocations = true,
+                             bool summarize_diagnostics = false);
 
   std::size_t GetSnapshotCount() const { return snapshots_.size(); }
   HeapSnapshot* GetSnapshot(uint32_t idx) const {
@@ -112,6 +115,11 @@ class QjsHeapProfilerImpl {
                         const std::shared_ptr<Fronted>& fronted);
 
   HeapSnapshot* TakeHeapSnapshot(LEPUSContext*);
+  HeapSnapshot* TakeHeapSnapshotForSlot(LEPUSContext* ctx, int32_t slot,
+                                        bool include_internal_allocations,
+                                        bool summarize_diagnostics);
+  HeapProfiler* FindHeapProfiler(LEPUSRuntime* rt);
+  void RemoveRuntime(LEPUSRuntime* rt) { profilers_.erase(rt); }
 
  private:
   auto* FindOrNewHeapProfiler(LEPUSContext* ctx);
