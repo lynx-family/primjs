@@ -94,8 +94,18 @@ Pod::Spec.new do |s|
     # sp.pod_target_xcconfig   = { "GCC_PREPROCESSOR_DEFINITIONS" => "ENABLE_CODECACHE PROFILE_CODECACHE" }
     sp.pod_target_xcconfig = { "HEADER_SEARCH_PATHS" => "\"${PODS_ROOT}/PrimJS\"" }
     sp.subspec "core" do |ssp|
-      ssp.source_files = ["src/napi/*.{h,cc}", "src/napi/common/*.{h,cc}"]
-      ssp.public_header_files = ["src/napi/*.h", "src/napi/common/*.h"]
+      ssp.source_files = [
+        "src/napi/*.{h,cc}",
+        "src/napi/common/*.{h,cc}",
+        "src/napi/internal/primjs_napi_defines.h",
+        "src/napi/internal/primjs_napi_undefs.h",
+      ]
+      ssp.public_header_files = [
+        "src/napi/*.h",
+        "src/napi/common/*.h",
+        "src/napi/internal/primjs_napi_defines.h",
+        "src/napi/internal/primjs_napi_undefs.h",
+      ]
     end
 
     sp.subspec "env" do |ssp|
@@ -125,17 +135,21 @@ Pod::Spec.new do |s|
     sp.subspec "adapter" do |ssp|
       ssp.source_files = [
         "src/napi/adapter/js_native_api_adapter.{h,cc}",
+        "src/napi/adapter/cpp_api/*.h",
         "src/napi/adapter/weak_napi_host_generator.cc",
         "src/napi/adapter/primjs_weak_node_api_provider.h",
         "src/napi/adapter/weak_node_api_host.h",
       ]
       ssp.public_header_files = [
         "src/napi/adapter/js_native_api_adapter.h",
+        "src/napi/adapter/cpp_api/*.h",
         "src/napi/adapter/primjs_weak_node_api_provider.h",
       ]
       ssp.private_header_files = [
         "src/napi/adapter/weak_node_api_host.h",
       ]
+      ssp.header_mappings_dir = "src/napi/adapter"
+      ssp.preserve_paths = "src/napi/adapter/cpp_api/LICENSE"
       ssp.dependency "PrimJS/napi/core"
       ssp.dependency "PrimJS/napi/env"
     end

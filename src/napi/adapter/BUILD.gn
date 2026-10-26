@@ -5,7 +5,10 @@
 import("//Primjs.gni")
 
 config("napi_adapter_config") {
-  include_dirs = [ "." ]
+  include_dirs = [
+    ".",
+    "cpp_api",
+  ]
   defines = []
   if (enable_napi_adapter_extern) {
     defines += [ "ENABLE_NAPI_ADAPTER_EXTERN" ]
@@ -14,7 +17,12 @@ config("napi_adapter_config") {
 
 napi_source_set("adapter") {
   sources = [ "js_native_api_adapter.cc" ]
-  public = [ "./js_native_api_adapter.h" ]
+  public = [
+    "./cpp_api/napi_adapter-inl.deprecated.h",
+    "./cpp_api/napi_adapter-inl.h",
+    "./cpp_api/napi_adapter.h",
+    "./js_native_api_adapter.h",
+  ]
   public_configs = [ ":napi_adapter_config" ]
   public_deps = [ "../..:napi_lib" ]
 }
