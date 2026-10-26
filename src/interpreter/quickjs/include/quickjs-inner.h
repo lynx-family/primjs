@@ -2452,6 +2452,8 @@ QJS_HIDE int string_buffer_putc8(StringBuffer *s, uint32_t c);
 QJS_HIDE int string_buffer_putc16(StringBuffer *s, uint32_t c);
 QJS_HIDE int string_getc(const JSString *p, int *pidx);
 QJS_HIDE BOOL test_final_sigma(JSString *p, int sigma_pos);
+QJS_HIDE int test_final_sigma_with_interrupt(LEPUSContext *ctx, JSString *p,
+                                             int sigma_pos, int *remaining);
 QJS_HIDE int string_buffer_putc(StringBuffer *s, uint32_t c);
 QJS_HIDE int string_buffer_fill(StringBuffer *s, int c, int count);
 QJS_HIDE int seal_template_obj_GC(LEPUSContext *ctx, LEPUSValueConst obj);

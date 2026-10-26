@@ -707,15 +707,30 @@ static int unicode_get_cc(uint32_t c) {
   }
 }
 
+typedef struct {
+  UnicodeInterruptFunc *interrupt;
+  void *opaque;
+  int remaining;
+} UnicodeNormalizationState;
+
+static int normalization_poll(UnicodeNormalizationState *state) {
+  if (!state->interrupt) return 0;
+  if (--state->remaining > 0) return 0;
+  state->remaining = 1024;
+  return state->interrupt(state->opaque);
+}
+
 /* Canonical ordering is stable within each run of non-starters. Small
    runs use bounded insertion sorting; large runs use the finite class range
    so hostile combining sequences cannot cause quadratic work. */
 static int sort_cc(int *buf, int len, void *opaque,
-                   DynBufReallocFunc *realloc_func) {
+                   DynBufReallocFunc *realloc_func,
+                   UnicodeNormalizationState *state) {
   DynBuf scratch;
   dbuf_init2(&scratch, opaque, realloc_func);
   int start = 0;
   while (start < len) {
+    if (normalization_poll(state)) goto fail;
     if (unicode_get_cc(buf[start]) == 0) {
       start++;
       continue;
@@ -724,6 +739,7 @@ static int sort_cc(int *buf, int len, void *opaque,
     int previous_cc = unicode_get_cc(buf[start]);
     BOOL ordered = TRUE;
     while (end < len) {
+      if (normalization_poll(state)) goto fail;
       int cc = unicode_get_cc(buf[end]);
       if (cc == 0) break;
       if (cc < previous_cc) ordered = FALSE;
@@ -737,6 +753,7 @@ static int sort_cc(int *buf, int len, void *opaque,
           int cc = unicode_get_cc(ch);
           int k = j;
           while (k > start && unicode_get_cc(buf[k - 1]) > cc) {
+            if (normalization_poll(state)) goto fail;
             buf[k] = buf[k - 1];
             k--;
           }
@@ -745,10 +762,12 @@ static int sort_cc(int *buf, int len, void *opaque,
       } else {
         size_t offsets[256] = {0};
         if (dbuf_realloc(&scratch, (size_t)(end - start) * sizeof(int))) {
-          dbuf_free(&scratch);
-          return -1;
+          goto fail;
         }
-        for (int j = start; j < end; j++) offsets[unicode_get_cc(buf[j])]++;
+        for (int j = start; j < end; j++) {
+          if (normalization_poll(state)) goto fail;
+          offsets[unicode_get_cc(buf[j])]++;
+        }
         size_t position = 0;
         for (int cc = 0; cc < 256; cc++) {
           size_t count = offsets[cc];
@@ -757,25 +776,33 @@ static int sort_cc(int *buf, int len, void *opaque,
         }
         int *sorted = (int *)scratch.buf;
         for (int j = start; j < end; j++) {
+          if (normalization_poll(state)) goto fail;
           int cc = unicode_get_cc(buf[j]);
           sorted[offsets[cc]++] = buf[j];
         }
-        memcpy(buf + start, sorted, (size_t)(end - start) * sizeof(int));
+        for (int j = start; j < end; j++) {
+          if (normalization_poll(state)) goto fail;
+          buf[j] = sorted[j - start];
+        }
       }
     }
     start = end;
   }
   dbuf_free(&scratch);
   return 0;
+fail:
+  dbuf_free(&scratch);
+  return -1;
 }
 
-static void to_nfd_rec(DynBuf *dbuf, const int *src, int src_len,
-                       int is_compat) {
+static int to_nfd_rec(DynBuf *dbuf, const int *src, int src_len, int is_compat,
+                      UnicodeNormalizationState *state) {
   uint32_t c, v;
   int i, l;
   uint32_t res[UNICODE_DECOMP_LEN_MAX];
 
   for (i = 0; i < src_len; i++) {
+    if (normalization_poll(state) || dbuf_error(dbuf)) return -1;
     c = src[i];
     if (c >= 0xac00 && c < 0xd7a4) {
       /* Hangul decomposition */
@@ -787,12 +814,13 @@ static void to_nfd_rec(DynBuf *dbuf, const int *src, int src_len,
     } else {
       l = unicode_decomp_char(res, c, is_compat);
       if (l) {
-        to_nfd_rec(dbuf, (int *)res, l, is_compat);
+        if (to_nfd_rec(dbuf, (int *)res, l, is_compat, state)) return -1;
       } else {
         dbuf_put_u32(dbuf, c);
       }
     }
   }
+  return dbuf_error(dbuf) ? -1 : 0;
 }
 
 /* return 0 if not found */
@@ -811,35 +839,52 @@ static int compose_pair(uint32_t c0, uint32_t c1) {
 int unicode_normalize(uint32_t **pdst, const uint32_t *src, int src_len,
                       UnicodeNormalizationEnum n_type, void *opaque,
                       void *mem_opaque, DynBufReallocFunc *realloc_func) {
+  return unicode_normalize_with_interrupt(pdst, src, src_len, n_type, opaque,
+                                          mem_opaque, realloc_func, NULL, NULL);
+}
+
+int unicode_normalize_with_interrupt(uint32_t **pdst, const uint32_t *src,
+                                     int src_len,
+                                     UnicodeNormalizationEnum n_type,
+                                     void *opaque, void *mem_opaque,
+                                     DynBufReallocFunc *realloc_func,
+                                     UnicodeInterruptFunc *interrupt,
+                                     void *interrupt_opaque) {
   int *buf, buf_len, i, p, starter_pos, cc, last_cc, out_len;
   BOOL is_compat;
   DynBuf dbuf_s, *dbuf = &dbuf_s;
+
+  UnicodeNormalizationState state = {interrupt, interrupt_opaque, 0};
 
   is_compat = n_type >> 1;
 
   dbuf_init2(dbuf, opaque, realloc_func);
   *pdst = NULL;
+  if (normalization_poll(&state)) goto fail;
   if (src_len == 0) return 0;
   if (dbuf_realloc(dbuf, sizeof(int) * src_len)) goto fail;
 
   /* common case: latin1 is unaffected by NFC */
   if (n_type == UNICODE_NFC) {
     for (i = 0; i < src_len; i++) {
+      if (normalization_poll(&state)) goto fail;
       if (src[i] >= 0x100) goto not_latin1;
     }
     buf = (int *)dbuf->buf;
-    memcpy(buf, src, src_len * sizeof(int));
+    for (i = 0; i < src_len; i++) {
+      if (normalization_poll(&state)) goto fail;
+      buf[i] = src[i];
+    }
     *pdst = (uint32_t *)buf;
     return src_len;
   not_latin1:;
   }
 
-  to_nfd_rec(dbuf, (const int *)src, src_len, is_compat);
-  if (dbuf_error(dbuf)) goto fail;
+  if (to_nfd_rec(dbuf, (const int *)src, src_len, is_compat, &state)) goto fail;
   buf = (int *)dbuf->buf;
   buf_len = dbuf->size / sizeof(int);
 
-  if (sort_cc(buf, buf_len, opaque, realloc_func)) goto fail;
+  if (sort_cc(buf, buf_len, opaque, realloc_func, &state)) goto fail;
 
   if (buf_len <= 1 || (n_type & 1) != 0) {
     /* NFD / NFKD */
@@ -850,11 +895,13 @@ int unicode_normalize(uint32_t **pdst, const uint32_t *src, int src_len,
   i = 1;
   out_len = 1;
   while (i < buf_len) {
+    if (normalization_poll(&state)) goto fail;
     /* find the starter character and test if it is blocked from
        the character at 'i' */
     last_cc = unicode_get_cc(buf[i]);
     starter_pos = out_len - 1;
     while (starter_pos >= 0) {
+      if (normalization_poll(&state)) goto fail;
       cc = unicode_get_cc(buf[starter_pos]);
       if (cc == 0) break;
       if (cc >= last_cc) goto next;

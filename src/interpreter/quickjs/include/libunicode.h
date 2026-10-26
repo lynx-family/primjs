@@ -118,6 +118,16 @@ int unicode_normalize(uint32_t **pdst, const uint32_t *src, int src_len,
                       void *(*realloc_func)(void *opaque, void *ptr,
                                             size_t size, int alloc_tag));
 
+/* Optional cooperative cancellation. A nonzero callback result aborts with
+   (-1, NULL), releasing workspace through the supplied allocator. The old
+   unicode_normalize entrypoint retains its non-interruptible contract. */
+typedef int UnicodeInterruptFunc(void *opaque);
+int unicode_normalize_with_interrupt(
+    uint32_t **pdst, const uint32_t *src, int src_len,
+    UnicodeNormalizationEnum n_type, void *opaque, void *mem_opaque,
+    void *(*realloc_func)(void *, void *, size_t, int),
+    UnicodeInterruptFunc *interrupt, void *interrupt_opaque);
+
 /* Unicode character range functions */
 
 int unicode_script(CharRange *cr, const char *script_name, LRE_BOOL is_ext);

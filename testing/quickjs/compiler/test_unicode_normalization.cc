@@ -197,3 +197,60 @@ TEST(UnicodeNormalization, DefaultAllocatorHandlesNullEmptyAndOwnedOutput) {
   EXPECT_EQ(output[0], 0x00c5u);
   std::free(output);
 }
+
+namespace {
+struct NormalizationCancellation {
+  int calls = 0;
+  int cancel_at = 0;
+  static int Poll(void* opaque) {
+    auto* state = static_cast<NormalizationCancellation*>(opaque);
+    ++state->calls;
+    return state->cancel_at != 0 && state->calls == state->cancel_at;
+  }
+};
+}  // namespace
+
+TEST(UnicodeNormalization, EveryCancellationPointReleasesWorkspace) {
+  std::vector<uint32_t> combining = {'x'};
+  for (size_t i = 0; i < 2048; ++i) {
+    combining.push_back(0x0315);
+    combining.push_back(0x0300);
+  }
+  combining.push_back(0xfb03);
+  combining.push_back(0xac01);
+  for (const auto& input : {std::vector<uint32_t>(4097, 'x'), combining}) {
+    for (int form = UNICODE_NFC; form <= UNICODE_NFKD; ++form) {
+      SCOPED_TRACE(form);
+      const auto normalization = static_cast<UnicodeNormalizationEnum>(form);
+      NormalizationAllocator completed_allocator;
+      NormalizationCancellation completed;
+      uint32_t* output = nullptr;
+      ASSERT_GT(
+          unicode_normalize_with_interrupt(
+              &output, input.data(), input.size(), normalization,
+              &completed_allocator, nullptr, NormalizationAllocator::Reallocate,
+              NormalizationCancellation::Poll, &completed),
+          0);
+      NormalizationAllocator::Reallocate(&completed_allocator, output, 0, 0);
+      EXPECT_EQ(completed_allocator.live_allocations(), 0u);
+      ASSERT_GT(completed.calls, 0);
+      // Exercise every observed callback boundary, including decompositions,
+      // sorting scratch, composition and the latin1 scan/copy path.
+      for (int cancel = 1; cancel <= completed.calls; ++cancel) {
+        SCOPED_TRACE(cancel);
+        NormalizationAllocator allocator;
+        NormalizationCancellation interrupted;
+        interrupted.cancel_at = cancel;
+        output = nullptr;
+        EXPECT_EQ(unicode_normalize_with_interrupt(
+                      &output, input.data(), input.size(), normalization,
+                      &allocator, nullptr, NormalizationAllocator::Reallocate,
+                      NormalizationCancellation::Poll, &interrupted),
+                  -1);
+        EXPECT_EQ(output, nullptr);
+        EXPECT_EQ(interrupted.calls, cancel);
+        EXPECT_EQ(allocator.live_allocations(), 0u);
+      }
+    }
+  }
+}

@@ -39064,13 +39064,23 @@ QJS_STATIC int string_prevc(JSString *p, int *pidx) {
   return c;
 }
 
-BOOL test_final_sigma(JSString *p, int sigma_pos) {
+/* Native Unicode loops must consult the actual handler, rather than spend
+   another full VM instruction counter at each native checkpoint. */
+static int js_unicode_poll(LEPUSContext *ctx, int *remaining) {
+  if (--*remaining > 0) return 0;
+  *remaining = 1024;
+  return __js_poll_interrupts(ctx);
+}
+
+int test_final_sigma_with_interrupt(LEPUSContext *ctx, JSString *p,
+                                    int sigma_pos, int *remaining) {
   int k, c1;
 
   /* before C: skip case ignorable chars and check there is
      a cased letter */
   k = sigma_pos;
   for (;;) {
+    if (ctx && js_unicode_poll(ctx, remaining)) return -1;
     c1 = string_prevc(p, &k);
     if (!lre_is_case_ignorable(c1)) break;
   }
@@ -39080,11 +39090,17 @@ BOOL test_final_sigma(JSString *p, int sigma_pos) {
      no cased letter */
   k = sigma_pos + 1;
   for (;;) {
+    if (ctx && js_unicode_poll(ctx, remaining)) return -1;
     if (k >= p->len) return TRUE;
     c1 = string_getc(p, &k);
     if (!lre_is_case_ignorable(c1)) break;
   }
   return !lre_is_cased(c1);
+}
+
+BOOL test_final_sigma(JSString *p, int sigma_pos) {
+  int remaining = 0;
+  return test_final_sigma_with_interrupt(NULL, p, sigma_pos, &remaining);
 }
 
 QJS_STATIC LEPUSValue js_string_localeCompare(LEPUSContext *ctx,
@@ -39115,6 +39131,7 @@ QJS_STATIC LEPUSValue js_string_toLowerCase(LEPUSContext *ctx,
   StringBuffer b_s, *b = &b_s;
   JSString *p;
   int i, c, j, l;
+  int remaining = 0;
   uint32_t res[LRE_CC_RES_LEN_MAX];
 
   val = JS_ToStringCheckObject(ctx, this_val);
@@ -39123,8 +39140,14 @@ QJS_STATIC LEPUSValue js_string_toLowerCase(LEPUSContext *ctx,
   if (p->len == 0) return val;
   if (string_buffer_init(ctx, b, p->len)) goto fail;
   for (i = 0; i < p->len;) {
+    if (js_unicode_poll(ctx, &remaining)) goto fail;
     c = string_getc(p, &i);
-    if (c == 0x3a3 && to_lower && test_final_sigma(p, i - 1)) {
+    int final_sigma = 0;
+    if (c == 0x3a3 && to_lower) {
+      final_sigma = test_final_sigma_with_interrupt(ctx, p, i - 1, &remaining);
+      if (final_sigma < 0) goto fail;
+    }
+    if (final_sigma) {
       res[0] = 0x3c2; /* final sigma */
       l = 1;
     } else {
@@ -39151,6 +39174,7 @@ QJS_STATIC int JS_ToUTF32String(LEPUSContext *ctx, uint32_t **pbuf,
   JSString *p;
   uint32_t *buf;
   int i, j, len;
+  int remaining = 0;
 
   val = JS_ToString_RC(ctx, val1);
   if (LEPUS_IsException(val)) return -1;
@@ -39163,7 +39187,14 @@ QJS_STATIC int JS_ToUTF32String(LEPUSContext *ctx, uint32_t **pbuf,
     LEPUS_FreeValue(ctx, val);
     goto fail;
   }
-  for (i = j = 0; i < len;) buf[j++] = string_getc(p, &i);
+  for (i = j = 0; i < len;) {
+    if (js_unicode_poll(ctx, &remaining)) {
+      lepus_free(ctx, buf);
+      LEPUS_FreeValue(ctx, val);
+      goto fail;
+    }
+    buf[j++] = string_getc(p, &i);
+  }
   LEPUS_FreeValue(ctx, val);
   *pbuf = buf;
   return j;
@@ -39175,15 +39206,25 @@ fail:
 QJS_STATIC LEPUSValue JS_NewUTF32String(LEPUSContext *ctx, const uint32_t *buf,
                                         int len) {
   int i;
+  int remaining = 0;
   StringBuffer b_s, *b = &b_s;
   if (string_buffer_init(ctx, b, len)) return LEPUS_EXCEPTION;
   for (i = 0; i < len; i++) {
+    if (js_unicode_poll(ctx, &remaining)) goto fail;
     if (string_buffer_putc(b, buf[i])) goto fail;
   }
   return string_buffer_end(b);
 fail:
   string_buffer_free(b);
   return LEPUS_EXCEPTION;
+}
+
+static int js_unicode_interrupt(void *opaque) {
+  return __js_poll_interrupts(static_cast<LEPUSContext *>(opaque));
+}
+
+static void *js_unicode_realloc(void *opaque, void *ptr, size_t size, int tag) {
+  return lepus_realloc(static_cast<LEPUSContext *>(opaque), ptr, size, tag);
 }
 
 QJS_STATIC LEPUSValue js_string_normalize(LEPUSContext *ctx,
@@ -39230,12 +39271,13 @@ QJS_STATIC LEPUSValue js_string_normalize(LEPUSContext *ctx,
     LEPUS_FreeCString(ctx, form);
   }
 
-  out_len =
-      unicode_normalize(&out_buf, buf, buf_len, n_type, ctx->rt, ctx, nullptr);
+  out_len = unicode_normalize_with_interrupt(&out_buf, buf, buf_len, n_type,
+                                             ctx, ctx, js_unicode_realloc,
+                                             js_unicode_interrupt, ctx);
   lepus_free(ctx, buf);
   if (out_len < 0) return LEPUS_EXCEPTION;
   val = JS_NewUTF32String(ctx, out_buf, out_len);
-  system_free(out_buf);
+  lepus_free(ctx, out_buf);
   return val;
 }
 #endif /* CONFIG_ALL_UNICODE */
