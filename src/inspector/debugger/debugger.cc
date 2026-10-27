@@ -1943,6 +1943,7 @@ void DeleteConsoleMessageWithURL(LEPUSContext *ctx, const char *url) {
           LEPUS_SetPropertyUint32(ctx, new_msg, new_msg_len++,
                                   LEPUS_DupValue(ctx, console_message));
         }
+        if (!ctx->rt->gc_enable) LEPUS_FreeCString(ctx, url_str);
       } else {
         LEPUS_SetPropertyUint32(ctx, new_msg, new_msg_len++,
                                 LEPUS_DupValue(ctx, console_message));
