@@ -327,6 +327,98 @@ TEST_F(CollectionCleanupTest, MapClearKeepsIteratorRecordsAliveDuringCleanup) {
   )");
 }
 
+TEST_F(CollectionCleanupTest, MapIteratorExhaustionCommitsBeforeCleanup) {
+  if (LEPUS_IsGCMode(ctx_)) GTEST_SKIP();
+  Check(R"(
+    (function() {
+      function check(method) {
+        var iterator;
+        var calls = 0;
+        var nestedResult;
+        var registry = new FinalizationRegistry(function() {
+          calls++;
+          nestedResult = iterator.next();
+        });
+        (function() {
+          var map = new Map([['key', 42]]);
+          // Trigger cleanup before records are freed so an incorrect nested
+          // yield remains safe to inspect.
+          registry.register(map, 0);
+          iterator = map[method]();
+          if (iterator.next().done) throw new Error('missing map entry');
+        })();
+        var result = iterator.next();
+        var repeated = iterator.next();
+        return calls === 1 && nestedResult.done === true &&
+               nestedResult.value === undefined && result.done === true &&
+               result.value === undefined && repeated.done === true &&
+               repeated.value === undefined;
+      }
+      return ['keys', 'values', 'entries', Symbol.iterator].every(check);
+    })()
+  )");
+}
+
+TEST_F(CollectionCleanupTest, SetIteratorExhaustionCommitsBeforeCleanup) {
+  if (LEPUS_IsGCMode(ctx_)) GTEST_SKIP();
+  Check(R"(
+    (function() {
+      function check(method) {
+        var iterator;
+        var calls = 0;
+        var nestedResult;
+        var registry = new FinalizationRegistry(function() {
+          calls++;
+          nestedResult = iterator.next();
+        });
+        (function() {
+          var set = new Set([42]);
+          registry.register(set, 0);
+          iterator = set[method]();
+          if (iterator.next().done) throw new Error('missing set entry');
+        })();
+        var result = iterator.next();
+        var repeated = iterator.next();
+        return calls === 1 && nestedResult.done === true &&
+               nestedResult.value === undefined && result.done === true &&
+               result.value === undefined && repeated.done === true &&
+               repeated.value === undefined;
+      }
+      return ['keys', 'values', 'entries', Symbol.iterator].every(check);
+    })()
+  )");
+}
+
+TEST_F(CollectionCleanupTest, ArrayIteratorExhaustionCommitsBeforeCleanup) {
+  if (LEPUS_IsGCMode(ctx_)) GTEST_SKIP();
+  Check(R"(
+    (function() {
+      function check(method) {
+        var iterator;
+        var calls = 0;
+        var nestedResult;
+        var registry = new FinalizationRegistry(function() {
+          calls++;
+          nestedResult = iterator.next();
+        });
+        (function() {
+          var array = [42];
+          registry.register(array, 0);
+          iterator = array[method]();
+          if (iterator.next().done) throw new Error('missing array element');
+        })();
+        var result = iterator.next();
+        var repeated = iterator.next();
+        return calls === 1 && nestedResult.done === true &&
+               nestedResult.value === undefined && result.done === true &&
+               result.value === undefined && repeated.done === true &&
+               repeated.value === undefined;
+      }
+      return ['keys', 'values', 'entries', Symbol.iterator].every(check);
+    })()
+  )");
+}
+
 TEST_F(FinalizationRegistryTest, DefinePropertyCommitsFlagsBeforeCleanup) {
   if (LEPUS_IsGCMode(ctx_)) GTEST_SKIP();
 

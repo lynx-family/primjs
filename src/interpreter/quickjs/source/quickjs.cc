@@ -37509,8 +37509,10 @@ QJS_STATIC LEPUSValue js_array_iterator_next(LEPUSContext *ctx,
 
   idx = it->idx;
   if (idx >= len) {
-    LEPUS_FreeValue(ctx, it->obj);
-    it->obj = LEPUS_UNDEFINED;
+    /* Commit exhaustion before releasing the iterated object: its
+       FinalizationRegistry callbacks can synchronously call next() on this
+       iterator. */
+    set_value(ctx, &it->obj, LEPUS_UNDEFINED);
   done:
     *pdone = TRUE;
     return LEPUS_UNDEFINED;
@@ -46122,8 +46124,10 @@ QJS_STATIC LEPUSValue js_map_iterator_next(LEPUSContext *ctx,
     if (el == &s->records) {
       /* no more record  */
       it->cur_record = NULL;
-      LEPUS_FreeValue(ctx, it->obj);
-      it->obj = LEPUS_UNDEFINED;
+      /* Commit exhaustion before releasing the collection: its
+         FinalizationRegistry callbacks can synchronously call next() on this
+         iterator. */
+      set_value(ctx, &it->obj, LEPUS_UNDEFINED);
     done:
       /* end of enumeration */
       *pdone = TRUE;
