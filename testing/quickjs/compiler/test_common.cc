@@ -1000,9 +1000,15 @@ TEST_F(CommonQjsTest, js_map_get) {
 
 TEST_F(CommonQjsTest, get_date_string) {
   std::string src = R"(
-    var givenDate = new Date(951753599000);
+    // The locale assertion describes local civil time, not a UTC+8 instant.
+    var givenDate = new Date(2000, 1, 28, 23, 59, 59);
     var localString = givenDate.toLocaleString();
     Assert(localString === "02/28/2000, 11:59:59 PM");
+
+    // Keep the original instant as a timezone-independent UTC control.
+    var fixedDate = new Date(951753599000);
+    Assert(fixedDate.toISOString() === "2000-02-28T15:59:59.000Z");
+    Assert(fixedDate.getTime() === 951753599000);
   )";
 
   RegisterAssert(ctx_);
