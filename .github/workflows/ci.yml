@@ -13,8 +13,43 @@ jobs:
     runs-on: lynx-ubuntu-22.04-medium
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
-      - run: |
-          echo "to be done"
+      - name: Set up Python 3.9
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.9"
+      - name: Cache formatter dependency
+        uses: lynx-infra/cache@d6bd70bf2182b228ff5cfa9539e5f61b0929a1ba
+        with:
+          path: |
+            ~/.habitat_cache/habitat
+            ~/.habitat_cache/objects
+          key: ${{ runner.os }}-${{ runner.arch }}-formatter-v1-${{ hashFiles('.habitat', 'DEPS', 'tools/ci/DEPS.precheck', 'tools/hab') }}
+      - name: Install pinned formatter
+        run: bash tools/hab sync . --target precheck --target-only
+      - name: Check all tracked source files
+        shell: bash
+        run: |
+          buildtools/llvm/bin/clang-format --version | grep -F '020d2fb7711d70e296f19d83565f8d93d2cfda71'
+          git ls-files -z -- '*.java' '*.h' '*.hpp' '*.c' '*.cc' '*.cpp' '*.m' '*.mm' ':(exclude)*_jni.h' |
+            xargs -0 buildtools/llvm/bin/clang-format --dry-run --Werror --
+  commit-check:
+    runs-on: lynx-ubuntu-22.04-medium
+    steps:
+      - name: Download source commit
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Set up Python 3.9
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.9"
+      - name: Check single PR commit
+        if: github.event_name == 'pull_request'
+        env:
+          COMMIT_COUNT: ${{ github.event.pull_request.commits }}
+        run: test "$COMMIT_COUNT" -eq 1
+      - name: Run commit-message check
+        run: python3 -B tools/cli/commit_message_helper.py
   lint-pod:
     runs-on: lynx-darwin-14-medium
     steps:

@@ -1,1 +1,6 @@
-solutions = [{'name': '.', 'deps_file': 'DEPS', 'url': 'https://github.com/lynx-family/primjs'}]
+solutions = [{
+    'name': '.',
+    'deps_file': 'DEPS',
+    'target_deps_files': {'precheck': 'tools/ci/DEPS.precheck'},
+    'url': 'https://github.com/lynx-family/primjs',
+}]

@@ -1,0 +1,11 @@
+# Copyright 2026 The Lynx Authors. All rights reserved.
+# Licensed under the Apache License Version 2.0 that can be found in the
+# LICENSE file in the root directory of this source tree.
+
+import os
+
+scope = {"root_dir": root_dir, "target": target}
+with open(os.path.join(root_dir, "DEPS")) as deps_file:
+    exec(deps_file.read(), scope)
+
+deps = {"buildtools/llvm": scope["deps"]["buildtools/llvm"]}
