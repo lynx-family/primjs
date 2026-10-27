@@ -707,37 +707,66 @@ static int unicode_get_cc(uint32_t c) {
   }
 }
 
-static void sort_cc(int *buf, int len) {
-  int i, j, k, cc, cc1, start, ch1;
-
-  for (i = 0; i < len; i++) {
-    cc = unicode_get_cc(buf[i]);
-    if (cc != 0) {
-      start = i;
-      j = i + 1;
-      while (j < len) {
-        ch1 = buf[j];
-        cc1 = unicode_get_cc(ch1);
-        if (cc1 == 0) break;
-        k = j - 1;
-        while (k >= start) {
-          if (unicode_get_cc(buf[k]) <= cc1) break;
-          buf[k + 1] = buf[k];
-          k--;
-        }
-        buf[k + 1] = ch1;
-        j++;
-      }
-#if 0
-            printf("cc:");
-            for(k = start; k < j; k++) {
-                printf(" %3d", unicode_get_cc(buf[k]));
-            }
-            printf("\n");
-#endif
-      i = j;
+/* Canonical ordering is stable within each run of non-starters. Small
+   runs use bounded insertion sorting; large runs use the finite class range
+   so hostile combining sequences cannot cause quadratic work. */
+static int sort_cc(int *buf, int len, void *opaque,
+                   DynBufReallocFunc *realloc_func) {
+  DynBuf scratch;
+  dbuf_init2(&scratch, opaque, realloc_func);
+  int start = 0;
+  while (start < len) {
+    if (unicode_get_cc(buf[start]) == 0) {
+      start++;
+      continue;
     }
+    int end = start + 1;
+    int previous_cc = unicode_get_cc(buf[start]);
+    BOOL ordered = TRUE;
+    while (end < len) {
+      int cc = unicode_get_cc(buf[end]);
+      if (cc == 0) break;
+      if (cc < previous_cc) ordered = FALSE;
+      previous_cc = cc;
+      end++;
+    }
+    if (!ordered) {
+      if (end - start <= 32) {
+        for (int j = start + 1; j < end; j++) {
+          int ch = buf[j];
+          int cc = unicode_get_cc(ch);
+          int k = j;
+          while (k > start && unicode_get_cc(buf[k - 1]) > cc) {
+            buf[k] = buf[k - 1];
+            k--;
+          }
+          buf[k] = ch;
+        }
+      } else {
+        size_t offsets[256] = {0};
+        if (dbuf_realloc(&scratch, (size_t)(end - start) * sizeof(int))) {
+          dbuf_free(&scratch);
+          return -1;
+        }
+        for (int j = start; j < end; j++) offsets[unicode_get_cc(buf[j])]++;
+        size_t position = 0;
+        for (int cc = 0; cc < 256; cc++) {
+          size_t count = offsets[cc];
+          offsets[cc] = position;
+          position += count;
+        }
+        int *sorted = (int *)scratch.buf;
+        for (int j = start; j < end; j++) {
+          int cc = unicode_get_cc(buf[j]);
+          sorted[offsets[cc]++] = buf[j];
+        }
+        memcpy(buf + start, sorted, (size_t)(end - start) * sizeof(int));
+      }
+    }
+    start = end;
   }
+  dbuf_free(&scratch);
+  return 0;
 }
 
 static void to_nfd_rec(DynBuf *dbuf, const int *src, int src_len,
@@ -789,6 +818,8 @@ int unicode_normalize(uint32_t **pdst, const uint32_t *src, int src_len,
   is_compat = n_type >> 1;
 
   dbuf_init2(dbuf, opaque, realloc_func);
+  *pdst = NULL;
+  if (src_len == 0) return 0;
   if (dbuf_realloc(dbuf, sizeof(int) * src_len)) goto fail;
 
   /* common case: latin1 is unaffected by NFC */
@@ -804,15 +835,11 @@ int unicode_normalize(uint32_t **pdst, const uint32_t *src, int src_len,
   }
 
   to_nfd_rec(dbuf, (const int *)src, src_len, is_compat);
-  if (dbuf_error(dbuf)) {
-  fail:
-    *pdst = NULL;
-    return -1;
-  }
+  if (dbuf_error(dbuf)) goto fail;
   buf = (int *)dbuf->buf;
   buf_len = dbuf->size / sizeof(int);
 
-  sort_cc(buf, buf_len);
+  if (sort_cc(buf, buf_len, opaque, realloc_func)) goto fail;
 
   if (buf_len <= 1 || (n_type & 1) != 0) {
     /* NFD / NFKD */
@@ -844,6 +871,10 @@ int unicode_normalize(uint32_t **pdst, const uint32_t *src, int src_len,
   }
   *pdst = (uint32_t *)buf;
   return out_len;
+
+fail:
+  dbuf_free(dbuf);
+  return -1;
 }
 
 /* char ranges for various unicode properties */

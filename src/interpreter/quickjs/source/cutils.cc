@@ -88,6 +88,11 @@ int has_suffix(const char *str, const char *suffix) {
 
 static void *dbuf_default_realloc(void *opaque, void *ptr, size_t size,
                                   int alloc_tag = 0) {
+  // realloc(ptr, 0) may return a new allocation; free explicitly.
+  if (size == 0) {
+    free(ptr);
+    return NULL;
+  }
   return realloc(ptr, size);
 }
 
