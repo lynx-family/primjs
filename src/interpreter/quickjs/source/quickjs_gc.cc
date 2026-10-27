@@ -2083,9 +2083,12 @@ static int init_shape_hash(LEPUSRuntime *rt) {
   rt->shape_hash_bits = 4; /* 16 shapes */
   rt->shape_hash_size = 1 << rt->shape_hash_bits;
   rt->shape_hash_count = 0;
-  rt->shape_hash = static_cast<JSShape **>(
-      lepus_mallocz_rt(rt, sizeof(rt->shape_hash[0]) * rt->shape_hash_size,
-                       ALLOC_TAG_WITHOUT_PTR));
+  {
+    ScopedCommonMemorySlot common_slot(rt);
+    rt->shape_hash = static_cast<JSShape **>(
+        lepus_mallocz_rt(rt, sizeof(rt->shape_hash[0]) * rt->shape_hash_size,
+                         ALLOC_TAG_WITHOUT_PTR));
+  }
   if (!rt->shape_hash) return -1;
   return 0;
 }

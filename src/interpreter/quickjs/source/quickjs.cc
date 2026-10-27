@@ -2729,8 +2729,11 @@ QJS_STATIC int JS_ResizeAtomHash(LEPUSRuntime *rt, int new_hash_size) {
 
   assert((new_hash_size & (new_hash_size - 1)) == 0); /* power of two */
   new_hash_mask = new_hash_size - 1;
-  new_hash = static_cast<uint32_t *>(lepus_mallocz_rt(
-      rt, sizeof(rt->atom_hash[0]) * new_hash_size, ALLOC_TAG_WITHOUT_PTR));
+  {
+    ScopedCommonMemorySlot common_slot(rt);
+    new_hash = static_cast<uint32_t *>(lepus_mallocz_rt(
+        rt, sizeof(rt->atom_hash[0]) * new_hash_size, ALLOC_TAG_WITHOUT_PTR));
+  }
   if (!new_hash) return -1;
   for (i = 0; i < rt->atom_hash_size; i++) {
     h = rt->atom_hash[i];
@@ -4551,8 +4554,11 @@ QJS_STATIC int init_shape_hash(LEPUSRuntime *rt) {
   rt->shape_hash_bits = 4; /* 16 shapes */
   rt->shape_hash_size = 1 << rt->shape_hash_bits;
   rt->shape_hash_count = 0;
-  rt->shape_hash = static_cast<JSShape **>(
-      lepus_mallocz_rt(rt, sizeof(rt->shape_hash[0]) * rt->shape_hash_size));
+  {
+    ScopedCommonMemorySlot common_slot(rt);
+    rt->shape_hash = static_cast<JSShape **>(
+        lepus_mallocz_rt(rt, sizeof(rt->shape_hash[0]) * rt->shape_hash_size));
+  }
   if (!rt->shape_hash) return -1;
   return 0;
 }
@@ -4580,9 +4586,12 @@ int resize_shape_hash(LEPUSRuntime *rt, int new_shape_hash_bits) {
   JSShape **new_shape_hash, *sh, *sh_next;
 
   new_shape_hash_size = 1 << new_shape_hash_bits;
-  new_shape_hash = static_cast<JSShape **>(
-      lepus_mallocz_rt(rt, sizeof(rt->shape_hash[0]) * new_shape_hash_size,
-                       ALLOC_TAG_WITHOUT_PTR));
+  {
+    ScopedCommonMemorySlot common_slot(rt);
+    new_shape_hash = static_cast<JSShape **>(
+        lepus_mallocz_rt(rt, sizeof(rt->shape_hash[0]) * new_shape_hash_size,
+                         ALLOC_TAG_WITHOUT_PTR));
+  }
   if (!new_shape_hash) return -1;
   for (i = 0; i < rt->shape_hash_size; i++) {
     for (sh = rt->shape_hash[i]; sh != NULL; sh = sh_next) {
