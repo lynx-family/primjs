@@ -782,6 +782,22 @@ typedef enum LEPUSGCMemoryPolicyLevel {
 
 // <Primjs end>
 
+/*
+ * Runtime creation mode bit layout:
+ * - Bits 0-23: reserved; pass zero.
+ * - Bits 24-31: allocation interval for GC info reporting in MiB (0..255).
+ *   Encode as ((uint32_t)interval_mb <<
+ *              LEPUS_RUNTIME_GC_INFO_THRESHOLD_MB_SHIFT);
+ *   the field mask is LEPUS_RUNTIME_GC_INFO_THRESHOLD_MB_MASK.
+ * These fields can be combined with bitwise OR. They are independent of
+ * GetSettingsFlag(); mode does not select RC versus GC.
+ */
+typedef enum LEPUSRuntimeMode {
+  LEPUS_RUNTIME_GC_INFO_THRESHOLD_MB_SHIFT = 24,
+  LEPUS_RUNTIME_GC_INFO_THRESHOLD_MB_MASK =
+      0xFFu << LEPUS_RUNTIME_GC_INFO_THRESHOLD_MB_SHIFT,
+} LEPUSRuntimeMode;
+
 LEPUSRuntime *LEPUS_NewRuntime(void);
 LEPUSRuntime *LEPUS_NewRuntimeWithMode(uint32_t mode);
 /*

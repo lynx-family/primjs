@@ -1035,9 +1035,6 @@ enum class EntryMode { INTERPRETER, BASELINE };
 #define JIT_THRESHOLD 6
 
 // <primjs end>
-enum {
-  GC_INFO_THRESHOLD_MB = 0xFF000000,
-};
 
 // settings key opt
 enum {

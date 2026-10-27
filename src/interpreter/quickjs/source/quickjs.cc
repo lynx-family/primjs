@@ -1473,7 +1473,9 @@ int32_t LEPUS_DumpMemorySlots(
 }
 
 void set_gc_info_threshold(LEPUSRuntime *rt, uint32_t mode) {
-  rt->gc_info_threshold = ((mode & GC_INFO_THRESHOLD_MB) >> 24) * MB;
+  rt->gc_info_threshold = ((mode & LEPUS_RUNTIME_GC_INFO_THRESHOLD_MB_MASK) >>
+                           LEPUS_RUNTIME_GC_INFO_THRESHOLD_MB_SHIFT) *
+                          MB;
   rt->gc_info_interval_size = 0;
 }
 
@@ -53124,18 +53126,10 @@ int64_t NapiAdjustExternalMemory(LEPUSRuntime *rt, int64_t size) {
 }
 
 void LEPUS_SetGCObserver(LEPUSRuntime *rt, void *opaque) {
-#ifdef ENABLE_COMPATIBLE_MM
   rt->gc_observer = opaque;
-#endif
 }
 
-void *LEPUS_GetGCObserver(LEPUSRuntime *rt) {
-#ifdef ENABLE_COMPATIBLE_MM
-  return rt->gc_observer;
-#else
-  return nullptr;
-#endif
-}
+void *LEPUS_GetGCObserver(LEPUSRuntime *rt) { return rt->gc_observer; }
 
 #if !defined(ENABLE_HEAPPROFILER) && !defined(ENABLE_QUICKJS_DEBUGGER)
 extern "C" const char *js_profile_take_heap_snapshot(LEPUSContext *ctx) {
