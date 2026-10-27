@@ -1835,14 +1835,19 @@ class CStack {
  public:
   explicit CStack(LEPUSRuntime *rt, uint32_t depth = STACK_INIT_SIZE) {
     runtime_ = rt;
-    stack_size_ = depth <= INLINE_SIZE ? INLINE_SIZE : depth;
-    base_ =
-        depth <= INLINE_SIZE
-            ? inline_storage_
-            : static_cast<element *>(system_malloc(sizeof(element) * depth));
-    if (!base_) return;
+    if (depth <= INLINE_SIZE) {
+      base_ = inline_storage_;
+      stack_size_ = INLINE_SIZE;
+    } else {
+      base_ = static_cast<element *>(system_malloc(sizeof(element) * depth));
+      if (!base_) return;
+      stack_size_ = depth;
+    }
     top_ = base_;
   }
+
+  CStack(const CStack &) = delete;
+  CStack &operator=(const CStack &) = delete;
 
   ~CStack() {
     if (base_ != inline_storage_) system_free(base_);
