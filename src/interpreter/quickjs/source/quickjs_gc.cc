@@ -13571,6 +13571,21 @@ static LEPUSValue js_object_hasOwnProperty(LEPUSContext *ctx,
     return LEPUS_NewBool(ctx, ret);
 }
 
+static LEPUSValue js_object_hasOwn(LEPUSContext *ctx, LEPUSValueConst this_val,
+                                   int argc, LEPUSValueConst *argv) {
+  HandleScope func_scope(ctx);
+  LEPUSValue obj = JS_ToObject_GC(ctx, argv[0]);
+  if (LEPUS_IsException(obj)) return LEPUS_EXCEPTION;
+  func_scope.PushHandle(&obj, HANDLE_TYPE_LEPUS_VALUE);
+
+  JSAtom atom = js_value_to_atom_gc(ctx, argv[1]);
+  if (unlikely(atom == JS_ATOM_NULL)) return LEPUS_EXCEPTION;
+  func_scope.PushLEPUSAtom(atom);
+  int ret =
+      JS_GetOwnPropertyInternal(ctx, nullptr, LEPUS_VALUE_GET_OBJ(obj), atom);
+  return ret < 0 ? LEPUS_EXCEPTION : LEPUS_NewBool(ctx, ret);
+}
+
 static LEPUSValue js_object_valueOf(LEPUSContext *ctx, LEPUSValueConst this_val,
                                     int argc, LEPUSValueConst *argv) {
   return JS_ToObject_GC(ctx, this_val);
@@ -14261,6 +14276,7 @@ static const LEPUSCFunctionListEntry js_object_funcs[] = {
                           js_object_getOwnPropertyDescriptor_GC, 0),
     LEPUS_CFUNC_DEF("getOwnPropertyDescriptors", 1,
                     js_object_getOwnPropertyDescriptors),
+    LEPUS_CFUNC_DEF("hasOwn", 2, js_object_hasOwn),
     LEPUS_CFUNC_DEF("is", 2, js_object_is),
     LEPUS_CFUNC_DEF("assign", 2, js_object_assign),
     LEPUS_CFUNC_MAGIC_DEF("seal", 1, js_object_seal, 0),
