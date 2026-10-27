@@ -31,7 +31,7 @@ Pod::Spec.new do |s|
   s.license = "MIT"
   s.author = { "pandazyp" => "2823543594@qq.com" }
 
-  s.source = { :git => "https://github.com/lynx-family/primjs.git", }.tap do |source_hash|
+  s.source = { :git => ENV['PRIMJS_GIT_URL'] || "https://github.com/lynx-family/primjs.git", }.tap do |source_hash|
       source_hash[:commit] = ENV['PRIMJS_COMMIT_ID']
   end
   s.compiler_flags = "-Wall", "-Wno-shorten-64-to-32", "-Os"

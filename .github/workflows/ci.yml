@@ -36,8 +36,12 @@ jobs:
         run: |-
           SDKROOT=/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk bundle install --path .bundle
       - name: Lint
+        env:
+          POD_VERSION: 0.0.1-for-ci-test
+          PRIMJS_GIT_URL: ${{ github.event.pull_request.head.repo.clone_url || github.event.repository.clone_url }}
+          PRIMJS_COMMIT_ID: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |-
-          POD_VERSION=0.0.1-for-ci-test PRIMJS_COMMIT_ID=${{ github.event.pull_request.head.sha }} bundle exec pod spec lint PrimJS.podspec --verbose --skip-import-validation --allow-warnings
+          bundle exec pod spec lint PrimJS.podspec --verbose --skip-import-validation --allow-warnings
   
   check-unittests-linux:
     runs-on: lynx-ubuntu-22.04-medium
