@@ -782,6 +782,28 @@ typedef enum LEPUSGCMemoryPolicyLevel {
 
 // <Primjs end>
 
+/*
+ * Runtime creation mode bit layout:
+ * - Bit 0: retain live RC allocation addresses for slot snapshots. Ignored
+ *   when the slot selector is null, the RC platform lacks slot support, or
+ *   neither ENABLE_HEAPPROFILER nor ENABLE_QUICKJS_DEBUGGER is compiled.
+ *   GC uses its existing census.
+ * - Bits 1-23: reserved; pass zero.
+ * - Bits 24-31: allocation interval for GC info reporting in MiB (0..255).
+ *   Encode as ((uint32_t)interval_mb <<
+ *              LEPUS_RUNTIME_GC_INFO_THRESHOLD_MB_SHIFT);
+ *   the field mask is LEPUS_RUNTIME_GC_INFO_THRESHOLD_MB_MASK.
+ *   Zero disables allocation-triggered reports, not forced or full-GC reports.
+ * These fields can be combined with bitwise OR. They are independent of
+ * GetSettingsFlag(); mode does not select RC versus GC.
+ */
+typedef enum LEPUSRuntimeMode {
+  LEPUS_RUNTIME_ENABLE_ALLOCATION_TRACKING = (1u << 0),
+  LEPUS_RUNTIME_GC_INFO_THRESHOLD_MB_SHIFT = 24,
+  LEPUS_RUNTIME_GC_INFO_THRESHOLD_MB_MASK =
+      0xFFu << LEPUS_RUNTIME_GC_INFO_THRESHOLD_MB_SHIFT,
+} LEPUSRuntimeMode;
+
 LEPUSRuntime *LEPUS_NewRuntime(void);
 LEPUSRuntime *LEPUS_NewRuntimeWithMode(uint32_t mode);
 /*
@@ -801,6 +823,13 @@ LEPUSRuntime *LEPUS_NewRuntimeWithMode(uint32_t mode);
  * Runtime without memory tracking. The selector value is unchanged.
  * GC mode stores the slot in the object header and has no usable-size
  * dependency.
+ * Setting LEPUS_RUNTIME_ENABLE_ALLOCATION_TRACKING in mode enables RC slot
+ * snapshots. Its address set uses system memory outside all VM counters.
+ * If the selector is NULL, the RC platform lacks slot support, or neither
+ * ENABLE_HEAPPROFILER nor ENABLE_QUICKJS_DEBUGGER is compiled, this flag is
+ * ignored and Runtime creation continues without address tracking.
+ * This option must be selected at creation; it cannot be enabled on an
+ * existing Runtime.
  */
 LEPUSRuntime *LEPUS_NewRuntimeWithModeMemoryTrackSlot(
     uint32_t mode, int32_t *ptr_to_current_slot);
@@ -1786,12 +1815,44 @@ void UpdateOuterObjSize(LEPUSRuntime *rt, int size);
 void LEPUS_ReportExternalSize(LEPUSRuntime *rt, int64_t total_size,
                               int64_t garbage_size);
 
+/* Registers a borrowed GCObserver for RC or GC. Callbacks are synchronous.
+ * Unregister with NULL before destroying the observer. */
 void LEPUS_SetGCObserver(LEPUSRuntime *rt, void *opaque);
 void *LEPUS_GetGCObserver(LEPUSRuntime *rt);
 
 // Returned pointer should be released with js_profile_free_heap_snapshot().
 // If heap profiler or debugger is not enabled, nullptr will be returned.
+// Both snapshot APIs inspect ctx's Runtime, including all its live Contexts.
+// The supplied Context selects the directly exposed global roots. Keep it
+// fixed when comparing snapshots to avoid global-root/name presentation
+// changes.
 const char *js_profile_take_heap_snapshot(LEPUSContext *ctx);
+/* Snapshot of allocations charged to slot, with strong retainer paths
+ * from other slots retained as zero-size context nodes. Sizes are allocator-
+ * consumed bytes after a full GC. Requires slot tracking and a valid Context
+ * on the Runtime's owning thread. RC additionally requires
+ * LEPUS_RUNTIME_ENABLE_ALLOCATION_TRACKING at Runtime creation. Returns NULL
+ * for invalid slots, unavailable profiling/tracking, or when GC is forbidden
+ * or pause-suppressed. RC's object enumeration list is not a strong root;
+ * allocations without a modeled root path appear under [root path uncovered].
+ * Node names include stable [slot=N] and [holder slot=N] labels.
+ * [cross-slot] and [root path uncovered] are zero-size diagnostic groups with
+ * weak member edges; changes in these states do not rename allocation nodes.
+ * include_internal_allocations=0 excludes shape, backing stores, bytecode and
+ * class state from the charged targets. Required internal retainer nodes stay
+ * in the graph without size/slot labels. JS objects, strings, symbols, ropes
+ * and bigints keep their physical allocation sizes. The sum of node self_size
+ * includes only displayed charges; use LEPUS_DumpMemorySlots for the complete
+ * slot total. summarize_diagnostics!=0 projects debugger-only storage/retained
+ * objects (including console.messages) and coverage storage into [debugger]
+ * and [coverage] accounting leaves, without modifying the Runtime. Objects
+ * independently reachable from non-diagnostic roots remain visible. Summary
+ * sizes include all target-slot physical charges even in compact mode.
+ * Both C and C++ calls must pass all four arguments.
+ * Release the returned buffer with js_profile_free_heap_snapshot(). */
+const char *js_profile_take_heap_snapshot_for_slot(
+    LEPUSContext *ctx, int32_t slot, LEPUS_BOOL include_internal_allocations,
+    LEPUS_BOOL summarize_diagnostics);
 void js_profile_free_heap_snapshot(const char *snapshot);
 
 // Coverage `ranges` are encoded as [startOffset, endOffset, count] tuples.

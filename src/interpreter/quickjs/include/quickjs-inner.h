@@ -73,6 +73,13 @@ extern "C" {
 #define QJS_RC_MEMORY_SLOT_TRACKING_SUPPORTED 0
 #endif
 
+#if defined(ENABLE_HEAPPROFILER) || defined(ENABLE_QUICKJS_DEBUGGER)
+// Owner-thread only. Query info only for a live base in this Runtime's set.
+QJS_HIDE ROS_GC::PointerSet *JS_GetRCAllocationSet(LEPUSRuntime *rt);
+QJS_HIDE void JS_GetRCAllocationInfo(const void *ptr, size_t *size,
+                                     int32_t *slot);
+#endif
+
 #ifndef DCHECK
 #ifdef ROS_DEBUG
 #define DCHECK(condition) \
@@ -1035,10 +1042,6 @@ enum class EntryMode { INTERPRETER, BASELINE };
 #define JIT_THRESHOLD 6
 
 // <primjs end>
-enum {
-  GC_INFO_THRESHOLD_MB = 0xFF000000,
-};
-
 // settings key opt
 enum {
   PRIMJS_SNAPSHOT_ENABLE = 0b000000001,

@@ -5,9 +5,11 @@
 #ifndef SRC_GC_POINTER_SET_H_
 #define SRC_GC_POINTER_SET_H_
 
+#include <cassert>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <new>
 #include <utility>
 
 namespace ROS_GC {
@@ -31,13 +33,46 @@ class PointerSet {
   // from many allocation sites, and inlining the probe and growth paths into
   // each of them cost about 4KB of code on arm64.
   __attribute__((noinline)) bool Insert(void *ptr) {
-    if (2 * (size_ + 1) > capacity_) {
+    assert(ptr);
+    if (size_ == capacity_ / 2) {
+      if (Contains(ptr)) return false;
       Rehash(capacity_ == 0 ? kInitialCapacity : 2 * capacity_);
     }
     void **slot = FindSlot(slots_.get(), capacity_, ptr);
     if (*slot == ptr) return false;
     *slot = ptr;
     ++size_;
+    return true;
+  }
+
+  bool Contains(const void *ptr) const {
+    return ptr && capacity_ && *FindSlot(slots_.get(), capacity_, ptr) == ptr;
+  }
+
+  // Reserve before a fallible VM allocation. Table storage uses the system
+  // allocator and never contributes to VM memory accounting.
+  bool TryReserve(size_t size) {
+    return size <= capacity_ / 2 || TryGrow(size);
+  }
+
+  // Backward-shift deletion keeps probes short without tombstones or
+  // allocation. Moving only entries whose probe crosses the hole also
+  // handles clusters that wrap around the end of the table.
+  __attribute__((noinline)) bool Erase(const void *ptr) {
+    if (!ptr || !capacity_) return false;
+    void **slot = FindSlot(slots_.get(), capacity_, ptr);
+    if (!*slot) return false;
+    const size_t mask = capacity_ - 1;
+    size_t hole = slot - slots_.get();
+    for (size_t i = (hole + 1) & mask; slots_[i]; i = (i + 1) & mask) {
+      size_t home = Hash(slots_[i]) & mask;
+      if (((hole - home) & mask) < ((i - home) & mask)) {
+        slots_[hole] = slots_[i];
+        hole = i;
+      }
+    }
+    slots_[hole] = nullptr;
+    --size_;
     return true;
   }
 
@@ -101,6 +136,18 @@ class PointerSet {
  private:
   static constexpr size_t kInitialCapacity = 64;
 
+  __attribute__((noinline)) bool TryGrow(size_t size) {
+    size_t capacity = capacity_ ? capacity_ : kInitialCapacity;
+    while (size > capacity / 2) {
+      if (capacity > SIZE_MAX / sizeof(void *) / 2) return false;
+      capacity *= 2;
+    }
+    std::unique_ptr<void *[]> slots(new (std::nothrow) void *[capacity]());
+    if (!slots) return false;
+    InstallTable(std::move(slots), capacity);
+    return true;
+  }
+
   // The smallest capacity that holds `size` pointers without growing.
   static size_t CapacityFor(size_t size) {
     size_t capacity = kInitialCapacity;
@@ -110,14 +157,14 @@ class PointerSet {
 
   // `capacity` is a power of two and the load factor stays at or below 1/2,
   // so probing always reaches either `ptr` or an empty slot.
-  static void **FindSlot(void **slots, size_t capacity, void *ptr) {
+  static void **FindSlot(void **slots, size_t capacity, const void *ptr) {
     const size_t mask = capacity - 1;
     for (size_t i = Hash(ptr) & mask;; i = (i + 1) & mask) {
       if (slots[i] == nullptr || slots[i] == ptr) return &slots[i];
     }
   }
 
-  static size_t Hash(void *ptr) {
+  static size_t Hash(const void *ptr) {
     // Fibonacci hashing spreads aligned addresses over the low bits.
     uint64_t h = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(ptr)) *
                  0x9E3779B97F4A7C15ull;
@@ -126,6 +173,10 @@ class PointerSet {
 
   void Rehash(size_t new_capacity) {
     std::unique_ptr<void *[]> new_slots(new void *[new_capacity]());
+    InstallTable(std::move(new_slots), new_capacity);
+  }
+
+  void InstallTable(std::unique_ptr<void *[]> new_slots, size_t new_capacity) {
     for (size_t i = 0; i < capacity_; ++i) {
       void *ptr = slots_[i];
       if (ptr != nullptr) *FindSlot(new_slots.get(), new_capacity, ptr) = ptr;

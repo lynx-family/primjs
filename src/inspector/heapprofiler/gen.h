@@ -77,14 +77,16 @@ class HeapSnapshotGenerator {
   HeapSnapshotGenerator& operator=(const HeapSnapshotGenerator&) = delete;
 
   void GenerateSnapshot();
+  bool GenerateSnapshotForSlot();
 
-  HeapEntry* FindEntry(HeapThing ptr) {
+  no_inline HeapEntry* FindEntry(HeapThing ptr) {
     auto it = entries_map_.find(ptr);
     return it != entries_map_.end() ? it->second : nullptr;
   }
 
-  HeapEntry* FindOrAddEntry(LEPUSContext* ctx, const LEPUSValue& value,
-                            HeapEntriesAllocator* allocator) {
+  no_inline HeapEntry* FindOrAddEntry(LEPUSContext* ctx,
+                                      const LEPUSValue& value,
+                                      HeapEntriesAllocator* allocator) {
     if (QjsHeapExplorer::HasEntry(value)) {
       auto it = FindEntry(LEPUS_VALUE_GET_PTR(value));
       return it ? it
@@ -96,8 +98,8 @@ class HeapSnapshotGenerator {
     return nullptr;
   }
 
-  HeapEntry* FindOrAddEntry(LEPUSContext* ctx, const HeapObjPtr& obj,
-                            HeapEntriesAllocator* allocator) {
+  no_inline HeapEntry* FindOrAddEntry(LEPUSContext* ctx, const HeapObjPtr& obj,
+                                      HeapEntriesAllocator* allocator) {
     auto it = FindEntry(obj.ptr_);
     return it ? it
               : entries_map_

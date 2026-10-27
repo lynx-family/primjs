@@ -87,6 +87,7 @@ extern "C" {
 
 #include "gc/global-handles.h"
 #include "gc/trace-gc.h"
+#include "inspector/heapprofiler/runtime_hooks.h"
 #include "quickjs/include/bignum.h"
 #include "quickjs/include/quickjs-inner.h"
 #include "quickjs/include/quickjs-opt-bytecode.h"
@@ -1032,6 +1033,10 @@ bool lepusng_gc_disabled() {
 }
 
 static inline uint8_t *js_get_stack_pointer(void);
+#if defined(ENABLE_HEAPPROFILER) || defined(ENABLE_QUICKJS_DEBUGGER)
+static void js_delete_rc_allocation_set(const LEPUSMallocFunctions *mf,
+                                        void *opaque);
+#endif
 QJS_STATIC LEPUSRuntime *JS_NewRuntime_RC(const LEPUSMallocFunctions *mf,
                                           void *opaque, uint32_t mode,
                                           int32_t *ptr_to_current_slot) {
@@ -1052,7 +1057,12 @@ QJS_STATIC LEPUSRuntime *JS_NewRuntime_RC(const LEPUSMallocFunctions *mf,
   rt = static_cast<LEPUSRuntime *>(
       mf->lepus_malloc(&ms, sizeof(LEPUSRuntime), 0));
 
-  if (!rt) return NULL;
+  if (!rt) {
+#if defined(ENABLE_HEAPPROFILER) || defined(ENABLE_QUICKJS_DEBUGGER)
+    js_delete_rc_allocation_set(mf, opaque);
+#endif
+    return NULL;
+  }
   memset(rt, 0, sizeof(*rt));
 
   rt->qjsvaluevalue_allocator = new QJSValueValueSpace(rt);
@@ -1291,6 +1301,35 @@ static uint8_t js_get_current_memory_slot(JSMallocState *s) {
 // block.
 static constexpr size_t kMemorySlotAllocationOverhead = sizeof(uint8_t);
 
+template <bool TrackAllocations>
+struct RCAllocationTracker {
+  static bool Reserve(JSMallocState *) { return true; }
+  static void Insert(JSMallocState *, void *) {}
+  static void Erase(JSMallocState *, const void *) {}
+};
+
+#if defined(ENABLE_HEAPPROFILER) || defined(ENABLE_QUICKJS_DEBUGGER)
+template <>
+struct RCAllocationTracker<true> {
+  static ROS_GC::PointerSet *Set(JSMallocState *s) {
+    return static_cast<ROS_GC::PointerSet *>(s->opaque);
+  }
+  static bool Reserve(JSMallocState *s) {
+    return Set(s)->TryReserve(Set(s)->Size() + 1);
+  }
+  static void Insert(JSMallocState *s, void *ptr) {
+    bool inserted = Set(s)->Insert(ptr);
+    assert(inserted);
+    (void)inserted;
+  }
+  static void Erase(JSMallocState *s, const void *ptr) {
+    bool erased = Set(s)->Erase(ptr);
+    assert(erased);
+    (void)erased;
+  }
+};
+#endif
+
 static uint8_t js_get_allocation_memory_slot(const void *raw_ptr,
                                              size_t malloc_usable_size) {
   assert(malloc_usable_size > 0);
@@ -1304,7 +1343,8 @@ static void js_set_allocation_memory_slot(void *raw_ptr,
   static_cast<uint8_t *>(raw_ptr)[malloc_usable_size - 1] = slot;
 }
 
-QJS_STATIC void *js_def_malloc_with_memory_slot(
+template <bool TrackAllocations>
+static void *js_def_malloc_with_memory_slot(
     JSMallocState *s, size_t size, int alloc_tag = ALLOC_TAG_WITHOUT_PTR) {
   /* Do not allocate zero bytes: behavior is platform dependent */
   assert(size != 0);
@@ -1313,9 +1353,11 @@ QJS_STATIC void *js_def_malloc_with_memory_slot(
   if (unlikely(s->malloc_size + allocation_size > s->malloc_limit)) {
     return NULL;
   }
+  if (!RCAllocationTracker<TrackAllocations>::Reserve(s)) return NULL;
 
   void *malloc_ptr = malloc(allocation_size);
   if (!malloc_ptr) return NULL;
+  RCAllocationTracker<TrackAllocations>::Insert(s, malloc_ptr);
 
   size_t malloc_size = js_def_malloc_usable_size(malloc_ptr) + MALLOC_OVERHEAD;
   uint8_t slot = js_get_current_memory_slot(s);
@@ -1329,9 +1371,11 @@ QJS_STATIC void *js_def_malloc_with_memory_slot(
   return malloc_ptr;
 }
 
-QJS_STATIC void js_def_free_with_memory_slot(JSMallocState *s, void *ptr) {
+template <bool TrackAllocations>
+static void js_def_free_with_memory_slot(JSMallocState *s, void *ptr) {
   if (!ptr) return;
 
+  RCAllocationTracker<TrackAllocations>::Erase(s, ptr);
   size_t malloc_usable_size = js_def_malloc_usable_size(ptr);
   size_t malloc_size = malloc_usable_size + MALLOC_OVERHEAD;
   uint8_t slot = js_get_allocation_memory_slot(ptr, malloc_usable_size);
@@ -1343,15 +1387,16 @@ QJS_STATIC void js_def_free_with_memory_slot(JSMallocState *s, void *ptr) {
   free(ptr);
 }
 
-QJS_STATIC void *js_def_realloc_with_memory_slot(
+template <bool TrackAllocations>
+static void *js_def_realloc_with_memory_slot(
     JSMallocState *s, void *ptr, size_t size,
     int alloc_tag = ALLOC_TAG_WITHOUT_PTR) {
   if (!ptr) {
     if (size == 0) return NULL;
-    return js_def_malloc_with_memory_slot(s, size, alloc_tag);
+    return js_def_malloc_with_memory_slot<TrackAllocations>(s, size, alloc_tag);
   }
   if (size == 0) {
-    js_def_free_with_memory_slot(s, ptr);
+    js_def_free_with_memory_slot<TrackAllocations>(s, ptr);
     return NULL;
   }
 
@@ -1366,8 +1411,16 @@ QJS_STATIC void *js_def_realloc_with_memory_slot(
     return NULL;
   }
 
+  // Replacing a live address cannot grow the set, so a successful realloc
+  // never needs a fallible table allocation.
+  uintptr_t old_address = reinterpret_cast<uintptr_t>(ptr);
   void *new_malloc_ptr = realloc(ptr, allocation_size);
   if (!new_malloc_ptr) return NULL;
+  if (reinterpret_cast<uintptr_t>(new_malloc_ptr) != old_address) {
+    RCAllocationTracker<TrackAllocations>::Erase(
+        s, reinterpret_cast<const void *>(old_address));
+    RCAllocationTracker<TrackAllocations>::Insert(s, new_malloc_ptr);
+  }
 
   size_t new_malloc_usable_size = js_def_malloc_usable_size(new_malloc_ptr);
   size_t new_malloc_size = new_malloc_usable_size + MALLOC_OVERHEAD;
@@ -1396,12 +1449,49 @@ QJS_STATIC size_t js_def_malloc_usable_size_with_memory_slot(const void *ptr) {
 }
 
 static const LEPUSMallocFunctions def_malloc_funcs_with_memory_slot = {
-    js_def_malloc_with_memory_slot,
-    js_def_free_with_memory_slot,
-    js_def_realloc_with_memory_slot,
+    js_def_malloc_with_memory_slot<false>,
+    js_def_free_with_memory_slot<false>,
+    js_def_realloc_with_memory_slot<false>,
     js_def_malloc_usable_size_with_memory_slot,
 };
+#if defined(ENABLE_HEAPPROFILER) || defined(ENABLE_QUICKJS_DEBUGGER)
+static const LEPUSMallocFunctions def_malloc_funcs_with_allocation_set = {
+    js_def_malloc_with_memory_slot<true>,
+    js_def_free_with_memory_slot<true>,
+    js_def_realloc_with_memory_slot<true>,
+    js_def_malloc_usable_size_with_memory_slot,
+};
+#endif
 #endif  // QJS_RC_MEMORY_SLOT_TRACKING_SUPPORTED
+
+#if defined(ENABLE_HEAPPROFILER) || defined(ENABLE_QUICKJS_DEBUGGER)
+static void js_delete_rc_allocation_set(const LEPUSMallocFunctions *mf,
+                                        void *opaque) {
+#if QJS_RC_MEMORY_SLOT_TRACKING_SUPPORTED
+  if (mf->lepus_free == js_def_free_with_memory_slot<true>) {
+    delete static_cast<ROS_GC::PointerSet *>(opaque);
+  }
+#endif
+}
+
+ROS_GC::PointerSet *JS_GetRCAllocationSet(LEPUSRuntime *rt) {
+#if QJS_RC_MEMORY_SLOT_TRACKING_SUPPORTED
+  if (!rt->gc_enable &&
+      rt->mf.lepus_free == js_def_free_with_memory_slot<true>) {
+    return static_cast<ROS_GC::PointerSet *>(rt->malloc_state.opaque);
+  }
+#endif
+  return nullptr;
+}
+
+void JS_GetRCAllocationInfo(const void *ptr, size_t *size, int32_t *slot) {
+#if QJS_RC_MEMORY_SLOT_TRACKING_SUPPORTED
+  size_t usable = js_def_malloc_usable_size(ptr);
+  *size = usable + MALLOC_OVERHEAD;
+  *slot = js_get_allocation_memory_slot(ptr, usable);
+#endif
+}
+#endif
 
 static const LEPUSMallocFunctions def_malloc_funcs = {
     js_def_malloc,
@@ -1429,6 +1519,15 @@ LEPUSRuntime *LEPUS_NewRuntimeWithModeMemoryTrackSlot(
   const LEPUSMallocFunctions *malloc_funcs = &def_malloc_funcs;
 #if QJS_RC_MEMORY_SLOT_TRACKING_SUPPORTED
   if (ptr_to_current_slot) malloc_funcs = &def_malloc_funcs_with_memory_slot;
+#if defined(ENABLE_HEAPPROFILER) || defined(ENABLE_QUICKJS_DEBUGGER)
+  if (ptr_to_current_slot &&
+      (mode & LEPUS_RUNTIME_ENABLE_ALLOCATION_TRACKING)) {
+    auto *allocations = new (std::nothrow) ROS_GC::PointerSet();
+    if (!allocations) return nullptr;
+    return JS_NewRuntime_RC(&def_malloc_funcs_with_allocation_set, allocations,
+                            mode, ptr_to_current_slot);
+  }
+#endif
 #else
   ptr_to_current_slot = nullptr;
 #endif
@@ -1473,7 +1572,9 @@ int32_t LEPUS_DumpMemorySlots(
 }
 
 void set_gc_info_threshold(LEPUSRuntime *rt, uint32_t mode) {
-  rt->gc_info_threshold = ((mode & GC_INFO_THRESHOLD_MB) >> 24) * MB;
+  rt->gc_info_threshold = ((mode & LEPUS_RUNTIME_GC_INFO_THRESHOLD_MB_MASK) >>
+                           LEPUS_RUNTIME_GC_INFO_THRESHOLD_MB_SHIFT) *
+                          MB;
   rt->gc_info_interval_size = 0;
 }
 
@@ -2026,8 +2127,15 @@ void LEPUS_FreeRuntime(LEPUSRuntime *rt) {
   }
 
   {
+#if defined(ENABLE_HEAPPROFILER) || defined(ENABLE_QUICKJS_DEBUGGER)
+    js_profile_remove_runtime(rt);
+#endif
     JSMallocState ms = rt->malloc_state;
-    rt->mf.lepus_free(&ms, rt);
+    LEPUSMallocFunctions mf = rt->mf;
+    mf.lepus_free(&ms, rt);
+#if defined(ENABLE_HEAPPROFILER) || defined(ENABLE_QUICKJS_DEBUGGER)
+    js_delete_rc_allocation_set(&mf, ms.opaque);
+#endif
   }
 
 #ifdef DEBUG_MEMORY
@@ -6439,6 +6547,8 @@ void LEPUS_RunGC(LEPUSRuntime *rt) {
 
   /* free the GC objects in a cycle */
   gc_free_cycles(rt);
+  // Keep the reentry guard active while notifying the observer.
+  JS_UpdateGCInfo(rt, 0, GCInfoUpdateReason::kFullGC);
   rt->gc_depth--;
   return;
 }
@@ -53115,22 +53225,24 @@ int64_t NapiAdjustExternalMemory(LEPUSRuntime *rt, int64_t size) {
 }
 
 void LEPUS_SetGCObserver(LEPUSRuntime *rt, void *opaque) {
-#ifdef ENABLE_COMPATIBLE_MM
   rt->gc_observer = opaque;
-#endif
 }
 
-void *LEPUS_GetGCObserver(LEPUSRuntime *rt) {
-#ifdef ENABLE_COMPATIBLE_MM
-  return rt->gc_observer;
-#else
-  return nullptr;
-#endif
-}
+void *LEPUS_GetGCObserver(LEPUSRuntime *rt) { return rt->gc_observer; }
 
 #if !defined(ENABLE_HEAPPROFILER) && !defined(ENABLE_QUICKJS_DEBUGGER)
 extern "C" const char *js_profile_take_heap_snapshot(LEPUSContext *ctx) {
   (void)ctx;
+  return nullptr;
+}
+
+extern "C" const char *js_profile_take_heap_snapshot_for_slot(
+    LEPUSContext *ctx, int32_t slot, LEPUS_BOOL include_internal_allocations,
+    LEPUS_BOOL summarize_diagnostics) {
+  (void)ctx;
+  (void)slot;
+  (void)include_internal_allocations;
+  (void)summarize_diagnostics;
   return nullptr;
 }
 
