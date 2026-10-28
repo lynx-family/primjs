@@ -233,6 +233,24 @@ void InterpreterAssembler::CheckStackOverflow(son::node::Node* sp) {
   Bind(&not_overflow);
 }
 
+void InterpreterAssembler::PollInterrupts() {
+  auto ctx = GetCtx();
+  auto offset = AccessBuilder::interrupt_counter_offset();
+  auto counter = LoadByteOffset(son::node::MachineType::kInt32, ctx, offset);
+  counter = Int32Sub(counter, IntValue(1));
+  StoreByteOffset(son::node::MachineType::kInt32, ctx, offset, counter);
+
+  son::node::Label done(this);
+  BranchIf(GreaterThan(counter, IntValue(0)), &done,
+           son::node::BranchHint::kTrue);
+  {
+    auto desc = son::node::CallDescriptors::prim_js_poll_interrupts_gc();
+    CallIntRetRuntime(desc, ctx);
+    Jump(&done);
+  }
+  Bind(&done);
+}
+
 son::node::Node* InterpreterAssembler::PushStackFrame(
     son::node::Node* alloc_size, son::node::Node** sf_end_ptr) {
   son::node::Node* rsp = nullptr;
