@@ -49269,28 +49269,41 @@ static LEPUSValue js_bigint_asUintN(LEPUSContext *ctx, LEPUSValueConst this_val,
     LEPUS_FreeValue(ctx, a);
     return LEPUS_NewBigInt64(ctx, 0);
   }
-  if (bits >= p->len * JS_LIMB_BITS) {
+  if (bits >= p->len * JS_LIMB_BITS && (asIntN || !js_bigint_sign(p))) {
     res = a;
   } else {
-    int len, shift, i;
+    int len, shift, i, l, is_neg;
     js_limb_t v;
-    len = (bits + JS_LIMB_BITS - 1) / JS_LIMB_BITS;
+    is_neg = js_bigint_sign(p);
+    len = min_int64((bits + JS_LIMB_BITS - 1) / JS_LIMB_BITS, INT32_MAX);
     r = js_bigint_new(ctx, len);
     if (!r) {
       LEPUS_FreeValue(ctx, a);
       return LEPUS_EXCEPTION;
     }
+    /* sign extend */
     r->len = len;
-    for (i = 0; i < len - 1; i++) r->tab[i] = p->tab[i];
+    l = min_int(len, p->len);
+    for (i = 0; i < l; i++) r->tab[i] = p->tab[i];
+    for (i = l; i < len; i++) r->tab[i] = -is_neg;
     shift = (-bits) & (JS_LIMB_BITS - 1);
     /* 0 <= shift <= JS_LIMB_BITS - 1 */
-    v = p->tab[len - 1] << shift;
+    v = r->tab[len - 1] << shift;
     if (asIntN)
       v = (js_slimb_t)v >> shift;
     else
       v = v >> shift;
     r->tab[len - 1] = v;
-    r = js_bigint_normalize(ctx, r);
+    if (asIntN) {
+      r = js_bigint_normalize(ctx, r);
+    } else {
+      /* add a zero limb if the top bit is set */
+      r = js_bigint_extend(ctx, r, 0);
+      if (!r) {
+        LEPUS_FreeValue(ctx, a);
+        return LEPUS_EXCEPTION;
+      }
+    }
     LEPUS_FreeValue(ctx, a);
     res = JS_CompactBigInt(ctx, r);
   }
