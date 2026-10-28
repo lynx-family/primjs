@@ -336,6 +336,10 @@ set_source_files_properties(
     COMPILE_FLAGS
     "${CMAKE_CXX_FLAGS} -fvisibility=hidden -fvisibility-inlines-hidden")
 add_library(quickjs STATIC ${quickjs_sources})
+if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+  find_package(Threads REQUIRED)
+  target_link_libraries(quickjs PUBLIC Threads::Threads)
+endif()
 add_library(napi_static STATIC ${napi_sources})
 if(ENABLE_PRIMJS_HARMONY AND ENABLE_JSVM)
   target_link_libraries(napi_static PUBLIC ${CMAKE_DL_LIBS})
