@@ -20,13 +20,9 @@ namespace quickjs {
 namespace heapprofiler {
 
 SnapshotObjectId HeapObjectIdMaps::GetHeapObjId(const HeapPtr ptr) {
-  auto itr = objectid_maps_.find(ptr);
-
-  if (itr != objectid_maps_.end()) {
-    return itr->second;
-  }
-  objectid_maps_.emplace(ptr, (next_id_ += kObjectIdStep));
-  return next_id_;
+  auto result = objectid_maps_.try_emplace(ptr, next_id_ + kObjectIdStep);
+  if (result.second) next_id_ += kObjectIdStep;
+  return result.first->second;
 }
 
 std::ostream& HeapObjectIdMaps::DumpObjectIdMaps(std::ostream& output) {

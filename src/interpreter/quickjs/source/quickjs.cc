@@ -87,6 +87,7 @@ extern "C" {
 
 #include "gc/global-handles.h"
 #include "gc/trace-gc.h"
+#include "inspector/heapprofiler/runtime_hooks.h"
 #include "quickjs/include/bignum.h"
 #include "quickjs/include/quickjs-inner.h"
 #include "quickjs/include/quickjs-opt-bytecode.h"
@@ -2028,6 +2029,9 @@ void LEPUS_FreeRuntime(LEPUSRuntime *rt) {
   }
 
   {
+#if defined(ENABLE_HEAPPROFILER) || defined(ENABLE_QUICKJS_DEBUGGER)
+    js_profile_remove_runtime(rt);
+#endif
     JSMallocState ms = rt->malloc_state;
     rt->mf.lepus_free(&ms, rt);
   }
@@ -53134,6 +53138,16 @@ void *LEPUS_GetGCObserver(LEPUSRuntime *rt) { return rt->gc_observer; }
 #if !defined(ENABLE_HEAPPROFILER) && !defined(ENABLE_QUICKJS_DEBUGGER)
 extern "C" const char *js_profile_take_heap_snapshot(LEPUSContext *ctx) {
   (void)ctx;
+  return nullptr;
+}
+
+extern "C" const char *js_profile_take_heap_snapshot_for_slot(
+    LEPUSContext *ctx, int32_t slot, LEPUS_BOOL include_internal_allocations,
+    LEPUS_BOOL summarize_diagnostics) {
+  (void)ctx;
+  (void)slot;
+  (void)include_internal_allocations;
+  (void)summarize_diagnostics;
   return nullptr;
 }
 

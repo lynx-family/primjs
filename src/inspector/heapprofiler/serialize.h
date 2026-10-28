@@ -12,7 +12,6 @@
 
 #include <fstream>
 #include <iostream>
-#include <sstream>
 #include <string>
 #include <unordered_map>
 
@@ -32,46 +31,20 @@ class OutputStream {
 // write to devtool helper
 class OutputStreamWriter {
  public:
-  explicit OutputStreamWriter(OutputStream* stream)
-      : front_stream_(stream), chunk_size(stream->GetChunkSize()) {}
-
-  ~OutputStreamWriter() {}
-
-  void AddString(const char* input) {
-    ss_ << input;
-    WriteChunkToOutStream();
-  }
-
-  void AddString(const std::string& input) {
-    ss_ << input;
-    WriteChunkToOutStream();
-  }
-
-  template <typename T>
-  void AddString(T input) {
-    ss_ << input;
-  }
-
-  void Finalize() {
-    front_stream_->WriteChunk(ss_.str());
-    Clear();
-  }
-
-  void Clear() {
-    ss_.clear();
-    ss_.str("");
-  }
+  explicit OutputStreamWriter(OutputStream* stream);
+  void AddString(const char* input);
+  void AddString(const std::string& input);
+  void AddString(char input);
+  void AddString(unsigned char input) { AddString(static_cast<char>(input)); }
+  void AddNumber(uint64_t input);
+  void Finalize();
+  void Clear() { buffer_.clear(); }
 
  private:
-  void WriteChunkToOutStream() {
-    if (ss_.str().length() >= chunk_size) {
-      front_stream_->WriteChunk(ss_.str());
-      Clear();
-    }
-  }
-  std::stringstream ss_;
+  void AddBytes(const char* input, size_t size);
+  std::string buffer_;
   OutputStream* front_stream_;
-  uint32_t chunk_size = 0;
+  uint32_t chunk_size_;
 };
 
 class HeapSnapshotJSONSerializer {
