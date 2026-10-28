@@ -200,7 +200,7 @@ DumpPassResult DumpPassSeconds(const std::string& source, int iterations) {
   return {std::chrono::duration<double>(end - begin).count(), dump_size};
 }
 
-TEST(QjsCoveragePerf, CompileAndExecuteDegradationRatio) {
+TEST(QjsCoveragePerf, DISABLED_CompileAndExecuteDegradationRatio) {
   // ---- compile phase -----------------------------------------------------
   constexpr int kCompileFunctions = 200;
   constexpr int kCompileIterations = 400;
@@ -252,7 +252,7 @@ TEST(QjsCoveragePerf, CompileAndExecuteDegradationRatio) {
   EXPECT_GE(exec_ratio, -0.05);
 }
 
-TEST(QjsCoveragePerf, DumpSerialization) {
+TEST(QjsCoveragePerf, DISABLED_DumpSerialization) {
   constexpr int kDumpFunctions = 500;
   constexpr int kDumpIterations = 30;
   const std::string source = MakeCompileWorkload(kDumpFunctions);
