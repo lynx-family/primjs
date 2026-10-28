@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "type": "module",
   "engines": {
-    "node": ">=22"
+    "node": ">=18"
   },
   "scripts": {
     "deps:android": "node scripts/fetch-libs.mjs --platform android --out vendor/android",
