@@ -1809,36 +1809,6 @@ done:
   return ret;
 }
 
-// given LEPUSClosureVar, return the closure lepusvalue
-QJS_STATIC LEPUSValue FindClosureVar(struct LEPUSStackFrame* sf,
-                                     struct LEPUSClosureVar* cvar) {
-  while (sf && sf->prev_frame) {
-    sf = sf->prev_frame;
-    LEPUSObject* f = LEPUS_VALUE_GET_OBJ(sf->cur_func);
-    if (!f || !lepus_class_has_bytecode(f->class_id)) return LEPUS_UNDEFINED;
-    struct LEPUSFunctionBytecode* b = f->u.func.function_bytecode;
-
-    if (cvar->is_local) {
-      if (cvar->is_arg) {
-        if (!sf->arg_buf || cvar->var_idx >= b->arg_count) {
-          return LEPUS_UNDEFINED;
-        }
-        return sf->arg_buf[cvar->var_idx];
-      } else {
-        if (!sf->var_buf || cvar->var_idx >= b->var_count) {
-          return LEPUS_UNDEFINED;
-        }
-        return sf->var_buf[cvar->var_idx];
-      }
-    }
-
-    if (!b->closure_var) break;
-    cvar = b->closure_var + cvar->var_idx;
-  }
-
-  return LEPUS_UNDEFINED;
-}
-
 // get closure variables given the stack frame
 QJS_HIDE LEPUSValue GetFrameClosureVariables(LEPUSContext* ctx,
                                              int32_t stack_index,
@@ -1857,29 +1827,30 @@ QJS_HIDE LEPUSValue GetFrameClosureVariables(LEPUSContext* ctx,
       continue;
     }
 
-    LEPUSObject* f = LEPUS_VALUE_GET_OBJ(sf->cur_func);
+    LEPUSValue function = sf->cur_func;
+    HandleScope frame_scope(ctx, &function, HANDLE_TYPE_LEPUS_VALUE);
+    LEPUSObject* f = LEPUS_VALUE_GET_OBJ(function);
     if (!f || !lepus_class_has_bytecode(f->class_id)) goto done;
 
     struct LEPUSFunctionBytecode* b = f->u.func.function_bytecode;
+    const uint32_t closure_var_count = b->closure_var_count;
 
-    for (uint32_t i = 0; i < b->closure_var_count; i++) {
-      struct LEPUSClosureVar* cvar = b->closure_var + i;
-      LEPUSValue val = FindClosureVar(sf, cvar);
+    for (uint32_t i = 0; i < closure_var_count; i++) {
+      // The dynamic caller need not be the lexical parent. Resolve captures
+      // through this function's VarRefs, for both live and detached variables.
+      // Reload heap pointers after the previous property write may have GC'd.
+      f = LEPUS_VALUE_GET_OBJ(function);
+      b = f->u.func.function_bytecode;
+      JSAtom var_name = b->closure_var[i].var_name;
       LEPUSValue ret_val = LEPUS_UNDEFINED;
-      if (LEPUS_IsUndefined(val)) {
-        JSVarRef** var_refs = f->u.func.var_refs;
-        if (var_refs) {
-          JSVarRef* var_ref = var_refs[i];
-          if (var_ref) {
-            ret_val = LEPUS_DupValue(ctx, var_ref->value);
-          }
-        }
-      } else {
-        ret_val = LEPUS_DupValue(ctx, val);
+      HandleScope value_scope(ctx, &ret_val, HANDLE_TYPE_LEPUS_VALUE);
+      value_scope.PushLEPUSAtom(var_name);
+      JSVarRef** var_refs = f->u.func.var_refs;
+      if (var_refs && var_refs[i] && var_refs[i]->pvalue) {
+        ret_val = LEPUS_DupValue(ctx, *var_refs[i]->pvalue);
       }
 
-      LEPUS_SetPropertyInternal(ctx, ret, cvar->var_name, ret_val,
-                                LEPUS_PROP_THROW);
+      LEPUS_SetPropertyInternal(ctx, ret, var_name, ret_val, LEPUS_PROP_THROW);
     }
     break;
   }

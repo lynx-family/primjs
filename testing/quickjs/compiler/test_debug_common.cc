@@ -850,6 +850,182 @@ add();
   ASSERT_TRUE(match_res == true);
 }
 
+static void ExpectClosureProperty(LEPUSContext* ctx, int scope_id,
+                                  const char* name, LEPUSValue expected) {
+  const int request_id = 100 + scope_id;
+  SendRuntimeGetProperties(ctx, request_id,
+                           "scope:" + std::to_string(scope_id));
+  std::string response = PopResponseById(ctx, request_id);
+  ASSERT_FALSE(response.empty());
+  LEPUSValue properties = GetPropertiesResultArray(ctx, response);
+  HandleScope handles(ctx, &properties, HANDLE_TYPE_LEPUS_VALUE);
+  LEPUSValue remote = FindPropertyRemoteObjectByName(ctx, properties, name);
+  handles.PushHandle(&remote, HANDLE_TYPE_LEPUS_VALUE);
+  EXPECT_TRUE(LEPUS_IsObject(remote)) << name << ": " << response;
+  LEPUSValue type = LEPUS_GetPropertyStr(ctx, remote, "type");
+  handles.PushHandle(&type, HANDLE_TYPE_LEPUS_VALUE);
+  if (LEPUS_IsUndefined(expected)) {
+    EXPECT_EQ(GetJsonString(ctx, type), "undefined") << response;
+  } else {
+    EXPECT_EQ(GetJsonString(ctx, type), "number") << response;
+    EXPECT_EQ(ExtractRemoteObjectIntValue(ctx, remote),
+              LEPUS_VALUE_GET_INT(expected))
+        << name << ": " << response;
+  }
+  if (!ctx->rt->gc_enable) {
+    LEPUS_FreeValue(ctx, type);
+    LEPUS_FreeValue(ctx, remote);
+    LEPUS_FreeValue(ctx, properties);
+  }
+}
+
+static void ResumeAfterClosureProperties(LEPUSContext* ctx) {
+  ProcessPausedMessages(ctx,
+                        R"({"id":99,"method":"Debugger.resume","params":{}})");
+}
+
+TEST_F(QjsDebugMethods, QJSDebugTestClosurePropertiesWithUnrelatedCaller) {
+  auto funcs = GetQJSCallbackFuncs();
+  funcs[0] = reinterpret_cast<void*>(+[](LEPUSContext* ctx) {
+    // 词法父函数已经返回，动态 caller 的局部变量不能用来解析 closure。
+    ExpectClosureProperty(ctx, 2, "rootValue", LEPUS_NewInt32(ctx, 101));
+    ExpectClosureProperty(ctx, 2, "middleValue", LEPUS_NewInt32(ctx, 20));
+    ResumeAfterClosureProperties(ctx);
+  });
+  RegisterQJSDebuggerCallbacks(rt_, funcs.data(), funcs.size());
+  QjsDebugQueue::GetSendMessageQueue().push(
+      R"({"id":1,"method":"Debugger.enable","params":{}})");
+  const char* script = R"(
+    function makeClosure(rootValue) {
+      return function middle() {
+        let middleValue = 20;
+        return function leaf() {
+          debugger;
+          return rootValue + middleValue;
+        };
+      };
+    }
+    const leaf = makeClosure(101)();
+    function unrelatedCaller(callback) {
+      let wrongValue = -999;
+      return callback() + wrongValue;
+    }
+    unrelatedCaller(leaf);
+  )";
+  EvalScriptExpectNoException(ctx_, script, "closure_unrelated_caller.js");
+  EXPECT_FALSE(PopResponseById(ctx_, 99).empty());
+}
+
+TEST_F(QjsDebugMethods, QJSDebugTestClosurePropertiesWithLiveReferences) {
+  auto funcs = GetQJSCallbackFuncs();
+  funcs[0] = reinterpret_cast<void*>(+[](LEPUSContext* ctx) {
+    // 捕获值仍在词法父函数栈上，并且已经被 child 改写。
+    LEPUS_RunGC(ctx->rt);
+    ExpectClosureProperty(ctx, 2, "argument", LEPUS_NewInt32(ctx, 101));
+    ExpectClosureProperty(ctx, 2, "captured", LEPUS_NewInt32(ctx, 27));
+    ExpectClosureProperty(ctx, 2, "unset", LEPUS_UNDEFINED);
+    ResumeAfterClosureProperties(ctx);
+  });
+  RegisterQJSDebuggerCallbacks(rt_, funcs.data(), funcs.size());
+  QjsDebugQueue::GetSendMessageQueue().push(
+      R"({"id":1,"method":"Debugger.enable","params":{}})");
+  const char* script = R"(
+    function unrelatedCaller(callback) {
+      let wrongValue = -999;
+      return callback() + wrongValue;
+    }
+    function outer(argument) {
+      let captured = 1;
+      let unset;
+      function child() {
+        captured = 27;
+        debugger;
+        return argument + captured + (unset === undefined ? 0 : 1);
+      }
+      return unrelatedCaller(child);
+    }
+    outer(101);
+  )";
+  EvalScriptExpectNoException(ctx_, script, "closure_live_references.js");
+  EXPECT_FALSE(PopResponseById(ctx_, 99).empty());
+}
+
+TEST_F(QjsDebugMethods,
+       QJSDebugTestClosurePropertiesWithDifferentLexicalLayout) {
+  auto funcs = GetQJSCallbackFuncs();
+  funcs[0] = reinterpret_cast<void*>(+[](LEPUSContext* ctx) {
+    ExpectClosureProperty(ctx, 2, "value511", LEPUS_NewInt32(ctx, 511));
+    ExpectClosureProperty(ctx, 2, "sum", LEPUS_NewInt32(ctx, 130305));
+    ResumeAfterClosureProperties(ctx);
+  });
+  RegisterQJSDebuggerCallbacks(rt_, funcs.data(), funcs.size());
+  QjsDebugQueue::GetSendMessageQueue().push(
+      R"({"id":1,"method":"Debugger.enable","params":{}})");
+
+  // middle 有 512 个词法捕获，caller 仅有一个；不能复用两者的索引。
+  std::string script = "function outer() {\n";
+  for (int i = 0; i < 512; ++i) {
+    script +=
+        "let value" + std::to_string(i) + " = " + std::to_string(i) + ";\n";
+  }
+  script += "return function middle() { function warmup() { return 0";
+  for (int i = 0; i < 511; ++i) {
+    script += " + value" + std::to_string(i);
+  }
+  script += R"(; }
+      let sum = warmup();
+      return function leaf() {
+        debugger;
+        return value511 + sum;
+      };
+    };
+  }
+  const leaf = outer()();
+  const caller = (function makeCaller() {
+    let marker = -999;
+    return function caller(callback) {
+      return marker + callback();
+    };
+  })();
+  caller(leaf);
+  )";
+  EvalScriptExpectNoException(ctx_, script, "closure_lexical_layout.js");
+  EXPECT_FALSE(PopResponseById(ctx_, 99).empty());
+}
+
+TEST_F(QjsDebugMethods, QJSDebugTestClosurePropertiesAcrossCallerScopes) {
+  auto funcs = GetQJSCallbackFuncs();
+  funcs[0] = reinterpret_cast<void*>(+[](LEPUSContext* ctx) {
+    // 连续展开 scope:2..8；各层 caller 参数都与词法捕获值不同。
+    for (int scope_id = 2; scope_id <= 8; ++scope_id) {
+      LEPUS_RunGC(ctx->rt);
+      ExpectClosureProperty(ctx, scope_id, "captured",
+                            LEPUS_NewInt32(ctx, scope_id - 1));
+    }
+    ResumeAfterClosureProperties(ctx);
+  });
+  RegisterQJSDebuggerCallbacks(rt_, funcs.data(), funcs.size());
+  QjsDebugQueue::GetSendMessageQueue().push(
+      R"({"id":1,"method":"Debugger.enable","params":{}})");
+  const char* script = R"(
+    function makeFrame(captured, next) {
+      return function frame(wrongValue) {
+        if (!next) {
+          debugger;
+        }
+        return captured + (next ? next(-999) : wrongValue);
+      };
+    }
+    let next = null;
+    for (let i = 1; i <= 7; ++i) {
+      next = makeFrame(i, next);
+    }
+    next(-999);
+  )";
+  EvalScriptExpectNoException(ctx_, script, "closure_caller_scopes.js");
+  EXPECT_FALSE(PopResponseById(ctx_, 99).empty());
+}
+
 TEST_F(QjsDebugMethods, QJSDebugTestGetRemoteObjectNum) {
   LEPUSValue num1 = LEPUS_NewInt32(ctx_, 100);
   LEPUSValue num1_obj = GetRemoteObject(ctx_, num1, true, true);  // free num1
