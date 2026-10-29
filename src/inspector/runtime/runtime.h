@@ -49,6 +49,8 @@ void HandleRuntimeEnable(DebuggerParams*);
 // https://chromedevtools.github.io/devtools-protocol/tot/Runtime/#method-discardConsoleEntries
 void HandleDiscardConsoleEntries(DebuggerParams*);
 
+void ClearConsoleMessages(LEPUSContext*);
+
 // evaluate a script
 // ref:
 // https://chromedevtools.github.io/devtools-protocol/tot/Runtime/#method-evaluate

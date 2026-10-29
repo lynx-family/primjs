@@ -16,17 +16,17 @@
 #include "inspector/heapprofiler/heapexplorer.h"
 #include "quickjs/include/quickjs-inner.h"
 
+#ifdef ENABLE_QUICKJS_DEBUGGER
+#include "inspector/runtime/runtime.h"
+#endif
+
 namespace quickjs {
 namespace heapprofiler {
 
 SnapshotObjectId HeapObjectIdMaps::GetHeapObjId(const HeapPtr ptr) {
-  auto itr = objectid_maps_.find(ptr);
-
-  if (itr != objectid_maps_.end()) {
-    return itr->second;
-  }
-  objectid_maps_.emplace(ptr, (next_id_ += kObjectIdStep));
-  return next_id_;
+  auto result = objectid_maps_.try_emplace(ptr, next_id_ + kObjectIdStep);
+  if (result.second) next_id_ += kObjectIdStep;
+  return result.first->second;
 }
 
 std::ostream& HeapObjectIdMaps::DumpObjectIdMaps(std::ostream& output) {
@@ -52,17 +52,37 @@ HeapSnapshotGenerator::HeapSnapshotGenerator(HeapSnapshot* snapshot,
       quickjs_heap_explorer_(snapshot, ctx),
       reporter_(report) {}
 
+no_inline HeapEntry* HeapSnapshotGenerator::InsertEntry(HeapThing ptr,
+                                                        HeapEntry* entry) {
+  return entries_map_.emplace(ptr, entry).first->second;
+}
+
+void HeapSnapshotGenerator::CollectGarbage() {
+  auto* rt = LEPUS_GetRuntime(context_);
+#ifdef ENABLE_QUICKJS_DEBUGGER
+  if (snapshot_->clear_console_messages()) {
+    ScopedCommonMemorySlot common_slot(rt);
+    list_head* el;
+    list_for_each(el, &rt->context_list) {
+      auto* ctx = list_entry(el, LEPUSContext, link);
+      if (ctx->debugger_info && ctx->debugger_info->console.length) {
+        ClearConsoleMessages(ctx);
+      }
+    }
+  }
+#endif
+  // forceParallel completes prior concurrent work and synchronously sweeps.
+  LEPUS_RunGC(rt);
+}
+
 void HeapSnapshotGenerator::GenerateSnapshot() {
-  // TODO: Implement
-  // 1. GC
-  // 2. count total obj
-  // 3. Traverse the obj list and alloc entry for obj
-  // 4. Iterate and extract every obj
-  LEPUS_RunGC(LEPUS_GetRuntime(context_));
+  CollectGarbage();
 
   snapshot_->AddSyntheticRootEntries();
   FillReferences();
+  quickjs_heap_explorer_.ExtractRuntimeAllocationReferences();
   snapshot_->FillChildren();
+  if (snapshot_->summarize_diagnostics()) snapshot_->SummarizeDiagnostics();
   ProgressGenResult();
 
   snapshot_->RememberLastJsObjectId();

@@ -430,12 +430,12 @@ TEST(HeapProfiler, CodeObjects) {
 
   ASSERT_TRUE(compiled);
 
-  ASSERT_TRUE(compiled->name() == "Function");
+  ASSERT_EQ(compiled->name(), "compiled");
+  ASSERT_EQ(compiled->type(), HeapEntry::kClosure);
 
   auto* compile_bytecode =
       GetProperty(compiled, HeapGraphEdge::kInternal, "function_bytecode");
-  ASSERT_TRUE(compile_bytecode &&
-              compile_bytecode->type() == HeapEntry::kClosure);
+  ASSERT_TRUE(compile_bytecode && compile_bytecode->type() == HeapEntry::kCode);
   bool has_constant_pool_edge = false;
   for (size_t i = 0, count = compile_bytecode->children_count(); i < count;
        ++i) {
@@ -451,21 +451,23 @@ TEST(HeapProfiler, CodeObjects) {
   auto* lazy =
       GetGlobalProperty(heapsnapshot, HeapGraphEdge::kProperty, "lazy");
 
-  ASSERT_TRUE(lazy && lazy->name() == "Function");
+  ASSERT_TRUE(lazy && lazy->name() == "lazy");
+  ASSERT_EQ(lazy->type(), HeapEntry::kClosure);
   auto* lazy_bytecode =
       GetProperty(lazy, HeapGraphEdge::kInternal, "function_bytecode");
 
-  ASSERT_TRUE(lazy_bytecode && lazy_bytecode->type() == HeapEntry::kClosure);
+  ASSERT_TRUE(lazy_bytecode && lazy_bytecode->type() == HeapEntry::kCode);
 
   auto* anonymous =
       GetGlobalProperty(heapsnapshot, HeapGraphEdge::kProperty, "anonymous");
 
-  ASSERT_TRUE(anonymous && anonymous->name() == "Function");
+  ASSERT_TRUE(anonymous && anonymous->name() == "anonymous");
+  ASSERT_EQ(anonymous->type(), HeapEntry::kClosure);
   auto* anonymous_bytecode =
       GetProperty(anonymous, HeapGraphEdge::kInternal, "function_bytecode");
 
   ASSERT_TRUE(anonymous_bytecode &&
-              anonymous_bytecode->type() == HeapEntry::kClosure);
+              anonymous_bytecode->type() == HeapEntry::kCode);
 }
 
 TEST(HeapProfiler, HeapNumber) {
@@ -613,6 +615,7 @@ TEST(HeapProfiler, TracingGcTakeSnapshotPreservesConsoleMessages) {
 
 #ifdef ENABLE_QUICKJS_DEBUGGER
   ScopedQjsDebugger debugger(env.ctx);
+
   auto* info = env.ctx->debugger_info;
   ASSERT_TRUE(info);
 
@@ -624,15 +627,18 @@ TEST(HeapProfiler, TracingGcTakeSnapshotPreservesConsoleMessages) {
   ASSERT_FALSE(LEPUS_IsUndefined(info->console.messages));
   ASSERT_GT(info->console.length, 0);
 
-  void* messages_ptr = LEPUS_VALUE_GET_PTR(info->console.messages);
-  int32_t messages_length = info->console.length;
+  const auto generation = info->console.generations[0];
+  const auto messages = LEPUS_VALUE_GET_PTR(info->console.messages);
+  const auto length = info->console.length;
 
   auto* snapshot = GetQjsHeapProfilerImplInstance().TakeHeapSnapshot(env.ctx);
 
   ASSERT_TRUE(ValidateSnapshot(snapshot));
   ASSERT_FALSE(LEPUS_IsUndefined(info->console.messages));
-  ASSERT_EQ(messages_ptr, LEPUS_VALUE_GET_PTR(info->console.messages));
-  ASSERT_EQ(messages_length, info->console.length);
+  ASSERT_EQ(LEPUS_VALUE_GET_PTR(info->console.messages), messages);
+  ASSERT_EQ(info->console.length, length);
+  ASSERT_EQ(LEPUS_GetLength(env.ctx, info->console.messages), length);
+  ASSERT_EQ(info->console.generations[0], generation);
 #else
   GTEST_SKIP();
 #endif

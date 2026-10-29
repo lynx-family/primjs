@@ -309,15 +309,18 @@ void HandleRuntimeDisable(DebuggerParams* runtime_options) {
   SendResponse(ctx, message, result);
 }
 
-// https://chromedevtools.github.io/devtools-protocol/tot/Runtime/#method-discardConsoleEntries
-void HandleDiscardConsoleEntries(DebuggerParams* runtime_protocols) {
-  LEPUSContext* ctx = runtime_protocols->ctx;
+void ClearConsoleMessages(LEPUSContext* ctx) {
   LEPUSDebuggerInfo* info = ctx->debugger_info;
   if (!ctx->rt->gc_enable) LEPUS_FreeValue(ctx, info->console.messages);
   InvalidateAllConsoleMessageSlots(info->console);
   info->console.length = 0;
   info->console.head = 0;
   LEPUS_HeapObjStore(ctx, &info->console.messages, LEPUS_NewArray(ctx));
+}
+
+// https://chromedevtools.github.io/devtools-protocol/tot/Runtime/#method-discardConsoleEntries
+void HandleDiscardConsoleEntries(DebuggerParams* runtime_protocols) {
+  ClearConsoleMessages(runtime_protocols->ctx);
 }
 
 // https://chromedevtools.github.io/devtools-protocol/tot/Runtime/#method-releaseObjectGroup

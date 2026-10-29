@@ -19,6 +19,9 @@
 #include <unistd.h>
 #endif
 
+#include "gc/collector_ms.h"
+#include "gc/ros_allocator.h"
+#include "gc/trace-gc.h"
 #include "inspector/heapprofiler/gen.h"
 #include "inspector/heapprofiler/serialize.h"
 #include "inspector/interface.h"
@@ -42,14 +45,25 @@ void HeapProfiler::RemoveSnapshot(HeapSnapshot* snapshot) {
 }
 
 HeapSnapshot* HeapProfiler::TakeSnapshot(LEPUSContext* ctx,
-                                         ProgressReportInterface* reporter) {
+                                         ProgressReportInterface* reporter,
+                                         int32_t slot, uint32_t flags) {
   context_ = ctx;
   is_takingsnapshot = true;
-  HeapSnapshot* result = new HeapSnapshot(this);
+  HeapSnapshot* result = new HeapSnapshot(this, slot, flags);
+  bool success = true;
   {
     HeapSnapshotGenerator generator(result, context_, reporter);
-    generator.GenerateSnapshot();
+    if (result->is_slot_snapshot()) {
+      success = generator.GenerateSnapshotForSlot();
+    } else {
+      generator.GenerateSnapshot();
+    }
+  }
+  if (success) {
     snapshots_.emplace_back(result);
+  } else {
+    delete result;
+    result = nullptr;
   }
   is_takingsnapshot = false;
   context_ = nullptr;
@@ -60,9 +74,19 @@ std::ostream& HeapProfiler::DumpObjectIdMaps(std::ostream& output) {
   return objectids_->DumpObjectIdMaps(output);
 }
 
+namespace {
+// No TLS destructor: Runtime owners can query this after profiler teardown.
+thread_local QjsHeapProfilerImpl* active_heap_profiler = nullptr;
+}  // namespace
+
 QjsHeapProfilerImpl& GetQjsHeapProfilerImplInstance() {
-  thread_local static QjsHeapProfilerImpl instance;
-  return instance;
+  struct ThreadLocalHeapProfiler {
+    ThreadLocalHeapProfiler() { active_heap_profiler = &profiler; }
+    ~ThreadLocalHeapProfiler() { active_heap_profiler = nullptr; }
+    QjsHeapProfilerImpl profiler;
+  };
+  thread_local static ThreadLocalHeapProfiler instance;
+  return instance.profiler;
 }
 
 auto* QjsHeapProfilerImpl::FindOrNewHeapProfiler(LEPUSContext* ctx) {
@@ -75,6 +99,17 @@ auto* QjsHeapProfilerImpl::FindOrNewHeapProfiler(LEPUSContext* ctx) {
     profilers_.emplace(rt, qjs_heapprofiler);
     return qjs_heapprofiler;
   }
+}
+
+HeapProfiler* QjsHeapProfilerImpl::FindHeapProfiler(LEPUSRuntime* rt) {
+  auto it = profilers_.find(rt);
+  return it == profilers_.end() ? nullptr : it->second.get();
+}
+
+HeapSnapshot* QjsHeapProfilerImpl::TakeHeapSnapshotForSlot(LEPUSContext* ctx,
+                                                           int32_t slot,
+                                                           uint32_t flags) {
+  return FindOrNewHeapProfiler(ctx)->TakeSnapshot(ctx, nullptr, slot, flags);
 }
 
 void QjsHeapProfilerImpl::TakeHeapSnapshot(
@@ -112,26 +147,29 @@ void QjsHeapProfilerImpl::TakeHeapSnapshot(
   fronted->SendReponse(message);
 }
 
-HeapSnapshot* QjsHeapProfilerImpl::TakeHeapSnapshot(LEPUSContext* ctx) {
+HeapSnapshot* QjsHeapProfilerImpl::TakeHeapSnapshot(LEPUSContext* ctx,
+                                                    uint32_t flags) {
   auto* profiler = FindOrNewHeapProfiler(ctx);
 
-  return profiler->TakeSnapshot(ctx, nullptr);
+  return profiler->TakeSnapshot(ctx, nullptr, -1, flags);
 }
 
 }  // namespace heapprofiler
 }  // namespace quickjs
 
-class PrintFronted : public quickjs::heapprofiler::Fronted {
+extern "C" void js_profile_remove_runtime(LEPUSRuntime* rt) {
+  if (auto* profiler = quickjs::heapprofiler::active_heap_profiler) {
+    profiler->RemoveRuntime(rt);
+  }
+}
+
+namespace {
+class StringOutputStream : public quickjs::heapprofiler::OutputStream {
  public:
-  // send notification
-  void AddHeapSnapshotChunk(const std::string& chunk) override {
+  uint32_t GetChunkSize() override { return 10240; }
+  void WriteChunk(const std::string& chunk) override {
     snapshot_.append(chunk);
   }
-
-  void ReportHeapSnapshotProgress(uint32_t done, uint32_t total,
-                                  bool finished) override {}
-  // send reponse
-  void SendReponse(LEPUSValue message) override {}
 
   const std::string& Content() const { return snapshot_; }
 
@@ -139,25 +177,52 @@ class PrintFronted : public quickjs::heapprofiler::Fronted {
   std::string snapshot_;
 };
 
-extern "C" const char* js_profile_take_heap_snapshot(LEPUSContext* ctx) {
-  if (ctx == nullptr) {
-    return nullptr;
+const char* SerializeAndDeleteSnapshot(
+    quickjs::heapprofiler::HeapSnapshot* snapshot) {
+  if (!snapshot) return nullptr;
+  StringOutputStream stream;
+  quickjs::heapprofiler::HeapSnapshotJSONSerializer(snapshot).Serialize(
+      &stream);
+  snapshot->Delete();
+  const auto& json = stream.Content();
+  auto* result = static_cast<char*>(std::malloc(json.size() + 1));
+  if (result) {
+    std::memcpy(result, json.data(), json.size());
+    result[json.size()] = '\0';
   }
-
-  auto outstream = std::make_shared<PrintFronted>();
-
-  quickjs::heapprofiler::GetQjsHeapProfilerImplInstance().TakeHeapSnapshot(
-      ctx, outstream);
-
-  const auto& snapshot = outstream->Content();
-  auto* result = static_cast<char*>(std::malloc(snapshot.size() + 1));
-  if (result == nullptr) {
-    return nullptr;
-  }
-
-  std::memcpy(result, snapshot.data(), snapshot.size());
-  result[snapshot.size()] = '\0';
   return result;
+}
+}  // namespace
+
+extern "C" const char* js_profile_take_heap_snapshot(LEPUSContext* ctx) {
+  return js_profile_take_heap_snapshot_flags(ctx, 0);
+}
+
+extern "C" const char* js_profile_take_heap_snapshot_flags(LEPUSContext* ctx,
+                                                           uint32_t flags) {
+  if (!ctx) return nullptr;
+  return SerializeAndDeleteSnapshot(
+      quickjs::heapprofiler::GetQjsHeapProfilerImplInstance().TakeHeapSnapshot(
+          ctx, flags));
+}
+
+extern "C" const char* js_profile_take_heap_snapshot_for_slot(LEPUSContext* ctx,
+                                                              int32_t slot,
+                                                              uint32_t flags) {
+  if (!ctx || !LEPUS_IsMemorySlotTrackingEnabled(ctx->rt) || slot < 0 ||
+      slot > ctx->rt->malloc_state.max_slot_index ||
+      (!ctx->gc_enable && !JS_GetRCAllocationSet(ctx->rt))) {
+    return nullptr;
+  }
+#ifdef ENABLE_COMPATIBLE_MM
+  if (ctx->gc_enable && (ctx->rt->collector_->IsForbidGC() ||
+                         ctx->rt->ros_->InGCPauseSuppressionMode()))
+    return nullptr;
+#endif
+  ScopedCommonMemorySlot common_slot(ctx->rt);
+  return SerializeAndDeleteSnapshot(
+      quickjs::heapprofiler::GetQjsHeapProfilerImplInstance()
+          .TakeHeapSnapshotForSlot(ctx, slot, flags));
 }
 
 extern "C" void js_profile_free_heap_snapshot(const char* snapshot) {
@@ -215,9 +280,6 @@ void HandleHeapProfilerProtocols(DebuggerParams* param) {
 #ifdef HEAPPROFILER_UNITTEST
 
 void take_heap_snapshot_test(LEPUSContext* ctx) {
-  auto outstream = std::make_shared<PrintFronted>();
-
-  quickjs::heapprofiler::GetQjsHeapProfilerImplInstance().TakeHeapSnapshot(
-      ctx, outstream);
+  js_profile_free_heap_snapshot(js_profile_take_heap_snapshot(ctx));
 }
 #endif
