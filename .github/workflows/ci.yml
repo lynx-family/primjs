@@ -48,6 +48,8 @@ jobs:
         env:
           COMMIT_COUNT: ${{ github.event.pull_request.commits }}
         run: test "$COMMIT_COUNT" -eq 1
+      - name: Test commit-message helper
+        run: python3 -B -m unittest discover -s tools/cli -p 'test_*.py'
       - name: Run commit-message check
         run: python3 -B tools/cli/commit_message_helper.py
   lint-pod:
