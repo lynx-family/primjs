@@ -7,7 +7,7 @@ import re
 
 ERROR_NO_ERROR = 0
 ERROR_MALFORMED_MESSAGE = 1
-ERROR_MISSING_DOC = 2
+WARNING_MISSING_DOC = 100
 
 AVAILABLE_LABELS = [
     "Feature",
@@ -74,7 +74,7 @@ def CheckCommitMessage(message):
                 doc_found = True
 
         if need_doc and not doc_found:
-            return ERROR_MISSING_DOC, "Missing doc link."
+            return WARNING_MISSING_DOC, "Missing doc link."
     return error_code, error_message
 
 
@@ -86,6 +86,13 @@ if __name__ == "__main__":
         ["git", "log", "-1", "--format=%B", "HEAD"], text=True
     )
     error_code, error_message = CheckCommitMessage(message)
-    if error_code:
+    if error_code == WARNING_MISSING_DOC:
+        print(
+            "Warning: %s A doc link is recommended for Feature/Refactor commits "
+            "but is not required." % error_message,
+            file=sys.stderr,
+        )
+        error_code = ERROR_NO_ERROR
+    elif error_code:
         print(error_message, file=sys.stderr)
     sys.exit(error_code)
