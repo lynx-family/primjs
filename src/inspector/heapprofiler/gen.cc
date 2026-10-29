@@ -20,13 +20,9 @@ namespace quickjs {
 namespace heapprofiler {
 
 SnapshotObjectId HeapObjectIdMaps::GetHeapObjId(const HeapPtr ptr) {
-  auto itr = objectid_maps_.find(ptr);
-
-  if (itr != objectid_maps_.end()) {
-    return itr->second;
-  }
-  objectid_maps_.emplace(ptr, (next_id_ += kObjectIdStep));
-  return next_id_;
+  auto result = objectid_maps_.try_emplace(ptr, next_id_ + kObjectIdStep);
+  if (result.second) next_id_ += kObjectIdStep;
+  return result.first->second;
 }
 
 std::ostream& HeapObjectIdMaps::DumpObjectIdMaps(std::ostream& output) {
@@ -52,6 +48,11 @@ HeapSnapshotGenerator::HeapSnapshotGenerator(HeapSnapshot* snapshot,
       quickjs_heap_explorer_(snapshot, ctx),
       reporter_(report) {}
 
+no_inline HeapEntry* HeapSnapshotGenerator::InsertEntry(HeapThing ptr,
+                                                        HeapEntry* entry) {
+  return entries_map_.emplace(ptr, entry).first->second;
+}
+
 void HeapSnapshotGenerator::GenerateSnapshot() {
   // TODO: Implement
   // 1. GC
@@ -62,7 +63,9 @@ void HeapSnapshotGenerator::GenerateSnapshot() {
 
   snapshot_->AddSyntheticRootEntries();
   FillReferences();
+  quickjs_heap_explorer_.ExtractRuntimeAllocationReferences();
   snapshot_->FillChildren();
+  if (snapshot_->summarize_diagnostics()) snapshot_->SummarizeDiagnostics();
   ProgressGenResult();
 
   snapshot_->RememberLastJsObjectId();

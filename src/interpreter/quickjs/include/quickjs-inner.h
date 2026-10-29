@@ -73,6 +73,15 @@ extern "C" {
 #define QJS_RC_MEMORY_SLOT_TRACKING_SUPPORTED 0
 #endif
 
+#if defined(ENABLE_HEAPPROFILER) || defined(ENABLE_QUICKJS_DEBUGGER)
+// Owner-thread only. Query info only for a live base in this Runtime's set.
+QJS_HIDE ROS_GC::PointerSet *JS_GetRCAllocationSet(LEPUSRuntime *rt);
+QJS_HIDE void JS_GetRCAllocationInfo(const void *ptr, size_t *size,
+                                     int32_t *slot);
+// Release the Runtime's profiler on its owner thread during teardown.
+extern "C" QJS_HIDE void js_profile_remove_runtime(LEPUSRuntime *rt);
+#endif
+
 #ifndef DCHECK
 #ifdef ROS_DEBUG
 #define DCHECK(condition) \
@@ -511,6 +520,9 @@ struct LEPUSRuntime {
   bool gc_enable;
   bool is_lepusng;
   bool opt_lepusng_package_size;
+#if defined(ENABLE_HEAPPROFILER) || defined(ENABLE_QUICKJS_DEBUGGER)
+  uint32_t last_source_id;
+#endif
   void *user_opaque;
   JSMallocState malloc_state;
   ROS_GC::RosAllocImpl *ros_;
@@ -1138,6 +1150,11 @@ typedef struct LEPUSFunctionBytecode {
     int line_num;
     int source_len;
     int source_offset;
+#if defined(ENABLE_HEAPPROFILER) || defined(ENABLE_QUICKJS_DEBUGGER)
+    // Distinguishes snapshot nodes from different compilations of same-named JS
+    // files. Runtime-local identity; 0 when unavailable (e.g. loaded bytecode).
+    uint32_t source_id;
+#endif
     int pc2line_len;
 #ifdef ENABLE_QUICKJS_DEBUGGER
     int64_t column_num;
@@ -3079,12 +3096,24 @@ typedef struct JSFunctionDef {
   char *source; /* raw source, utf-8 encoded */
   int source_len;
   int source_offset;
+#if defined(ENABLE_HEAPPROFILER) || defined(ENABLE_QUICKJS_DEBUGGER)
+  uint32_t source_id;
+#endif
   int32_t runtime_id;
   uint32_t coverage_slot_count;
   uint32_t coverage_slot_size;
   JSCoverageSlot *coverage_slots;
   LEPUSModuleDef *module; /* != NULL when parsing a module */
 } JSFunctionDef;
+
+QJS_HIDE int js_parse_source_offset(JSParseState *s, const uint8_t *ptr);
+#if defined(ENABLE_HEAPPROFILER) || defined(ENABLE_QUICKJS_DEBUGGER)
+static inline uint32_t js_next_source_id(LEPUSRuntime *rt) {
+  // Never reuse an identity while bytecodes from earlier compilations survive.
+  if (rt->last_source_id == UINT32_MAX) return 0;
+  return ++rt->last_source_id;
+}
+#endif
 
 QJS_HIDE int add_closure_variables(LEPUSContext *ctx, JSFunctionDef *s,
                                    LEPUSFunctionBytecode *b, int scope_idx);

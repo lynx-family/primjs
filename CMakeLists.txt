@@ -204,6 +204,7 @@ set(heapprofiler_sources
     ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/heapprofiler/heapexplorer.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/heapprofiler/heapprofiler.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/heapprofiler/serialize.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/heapprofiler/slot_snapshot.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/inspector/heapprofiler/snapshot.cc)
 
 if(${ENABLE_QUICKJS_DEBUGGER})

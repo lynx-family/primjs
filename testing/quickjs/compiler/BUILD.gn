@@ -103,6 +103,8 @@ unittest_set("qjs_debug_testset") {
   public_deps = [ "../../../src:quickjs_lib" ]
 
   sources = [
+    "test-heap-profiler-locations.cc",
+    "test-heap-profiler-slot.cc",
     "test-heap-profiler.cc",
     "test_debug_base.cc",
     "test_debug_common.cc",

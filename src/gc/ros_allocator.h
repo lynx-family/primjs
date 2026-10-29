@@ -14,6 +14,7 @@
 #include "gc/space.h"
 #include "gc/structs.h"
 #include "gc/thread_pool.h"
+#include "quickjs/include/base_export.h"
 
 #define ROSALLOC_MEMSET_S(addr, dstsize, c, size)                        \
   do {                                                                   \
@@ -379,6 +380,11 @@ class RosAllocImpl : public Allocator {
   void ReleaseAllPageGroups();
   bool ConcurrentSweep(MplThreadPool &threadPool);
   void ForEachObj(HeapAliveObjsVisitor &visitor);
+#if defined(ENABLE_HEAPPROFILER) || defined(ENABLE_QUICKJS_DEBUGGER)
+  // Diagnostic-only: header must come from ForEachObj, with GC/sweep stopped.
+  // Returns the physical charge, including capacity retained after a shrink.
+  QJS_HIDE size_t GetAllocatedObjectSize(address_t header);
+#endif
   bool ParallelForEachObj(MplThreadPool &threadPool,
                           VisitorFactory visitorFactory);
 

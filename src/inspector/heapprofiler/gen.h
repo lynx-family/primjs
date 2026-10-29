@@ -77,32 +77,29 @@ class HeapSnapshotGenerator {
   HeapSnapshotGenerator& operator=(const HeapSnapshotGenerator&) = delete;
 
   void GenerateSnapshot();
+  bool GenerateSnapshotForSlot();
 
-  HeapEntry* FindEntry(HeapThing ptr) {
+  no_inline HeapEntry* FindEntry(HeapThing ptr) {
     auto it = entries_map_.find(ptr);
     return it != entries_map_.end() ? it->second : nullptr;
   }
 
-  HeapEntry* FindOrAddEntry(LEPUSContext* ctx, const LEPUSValue& value,
-                            HeapEntriesAllocator* allocator) {
+  no_inline HeapEntry* FindOrAddEntry(LEPUSContext* ctx,
+                                      const LEPUSValue& value,
+                                      HeapEntriesAllocator* allocator) {
     if (QjsHeapExplorer::HasEntry(value)) {
       auto it = FindEntry(LEPUS_VALUE_GET_PTR(value));
       return it ? it
-                : entries_map_
-                      .emplace(LEPUS_VALUE_GET_PTR(value),
-                               allocator->AllocateEntry(ctx, value))
-                      .first->second;
+                : InsertEntry(LEPUS_VALUE_GET_PTR(value),
+                              allocator->AllocateEntry(ctx, value));
     }
     return nullptr;
   }
 
-  HeapEntry* FindOrAddEntry(LEPUSContext* ctx, const HeapObjPtr& obj,
-                            HeapEntriesAllocator* allocator) {
+  no_inline HeapEntry* FindOrAddEntry(LEPUSContext* ctx, const HeapObjPtr& obj,
+                                      HeapEntriesAllocator* allocator) {
     auto it = FindEntry(obj.ptr_);
-    return it ? it
-              : entries_map_
-                    .emplace(obj.ptr_, allocator->AllocateEntry(ctx, obj))
-                    .first->second;
+    return it ? it : InsertEntry(obj.ptr_, allocator->AllocateEntry(ctx, obj));
   }
 
   LEPUSContext* context() const { return context_; }
@@ -112,6 +109,7 @@ class HeapSnapshotGenerator {
 
   void ProgressGenResult();
   void FillReferences();
+  HeapEntry* InsertEntry(HeapThing ptr, HeapEntry* entry);
   HeapSnapshot* snapshot_;
   LEPUSContext* context_;
   QjsHeapExplorer quickjs_heap_explorer_;

@@ -163,21 +163,42 @@ int main(int argc, char **argv) {
   LEPUSRuntime *rt;
   LEPUSContext *ctx;
   int32_t dump_memory = 0;
+  int32_t current_slot = LEPUS_MEMORY_CATEGORY_COMMON;
+  bool memory_slots = false, runtime_info = false;
+  uint32_t runtime_mode = 0;
   const char *filename;
   if (argc == 1) {
     printf("Input the test file name\n");
     return 0;
   }
 
-  if (argc > 2 && !strcmp(argv[1], "-d")) {  // -d: dump memory
-    dump_memory = 1;
+  for (int i = 1; i < argc - 1; ++i) {
+    if (!strcmp(argv[i], "-d")) {
+      dump_memory = 1;
+    } else if (!strcmp(argv[i], "--memory-slots")) {
+      memory_slots = true;
+    } else if (!strcmp(argv[i], "--track-allocations")) {
+      memory_slots = true;
+      runtime_mode |= LEPUS_RUNTIME_ENABLE_ALLOCATION_TRACKING;
+    } else if (!strcmp(argv[i], "--runtime-info")) {
+      runtime_info = true;
+    } else {
+      fprintf(stderr, "Unknown option: %s\n", argv[i]);
+      return 2;
+    }
   }
   filename = argv[argc - 1];
 
-  rt = LEPUS_NewRuntime();
+  rt = LEPUS_NewRuntimeWithModeMemoryTrackSlot(
+      runtime_mode, memory_slots ? &current_slot : nullptr);
   if (!rt) {
     fprintf(stderr, "qjs: cannot allocate JS runtime\n");
     exit(2);
+  }
+  if (memory_slots && !LEPUS_IsMemorySlotTrackingEnabled(rt)) {
+    fprintf(stderr, "qjs: memory slots are unavailable\n");
+    LEPUS_FreeRuntime(rt);
+    return 2;
   }
   ctx = LEPUS_NewContext(rt);
   if (!ctx) {
@@ -215,6 +236,20 @@ int main(int argc, char **argv) {
       LEPUSMemoryUsage stats;
       LEPUS_ComputeMemoryUsage(rt, &stats);
       LEPUS_DumpMemoryUsage(stdout, &stats, rt);
+    }
+    if (runtime_info) {
+      size_t registry_bytes = 0, registry_count = 0;
+#if defined(ENABLE_HEAPPROFILER) || defined(ENABLE_QUICKJS_DEBUGGER)
+      if (auto *set = JS_GetRCAllocationSet(rt)) {
+        registry_bytes = set->MemoryUsage();
+        registry_count = set->Size();
+      }
+#endif
+      fprintf(stderr,
+              "runtime: gc=%d slots=%d allocation_tracking=%d "
+              "registry_bytes=%zu registry_count=%zu\n",
+              rt->gc_enable, LEPUS_IsMemorySlotTrackingEnabled(rt),
+              registry_bytes != 0, registry_bytes, registry_count);
     }
   }
 
