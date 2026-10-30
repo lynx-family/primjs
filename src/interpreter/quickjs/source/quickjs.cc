@@ -6450,6 +6450,8 @@ void LEPUS_RunGC(LEPUSRuntime *rt) {
   return;
 }
 
+void LEPUS_TrigGC(LEPUSRuntime *rt) { LEPUS_RunGC(rt); }
+
 /* Return true during the GC sweep phase (can be useful inside in finalizer) */
 BOOL LEPUS_IsInGCSweep(LEPUSRuntime *rt) { return rt->in_gc_sweep; }
 

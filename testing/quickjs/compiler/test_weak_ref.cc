@@ -194,4 +194,27 @@ TEST_F(WeakRefTest, DetachDeadWeakRefRecordBeforeWeakRefFinalizer) {
   LEPUS_RunGC(rt_);
 }
 
+TEST_F(WeakRefTest, TrigGCCollectsUnreachableCycle) {
+  const char* source = R"(
+    var weakRef = (function() {
+      var target = {};
+      target.self = target;
+      return new WeakRef(target);
+    })();
+  )";
+  LEPUSValue result = LEPUS_Eval(ctx_, source, strlen(source), "test.js",
+                                 LEPUS_EVAL_TYPE_GLOBAL);
+  ASSERT_FALSE(LEPUS_IsException(result));
+  LEPUS_FreeValue(ctx_, result);
+
+  LEPUS_TrigGC(rt_);
+
+  const char* check = "weakRef.deref() === undefined";
+  result =
+      LEPUS_Eval(ctx_, check, strlen(check), "test.js", LEPUS_EVAL_TYPE_GLOBAL);
+  ASSERT_FALSE(LEPUS_IsException(result));
+  EXPECT_TRUE(LEPUS_ToBool(ctx_, result));
+  LEPUS_FreeValue(ctx_, result);
+}
+
 }  // namespace weak_ref_test

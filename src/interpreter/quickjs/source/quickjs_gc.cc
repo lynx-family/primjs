@@ -28358,8 +28358,6 @@ void *JS_VisitLEPUSValue_GC(LEPUSRuntime *rt, LEPUSValue *val) {
   return rt->collector_->GetVisitor()->VisitRootLEPUSValue(*val);
 }
 
-void LEPUS_TrigGC(LEPUSRuntime *rt) { JS_RunGC_GC(rt); }
-
 void DisposeGlobal_GC(LEPUSRuntime *runtime, LEPUSValue *global_handle) {
   runtime->global_handles_->Destroy(global_handle);
 }
@@ -29763,7 +29761,6 @@ void HandleScope::PushLEPUSPropertyDescriptor(LEPUSPropertyDescriptor *desc) {}
 void LEPUS_PushHandle(LEPUSContext *ctx, void *ptr, int type) {}
 void LEPUS_ResetHandle(LEPUSContext *ctx, void *ptr, int type) {}
 
-void LEPUS_TrigGC(LEPUSRuntime *rt) {}
 void JS_FreeRuntimeForEffect(LEPUSRuntime *rt) {}
 bool LEPUS_IsMarkedLEPUSValue(LEPUSRuntime *rt, LEPUSValue *val) {
   return true;
