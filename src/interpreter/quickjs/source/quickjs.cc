@@ -706,6 +706,15 @@ QJS_STATIC LEPUSValue JSRef2Value(LEPUSContext *ctx, LEPUSValue ref) {
 
 // <Primjs end>
 
+// Collect cycles before allocations between object creations exhaust the cap.
+// At the cap, zero forces collection even if RC frees memory before then.
+QJS_STATIC uint64_t js_cap_gc_threshold(const JSMallocState *s,
+                                        uint64_t gc_threshold) {
+  if (s->malloc_size >= s->malloc_limit) return 0;
+  return std::min(gc_threshold,
+                  s->malloc_size + (s->malloc_limit - s->malloc_size) / 2);
+}
+
 QJS_STATIC void js_trigger_gc(LEPUSRuntime *rt, size_t size) {
   BOOL force_gc;
 #ifdef FORCE_GC_AT_MALLOC
@@ -718,8 +727,9 @@ QJS_STATIC void js_trigger_gc(LEPUSRuntime *rt, size_t size) {
     printf("GC: size=%" PRIu64 "\n", (uint64_t)rt->malloc_state.malloc_size);
 #endif
     LEPUS_RunGC(rt);
-    rt->malloc_gc_threshold =
-        rt->malloc_state.malloc_size + (rt->malloc_state.malloc_size >> 1);
+    rt->malloc_gc_threshold = js_cap_gc_threshold(
+        &rt->malloc_state,
+        rt->malloc_state.malloc_size + (rt->malloc_state.malloc_size >> 1));
   }
 }
 
@@ -730,7 +740,9 @@ void *lepus_malloc_rt(LEPUSRuntime *rt, size_t size,
   return rt->js_malloc_rt(rt, size, alloc_tag);
 }
 void *js_malloc_rt_rc(LEPUSRuntime *rt, size_t size, int alloc_tag) {
-  return rt->mf.lepus_malloc(&rt->malloc_state, size, alloc_tag);
+  void *ptr = rt->mf.lepus_malloc(&rt->malloc_state, size, alloc_tag);
+  if (unlikely(!ptr)) JS_NotifyOutOfMemory(rt, size);
+  return ptr;
 }
 
 void lepus_free_rt(LEPUSRuntime *rt, void *ptr) {
@@ -755,7 +767,10 @@ void *lepus_dbuf_realloc_rt(void *opaque, void *ptr, size_t size,
 
 void *js_realloc_rt_rc(LEPUSRuntime *rt, void *ptr, size_t size,
                        int alloc_tag) {
-  return rt->mf.lepus_realloc(&rt->malloc_state, ptr, size, alloc_tag);
+  void *new_ptr = rt->mf.lepus_realloc(&rt->malloc_state, ptr, size, alloc_tag);
+  // Reallocating to zero bytes frees ptr and returns NULL.
+  if (unlikely(!new_ptr && size != 0)) JS_NotifyOutOfMemory(rt, size);
+  return new_ptr;
 }
 
 size_t lepus_malloc_usable_size_rt(LEPUSRuntime *rt, const void *ptr) {
@@ -1569,9 +1584,47 @@ LEPUSGCMemoryPolicyLevel LEPUS_GetGCMemoryPolicyLevel(LEPUSRuntime *rt) {
   return LEPUS_GC_MEMORY_POLICY_BALANCED;
 }
 
+QJS_STATIC size_t js_get_memory_limit(LEPUSRuntime *rt) {
+  return rt->gc_enable ? rt->ros_->GetAllocatedPageLimit()
+                       : rt->malloc_state.malloc_limit;
+}
+
+QJS_STATIC size_t js_get_memory_limit_usage(LEPUSRuntime *rt) {
+  return rt->gc_enable ? rt->ros_->GetAllocatedPageSize()
+                       : rt->malloc_state.malloc_size;
+}
+
+// A larger request cannot succeed, whatever is collected.
+QJS_STATIC size_t js_get_max_allocation_size(LEPUSRuntime *rt) {
+  return rt->gc_enable ? rt->ros_->GetMaxAllocationSize()
+                       : rt->malloc_state.malloc_limit;
+}
+
 void LEPUS_SetMemoryLimit(LEPUSRuntime *rt, size_t limit) {
   CallGCFunc(JS_SetMemoryLimit_GC, rt, limit);
   rt->malloc_state.malloc_limit = limit;
+  // A previous collection may have set the threshold above the new cap.
+  rt->malloc_gc_threshold =
+      js_cap_gc_threshold(&rt->malloc_state, rt->malloc_gc_threshold);
+}
+
+void LEPUS_SetOutOfMemoryCallback(LEPUSRuntime *rt,
+                                  LEPUSOutOfMemoryCallback *cb, void *opaque) {
+  rt->oom_callback = cb;
+  rt->oom_callback_opaque = opaque;
+}
+
+void JS_NotifyOutOfMemory(LEPUSRuntime *rt, size_t request_size) {
+  // Such a failure says nothing about the usage, so the report is kept.
+  if (request_size > js_get_max_allocation_size(rt)) return;
+  // Late callback registration must not report an earlier failure.
+  if (rt->oom_reported) return;
+  rt->oom_reported = TRUE;
+  if (!rt->oom_callback) return;
+  LEPUSOutOfMemoryInfo info = {js_get_memory_limit(rt),
+                               js_get_memory_limit_usage(rt), request_size,
+                               LEPUS_GetHeapSize(rt)};
+  rt->oom_callback(rt, &info, rt->oom_callback_opaque);
 }
 
 /* use -1 to disable automatic GC */
@@ -2181,11 +2234,18 @@ static inline BOOL js_check_stack_overflow(LEPUSContext *ctx,
 }
 #endif
 
-LEPUSValue LEPUS_ThrowOutOfMemory(LEPUSContext *ctx) {
+// Kept out of line: allocation sites throughout the engine reach this cold
+// path, and inlining it into each of them grows the binary considerably.
+no_inline LEPUSValue LEPUS_ThrowOutOfMemory(LEPUSContext *ctx) {
   LEPUSRuntime *rt = ctx->rt;
   if (!rt->in_out_of_memory) {
     rt->in_out_of_memory = TRUE;
+    // The memory limit has likely failed the allocation and would fail the
+    // error object as well, leaving the embedder a null exception.
+    const size_t memory_limit = js_get_memory_limit(rt);
+    LEPUS_SetMemoryLimit(rt, SIZE_MAX);
     LEPUS_ThrowInternalError(ctx, "out of memory");
+    LEPUS_SetMemoryLimit(rt, memory_limit);
     rt->in_out_of_memory = FALSE;
   }
   return LEPUS_EXCEPTION;
@@ -6666,7 +6726,7 @@ void LEPUS_ComputeMemoryUsageInternal(LEPUSRuntime *rt, LEPUSMemoryUsage *s,
 
   if (rt->gc_enable) {
     s->malloc_size = rt->ros_->GetAllocatedSize();
-    s->malloc_limit = rt->ros_->GetHeapGrowthLimit();
+    s->malloc_limit = js_get_memory_limit(rt);
 
     // base size only for gc mode.
     size_t gc_base_size = sizeof(LEPUSRuntime);
@@ -19323,10 +19383,13 @@ int emit_label(JSParseState *s, int label) {
   }
 }
 
-/* return label or -1 if dead code */
+/* return label or -1 if dead code or out of memory */
 int emit_goto(JSParseState *s, int opcode, int label) {
   if (js_is_live_code(s)) {
-    if (label < 0) label = new_label(s);
+    if (label < 0) {
+      label = new_label(s);
+      if (label < 0) return -1;
+    }
     emit_op(s, opcode);
     emit_u32(s, label);
     s->cur_func->label_slots[label].ref_count++;
@@ -22066,7 +22129,7 @@ QJS_STATIC int js_parse_destructing_element(JSParseState *s, int tok,
     /* remove test and decrement label ref count */
     memset(s->cur_func->byte_code.buf + start_addr, OP_nop,
            assign_addr - start_addr);
-    s->cur_func->label_slots[label_parse].ref_count--;
+    if (label_parse >= 0) s->cur_func->label_slots[label_parse].ref_count--;
     has_initializer = FALSE;
   }
   return has_initializer;
@@ -24233,7 +24296,7 @@ QJS_STATIC __exception int js_parse_statement_or_decl(JSParseState *s,
         }
       }
       if (js_parse_expect(s, '}')) goto fail;
-      if (default_label_pos >= 0) {
+      if (default_label_pos >= 0 && label_case >= 0) {
         /* Ugly patch for the the `default` label, shameful and risky */
         put_u32(s->cur_func->byte_code.buf + default_label_pos, label_case);
         s->cur_func->label_slots[label_case].pos = default_label_pos + 4;

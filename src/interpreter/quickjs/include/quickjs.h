@@ -856,7 +856,27 @@ int32_t LEPUS_DumpMemorySlots(
    Only effective when is_lepusng is also true. Default: enabled. */
 void LEPUS_SetOptLepusNGPackageSize(LEPUSRuntime *rt, int enable);
 void LEPUS_SetRuntimeInfo(LEPUSRuntime *rt, const char *info);
+/* Caps heap malloc bytes (RC) or in-use pages (GC), excluding external memory.
+   SIZE_MAX removes the cap. Call from rt's owning thread. */
 void LEPUS_SetMemoryLimit(LEPUSRuntime *rt, size_t limit);
+
+/* Snapshot valid only during the callback. */
+typedef struct LEPUSOutOfMemoryInfo {
+  size_t limit_bytes;   /* cap set by LEPUS_SetMemoryLimit, SIZE_MAX if none */
+  size_t used_bytes;    /* usage compared with the cap */
+  size_t request_bytes; /* size of the failed allocation */
+  size_t heap_bytes;    /* LEPUS_GetHeapSize at the failure */
+} LEPUSOutOfMemoryInfo;
+
+/* Each rt reports once; requests above cap or GC maximum never report.
+   Only LEPUS_GetHeapSize/LEPUS_DumpMemorySlots may use rt in cb. */
+typedef void LEPUSOutOfMemoryCallback(LEPUSRuntime *rt,
+                                      const LEPUSOutOfMemoryInfo *info,
+                                      void *opaque);
+/* NULL disables cb; failures without cb still consume the report.
+   Runs before throwing. Owning thread only; opaque passes unchanged. */
+void LEPUS_SetOutOfMemoryCallback(LEPUSRuntime *rt,
+                                  LEPUSOutOfMemoryCallback *cb, void *opaque);
 /* Must be called from the owning thread of rt. */
 int LEPUS_SetGCMemoryPolicyLevel(LEPUSRuntime *rt,
                                  LEPUSGCMemoryPolicyLevel level);

@@ -189,6 +189,9 @@ void Space::Extend(size_t deltaSize) {
 address_t Space::Alloc(size_t reqSize, bool allowExtension, uint32_t &idx,
                        int forceLevel) {
   address_t retAddress = 0U;
+  if (ExceedsAllocatedPageLimit(reqSize)) {
+    return retAddress;
+  }
   if (usedMemSize - allocatedPageSize >= reqSize) {
     retAddress = GetChunk(reqSize, idx);
     if (retAddress != 0) {

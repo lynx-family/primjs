@@ -775,6 +775,18 @@ class RosAllocImpl : public Allocator {
     allocSpace.heapGrowthLimit =
         (std::max)(growthLimit, kRosDefaultPageGroupSize);
   }
+  size_t GetAllocatedPageLimit() const { return allocSpace.allocatedPageLimit; }
+  void SetAllocatedPageLimit(size_t limit) {
+    allocSpace.allocatedPageLimit = limit;
+  }
+  size_t GetAllocatedPageSize() const {
+    return allocSpace.GetAllocatedPageSize();
+  }
+  // A larger request cannot succeed, whatever is collected.
+  size_t GetMaxAllocationSize() const {
+    return (std::min)(allocSpace.heapGrowthLimit,
+                      allocSpace.allocatedPageLimit);
+  }
   size_t GetAllocatedSize() { return allocatedInternalSize; }
 
  public:

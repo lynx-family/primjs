@@ -95,6 +95,8 @@ class Space {
   // the maximum heap size
   size_t heapSize;
   size_t heapGrowthLimit;
+  // Caps pages in use, excluding mapped free pages released by a full GC.
+  size_t allocatedPageLimit{SIZE_MAX};
   // the minimum size of free pages, unused
   size_t heapMinFree;
   // the maximum size of free pages, used to trigger trim
@@ -191,6 +193,9 @@ class Space {
   inline size_t GetFreePageSize() const {
     return nonReleasedPageSize - allocatedPageSize;
   }
+  inline bool ExceedsAllocatedPageLimit(size_t reqSize) const {
+    return SaturatingAdd(allocatedPageSize, reqSize) > allocatedPageLimit;
+  }
 
   inline size_t HeapMaxFreeByUtilization() const {
     // maximum is twice the ideal
@@ -220,7 +225,7 @@ class Space {
 
   void Extend(size_t deltaSize);
   address_t NewHugeGroup(size_t req_size) {
-    if (GetHeapHeadroom() < req_size) {
+    if (GetHeapHeadroom() < req_size || ExceedsAllocatedPageLimit(req_size)) {
       return 0;
     }
     PageGroup &group = page_groups.NewHugeMem(req_size);

@@ -2156,11 +2156,15 @@ void RosAllocImpl::FreeRun(RunSlots &runSlots, bool delayFree) {
 
 bool __attribute__((noinline))
 RosAllocImpl::HandleAllocFailure(size_t alloc_size, int &forceLevel) {
+  if (alloc_size > GetMaxAllocationSize()) return false;
   if (forceLevel >= kEagerLevelMax) {
-    ROSIMPL_ASSERT(allocSpace.heapSize == allocSpace.heapGrowthLimit,
+    // With a memory limit set, the pages in use can reach it first.
+    ROSIMPL_ASSERT(allocSpace.heapSize == allocSpace.heapGrowthLimit ||
+                       allocSpace.allocatedPageLimit != SIZE_MAX,
                    "heap size doesn't reach limit before oom");
     size_t largestChunkSize = 0;
     largestChunkSize = allocSpace.GetLargestChunkSize();
+    JS_NotifyOutOfMemory(rt_, alloc_size);
     return false;
   }
   collector->RunFullCollection(alloc_size, forceLevel);

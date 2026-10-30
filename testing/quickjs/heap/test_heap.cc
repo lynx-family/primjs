@@ -1785,4 +1785,104 @@ TEST_F(HeapTest, LoadingBytecodeDoesNotRegisterFunctionsForFinalization) {
   LEPUS_FreeRuntime(rt);
 }
 
+class MemoryLimitTest : public HeapTest {
+ protected:
+  static constexpr size_t kLimit = 16 * MB;
+  int reports = 0;
+  LEPUSOutOfMemoryInfo info = {};
+  static void Record(LEPUSRuntime *rt, const LEPUSOutOfMemoryInfo *info,
+                     void *opaque) {
+    auto *test = static_cast<MemoryLimitTest *>(opaque);
+    ++test->reports;
+    test->info = *info;
+    EXPECT_EQ(info->heap_bytes, LEPUS_GetHeapSize(rt));
+  }
+  void SetUp() override {
+    HeapTest::SetUp();
+    LEPUS_SetOutOfMemoryCallback(get_rt(), Record, this);
+    LEPUS_SetMemoryLimit(get_rt(), kLimit);
+  }
+  std::string Eval(const std::string &source) {
+    LEPUSValue result = LEPUS_Eval(ctx, source.c_str(), source.size(),
+                                   "memory_limit.js", LEPUS_EVAL_TYPE_GLOBAL);
+    if (LEPUS_IsException(result)) return "<exception>";
+    HandleScope scope(ctx, &result, HANDLE_TYPE_LEPUS_VALUE);
+    const char *str = LEPUS_ToCString(ctx, result);
+    std::string value = str ? str : "<null>";
+    if (!ctx->gc_enable) {
+      LEPUS_FreeCString(ctx, str);
+      LEPUS_FreeValue(ctx, result);
+    }
+    return value;
+  }
+};
+
+constexpr char kFillHeapUntilThrow[] = R"(
+  var keep = [], error;
+  try { for (;;) {
+    var chunk = [];
+    for (var i = 0; i < 1024; i++) chunk.push({});
+    keep.push(chunk);
+  } } catch (e) { error = e; }
+  keep = null; error instanceof InternalError ? error.message : String(error);
+)";
+
+TEST_F(MemoryLimitTest, ReportsOnceAndIgnoresOversizedRequests) {
+  EXPECT_EQ(Eval("try { new ArrayBuffer(33554432); } catch(e) { e.message; }"),
+            "out of memory");
+  if (ctx->gc_enable) {
+    LEPUSRuntime *rt = get_rt();
+    LEPUS_SetMemoryLimit(rt, SIZE_MAX);
+    const int gc_count = rt->ros_->gc_cnt;
+    EXPECT_EQ(rt->js_malloc_rt(rt, rt->ros_->GetHeapGrowthLimit() + 1,
+                               ALLOC_TAG_WITHOUT_PTR),
+              nullptr);
+    EXPECT_EQ(rt->ros_->gc_cnt, gc_count);
+    LEPUS_SetMemoryLimit(rt, kLimit);
+  }
+  EXPECT_EQ(reports, 0);
+  EXPECT_EQ(Eval(kFillHeapUntilThrow), "out of memory");
+  ASSERT_EQ(reports, 1);
+  EXPECT_EQ(info.limit_bytes, kLimit);
+  EXPECT_LE(info.used_bytes, kLimit);
+  EXPECT_GT(info.used_bytes, kLimit / 2);
+  EXPECT_GT(info.request_bytes, 0u);
+  EXPECT_LE(info.heap_bytes, info.used_bytes);
+  LEPUS_SetOutOfMemoryCallback(get_rt(), Record, this);
+  EXPECT_EQ(Eval(kFillHeapUntilThrow), "out of memory");
+  EXPECT_EQ(reports, 1);
+}
+
+TEST_F(MemoryLimitTest, CollectsCyclesBeforeAndAfterOutOfMemory) {
+  LEPUS_SetGCThreshold(get_rt(), 4 * kLimit);
+  LEPUS_SetMemoryLimit(get_rt(), kLimit);
+  const char *cycles = R"(
+    for (var i = 0; i < 32768; i++) {
+      var node = {padding: new Array(64).fill(0)}; node.self = node;
+    } 'done';
+  )";
+  EXPECT_EQ(Eval(cycles), "done");
+  ASSERT_EQ(Eval(kFillHeapUntilThrow), "out of memory");
+  EXPECT_EQ(Eval(cycles), "done");
+}
+
+TEST_F(MemoryLimitTest, IgnoresFreePagesOfMappedHeap) {
+  if (!ctx->gc_enable) GTEST_SKIP();
+  constexpr size_t kMappedLimit = 96 * MB, kHugeBufferSize = 40 * MB;
+  auto *rt = get_rt();
+  LEPUS_SetMemoryLimit(rt, kMappedLimit);
+  ASSERT_EQ(Eval(R"(
+    var buffers = [];
+    for (var i = 0; i < 960; i++) buffers.push(new ArrayBuffer(65536));
+    for (var i = 0; i < buffers.length; i += 2) buffers[i] = null;
+    buffers.length;
+  )"),
+            "960");
+  LEPUS_RunGC(rt);
+  ASSERT_GT(rt->ros_->GetCurrentSpaceCapacity() + kHugeBufferSize,
+            kMappedLimit);
+  const std::string size = std::to_string(kHugeBufferSize);
+  EXPECT_EQ(Eval("new ArrayBuffer(" + size + ").byteLength"), size);
+}
+
 }  // namespace heap_test

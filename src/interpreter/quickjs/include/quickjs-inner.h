@@ -458,6 +458,10 @@ struct LEPUSRuntime {
   LEPUSInterruptHandler *interrupt_handler;
   void *interrupt_opaque;
 
+  LEPUSOutOfMemoryCallback *oom_callback;
+  void *oom_callback_opaque;
+  BOOL oom_reported : 8;
+
   struct list_head job_list; /* list of JSJobEntry.link */
 
   LEPUSModuleNormalizeFunc *module_normalize_func;
@@ -3383,6 +3387,8 @@ enum class GCInfoUpdateReason {
 void JS_UpdateGCInfo(
     LEPUSRuntime *rt, size_t size,
     GCInfoUpdateReason reason = GCInfoUpdateReason::kAllocation);
+// Reports the first failed allocation of rt to the out of memory callback.
+QJS_HIDE void JS_NotifyOutOfMemory(LEPUSRuntime *rt, size_t request_size);
 
 QJS_HIDE pid_t get_tid();
 

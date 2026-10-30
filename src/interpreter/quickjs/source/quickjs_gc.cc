@@ -730,7 +730,7 @@ LEPUSGCMemoryPolicyLevel JS_GetGCMemoryPolicyLevel_GC(LEPUSRuntime *rt) {
 }
 
 void JS_SetMemoryLimit_GC(LEPUSRuntime *rt, size_t limit) {
-  rt->ros_->SetHeapGrowthLimit(limit);
+  rt->ros_->SetAllocatedPageLimit(limit);
 }
 
 void JS_RaiseStartupHeapLimit_GC(LEPUSRuntime *rt, size_t limit) {
@@ -9743,7 +9743,7 @@ int js_parse_destructing_element_GC(JSParseState *s, int tok, int is_arg,
     /* remove test and decrement label ref count */
     memset(s->cur_func->byte_code.buf + start_addr, OP_nop,
            assign_addr - start_addr);
-    s->cur_func->label_slots[label_parse].ref_count--;
+    if (label_parse >= 0) s->cur_func->label_slots[label_parse].ref_count--;
     has_initializer = FALSE;
   }
   return has_initializer;
@@ -11213,7 +11213,7 @@ static __exception int js_parse_statement_or_decl(JSParseState *s,
         }
       }
       if (js_parse_expect(s, '}')) goto fail;
-      if (default_label_pos >= 0) {
+      if (default_label_pos >= 0 && label_case >= 0) {
         /* Ugly patch for the the `default` label, shameful and risky */
         put_u32(s->cur_func->byte_code.buf + default_label_pos, label_case);
         s->cur_func->label_slots[label_case].pos = default_label_pos + 4;
