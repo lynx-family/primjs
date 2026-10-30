@@ -8,6 +8,7 @@ group("testing") {
   deps = [
     "napi:napi_unittest",
     "quickjs:run_test262",
+    "quickjs/compiler:object_has_own_unittest",
     "quickjs/compiler:quickjs_unittest",
     "quickjs/compiler:unicode_normalization_unittest",
     "quickjs/heap:heap_unittest",
