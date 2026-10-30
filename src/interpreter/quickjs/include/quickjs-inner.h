@@ -41,6 +41,7 @@ extern "C" {
 #ifdef __cplusplus
 }
 #endif
+
 #include "gc/allocator.h"
 #include "gc/collector_ms.h"
 #include "gc/pointer_set.h"
@@ -370,6 +371,7 @@ class PtrHandles;
 class CheckTools;
 class ByteThreadPool;
 class NAPIHandleScope;
+class GCRawBufferStack;
 
 void *lepus_def_allocate(ROS_GC::RosAllocImpl *, size_t size, int alloc_tag);
 void *lepus_def_reallocate(ROS_GC::RosAllocImpl *ros, void *ptr, size_t size,
@@ -393,15 +395,11 @@ typedef struct JSCoverageInfo {
   uint32_t *coverage_counters;
 } JSCoverageInfo;
 
-static constexpr uint32_t kFirstCachedSingleCharacter = 0x00;
-static constexpr uint32_t kLastCachedSingleCharacter = 0x7f;
+static constexpr uint32_t kFirstCachedSingleCharacter = 0;
+static constexpr uint32_t kLastCachedSingleCharacter = 0x7e;
 static constexpr uint32_t kSingleCharacterStringTableSize =
     kLastCachedSingleCharacter - kFirstCachedSingleCharacter + 1;
-
-static constexpr uint32_t kFirstCachedTwoDigitNumber = 10;
-static constexpr uint32_t kLastCachedTwoDigitNumber = 99;
-static constexpr uint32_t kTwoDigitNumberStringTableSize =
-    kLastCachedTwoDigitNumber - kFirstCachedTwoDigitNumber + 1;
+static constexpr uint32_t kCachedSmallIntegerStringCount = 100;
 
 struct JSStrCacheOrphan {
   void *cache;
@@ -508,6 +506,7 @@ struct LEPUSRuntime {
 
   QJSValueValueSpace *qjsvaluevalue_allocator = nullptr;
   PtrHandles *ptr_handles;
+  GCRawBufferStack *raw_buffer_stack;
   bool gc_enable;
   bool is_lepusng;
   bool opt_lepusng_package_size;
@@ -535,12 +534,12 @@ struct LEPUSRuntime {
   size_t gc_info_threshold;
   size_t gc_info_interval_size;
   JSAtom single_character_string_table[kSingleCharacterStringTableSize];
-  JSAtom two_digit_number_string_table[kTwoDigitNumberStringTableSize];
-  JSStrCacheOrphan *str_cache_orphans;
+  JSAtom small_integer_string_table[kCachedSmallIntegerStringCount];
 #ifdef ENABLE_LEPUSNG
   /* Keep new fields at the end to preserve existing embedded-code offsets. */
   struct list_head lepus_ref_list;
 #endif
+  JSStrCacheOrphan *str_cache_orphans;
   bool uswap_in_progress;
 };
 
@@ -578,6 +577,79 @@ static const char *const native_error_name[JS_NATIVE_ERROR_COUNT] = {
 
 /* Set/Map/WeakSet/WeakMap */
 
+constexpr uint32_t kJSLinkedHashMapClearedCount = UINT32_MAX;
+
+typedef struct JSLinkedHashMapEntry {
+  LEPUSValue key;
+  LEPUSValue value;
+} JSLinkedHashMapEntry;
+
+static inline bool JSLinkedHashMapEntryIsLive(
+    const JSLinkedHashMapEntry *entry) {
+  return !LEPUS_IsUninitialized(entry->key);
+}
+
+typedef struct JSLinkedHashMap {
+  BOOL is_weak;
+  uint32_t bucket_count;
+  uint32_t entry_capacity;
+  uint32_t entry_used;
+  uint32_t live_count;
+  uint32_t deleted_count;
+  struct JSLinkedHashMap *next_table;
+} JSLinkedHashMap;
+
+typedef struct JSMapIteratorDataGC {
+  JSLinkedHashMap *table;
+  int32_t kind;
+  uint32_t entry_index;
+} JSMapIteratorDataGC;
+
+static inline uint32_t *JSLinkedHashMapBuckets(JSLinkedHashMap *table) {
+  return reinterpret_cast<uint32_t *>(table + 1);
+}
+
+static inline const uint32_t *JSLinkedHashMapBuckets(
+    const JSLinkedHashMap *table) {
+  return reinterpret_cast<const uint32_t *>(table + 1);
+}
+
+static inline uint32_t *JSLinkedHashMapHashNext(JSLinkedHashMap *table) {
+  return JSLinkedHashMapBuckets(table) + table->bucket_count;
+}
+
+static inline const uint32_t *JSLinkedHashMapHashNext(
+    const JSLinkedHashMap *table) {
+  return JSLinkedHashMapBuckets(table) + table->bucket_count;
+}
+
+static inline uint32_t *JSLinkedHashMapWeakBuckets(JSLinkedHashMap *table) {
+  return JSLinkedHashMapHashNext(table) + table->entry_capacity;
+}
+
+static inline const uint32_t *JSLinkedHashMapWeakBuckets(
+    const JSLinkedHashMap *table) {
+  return JSLinkedHashMapHashNext(table) + table->entry_capacity;
+}
+
+static inline JSLinkedHashMapEntry *JSLinkedHashMapEntries(
+    JSLinkedHashMap *table) {
+  uint32_t *entry_base = JSLinkedHashMapWeakBuckets(table);
+  if (table->is_weak) {
+    entry_base += table->entry_capacity;
+  }
+  return reinterpret_cast<JSLinkedHashMapEntry *>(entry_base);
+}
+
+static inline const JSLinkedHashMapEntry *JSLinkedHashMapEntries(
+    const JSLinkedHashMap *table) {
+  const uint32_t *entry_base = JSLinkedHashMapWeakBuckets(table);
+  if (table->is_weak) {
+    entry_base += table->entry_capacity;
+  }
+  return reinterpret_cast<const JSLinkedHashMapEntry *>(entry_base);
+}
+
 typedef struct JSMapState {
   BOOL is_weak;             /* TRUE if WeakSet/WeakMap */
   struct list_head records; /* list of JSMapRecord.link */
@@ -585,8 +657,7 @@ typedef struct JSMapState {
   uint32_t hash_bits;
   uint32_t hash_size; /* must be a power of two */
   uint32_t record_count;
-  uint32_t record_count_threshold; /* count at which a hash table
-                                      resize is needed */
+  uint32_t record_count_threshold;
 } JSMapState;
 
 typedef struct JSUnhandledRejectionEntry {
@@ -615,11 +686,10 @@ typedef struct LEPUSStackFrame {
   struct LEPUSStackFrame *prev_frame; /* NULL if first stack frame */
   LEPUSValue
       cur_func; /* current function, LEPUS_UNDEFINED if the frame is detached */
-  LEPUSValue *arg_buf;           /* arguments */
-  LEPUSValue *var_buf;           /* variables */
-  struct list_head var_ref_list; /* list of JSVarRef.link */
-  const uint8_t *cur_pc;         /* only used in bytecode functions : PC of the
-                              instruction after the call */
+  LEPUSValue *arg_buf;   /* arguments */
+  LEPUSValue *var_buf;   /* variables */
+  const uint8_t *cur_pc; /* only used in bytecode functions : PC of the
+                      instruction after the call */
   int arg_count;
   int js_mode; /* for C functions: 0 */
   /* only used in generators. Current stack pointer value. NULL if
@@ -733,29 +803,67 @@ enum TOK {
 };
 #define TOK_FIRST_KEYWORD TOK_NULL
 #define TOK_LAST_KEYWORD TOK_AWAIT
+enum {
+  JS_STRING_ASCII_UNKNOWN,
+  JS_STRING_ASCII_YES,
+  JS_STRING_ASCII_NO,
+};
+
+struct JSStringMeta {
+  /* for JS_ATOM_TYPE_SYMBOL: hash = 0, atom_type = 3,
+     for JS_ATOM_TYPE_PRIVATE: hash = 1, atom_type = 3 */
+  uint32_t hash : 30;
+  uint32_t atom_type : 2;
+  uint32_t hash_next : 30; /* atom_index for JS_ATOM_TYPE_SYMBOL */
+  uint32_t ascii_state : 2;
+};
+
+struct JSStringAux {
+  JSStringMeta meta;
+  void *cache;
+};
+
+/* Maximum string length; it must fit in the 30-bit JSString::len field. */
+#define JS_STRING_LEN_MAX ((1 << 30) - 1)
+
 struct JSString {
   LEPUSRefCountHeader header; /* must come first, 32-bit */
-  uint32_t len : 31;
-  uint8_t is_wide_char : 1; /* 0 = 8 bits, 1 = 16 bits characters */
-  /* for JS_ATOM_TYPE_SYMBOL: hash = 0, atom_type = 3,
-     for JS_ATOM_TYPE_PRIVATE: hash = 1, atom_type = 3
-     XXX: could change encoding to have one more bit in hash */
-  uint32_t hash : 30;
-  uint8_t atom_type : 2; /* != 0 if atom, JS_ATOM_TYPE_x */
-  uint32_t hash_next;    /* atom_index for JS_ATOM_TYPE_SYMBOL */
+  uint32_t len : 30;
+  uint32_t has_aux : 1;
+  uint32_t is_wide_char : 1; /* 0 = 8 bits, 1 = 16 bits characters */
+  union {
+    JSStringMeta meta;
+    JSStringAux *aux;
+  };
 #ifdef DUMP_LEAKS
   struct list_head link; /* string list */
-#endif
-
-#ifdef ENABLE_LEPUSNG
-  // Primjs add
-  void *cache_;  // add to convert to jsString
 #endif
   union {
     uint8_t str8[0]; /* 8 bit strings will get an extra null terminator */
     uint16_t str16[0];
   } u;
 };
+
+QJS_STATIC inline JSStringMeta *js_string_meta(JSString *str) {
+  if (unlikely(str->has_aux)) return &str->aux->meta;
+  return &str->meta;
+}
+
+QJS_STATIC inline const JSStringMeta *js_string_meta(const JSString *str) {
+  if (unlikely(str->has_aux)) return &str->aux->meta;
+  return &str->meta;
+}
+
+QJS_STATIC inline size_t js_string_aux_size(const JSString *str) {
+  return str->has_aux ? sizeof(JSStringAux) : 0;
+}
+
+#ifdef ENABLE_LEPUSNG
+QJS_HIDE void js_string_set_cache(LEPUSContext *ctx, JSString *str,
+                                  void *cache);
+QJS_HIDE void *js_string_get_cache(const JSString *str);
+QJS_HIDE void js_string_free_cache(LEPUSRuntime *rt, JSString *str);
+#endif
 
 typedef struct JSGCHeader {
   uint8_t mark;
@@ -771,13 +879,55 @@ typedef struct JSVarRef {
    */
   uint8_t is_detached;
   uint8_t from;
-  int var_idx; /* index of the corresponding function variable on
-                  the stack */
-  struct list_head link;
+  int var_idx;        /* index of the corresponding function variable on
+                         the stack */
   LEPUSValue *pvalue; /* pointer to the value, either on the stack or
                       to 'value' */
   LEPUSValue value;   /* used when the variable is no longer on the stack */
 } JSVarRef;
+
+typedef struct JSVarRefGC {
+  LEPUSValue *pvalue;
+  LEPUSValue value;
+} JSVarRefGC;
+
+static_assert(sizeof(uintptr_t) != 8 || sizeof(LEPUSValue) != 8 ||
+                  sizeof(JSVarRefGC) == 16,
+              "64-bit NaN-boxed variable references must remain compact");
+
+QJS_STATIC inline std::atomic<LEPUSValue *> *js_var_ref_gc_atomic_word(
+    JSVarRefGC *var_ref) {
+  return reinterpret_cast<std::atomic<LEPUSValue *> *>(&var_ref->pvalue);
+}
+
+QJS_STATIC inline const std::atomic<LEPUSValue *> *js_var_ref_gc_atomic_word(
+    const JSVarRefGC *var_ref) {
+  return reinterpret_cast<const std::atomic<LEPUSValue *> *>(&var_ref->pvalue);
+}
+
+QJS_STATIC inline LEPUSValue *js_var_ref_gc_pvalue(const JSVarRefGC *var_ref) {
+  return std::atomic_load_explicit(js_var_ref_gc_atomic_word(var_ref),
+                                   std::memory_order_relaxed);
+}
+
+QJS_STATIC inline void js_var_ref_gc_set_pvalue(JSVarRefGC *var_ref,
+                                                LEPUSValue *pvalue) {
+  std::atomic_store_explicit(js_var_ref_gc_atomic_word(var_ref), pvalue,
+                             std::memory_order_relaxed);
+}
+
+QJS_STATIC inline void js_var_ref_gc_init(JSVarRefGC *var_ref,
+                                          LEPUSValue *pvalue) {
+  var_ref->pvalue = pvalue;
+}
+
+QJS_STATIC inline JSVarRefGC *js_var_ref_gc(JSVarRef *var_ref) {
+  return reinterpret_cast<JSVarRefGC *>(var_ref);
+}
+
+QJS_STATIC inline const JSVarRefGC *js_var_ref_gc(const JSVarRef *var_ref) {
+  return reinterpret_cast<const JSVarRefGC *>(var_ref);
+}
 
 /* must be large enough to have a negligible runtime cost and small
    enough to call the interrupt callback often. */
@@ -831,6 +981,11 @@ enum {
   OP_SHIPPABLE_COUNT = 0
 #include "quickjs/include/quickjs-opcode.h"
 };
+
+static_assert(OP_SHIPPABLE_COUNT == 242,
+              "changing the shipped opcode count breaks bytecode ABI");
+static_assert(OP_inc_coverage == OP_SHIPPABLE_COUNT);
+static_assert(OP_COUNT <= 256, "opcodes must fit in one byte");
 
 struct FinalizationRegistryContext;
 constexpr size_t kFunctionShapeLengthNamePrototype = 0;
@@ -934,6 +1089,10 @@ struct LEPUSContext {
   struct FinalizationRegistryContext *fg_ctx = nullptr;
   bool con_mark_state = false;
   CheckTools *check_tools;
+  JSShape *object_shape;    /* initial shape for plain objects */
+  JSShape *arguments_shape; /* initial shape for Arguments objects */
+  JSShape *non_strict_arguments_shape;
+  struct JSPropertyAutoInit *function_proto_autoinit;
 };
 
 typedef union JSFloat64Union {
@@ -1011,6 +1170,21 @@ typedef struct JSVarDef {
   uint8_t var_kind : 4;   /* see JSVarKindEnum */
   int func_pool_idx : 24; /* only used during compilation */
 } JSVarDef;
+
+/* Compact runtime/debug representation. Compilation-only fields such as
+   func_pool_idx are deliberately kept out of LEPUSFunctionBytecode. */
+typedef struct JSBytecodeVarDef {
+  JSAtom var_name;
+  int32_t scope_next;
+  uint32_t scope_level : 24;
+  uint32_t is_const : 1;
+  uint32_t is_lexical : 1;
+  uint32_t is_captured : 1;
+  uint32_t var_kind : 4; /* see JSVarKindEnum */
+} JSBytecodeVarDef;
+
+static_assert(sizeof(JSBytecodeVarDef) == 12);
+static_assert(sizeof(JSBytecodeVarDef) < sizeof(JSVarDef));
 
 /* for the encoding of the pc2line table */
 #define PC2LINE_BASE (-1)
@@ -1103,8 +1277,8 @@ typedef struct LEPUSFunctionBytecode {
   uint8_t *byte_code_buf; /* (self pointer) */
   int byte_code_len;
   JSAtom func_name;
-  JSVarDef *vardefs; /* arguments + local variables (arg_count + var_count)
-                        (self pointer) */
+  JSBytecodeVarDef *vardefs; /* arguments + local variables (arg_count +
+                                var_count) (self pointer) */
   LEPUSClosureVar
       *closure_var; /* list of variables in the closure (self pointer) */
   uint16_t arg_count;
@@ -1176,6 +1350,15 @@ typedef struct JSForInIterator {
   uint32_t array_length;
   uint32_t idx;
 } JSForInIterator;
+
+typedef struct JSForInIteratorGC {
+  LEPUSValue obj;
+  uint32_t idx;
+  uint32_t atom_count;
+  uint8_t in_prototype_chain;
+  uint8_t is_array;
+  LEPUSPropertyEnum *tab_atom; /* is_array = FALSE */
+} JSForInIteratorGC;
 
 typedef struct JSRegExp {
   JSString *pattern;
@@ -1357,6 +1540,10 @@ typedef struct WeakRefRecord {
   struct WeakRefRecord *next_weak_ref;
   union {
     JSMapRecord *map_record;
+    struct {
+      JSLinkedHashMap *table;
+      uint32_t entry_index;
+    } map_entry;
     FinalizationRegistryEntry *fin_node;
     WeakRefData *weak_ref;
     void *ptr;
@@ -1432,12 +1619,12 @@ typedef LEPUSValue JSAutoInitFunc(LEPUSContext *ctx, LEPUSObject *obj,
                                   JSAtom prop, void *opaque);
 
 typedef struct JSPropertyGetSet {
-  LEPUSObject *getter; /* NULL if undefined */
-  LEPUSObject *setter; /* NULL if undefined */
+  LEPUSValue getter; /* LEPUS_UNDEFINED or an object */
+  LEPUSValue setter; /* LEPUS_UNDEFINED or an object */
 } JSPropertyGetSet;
 
 typedef struct JSPropertyAutoInit {
-  uintptr_t init_func;
+  JSAutoInitFunc *init_func;
   void *opaque;
 } JSPropertyAutoInit;
 
@@ -1450,28 +1637,67 @@ typedef struct JSProperty {
     } getset;
     JSVarRef *var_ref; /* LEPUS_PROP_VARREF */
     struct {           /* LEPUS_PROP_AUTOINIT */
-      LEPUSValue (*init_func)(LEPUSContext *ctx, LEPUSObject *obj, JSAtom prop,
-                              void *opaque);
+      uintptr_t init_func;
       void *opaque;
     } init;
   } u;
 } JSProperty;
 
+inline bool js_prop_is_autoinit(JSProperty *pr) {
+  auto init_val = pr->u.init.init_func;
+  return (init_val & 3) == 1;
+}
+
 typedef struct JSPropertyGC {
   union {
-    LEPUSValue value;             /* LEPUS_PROP_NORMAL */
-    JSPropertyGetSet *getset;     /* LEPUS_PROP_GETSET */
-    JSVarRef *var_ref;            /* LEPUS_PROP_VARREF */
-    JSPropertyAutoInit *autoinit; /* LEPUS_PROP_AUTOINIT */
+    /*
+     * Every GC property kind is stored as a tagged LEPUSValue. Raw pointers
+     * are not representation compatible with LEPUSValue on 32-bit NaN-boxing
+     * targets, and leave the tag half uninitialized when DISABLE_NANBOX=1.
+     */
+    LEPUSValue value;
   } u;
 } JSPropertyGC;
 
-inline JSAutoInitFunc *js_autoinit_get_func(JSPropertyGC *pr) {
-  return reinterpret_cast<JSAutoInitFunc *>(pr->u.autoinit->init_func);
+inline LEPUSValue js_property_gc_make_getset(JSPropertyGetSet *getset) {
+  return LEPUS_MKPTR(LEPUS_TAG_OBJECT, getset);
+}
+
+inline JSPropertyGetSet *js_property_gc_get_getset(const JSPropertyGC *pr) {
+  return static_cast<JSPropertyGetSet *>(LEPUS_VALUE_GET_PTR(pr->u.value));
+}
+
+inline LEPUSValue js_property_gc_make_accessor(LEPUSObject *accessor) {
+  return accessor ? LEPUS_MKPTR(LEPUS_TAG_OBJECT, accessor) : LEPUS_UNDEFINED;
+}
+
+inline LEPUSObject *js_property_gc_get_accessor(LEPUSValue accessor) {
+  return LEPUS_VALUE_IS_OBJECT(accessor) ? LEPUS_VALUE_GET_OBJ(accessor)
+                                         : nullptr;
+}
+
+inline LEPUSValue js_property_gc_make_var_ref(JSVarRef *var_ref) {
+  return LEPUS_MKPTR(LEPUS_TAG_VAR_REF, var_ref);
+}
+
+inline JSVarRef *js_property_gc_get_var_ref(const JSPropertyGC *pr) {
+  return static_cast<JSVarRef *>(LEPUS_VALUE_GET_PTR(pr->u.value));
+}
+
+inline LEPUSValue js_property_gc_make_autoinit(JSPropertyAutoInit *autoinit) {
+  return LEPUS_MKPTR(LEPUS_TAG_OBJECT, autoinit);
+}
+
+inline JSPropertyAutoInit *js_property_gc_get_autoinit(const JSPropertyGC *pr) {
+  return static_cast<JSPropertyAutoInit *>(LEPUS_VALUE_GET_PTR(pr->u.value));
+}
+
+inline JSAutoInitFunc *js_autoinit_get_func(const JSPropertyGC *pr) {
+  return js_property_gc_get_autoinit(pr)->init_func;
 }
 
 inline void set_js_autoinit_func(JSPropertyGC *pr, JSAutoInitFunc *func) {
-  pr->u.autoinit->init_func = reinterpret_cast<uintptr_t>(func);
+  js_property_gc_get_autoinit(pr)->init_func = func;
 }
 
 static_assert(sizeof(JSPropertyGC) == sizeof(LEPUSValue));
@@ -1486,6 +1712,12 @@ typedef struct JSShapeProperty {
   JSAtom atom;             /* JS_ATOM_NULL = free property entry */
 } JSShapeProperty;
 
+typedef struct JSShapeTransition {
+  JSShape *target;
+  JSAtom atom;
+  uint8_t prop_flags;
+} JSShapeTransition;
+
 struct JSShape {
   LEPUSRefCountHeader header; /* must come first, 32-bit */
   JSGCHeader gc_header;       /* must come after LEPUSRefCountHeader, 8-bit */
@@ -1496,31 +1728,45 @@ struct JSShape {
      <= n <= 2^31-1. If false, the shape is guaranteed not to have
      small array index properties */
   uint8_t has_small_array_index;
+  /* Cached shapes must be cloned before any structural mutation. */
+  uint8_t transition_cached : 1;
+  /* Shared root shapes are too polymorphic for a single transition slot. */
+  uint8_t disable_monomorphic_transition : 1;
   uint32_t hash; /* current hash value */
   uint32_t prop_hash_mask;
   int prop_size; /* allocated properties */
   int prop_count;
   JSShape *shape_hash_next; /* in LEPUSRuntime.shape_hash[h] list */
   LEPUSObject *proto;
+  /* Weak monomorphic transition. */
+  JSShapeTransition transition;
+  /* Strong reference to the predecessor in the shape transition chain. */
+  JSShape *parent;
   uint32_t hash_table[0]; /* prop_hash_mask + 1 elements, followed by
                              JSShapeProperty prop[prop_size]. */
 };
 struct LEPUSObject {
   LEPUSRefCountHeader header; /* must come first, 32-bit */
   JSGCHeader gc_header;       /* must come after LEPUSRefCountHeader, 8-bit */
+
   uint8_t extensible : 1;
-  /* RC: only used when freeing objects with cycles.
-     GC: TRUE when ctx/tid are real fields, i.e. they are not reused as inline
-     property slots. Unused by the tracing GC otherwise, see
-     LEPUSObjectHasContextFields(). */
+  /* RC: cycle free mark; GC: ctx/tid layout is present. */
   uint8_t free_mark : 1;
   uint8_t is_exotic : 1;      /* TRUE if object has exotic property handlers */
   uint8_t fast_array : 1;     /* TRUE if u.array is used for get/put */
   uint8_t is_constructor : 1; /* TRUE if object is a constructor function */
-  uint8_t is_uncatchable_error : 1; /* if TRUE, error is not catchable */
-  uint8_t is_class : 1;             /* TRUE if object is a class constructor */
-  uint8_t tmp_mark : 1;             /* used in JS_WriteObjectRec() */
-  uint16_t class_id;                /* see JS_CLASS_x */
+  /* TRUE if the array prototype is "normal":
+      - no small index properties which are get/set or non writable
+      - its prototype is Object.prototype
+      - Object.prototype has no small index properties which are get/set or non
+     writable
+      - the prototype of Object.prototype is null (always true as it is
+     immutable)
+  */
+  uint8_t is_std_array_prototype : 1;
+  uint8_t is_std_object_prototype : 1;
+  uint8_t tmp_mark : 1; /* used in JS_WriteObjectRec() */
+  uint16_t class_id;    /* see JS_CLASS_x */
   /* byte offsets: 8/8 */
   /* byte offsets: 16/24 */
   JSShape *shape; /* prototype and property names + flag */
@@ -1608,6 +1854,9 @@ struct LEPUSObject {
     } array;                /* 12/20 bytes */
     JSRegExp regexp;        /* JS_CLASS_REGEXP: 8/16 bytes */
     LEPUSValue object_data; /* for JS_SetObjectData(): 8/16/16 bytes */
+    struct {                /* JS_CLASS_ERROR: 8/16 bytes */
+      uint8_t is_uncatchable_error;
+    } error;
   } u;
   LEPUSContext *ctx;
   pid_t tid;
@@ -1615,28 +1864,110 @@ struct LEPUSObject {
   /* byte sizes: 40/48/72 */
 };
 
-/* ctx and tid are only meaningful when they are not reused as inline property
-   slots. The layout is decided per object at creation time, while
-   object_ctx_check can be turned on later (SetObjectCtxCheckStatus), so the
-   decision has to be recorded on the object itself. */
 static inline bool LEPUSObjectHasContextFields(const LEPUSRuntime *rt,
                                                const LEPUSObject *obj) {
+  /* RC objects always use the complete LEPUSObject layout. */
   return !rt->gc_enable || obj->free_mark;
 }
 
-// ctx, tid and link are reused as four inline GC property slots when object
-// context checking is disabled.
+// In GC mode the class-specific payload starts at u. When object context
+// checking is disabled, four inline property slots immediately follow the
+// payload. first_weak_ref stays in the fixed prefix because GC weak references
+// use it.
 #define LEPUS_IN_OBJECT_PROPERTY_SIZE 4
-#ifdef ENABLE_COMPATIBLE_MM
-static_assert((sizeof(LEPUSObject) - __builtin_offsetof(LEPUSObject, ctx)) /
-                  sizeof(JSPropertyGC) ==
-              LEPUS_IN_OBJECT_PROPERTY_SIZE);
-#endif
 static constexpr size_t LEPUS_OBJECT_SIZE = sizeof(LEPUSObject);
-static constexpr size_t OBJECT_PROP_OFFSET =
-    __builtin_offsetof(LEPUSObject, ctx);
-#define IS_IN_OBJECT_PROP(p, prop) \
-  ((uintptr_t)(prop) - (uintptr_t)p == OBJECT_PROP_OFFSET)
+static constexpr size_t LEPUS_OBJECT_PAYLOAD_OFFSET =
+    __builtin_offsetof(LEPUSObject, u);
+
+static constexpr size_t AlignLEPUSObjectPayload(size_t size) {
+  return (size + alignof(JSPropertyGC) - 1) & ~(alignof(JSPropertyGC) - 1);
+}
+
+static constexpr force_inline size_t
+GetLEPUSObjectPayloadSize(LEPUSClassID class_id) {
+  switch (class_id) {
+    case JS_CLASS_OBJECT:
+    case JS_CLASS_MAPPED_ARGUMENTS:
+    case JS_CLASS_MODULE_NS:
+      return 0;
+    case JS_CLASS_ERROR:
+      return AlignLEPUSObjectPayload(sizeof(((LEPUSObject *)nullptr)->u.error));
+    case JS_CLASS_C_FUNCTION:
+      return AlignLEPUSObjectPayload(sizeof(((LEPUSObject *)nullptr)->u.cfunc));
+    case JS_CLASS_BYTECODE_FUNCTION:
+    case JS_CLASS_GENERATOR_FUNCTION:
+    case JS_CLASS_ASYNC_FUNCTION:
+    case JS_CLASS_ASYNC_GENERATOR_FUNCTION:
+      return AlignLEPUSObjectPayload(sizeof(((LEPUSObject *)nullptr)->u.func));
+    case JS_CLASS_ARRAY:
+    case JS_CLASS_ARGUMENTS:
+    case JS_CLASS_UINT8C_ARRAY:
+    case JS_CLASS_INT8_ARRAY:
+    case JS_CLASS_UINT8_ARRAY:
+    case JS_CLASS_INT16_ARRAY:
+    case JS_CLASS_UINT16_ARRAY:
+    case JS_CLASS_INT32_ARRAY:
+    case JS_CLASS_UINT32_ARRAY:
+    case JS_CLASS_FLOAT32_ARRAY:
+    case JS_CLASS_FLOAT64_ARRAY:
+    case JS_CLASS_BIG_INT64_ARRAY:
+    case JS_CLASS_BIG_UINT64_ARRAY:
+    case JS_CLASS_DATAVIEW:
+      return AlignLEPUSObjectPayload(sizeof(((LEPUSObject *)nullptr)->u.array));
+    case JS_CLASS_REGEXP:
+      return AlignLEPUSObjectPayload(
+          sizeof(((LEPUSObject *)nullptr)->u.regexp));
+    case JS_CLASS_NUMBER:
+    case JS_CLASS_STRING:
+    case JS_CLASS_BOOLEAN:
+    case JS_CLASS_SYMBOL:
+    case JS_CLASS_DATE:
+    case JS_CLASS_BIG_INT:
+      return AlignLEPUSObjectPayload(
+          sizeof(((LEPUSObject *)nullptr)->u.object_data));
+    default:
+      return AlignLEPUSObjectPayload(sizeof(void *));
+  }
+}
+
+static constexpr force_inline size_t
+GetLEPUSObjectInlinePropOffset(LEPUSClassID class_id) {
+  return LEPUS_OBJECT_PAYLOAD_OFFSET + GetLEPUSObjectPayloadSize(class_id);
+}
+
+static constexpr force_inline size_t
+GetLEPUSObjectAllocSize(LEPUSClassID class_id) {
+  return GetLEPUSObjectInlinePropOffset(class_id) +
+         LEPUS_IN_OBJECT_PROPERTY_SIZE * sizeof(JSPropertyGC);
+}
+
+static constexpr force_inline bool CanInlineLEPUSObjectProperties(
+    LEPUSClassID class_id) {
+  /*
+   * Inline properties are only useful while the class-specific allocation is
+   * no larger than the complete object. Representations with wider
+   * LEPUSValue slots fall back to the complete layout when this is not true.
+   */
+  return GetLEPUSObjectAllocSize(class_id) <= LEPUS_OBJECT_SIZE;
+}
+
+static inline bool IsInLEPUSObjectProp(const LEPUSObject *obj,
+                                       const void *prop) {
+  return reinterpret_cast<uintptr_t>(prop) ==
+         reinterpret_cast<uintptr_t>(obj) +
+             GetLEPUSObjectInlinePropOffset(
+                 static_cast<LEPUSClassID>(obj->class_id));
+}
+
+static_assert((alignof(JSPropertyGC) & (alignof(JSPropertyGC) - 1)) == 0);
+static_assert(GetLEPUSObjectPayloadSize(JS_CLASS_BYTECODE_FUNCTION) %
+                      alignof(JSPropertyGC) ==
+                  0,
+              "object payload must preserve JSPropertyGC alignment");
+static_assert(GetLEPUSObjectAllocSize(JS_CLASS_OBJECT) ==
+              GetLEPUSObjectInlinePropOffset(JS_CLASS_OBJECT) +
+                  LEPUS_IN_OBJECT_PROPERTY_SIZE * sizeof(JSPropertyGC));
+#define IS_IN_OBJECT_PROP(p, prop) IsInLEPUSObjectProp((p), (prop))
 
 constexpr const char *lepusjs_filename = "file://lepus.js";
 constexpr const char *lepusng_functionid_str = "__lepusNG_function_id__";
@@ -1821,8 +2152,9 @@ typedef struct JSSeparableString {
   uint32_t depth;
   LEPUSValue left_op;
   LEPUSValue right_op;
-  LEPUSValue flat_content;
 } JSSeparableString;
+
+static constexpr uint32_t JS_STRING_ROPE_MAX_DEPTH = 60;
 
 class CStack {
   using element = JSSeparableString *;
@@ -1882,6 +2214,16 @@ QJS_STATIC inline JSSeparableString *JS_GetSeparableString(LEPUSValue val) {
   return reinterpret_cast<JSSeparableString *>(LEPUS_VALUE_GET_PTR(val));
 }
 
+QJS_STATIC inline bool JS_IsSeparableStringFlat(const JSSeparableString *str) {
+  return LEPUS_IsNull(str->right_op);
+}
+
+QJS_STATIC inline LEPUSValueConst JS_GetSeparableStringFlatContent(
+    const JSSeparableString *str) {
+  DCHECK(JS_IsSeparableStringFlat(str));
+  return str->left_op;
+}
+
 QJS_HIDE LEPUSValue JS_GetPropertyInternalImpl_GC(LEPUSContext *ctx,
                                                   LEPUSValueConst obj,
                                                   JSAtom prop,
@@ -1889,6 +2231,17 @@ QJS_HIDE LEPUSValue JS_GetPropertyInternalImpl_GC(LEPUSContext *ctx,
                                                   BOOL throw_ref_error);
 QJS_HIDE LEPUSValue js_closure_gc(LEPUSContext *ctx, LEPUSValue bfunc,
                                   JSVarRef **cur_var_refs, LEPUSStackFrame *sf);
+QJS_HIDE LEPUSValue js_closure2_gc(LEPUSContext *ctx, LEPUSValue func_obj,
+                                   LEPUSFunctionBytecode *b,
+                                   JSVarRef **cur_var_refs,
+                                   LEPUSStackFrame *sf);
+QJS_HIDE LEPUSValue js_closure_gc_slowpath(LEPUSContext *ctx,
+                                           LEPUSFunctionBytecode *b,
+                                           JSVarRef **cur_var_refs,
+                                           LEPUSStackFrame *sf);
+QJS_HIDE LEPUSValue js_instantiate_prototype_gc(LEPUSContext *ctx,
+                                                LEPUSObject *p, JSAtom atom,
+                                                void *opaque);
 
 QJS_HIDE void DebuggerPause(LEPUSContext *ctx, LEPUSValue val,
                             const uint8_t *pc);
@@ -1939,12 +2292,18 @@ QJS_HIDE LEPUSValue JS_CallConstructorInternal_GC(LEPUSContext *ctx,
                                                   LEPUSValueConst new_target,
                                                   int argc, LEPUSValue *argv,
                                                   int flags);
+QJS_HIDE LEPUSValue js_create_ordinary_constructor_this_GC(LEPUSContext *ctx,
+                                                           LEPUSValue *argv);
 QJS_HIDE int JS_CheckGlobalVar_GC(LEPUSContext *ctx, JSAtom prop);
 QJS_HIDE LEPUSValue JS_GetPropertyValue_GC(LEPUSContext *ctx,
                                            LEPUSValueConst this_obj,
                                            LEPUSValue prop);
 QJS_HIDE int JS_DefineGlobalVar_GC(LEPUSContext *ctx, JSAtom prop,
                                    int def_flags);
+QJS_HIDE LEPUSValue js_regexp_constructor_internal(LEPUSContext *ctx,
+                                                   LEPUSValueConst ctor,
+                                                   LEPUSValue pattern,
+                                                   LEPUSValue bc);
 QJS_HIDE LEPUSValue js_regexp_constructor_internal_gc(LEPUSContext *ctx,
                                                       LEPUSValueConst ctor,
                                                       LEPUSValue pattern,
@@ -2000,13 +2359,10 @@ QJS_HIDE JSVarRef *get_var_ref(LEPUSContext *ctx, LEPUSStackFrame *sf,
                                int var_idx, BOOL is_arg);
 QJS_HIDE JSVarRef *get_var_ref_gc(LEPUSContext *ctx, LEPUSStackFrame *sf,
                                   int var_idx, BOOL is_arg);
-QJS_HIDE void free_var_ref(LEPUSRuntime *rt, JSVarRef *var_ref);
-
-QJS_HIDE JSProperty *add_property(LEPUSContext *ctx, LEPUSObject *p,
-                                  JSAtom prop, int prop_flags);
 QJS_HIDE JSPropertyGC *add_property_gc(LEPUSContext *ctx, LEPUSObject *p,
                                        JSAtom prop, int prop_flags);
-QJS_HIDE void prim_HeapObjStoreLEPUSValue(void *fieldAddr, LEPUSValue value);
+QJS_HIDE JSShape *find_hashed_shape_prop_gc(LEPUSRuntime *rt, JSShape *sh,
+                                            JSAtom atom, int prop_flags);
 QJS_HIDE void prim_WriteBarrierNoStore(LEPUSValue value, LEPUSContext *ctx);
 QJS_HIDE LEPUSValue prim_js_op_eval_gc(LEPUSContext *ctx, int scope_idx,
                                        LEPUSValue op1);
@@ -2029,6 +2385,8 @@ QJS_HIDE LEPUSValue primjs_get_super_ctor_gc(LEPUSContext *ctx, LEPUSValue op);
 
 QJS_HIDE LEPUSValue JS_ConcatString_GC(LEPUSContext *ctx, LEPUSValue op1,
                                        LEPUSValue op2);
+QJS_HIDE void *prim_try_malloc_gc(LEPUSContext *ctx, size_t size,
+                                  int alloc_tag);
 QJS_HIDE LEPUSValue prim_js_unary_arith_slow_gc(LEPUSContext *ctx,
                                                 LEPUSValue op1, OPCodeEnum op);
 QJS_HIDE LEPUSValue prim_js_add_slow_gc(LEPUSContext *ctx, LEPUSValue op1,
@@ -2064,12 +2422,17 @@ QJS_HIDE int JS_SetPropertyInternalImpl_GC(LEPUSContext *ctx,
                                            LEPUSValueConst this_obj,
                                            JSAtom prop, LEPUSValue val,
                                            int flags);
+QJS_HIDE int JS_SetArrayIntPropertyValue_GC(LEPUSContext *ctx, LEPUSObject *p,
+                                            uint32_t idx, LEPUSValue val,
+                                            int flags);
 
 QJS_HIDE int add_fast_array_element_gc(LEPUSContext *ctx, LEPUSObject *p,
                                        LEPUSValue val, int flags);
 
 QJS_HIDE BOOL JS_IsUncatchableError_GC(LEPUSContext *ctx, LEPUSValueConst val);
 QJS_HIDE JSAtom js_value_to_atom_gc(LEPUSContext *ctx, LEPUSValueConst val);
+QJS_HIDE JSAtom prim_get_interned_non_index_atom(LEPUSRuntime *rt,
+                                                 JSString *str);
 QJS_HIDE LEPUSValue JS_ThrowReferenceErrorNotDefined_GC(LEPUSContext *ctx,
                                                         JSAtom name);
 QJS_HIDE LEPUSValue JS_ThrowTypeErrorNotFunction(LEPUSContext *ctx);
@@ -2462,16 +2825,12 @@ QJS_HIDE int string_buffer_putc(StringBuffer *s, uint32_t c);
 QJS_HIDE int string_buffer_fill(StringBuffer *s, int c, int count);
 QJS_HIDE int seal_template_obj_GC(LEPUSContext *ctx, LEPUSValueConst obj);
 struct BCReaderState;
-QJS_HIDE LEPUSValue JS_ReadError_GC(BCReaderState *s);
-QJS_HIDE LEPUSValue JS_ReadRegExp(BCReaderState *s);
-QJS_HIDE LEPUSValue JS_ReadMap_GC(BCReaderState *s);
 QJS_HIDE LEPUSValue js_typed_array_constructor_GC(LEPUSContext *ctx,
                                                   LEPUSValueConst new_target,
                                                   int argc,
                                                   LEPUSValueConst *argv,
                                                   int classid);
 QJS_HIDE LEPUSValue JS_ReadObjectRec(BCReaderState *s);
-QJS_HIDE LEPUSValue JS_ReadRegExp_GC(BCReaderState *s);
 QJS_HIDE JSAtom __JS_NewAtom(LEPUSRuntime *rt, JSString *str, int atom_type);
 QJS_HIDE int js_string_compare(LEPUSContext *ctx, const JSString *p1,
                                const JSString *p2);
@@ -2597,7 +2956,8 @@ QJS_HIDE int add_closure_var(LEPUSContext *ctx, JSFunctionDef *s, BOOL is_local,
                              BOOL is_arg, int var_idx, JSAtom var_name,
                              BOOL is_const, BOOL is_lexical,
                              JSVarKindEnum var_kind);
-QJS_HIDE BOOL is_var_in_arg_scope(LEPUSContext *ctx, const JSVarDef *vd);
+QJS_HIDE BOOL is_var_in_arg_scope(LEPUSContext *ctx, JSAtom var_name,
+                                  JSVarKindEnum var_kind);
 QJS_HIDE LEPUSValue js_create_function(LEPUSContext *ctx, JSFunctionDef *fd);
 QJS_HIDE void skip_shebang(JSParseState *s);
 QJS_HIDE const char *JS_AtomGetStrRT(LEPUSRuntime *rt, char *buf, int buf_size,
@@ -3126,6 +3486,12 @@ LEPUSValue js_array_reduce_gc(LEPUSContext *ctx, LEPUSValueConst this_val,
 
 LEPUSValue js_array_concat_gc(LEPUSContext *ctx, LEPUSValueConst this_val,
                               int argc, LEPUSValueConst *argv);
+#ifdef ENABLE_QUICKJS_DEBUGGER
+int JS_MapGetNextEntry(LEPUSContext *ctx, LEPUSValueConst obj, int magic,
+                       uint32_t *cursor, LEPUSValue *key, LEPUSValue *value);
+int JS_MapGetNextEntry_GC(LEPUSContext *ctx, LEPUSValueConst obj, int magic,
+                          uint32_t *cursor, LEPUSValue *key, LEPUSValue *value);
+#endif
 /* Shape support */
 QJS_STATIC inline JSShapeProperty *get_shape_prop(JSShape *sh) {
   return reinterpret_cast<JSShapeProperty *>(sh->hash_table +
@@ -3146,9 +3512,7 @@ QJS_STATIC inline BOOL __JS_AtomIsTaggedInt(JSAtom v) {
 }
 
 static force_inline bool IsCachedSingleCharacter(uint32_t c) {
-  static_assert(kFirstCachedSingleCharacter == 0,
-                "range check below assumes the table starts at NUL");
-  return c <= kLastCachedSingleCharacter;
+  return c >= kFirstCachedSingleCharacter && c <= kLastCachedSingleCharacter;
 }
 
 static force_inline LEPUSValue
@@ -3161,17 +3525,10 @@ GetSingleCharacterString_GC_Impl(LEPUSRuntime *rt, uint32_t c) {
   return LEPUS_MKPTR(LEPUS_TAG_STRING, rt->atom_array[atom]);
 }
 
-static force_inline bool IsCachedTwoDigitNumber(uint32_t c0, uint32_t c1) {
-  return c0 >= '1' && c0 <= '9' && c1 >= '0' && c1 <= '9';
-}
-
-static force_inline LEPUSValue GetTwoDigitNumberString_GC_Impl(LEPUSRuntime *rt,
-                                                               uint32_t c0,
-                                                               uint32_t c1) {
-  DCHECK(IsCachedTwoDigitNumber(c0, c1));
-  uint32_t n = (c0 - '0') * 10 + (c1 - '0');
-  JSAtom atom =
-      rt->two_digit_number_string_table[n - kFirstCachedTwoDigitNumber];
+static force_inline LEPUSValue GetSmallIntegerString_GC_Impl(LEPUSRuntime *rt,
+                                                             uint32_t value) {
+  DCHECK(value < kCachedSmallIntegerStringCount);
+  JSAtom atom = rt->small_integer_string_table[value];
   DCHECK(atom != JS_ATOM_NULL);
   DCHECK(!__JS_AtomIsTaggedInt(atom));
   return LEPUS_MKPTR(LEPUS_TAG_STRING, rt->atom_array[atom]);
@@ -3270,6 +3627,14 @@ typedef struct ValueSlot {
   JSString *str;
   int64_t pos;
 } ValueSlot;
+
+/* Array.prototype.sort slots in tracing GC mode. A
+   HANDLE_TYPE_VALUE_SLOT_BUFFER handle scans the first 'count' slots as
+   roots, so rqsort() may move them without write barriers. */
+typedef struct ValueSlotBuffer {
+  ValueSlot *slots;
+  size_t count;
+} ValueSlotBuffer;
 
 struct array_sort_context {
   LEPUSContext *ctx;
@@ -3406,16 +3771,9 @@ typedef enum JSToNumberHintEnum {
 } JSToNumberHintEnum;
 
 LEPUSValue js_new_string8_len(LEPUSContext *ctx, const char *buf, int32_t len);
-
-inline LEPUSValue js_new_string8(LEPUSContext *ctx, const uint8_t *buf,
-                                 int32_t len) {
-  return js_new_string8_len(ctx, reinterpret_cast<const char *>(buf), len);
-}
-
-inline LEPUSValue js_new_string8(LEPUSContext *ctx, const char *buf,
-                                 int32_t len) {
-  return js_new_string8_len(ctx, buf, len);
-}
+LEPUSValue js_new_string8_Impl(LEPUSContext *ctx, const char *buf, int32_t len);
+LEPUSValue js_new_string_char_Impl(LEPUSContext *ctx, uint16_t c);
+uint32_t JS_GetStringCharFast_GC(LEPUSValueConst str, uint32_t index);
 
 inline BOOL JS_IsBigInt(LEPUSContext *ctx, LEPUSValueConst v) {
   return LEPUS_VALUE_GET_TAG(v) == LEPUS_TAG_BIG_INT;
@@ -3428,6 +3786,12 @@ inline BOOL tag_is_number(int64_t tag) {
 
 inline BOOL tag_is_string(uint64_t tag) {
   return tag == LEPUS_TAG_STRING || tag == LEPUS_TAG_SEPARABLE_STRING;
+}
+
+// CheckObjectCtx() does nothing unless object_ctx_check is set. Test the flag
+// inline so that hot paths do not pay for an out-of-line call.
+inline void CheckObjectCtxIfEnabled(LEPUSContext *ctx, LEPUSValueConst obj) {
+  if (unlikely(ctx->object_ctx_check)) CheckObjectCtx(ctx, obj);
 }
 
 LEPUSValue JS_ToBigIntFree(LEPUSContext *ctx, LEPUSValue val);
@@ -3446,9 +3810,9 @@ inline double js_pow(double a, double b) {
 }
 
 JSAtom __JS_NewAtomInit_NOGC(LEPUSRuntime *rt, const char *str, int len,
-                             int atom_type, int is_const);
+                             int atom_type);
 JSAtom __JS_NewAtomInit(LEPUSRuntime *rt, const char *str, int len,
-                        int atom_type, int is_const);
+                        int atom_type);
 int init_bigint_name(LEPUSRuntime *rt);
 uintptr_t get_thread_stack_limit();
 

@@ -123,6 +123,14 @@ else()
   endif()
 endif()
 
+if(DISABLE_NANBOX AND
+   (ENABLE_PRIMJS_SNAPSHOT OR
+    (ENABLE_COMPATIBLE_MM AND PLATFORM_ABI MATCHES "arm64")))
+  message(FATAL_ERROR
+          "PrimJS snapshot requires the 8-byte LEPUSValue representation; "
+          "DISABLE_NANBOX uses 16-byte LEPUSValue slots")
+endif()
+
 # primjs snapshot version
 if((${ENABLE_COMPATIBLE_MM} AND (${PLATFORM_ABI} MATCHES "arm64"))
    OR (${ENABLE_GEN_EMBEDDED}))

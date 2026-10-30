@@ -107,12 +107,28 @@ DEFINE_BYTECODE_HANDLER(fclosure) { GenFclosure(opcode); }
 DEFINE_BYTECODE_HANDLER(push_atom_value) {
   // *sp++ = JS_AtomToValue_GC(ctx, get_u32(pc));
   // pc += 4;
-  auto desc = son::node::CallDescriptors::__JS_AtomToValue_GC();
-  auto imm = Fetch_32(0);
+  son::node::Label slow(this);
+  auto atom = Fetch_32(0);
+  auto is_tagged_int =
+      NotEqual(Int32And(atom, IntValue(JS_ATOM_TAG_INT)), IntValue(0));
+  BranchIf(is_tagged_int, &slow, son::node::BranchHint::kFalse);
+
   auto ctx = GetCtx();
-  auto res = CallRuntimeArg2(desc, ctx, imm, IntValue(0));
-  PushSp(res);
+  auto atom_array = LoadRtAtomArray(LoadRt(ctx));
+  auto atom_ptr = LoadRawVal(atom_array, atom);
+  BranchIf(NotEqual(LoadAtomType(atom_ptr), IntValue(JS_ATOM_TYPE_STRING)),
+           &slow, son::node::BranchHint::kFalse);
+  PushSp(MakeValue(LEPUS_TAG_STRING, CastRawToInt64(atom_ptr)));
   Dispatch(opcode);
+
+  Bind(&slow);
+  {
+    ClearNewSp();
+    auto desc = son::node::CallDescriptors::__JS_AtomToValue_GC();
+    auto res = CallRuntimeArg2(desc, GetCtx(), atom, IntValue(0));
+    PushSp(res);
+    Dispatch(opcode);
+  }
 }
 
 DEFINE_BYTECODE_HANDLER(private_symbol) {
@@ -222,10 +238,30 @@ DEFINE_BYTECODE_HANDLER(object) {
   // if (unlikely(LEPUS_IsException(sp[-1]))) {
   //   TAIL_CALL return exception_h(HANDLER_PARAM(pc));
   // }
-  auto desc = son::node::CallDescriptors::PRIM_JS_NewObject_GC();
-  auto res = CallRuntimeArg0(desc, GetCtx());
-  PushSp(res);
+  son::node::Label fallback(this);
+  auto ctx = GetCtx();
+
+  BranchIf(NotEqual(LoadObjectCtxCheck(ctx), Int8Value(0)), &fallback,
+           son::node::BranchHint::kFalse);
+  auto shape = LoadInitialObjectShape(ctx);
+  BranchIf(Equal(shape, NullptrValue()), &fallback,
+           son::node::BranchHint::kFalse);
+
+  constexpr uint8_t kObjectFlags = AccessBuilder::object_extensible_flag();
+  auto object =
+      TryAllocateObject(ctx, shape, JS_CLASS_OBJECT, kObjectFlags, &fallback);
+  ClearNewSp();
+  PushSp(MakeValue(LEPUS_TAG_OBJECT, CastRawToInt64(object)));
   Dispatch(opcode);
+
+  Bind(&fallback);
+  {
+    ClearNewSp();
+    auto desc = son::node::CallDescriptors::PRIM_JS_NewObject_GC();
+    auto result = CallRuntimeArg0(desc, ctx);
+    PushSp(result);
+    Dispatch(opcode);
+  }
 }
 DEFINE_BYTECODE_HANDLER(special_object) { GenSpecialObject(opcode); }
 DEFINE_BYTECODE_HANDLER(rest) {
@@ -298,23 +334,84 @@ DEFINE_BYTECODE_HANDLER(call_constructor) {
   // }
   // sp -= call_argc + 2;
   // *sp++ = ret_val;
-  auto saved_pc = IntPtrAdd(GetPc(), IntPtrValue(get_opcode_size(opcode) - 1));
-  SavePc(CastIntPtrToRaw(saved_pc));
-  auto call_argc = Fetch_16(0);
-  auto call_argc_intptr = ZExtInt32ToIntPtr(call_argc);
-  auto call_argv = LeapSp(call_argc);
+  son::node::Label slow(this);
+  son::node::Label check_object(this);
+  son::node::Label check_class(this);
+  son::node::Label check_constructor(this);
+  son::node::Label check_derived(this);
+  son::node::Label fast_ordinary(this);
+  son::node::Label fast_derived(this);
 
+  auto call_argc = Fetch_16(0);
+  auto call_argv = LeapSp(call_argc);
   auto func_obj = LoadSp(call_argv, -2);
   auto new_target = LoadSp(call_argv, -1);
 
-  auto desc = son::node::CallDescriptors::JS_CallConstructorInternal_GC();
-  auto res = CallRuntime(desc, GetCtx(), func_obj, new_target, call_argc,
-                         call_argv, IntValue(0));
+  Branch(Equal(func_obj, new_target), &check_object, &slow,
+         son::node::BranchHint::kTrue);
 
-  call_argc = Fetch_16(0);
-  DecSp(IntPtrAdd(ZExtInt32ToIntPtr(call_argc), IntPtrValue(2)));
-  PushSp(res);
-  Dispatch(opcode);
+  Bind(&check_object);
+  Branch(IsLepusObject(func_obj), &check_class, &slow,
+         son::node::BranchHint::kTrue);
+
+  Bind(&check_class);
+  auto func_obj_raw = CastToRaw(func_obj);
+  Branch(
+      Equal(LoadClassId(func_obj_raw), Int16Value(JS_CLASS_BYTECODE_FUNCTION)),
+      &check_constructor, &slow, son::node::BranchHint::kTrue);
+
+  Bind(&check_constructor);
+  constexpr uint8_t kIsConstructor = 1 << 4;
+  auto object_flags = ZExtInt8ToInt32(
+      LoadByteOffset(son::node::MachineType::kInt8, func_obj_raw,
+                     AccessBuilder::object_flags_offset()));
+  Branch(
+      NotEqual(Int32And(object_flags, IntValue(kIsConstructor)), IntValue(0)),
+      &check_derived, &slow, son::node::BranchHint::kTrue);
+
+  Bind(&check_derived);
+  constexpr uint8_t kIsDerivedClassConstructor =
+      AccessBuilder::function_is_derived_class_constructor_flag();
+  auto function_bytecode = LoadFunctionBytecode(func_obj_raw);
+  auto function_flags = ZExtInt8ToInt32(LoadFunctionFlags(function_bytecode));
+  Branch(Equal(Int32And(function_flags, IntValue(kIsDerivedClassConstructor)),
+               IntValue(0)),
+         &fast_ordinary, &fast_derived, son::node::BranchHint::kTrue);
+
+  Bind(&fast_ordinary);
+  {
+    ClearNewSp();
+    DispatchWithIdArg0(CallBcIndex::kFastCallConstructor,
+                       ZExtInt32ToInt64(call_argc));
+  }
+
+  Bind(&fast_derived);
+  {
+    ClearNewSp();
+    DispatchWithIdArg0(CallBcIndex::kFastCallDerivedConstructor,
+                       ZExtInt32ToInt64(call_argc));
+  }
+
+  Bind(&slow);
+  {
+    ClearNewSp();
+    auto saved_pc =
+        IntPtrAdd(GetPc(), IntPtrValue(get_opcode_size(opcode) - 1));
+    SavePc(CastIntPtrToRaw(saved_pc));
+    auto desc = son::node::CallDescriptors::JS_CallConstructorInternal_GC();
+    auto res = CallRuntime(desc, GetCtx(), func_obj, new_target, call_argc,
+                           call_argv, IntValue(0));
+    call_argc = Fetch_16(0);
+    DecSp(IntPtrAdd(ZExtInt32ToIntPtr(call_argc), IntPtrValue(2)));
+    PushSp(res);
+    Dispatch(opcode);
+  }
+}
+
+DEFINE_BYTECODE_HANDLER(FastCallConstructor) { GenFastCallConstructor(false); }
+
+DEFINE_BYTECODE_HANDLER(FastCallDerivedConstructor) {
+  GenFastCallConstructor(true);
 }
 
 DEFINE_BYTECODE_HANDLER(tail_call) {
@@ -758,6 +855,23 @@ DEFINE_BYTECODE_HANDLER(get_ref_value) {
   auto cond = Equal(obj, LepusUndefined());
   BranchIf(cond, &is_indefined, son::node::BranchHint::kFalse);
 
+  if (_use_fast_path) {
+    son::node::Label slow_get(this);
+    BranchIfFalse(IsLepusObject(obj), &slow_get, son::node::BranchHint::kTrue);
+    auto obj_raw = CastToRaw(GetObject(obj));
+    BranchIf(NotEqual(LoadClassId(obj_raw), Int16Value(JS_CLASS_OBJECT)),
+             &slow_get, son::node::BranchHint::kFalse);
+    BranchIf(LoadObjectIsExotic(obj_raw), &slow_get,
+             son::node::BranchHint::kFalse);
+    auto atom = TryGetInternedStringAtom(prop, &slow_get);
+    auto result = FindPropertyForGet(obj_raw, atom, &slow_get, nullptr);
+    ClearNewSp();
+    PushSp(result);
+    Dispatch(opcode);
+    Bind(&slow_get);
+    ClearNewSp();
+  }
+
   auto desc = son::node::CallDescriptors::JS_GetPropertyValue_GC();
   auto res = CallRuntime(desc, GetCtx(), obj, prop);
   PushSp(res);
@@ -824,6 +938,31 @@ DEFINE_BYTECODE_HANDLER(put_ref_value) {
   }
   Bind(&not_indefined);
   {
+    if (_use_fast_path) {
+      son::node::Label slow_set(this);
+      son::node::Label add_property(this);
+      BranchIfFalse(IsLepusObject(*obj_h), &slow_set,
+                    son::node::BranchHint::kTrue);
+      auto obj_raw = CastToRaw(GetObject(*obj_h));
+      BranchIf(NotEqual(LoadClassId(obj_raw), Int16Value(JS_CLASS_OBJECT)),
+               &slow_set, son::node::BranchHint::kFalse);
+      BranchIf(LoadObjectIsExotic(obj_raw), &slow_set,
+               son::node::BranchHint::kFalse);
+      auto atom = TryGetInternedStringAtom(prop, &slow_set);
+      FindPropertyForSet(obj_raw, atom, val, &slow_set, &add_property);
+      ClearNewSp();
+      DecSp(3);
+      Dispatch(opcode);
+      ClearNewSp();
+
+      Bind(&add_property);
+      BranchIfFalse(LoadObjectIsExtensible(obj_raw), &slow_set,
+                    son::node::BranchHint::kFalse);
+      DispatchAddNamedProperty(atom);
+      ClearNewSp();
+
+      Bind(&slow_set);
+    }
     auto desc = son::node::CallDescriptors::JS_SetPropertyValue_GC();
     CallIntRetRuntime(desc, GetCtx(), *obj_h, prop, val,
                       IntValue(LEPUS_PROP_THROW_STRICT));
@@ -1051,11 +1190,74 @@ DEFINE_BYTECODE_HANDLER(define_field) {
   auto val = LoadTop0();
   auto this_obj = LoadTop1();
 
-  auto desc = son::node::CallDescriptors::JS_DefinePropertyValue_GC();
-  auto flags = IntValue(LEPUS_PROP_C_W_E | LEPUS_PROP_THROW);
-  CallIntRetRuntime(desc, GetCtx(), this_obj, atom, val, flags);
-  DecSp();
-  Dispatch(opcode);
+  if (!_use_fast_path) {
+    auto desc = son::node::CallDescriptors::JS_DefinePropertyValue_GC();
+    auto flags = IntValue(LEPUS_PROP_C_W_E | LEPUS_PROP_THROW);
+    CallIntRetRuntime(desc, GetCtx(), this_obj, atom, val, flags);
+    DecSp();
+    Dispatch(opcode);
+    return;
+  }
+
+  son::node::Label slow(this);
+  son::node::Label check_object(this);
+  son::node::Label property_not_found(this);
+  son::node::Label fast_done(this);
+
+  Branch(IsLepusObject(this_obj), &check_object, &slow,
+         son::node::BranchHint::kTrue);
+
+  Bind(&check_object);
+  auto obj = CastToRaw(GetObject(this_obj));
+  {
+    BranchIf(NotEqual(LoadClassId(obj), Int16Value(JS_CLASS_OBJECT)), &slow,
+             son::node::BranchHint::kFalse);
+    BranchIf(LoadObjectIsExotic(obj), &slow, son::node::BranchHint::kFalse);
+    BranchIfFalse(LoadObjectIsExtensible(obj), &slow,
+                  son::node::BranchHint::kFalse);
+
+    auto set_existing = [&](son::node::Node* prs, son::node::Node* h) {
+      son::node::Label writable_data_property(this);
+      auto prop_flags = LoadJsShapePropertyHashFlags(prs);
+      auto mask = IntValue(LEPUS_PROP_TMASK | LEPUS_PROP_C_W_E);
+      Branch(Equal(Int32And(prop_flags, mask), IntValue(LEPUS_PROP_C_W_E)),
+             &writable_data_property, &slow, son::node::BranchHint::kTrue);
+
+      Bind(&writable_data_property);
+      auto prop = LoadObjectProp(obj);
+      auto property_index =
+          Int32Mul(Int32Sub(h, IntValue(1)),
+                   Int32Value(sizeof(JSPropertyGC) / sizeof(int64_t)));
+      StoreHeapVal(GetCtx(), prop, property_index, val);
+      Jump(&fast_done);
+    };
+    FindOwnProperty(obj, atom, &property_not_found, set_existing);
+  }
+
+  Bind(&property_not_found);
+  {
+    auto is_tagged_atom =
+        NotEqual(Int32And(atom, Int32Value(JS_ATOM_TAG_INT)), Int32Value(0));
+    BranchIf(is_tagged_atom, &slow, son::node::BranchHint::kFalse);
+    DispatchAddNamedProperty(atom);
+  }
+
+  Bind(&fast_done);
+  {
+    ClearNewSp();
+    DecSp();
+    Dispatch(opcode);
+  }
+
+  Bind(&slow);
+  {
+    ClearNewSp();
+    auto desc = son::node::CallDescriptors::JS_DefinePropertyValue_GC();
+    auto flags = IntValue(LEPUS_PROP_C_W_E | LEPUS_PROP_THROW);
+    CallIntRetRuntime(desc, GetCtx(), this_obj, atom, val, flags);
+    DecSp();
+    Dispatch(opcode);
+  }
 }
 
 DEFINE_BYTECODE_HANDLER(set_name) {
@@ -1555,14 +1757,7 @@ DEFINE_BYTECODE_HANDLER(for_await_of_start) {
   Dispatch(opcode);
 }
 
-DEFINE_BYTECODE_HANDLER(for_in_next) {
-  auto desc = son::node::CallDescriptors::js_for_in_next_gc();
-
-  auto ret_Val = CallIntRetRuntime(desc, GetCtx(), GetSp());
-  // sp += 2;
-  IncSp(2);
-  Dispatch(opcode);
-}
+DEFINE_BYTECODE_HANDLER(for_in_next) { GenForInNext(opcode); }
 
 DEFINE_BYTECODE_HANDLER(for_of_next) {
   auto desc = son::node::CallDescriptors::js_for_of_next_gc();
@@ -2794,6 +2989,17 @@ DEFINE_BYTECODE_HANDLER(exception_spill_top0_top1) {
   DispatchWithId(CallBcIndex::kexception);
 }
 
+DEFINE_BYTECODE_HANDLER(spill_table1_to_table0) {
+  PushSpImpl(GetTop0());
+  DispatchPrevPc();
+}
+
+DEFINE_BYTECODE_HANDLER(spill_table2_to_table0) {
+  PushSpImpl(GetTop0());
+  PushSpImpl(GetTop1());
+  DispatchPrevPc();
+}
+
 DEFINE_BYTECODE_HANDLER(exception) {
   auto ctx = GetCtx();
   auto rt = LoadRt(GetCtx());
@@ -2938,6 +3144,553 @@ DEFINE_BYTECODE_HANDLER(SlowJSNot) {
   auto res = CallRuntime(desc, ctx, op1);
   StoreTop0(res);
   DispatchNext();
+}
+
+DEFINE_BYTECODE_HANDLER(FastJSConcatString) {
+  son::node::Label load_add(this);
+  son::node::Label load_add_loc(this);
+  son::node::Label concat(this);
+  son::node::Label op1_is_separable(this);
+  son::node::Label op1_done(this);
+  son::node::Label op2_is_separable(this);
+  son::node::Label op2_done(this);
+  son::node::Label fallback(this);
+  son::node::Label fallback_add(this);
+  son::node::Label fallback_add_loc(this);
+  son::node::Label finish_add(this);
+  son::node::Label finish_add_loc(this);
+
+  SetVar64(HandlerVarIndex::kScratch1, GetScratch());
+  auto is_add_loc =
+      NotEqual(GetVar64(HandlerVarIndex::kScratch1), Int64Value(0));
+  son::node::Variable op1(this, son::node::NodeType::Int64Type(),
+                          LepusUndefined());
+  son::node::Variable op2(this, son::node::NodeType::Int64Type(),
+                          LepusUndefined());
+  son::node::Variable result(this, son::node::NodeType::Int64Type(),
+                             LepusUndefined());
+  son::node::Variable depth(this, son::node::NodeType::IntType(), IntValue(1));
+  Branch(is_add_loc, &load_add_loc, &load_add, son::node::BranchHint::kFalse);
+
+  Bind(&load_add);
+  {
+    auto args = CastToRaw(IntPtrSub(CastRawToIntPtr(GetSp()),
+                                    IntPtrValue(2 * sizeof(LEPUSValue))));
+    op1 = LoadImpl(son::node::MachineType::kInt64, args, IntValue(0));
+    op2 = LoadImpl(son::node::MachineType::kInt64, args, IntValue(1));
+    Jump(&concat);
+  }
+
+  Bind(&load_add_loc);
+  op1 = LoadLepusVal(RestoreVarBuf(), Fetch_8(0));
+  op2 = LoadSp(GetSp(), -1);
+  Jump(&concat);
+
+  Bind(&concat);
+  auto str1 = CastToRaw(GetPtr(*op1));
+  auto str2 = CastToRaw(GetPtr(*op2));
+  auto len_and_wide1 = LoadStringLengthAndWideFlag(str1);
+  auto len_and_wide2 = LoadStringLengthAndWideFlag(str2);
+  auto len1 =
+      Int32And(len_and_wide1, IntValue(AccessBuilder::string_length_mask()));
+  auto len2 =
+      Int32And(len_and_wide2, IntValue(AccessBuilder::string_length_mask()));
+  // Both lengths are at most JS_STRING_LEN_MAX, so the sum cannot overflow.
+  // Over-long results take the runtime path, which throws.
+  auto total_len = Int32Add(len1, len2);
+  BranchIf(UnsignedGreaterThan(total_len, Int32Value(JS_STRING_LEN_MAX)),
+           &fallback, son::node::BranchHint::kFalse);
+  auto length_and_wide =
+      Int32Or(total_len, Int32And(Int32Or(len_and_wide1, len_and_wide2),
+                                  IntValue(AccessBuilder::string_wide_mask())));
+
+  Branch(IsSeparableStringValue(*op1), &op1_is_separable, &op1_done,
+         son::node::BranchHint::kFalse);
+  Bind(&op1_is_separable);
+  depth =
+      Int32Add(LoadByteOffset(son::node::MachineType::kInt32, str1,
+                              AccessBuilder::separable_string_depth_offset()),
+               IntValue(1));
+  Jump(&op1_done);
+
+  Bind(&op1_done);
+  Branch(IsSeparableStringValue(*op2), &op2_is_separable, &op2_done,
+         son::node::BranchHint::kFalse);
+  Bind(&op2_is_separable);
+  depth = Int32Max(
+      *depth,
+      Int32Add(LoadByteOffset(son::node::MachineType::kInt32, str2,
+                              AccessBuilder::separable_string_depth_offset()),
+               IntValue(1)));
+  Jump(&op2_done);
+
+  Bind(&op2_done);
+  auto separable_string =
+      TryMalloc(GetCtx(), IntPtrValue(sizeof(JSSeparableString)),
+                ALLOC_TAG_JSSeparableString, &fallback);
+  StoreSeparableStringHeader(separable_string, length_and_wide, *depth);
+  StoreHeapVal(GetCtx(), separable_string,
+               IntValue(AccessBuilder::separable_string_left_offset() /
+                        sizeof(LEPUSValue)),
+               *op1);
+  StoreHeapVal(GetCtx(), separable_string,
+               IntValue(AccessBuilder::separable_string_right_offset() /
+                        sizeof(LEPUSValue)),
+               *op2);
+  result =
+      MakeValue(LEPUS_TAG_SEPARABLE_STRING, CastRawToInt64(separable_string));
+  Branch(is_add_loc, &finish_add_loc, &finish_add);
+
+  Bind(&fallback);
+  Branch(is_add_loc, &fallback_add_loc, &fallback_add,
+         son::node::BranchHint::kFalse);
+
+  Bind(&fallback_add);
+  {
+    ClearNewSp();
+    auto desc = son::node::CallDescriptors::JS_ConcatString_GC();
+    auto call_result = CallRuntime(desc, GetCtx(), *op1, *op2);
+    DecSp();
+    StoreSpImpl(-1, call_result);
+    DispatchNext();
+  }
+
+  Bind(&fallback_add_loc);
+  {
+    ClearNewSp();
+    auto desc = son::node::CallDescriptors::JS_ConcatString_GC();
+    auto call_result = CallRuntime(desc, GetCtx(), *op1, *op2);
+    DecSp();
+    StoreLepusVal(RestoreVarBuf(), Fetch_8(0), call_result);
+    DispatchWithPc(IntPtrAdd(GetPc(), IntPtrValue(1)));
+  }
+
+  Bind(&finish_add);
+  ClearNewSp();
+  DecSp();
+  StoreSpImpl(-1, *result);
+  DispatchNext();
+
+  Bind(&finish_add_loc);
+  ClearNewSp();
+  DecSp();
+  StoreLepusVal(RestoreVarBuf(), Fetch_8(0), *result);
+  DispatchWithPc(IntPtrAdd(GetPc(), IntPtrValue(1)));
+}
+
+DEFINE_BYTECODE_HANDLER(FastStringEqual) {
+  son::node::Label load_op1_flat_content(this);
+  son::node::Label length_equal(this);
+  son::node::Label op1_ready(this);
+  son::node::Label load_op2_flat_content(this);
+  son::node::Label op2_ready(this);
+  son::node::Label compare_content(this);
+  son::node::Label equal(this);
+  son::node::Label not_equal(this);
+  son::node::Label fallback(this);
+  son::node::Label finish(this);
+
+  ClearNewSp();
+  auto args = CastToRaw(
+      IntPtrSub(CastRawToIntPtr(GetSp()), IntPtrValue(2 * sizeof(LEPUSValue))));
+  son::node::Variable op1(
+      this, son::node::NodeType::Int64Type(),
+      LoadImpl(son::node::MachineType::kInt64, args, IntValue(0)));
+  son::node::Variable op2(
+      this, son::node::NodeType::Int64Type(),
+      LoadImpl(son::node::MachineType::kInt64, args, IntValue(1)));
+  son::node::Variable result(this, son::node::NodeType::Int64Type(),
+                             LepusUndefined());
+  auto is_neq = TruncInt64ToBool(GetScratch());
+
+  auto input_str1 = CastToRaw(GetPtr(*op1));
+  auto input_str2 = CastToRaw(GetPtr(*op2));
+  auto input_len1 = LoadStringLength(input_str1);
+  auto input_len2 = LoadStringLength(input_str2);
+  Branch(NotEqual(input_len1, input_len2), &not_equal, &length_equal,
+         son::node::BranchHint::kTrue);
+
+  Bind(&length_equal);
+  Branch(IsSeparableStringValue(*op1), &load_op1_flat_content, &op1_ready,
+         son::node::BranchHint::kFalse);
+  Bind(&load_op1_flat_content);
+  {
+    auto separable = CastToRaw(GetPtr(*op1));
+    auto right_op =
+        LoadByteOffset(son::node::MachineType::kInt64, separable,
+                       AccessBuilder::separable_string_right_offset());
+    BranchIfFalse(IsNull(right_op), &fallback);
+    auto flat_content =
+        LoadByteOffset(son::node::MachineType::kInt64, separable,
+                       AccessBuilder::separable_string_left_offset());
+    op1 = flat_content;
+    Jump(&op1_ready);
+  }
+
+  Bind(&op1_ready);
+  Branch(IsSeparableStringValue(*op2), &load_op2_flat_content, &op2_ready,
+         son::node::BranchHint::kFalse);
+  Bind(&load_op2_flat_content);
+  {
+    auto separable = CastToRaw(GetPtr(*op2));
+    auto right_op =
+        LoadByteOffset(son::node::MachineType::kInt64, separable,
+                       AccessBuilder::separable_string_right_offset());
+    BranchIfFalse(IsNull(right_op), &fallback);
+    auto flat_content =
+        LoadByteOffset(son::node::MachineType::kInt64, separable,
+                       AccessBuilder::separable_string_left_offset());
+    op2 = flat_content;
+    Jump(&op2_ready);
+  }
+
+  Bind(&op2_ready);
+  auto str1 = CastToRaw(GetPtr(*op1));
+  auto str2 = CastToRaw(GetPtr(*op2));
+  Branch(Equal(str1, str2), &equal, &compare_content,
+         son::node::BranchHint::kFalse);
+
+  Bind(&compare_content);
+  {
+    son::node::Label compare_chars(this);
+    son::node::Label compare_8_8(this);
+    son::node::Label compare_8_16(this);
+    son::node::Label compare_16_8(this);
+    son::node::Label compare_16_16(this);
+    son::node::Label str1_is_wide(this);
+    son::node::Label str1_is_8bit(this);
+    auto atom_type1 = LoadAtomType(str1);
+    auto atom_type2 = LoadAtomType(str2);
+    auto both_atoms =
+        BoolAnd(Equal(atom_type1, Int32Value(JS_ATOM_TYPE_STRING)),
+                Equal(atom_type2, Int32Value(JS_ATOM_TYPE_STRING)));
+    Branch(both_atoms, &not_equal, &compare_chars,
+           son::node::BranchHint::kFalse);
+
+    Bind(&compare_chars);
+    auto length_and_wide1 = LoadStringLengthAndWideFlag(str1);
+    auto length_and_wide2 = LoadStringLengthAndWideFlag(str2);
+    auto str1_wide = LessThan(length_and_wide1, IntValue(0));
+    auto str2_wide = LessThan(length_and_wide2, IntValue(0));
+    auto data1 =
+        CastToRaw(IntPtrAdd(CastRawToIntPtr(str1),
+                            IntPtrValue(AccessBuilder::string_data_offset())));
+    auto data2 =
+        CastToRaw(IntPtrAdd(CastRawToIntPtr(str2),
+                            IntPtrValue(AccessBuilder::string_data_offset())));
+    auto length = Int32And(length_and_wide1,
+                           Int32Value(AccessBuilder::string_length_mask()));
+    son::node::Variable index_8_8(this, son::node::NodeType::IntType(),
+                                  IntValue(0));
+    son::node::Variable index_8_16(this, son::node::NodeType::IntType(),
+                                   IntValue(0));
+    son::node::Variable index_16_8(this, son::node::NodeType::IntType(),
+                                   IntValue(0));
+    son::node::Variable index_16_16(this, son::node::NodeType::IntType(),
+                                    IntValue(0));
+
+    Branch(str1_wide, &str1_is_wide, &str1_is_8bit,
+           son::node::BranchHint::kFalse);
+    Bind(&str1_is_8bit);
+    Branch(str2_wide, &compare_8_16, &compare_8_8,
+           son::node::BranchHint::kFalse);
+    Bind(&str1_is_wide);
+    Branch(str2_wide, &compare_16_16, &compare_16_8,
+           son::node::BranchHint::kFalse);
+
+    auto emit_compare_loop = [&](son::node::Label* entry,
+                                 son::node::Variable* index,
+                                 son::node::MachineType type1,
+                                 son::node::MachineType type2) {
+      son::node::Label loop(this, true);
+      son::node::Label compare_char(this);
+      son::node::Label next_char(this);
+
+      Bind(entry);
+      BindLoop(&loop, 2);
+      Branch(Equal(**index, length), &equal, &compare_char,
+             son::node::BranchHint::kFalse);
+      Bind(&compare_char);
+      auto char1 = LoadImpl(type1, data1, **index);
+      auto char2 = LoadImpl(type2, data2, **index);
+      char1 = type1 == son::node::MachineType::kInt8 ? ZExtInt8ToInt32(char1)
+                                                     : ZExtInt16ToInt32(char1);
+      char2 = type2 == son::node::MachineType::kInt8 ? ZExtInt8ToInt32(char2)
+                                                     : ZExtInt16ToInt32(char2);
+      Branch(NotEqual(char1, char2), &not_equal, &next_char,
+             son::node::BranchHint::kFalse);
+      Bind(&next_char);
+      *index = Int32Add(**index, IntValue(1));
+      Jump(&loop);
+    };
+
+    emit_compare_loop(&compare_8_8, &index_8_8, son::node::MachineType::kInt8,
+                      son::node::MachineType::kInt8);
+    emit_compare_loop(&compare_8_16, &index_8_16, son::node::MachineType::kInt8,
+                      son::node::MachineType::kInt16);
+    emit_compare_loop(&compare_16_8, &index_16_8,
+                      son::node::MachineType::kInt16,
+                      son::node::MachineType::kInt8);
+    emit_compare_loop(&compare_16_16, &index_16_16,
+                      son::node::MachineType::kInt16,
+                      son::node::MachineType::kInt16);
+  }
+
+  Bind(&equal);
+  {
+    result = NewBoolean(BoolNot(is_neq));
+    Jump(&finish);
+  }
+
+  Bind(&not_equal);
+  {
+    result = NewBoolean(is_neq);
+    Jump(&finish);
+  }
+
+  Bind(&fallback);
+  {
+    auto desc = son::node::CallDescriptors::prim_js_strict_eq_slow_gc();
+    result = CallRuntime(desc, GetCtx(), *op1, *op2,
+                         TruncInt64ToInt32(GetScratch()));
+    Jump(&finish);
+  }
+
+  Bind(&finish);
+  DecSp();
+  StoreSpImpl(-1, *result);
+  DispatchNext();
+}
+
+DEFINE_BYTECODE_HANDLER(FastBuildArguments) {
+  son::node::Label fallback(this);
+  son::node::Label finish(this);
+  auto ctx = GetCtx();
+  auto argc = RestoreArgc();
+  auto argv = RestoreArgBuf();
+  son::node::Variable result(this, son::node::NodeType::Int64Type(),
+                             LepusUndefined());
+
+  result = FastBuildArguments(argc, argv, &fallback);
+  Jump(&finish);
+
+  Bind(&fallback);
+  ClearNewSp();
+  auto desc = son::node::CallDescriptors::js_build_arguments_gc();
+  result = CallRuntimeArg2(desc, ctx, argc, argv);
+  Jump(&finish);
+
+  Bind(&finish);
+  PushSp(*result);
+  DispatchWithPc(IntPtrAdd(GetPc(), IntPtrValue(1)));
+}
+
+DEFINE_BYTECODE_HANDLER(FastFclosure) {
+  son::node::Label fallback(this);
+  son::node::Label finish(this);
+  son::node::Label dispatch_fclosure8(this);
+  son::node::Label dispatch_fclosure(this);
+  auto ctx = GetCtx();
+  auto b = CastToRaw(GetPtr(GetScratch()));
+  son::node::Variable result(this, son::node::NodeType::Int64Type(),
+                             LepusUndefined());
+
+  result = FastFclosure(b, &fallback);
+  Jump(&finish);
+
+  Bind(&fallback);
+  {
+    ClearNewSp();
+    auto desc = son::node::CallDescriptors::js_closure_gc_slowpath();
+    result = CallRuntime(desc, ctx, b, GetVarRefsCache(), GetFrame());
+    Jump(&finish);
+  }
+
+  Bind(&finish);
+  PushSp(*result);
+  auto current_opcode =
+      LoadImpl(son::node::MachineType::kInt8, GetPc(), IntValue(-1));
+  Branch(Equal(current_opcode,
+               Int8Value(static_cast<int>(PrimjsOpcode::OP_fclosure8))),
+         &dispatch_fclosure8, &dispatch_fclosure, son::node::BranchHint::kTrue);
+
+  Bind(&dispatch_fclosure8);
+  DispatchWithPc(IntPtrAdd(GetPc(), IntPtrValue(1)));
+
+  Bind(&dispatch_fclosure);
+  DispatchWithPc(IntPtrAdd(GetPc(), IntPtrValue(4)));
+}
+
+// Shared by get_array_el and get_array_el2 in all dispatch tables. The caller
+// has checked that sp[-2] is a typed array and sp[-1] is an int. Scratch is 1
+// for get_array_el2, which keeps the object on the stack.
+DEFINE_BYTECODE_HANDLER(FastTypedArrayGet) {
+  son::node::Label slow_get(this);
+  son::node::Label finish(this);
+  son::node::Label keep_obj(this);
+  son::node::Label pop_obj(this);
+  auto keep = TruncInt64ToBool(GetScratch());
+  auto obj = LoadSpImpl(-2);
+  auto prop = LoadSpImpl(-1);
+  auto obj_raw = CastToRaw(GetObject(obj));
+  son::node::Variable result(this, son::node::NodeType::Int64Type(),
+                             LepusUndefined());
+
+  result = LoadTypedArrayElement(obj_raw, GetLepusInt(prop),
+                                 LoadClassId(obj_raw), &slow_get);
+  Jump(&finish);
+
+  Bind(&slow_get);
+  {
+    auto desc = son::node::CallDescriptors::JS_GetPropertyValue_GC();
+    result = CallRuntime(desc, GetCtx(), obj, prop);
+    Jump(&finish);
+  }
+
+  Bind(&finish);
+  Branch(keep, &keep_obj, &pop_obj, son::node::BranchHint::kFalse);
+  Bind(&pop_obj);
+  DecSp();
+  StoreSpImpl(-1, *result);
+  DispatchNext();
+  ClearNewSp();
+
+  Bind(&keep_obj);
+  StoreSpImpl(-1, *result);
+  DispatchNext();
+}
+
+// Shared by put_array_el in all dispatch tables. The caller has checked that
+// sp[-3] is a typed array.
+DEFINE_BYTECODE_HANDLER(FastTypedArraySet) {
+  son::node::Label slow_set(this);
+  son::node::Label done(this);
+  auto obj = LoadSpImpl(-3);
+  auto prop = LoadSpImpl(-2);
+  auto val = LoadSpImpl(-1);
+  auto obj_raw = CastToRaw(GetObject(obj));
+
+  StoreTypedArrayElement(obj_raw, prop, val, LoadClassId(obj_raw), &done,
+                         &slow_set);
+
+  Bind(&done);
+  DecSp(3);
+  DispatchNext();
+  ClearNewSp();
+
+  Bind(&slow_set);
+  {
+    auto desc = son::node::CallDescriptors::JS_SetPropertyValue_GC();
+    CallIntRetRuntime(desc, GetCtx(), obj, prop, val, IntValue(0));
+    DecSp(3);
+    DispatchNext();
+  }
+}
+
+// Shared by put_field, define_field, put_array_el and put_ref_value in all
+// dispatch tables. The caller has checked that the receiver is an extensible,
+// non-exotic JS_CLASS_OBJECT without the property. Scratch holds the atom and
+// the current opcode tells where the receiver is and how much to pop.
+DEFINE_BYTECODE_HANDLER(FastAddNamedProperty) {
+  son::node::Label obj_at_sp2(this);
+  son::node::Label obj_loaded(this);
+  son::node::Label use_global(this);
+  son::node::Label obj_ready(this);
+  son::node::Label added(this);
+  son::node::Label slow_add(this);
+  son::node::Label add_exception(this);
+  son::node::Label done_put_field(this);
+  son::node::Label not_put_field(this);
+  son::node::Label done_define_field(this);
+  son::node::Label done_pop3(this);
+  son::node::Label throw_put_field(this);
+  son::node::Label throw_not_put_field(this);
+  son::node::Label throw_define_field(this);
+  son::node::Label throw_pop3(this);
+
+  auto atom = TruncInt64ToInt32(GetScratch());
+  auto current_opcode =
+      LoadImpl(son::node::MachineType::kInt8, GetPc(), IntValue(-1));
+  auto is_put_field = Equal(
+      current_opcode, Int8Value(static_cast<int>(PrimjsOpcode::OP_put_field)));
+  auto is_define_field =
+      Equal(current_opcode,
+            Int8Value(static_cast<int>(PrimjsOpcode::OP_define_field)));
+
+  son::node::Variable obj(this, son::node::NodeType::Int64Type(),
+                          LoadSpImpl(-3));
+  Branch(BoolOr(is_put_field, is_define_field), &obj_at_sp2, &obj_loaded,
+         son::node::BranchHint::kTrue);
+  Bind(&obj_at_sp2);
+  obj = LoadSpImpl(-2);
+  Jump(&obj_loaded);
+
+  // put_ref_value uses the global object for an undefined reference base.
+  Bind(&obj_loaded);
+  Branch(Equal(*obj, LepusUndefined()), &use_global, &obj_ready,
+         son::node::BranchHint::kFalse);
+  Bind(&use_global);
+  obj = GetGlobal();
+  Jump(&obj_ready);
+
+  Bind(&obj_ready);
+  auto obj_raw = CastToRaw(GetObject(*obj));
+  FastAddProperty(obj_raw, atom, LoadSpImpl(-1), &added, &slow_add);
+
+  Bind(&slow_add);
+  {
+    auto desc = son::node::CallDescriptors::add_property_gc();
+    auto pr = CallRuntimeNoCheck(desc, GetCtx(), obj_raw, atom,
+                                 IntValue(LEPUS_PROP_C_W_E));
+    BranchIf(Equal(pr, NullptrValue()), &add_exception);
+    // add_property_gc may move heap objects. Reload the rooted value from
+    // the interpreter stack instead of using the pre-call SSA value.
+    StoreHeapVal(GetCtx(), pr, Int32Value(0), LoadSpImpl(-1));
+    Jump(&added);
+  }
+
+  Bind(&added);
+  Branch(is_put_field, &done_put_field, &not_put_field,
+         son::node::BranchHint::kTrue);
+  Bind(&not_put_field);
+  Branch(is_define_field, &done_define_field, &done_pop3,
+         son::node::BranchHint::kTrue);
+
+  Bind(&done_put_field);
+  DecSp(2);
+  Dispatch(PrimjsOpcode::OP_put_field);
+  ClearNewSp();
+
+  Bind(&done_define_field);
+  DecSp();
+  Dispatch(PrimjsOpcode::OP_define_field);
+  ClearNewSp();
+
+  // put_array_el and put_ref_value have the same size and stack effect.
+  Bind(&done_pop3);
+  DecSp(3);
+  Dispatch(PrimjsOpcode::OP_put_array_el);
+  ClearNewSp();
+
+  Bind(&add_exception);
+  Branch(is_put_field, &throw_put_field, &throw_not_put_field,
+         son::node::BranchHint::kTrue);
+  Bind(&throw_not_put_field);
+  Branch(is_define_field, &throw_define_field, &throw_pop3,
+         son::node::BranchHint::kTrue);
+
+  Bind(&throw_put_field);
+  DecSp(2);
+  DispatchException();
+  ClearNewSp();
+
+  Bind(&throw_define_field);
+  DispatchException();
+  ClearNewSp();
+
+  Bind(&throw_pop3);
+  DecSp(3);
+  DispatchException();
 }
 
 DEFINE_BYTECODE_HANDLER(ThrowReferenceErrorUninitialized) {

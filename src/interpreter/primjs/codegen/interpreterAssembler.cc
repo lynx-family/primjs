@@ -22,6 +22,44 @@ InterpreterAssembler::InterpreterAssembler(son::node::NodeGraph* graph,
   _use_fast_path = graph->options().UseFastPath();
 }
 
+son::node::Node* InterpreterAssembler::TryMalloc(son::node::Node* ctx,
+                                                 son::node::Node* size,
+                                                 int alloc_tag,
+                                                 son::node::Label* fail) {
+  son::node::Label success(this);
+  auto desc = son::node::CallDescriptors::prim_try_malloc_gc();
+  auto result = CallRuntimeNoCheck(desc, ctx, size, IntValue(alloc_tag));
+  Branch(NotEqual(result, NullptrValue()), &success, fail,
+         son::node::BranchHint::kTrue);
+  Bind(&success);
+  return result;
+}
+
+son::node::Node* InterpreterAssembler::TryAllocateObject(
+    son::node::Node* ctx, son::node::Node* shape, LEPUSClassID class_id,
+    uint8_t flags, son::node::Label* fail) {
+  auto object = TryMalloc(ctx, IntPtrValue(GetLEPUSObjectAllocSize(class_id)),
+                          ALLOC_TAG_LEPUSObject, fail);
+
+  auto shape_ref_count =
+      LoadByteOffset(son::node::MachineType::kInt32, shape, 0);
+  StoreByteOffset(son::node::MachineType::kInt32, shape, 0,
+                  Int32Add(shape_ref_count, IntValue(1)));
+
+  StoreByteOffset(son::node::MachineType::kInt32, object, 0, IntValue(1));
+  StoreByteOffset(son::node::MachineType::kInt8, object,
+                  AccessBuilder::object_flags_offset(), Int8Value(flags));
+  StoreByteOffset(son::node::MachineType::kInt16, object,
+                  AccessBuilder::class_id_offset(), Int16Value(class_id));
+  StoreShapeRef(ctx, object, shape);
+  auto prop = CastToRaw(
+      IntPtrAdd(CastRawToIntPtr(object),
+                IntPtrValue(GetLEPUSObjectInlinePropOffset(class_id))));
+  StoreByteOffset(son::node::MachineType::kRawType, object,
+                  AccessBuilder::object_prop_offset(), prop);
+  return object;
+}
+
 void InterpreterAssembler::CheckEqual(son::node::Node* val0,
                                       son::node::Node* val1) {
   son::node::Label slow(this);

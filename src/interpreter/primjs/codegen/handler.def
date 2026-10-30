@@ -6,9 +6,12 @@
 #define DEF_INTERP_DESP(...)
 #endif
 
+#ifndef DEF_INTERP_TABLE0_ONLY
+#define DEF_INTERP_TABLE0_ONLY(...)
+#endif
+
 DEF_INTERP_DESP(push_i32, U0_U1, C0_U1)
 DEF_INTERP_DESP(push_const, U0_U1, C0_U1)
-DEF_INTERP_DESP(fclosure, U0_U1, C0_U1)
 DEF_INTERP_DESP(push_atom_value, U0_U1, C0_U1)
 DEF_INTERP_DESP(private_symbol, U0_U1, C0_U1)
 DEF_INTERP_DESP(undefined, U0_U1, C0_U1)
@@ -149,7 +152,6 @@ DEF_INTERP_DESP(push_7, U0_U1, C0_U1)
 DEF_INTERP_DESP(push_i8, U0_U1, C0_U1)
 DEF_INTERP_DESP(push_i16, U0_U1, C0_U1)
 DEF_INTERP_DESP(push_const8, U0_U1, C0_U1)
-DEF_INTERP_DESP(fclosure8, U0_U1, C0_U1)
 DEF_INTERP_DESP(push_empty_string, U0_U1, C0_U1)
 DEF_INTERP_DESP(get_loc8, U0_U1, C0_U1)
 DEF_INTERP_DESP(put_loc8, C0_U1, U0_U1)
@@ -202,4 +204,50 @@ DEF_INTERP_DESP(return, C0_U1, U0_U1)
 DEF_INTERP_DESP(return_undef, U0_U1, U0_U1)
 DEF_INTERP_DESP(inc_coverage, U0_U1, U0_U1)
 
+// Less frequent property access handlers whose fast paths are large. Only the
+// table0 variant keeps the full implementation; table1/table2 variants spill
+// the cached top values and jump to table0. Array element access and put_field
+// are kept in all tables because they are hot.
+DEF_INTERP_TABLE0_ONLY(get_ref_value)
+DEF_INTERP_TABLE0_ONLY(put_ref_value)
+DEF_INTERP_TABLE0_ONLY(define_field)
+
+// Rarely executed opcodes. Their table1/table2 variants are not worth the
+// code size, so they also spill the cached top values and jump to table0.
+DEF_INTERP_TABLE0_ONLY(inc_coverage)
+DEF_INTERP_TABLE0_ONLY(special_object)
+DEF_INTERP_TABLE0_ONLY(regexp)
+DEF_INTERP_TABLE0_ONLY(import)
+DEF_INTERP_TABLE0_ONLY(private_symbol)
+DEF_INTERP_TABLE0_ONLY(get_private_field)
+DEF_INTERP_TABLE0_ONLY(put_private_field)
+DEF_INTERP_TABLE0_ONLY(define_private_field)
+DEF_INTERP_TABLE0_ONLY(check_brand)
+DEF_INTERP_TABLE0_ONLY(add_brand)
+DEF_INTERP_TABLE0_ONLY(get_super_value)
+DEF_INTERP_TABLE0_ONLY(get_super_ctor)
+DEF_INTERP_TABLE0_ONLY(get_super)
+DEF_INTERP_TABLE0_ONLY(set_home_object)
+DEF_INTERP_TABLE0_ONLY(set_proto)
+DEF_INTERP_TABLE0_ONLY(set_name)
+DEF_INTERP_TABLE0_ONLY(set_name_computed)
+DEF_INTERP_TABLE0_ONLY(define_func)
+DEF_INTERP_TABLE0_ONLY(define_var)
+DEF_INTERP_TABLE0_ONLY(check_define_var)
+DEF_INTERP_TABLE0_ONLY(check_var)
+DEF_INTERP_TABLE0_ONLY(delete_var)
+DEF_INTERP_TABLE0_ONLY(put_var_init)
+DEF_INTERP_TABLE0_ONLY(catch)
+DEF_INTERP_TABLE0_ONLY(gosub)
+DEF_INTERP_TABLE0_ONLY(ret)
+DEF_INTERP_TABLE0_ONLY(for_in_start)
+DEF_INTERP_TABLE0_ONLY(check_ctor)
+DEF_INTERP_TABLE0_ONLY(check_ctor_return)
+DEF_INTERP_TABLE0_ONLY(rest)
+DEF_INTERP_TABLE0_ONLY(delete)
+DEF_INTERP_TABLE0_ONLY(to_object)
+DEF_INTERP_TABLE0_ONLY(put_var_strict)
+DEF_INTERP_TABLE0_ONLY(define_array_el)
+
 #undef DEF_INTERP_DESP
+#undef DEF_INTERP_TABLE0_ONLY

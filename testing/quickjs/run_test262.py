@@ -1,99 +1,181 @@
+#!/usr/bin/env python3
 # Copyright 2024 The Lynx Authors. All rights reserved.
 # Licensed under the Apache License Version 2.0 that can be found in the
 # LICENSE file in the root directory of this source tree.
 
-#!/use/bin/python
+"""Run test262-harness in bounded parallel batches.
+
+The output format intentionally stays compatible with the previous runner:
+one ``<pass> <file>`` record per harness result.
+"""
+
+import argparse
+import concurrent.futures
+import json
+import os
+from pathlib import Path
+import shutil
 import subprocess
 import sys
-from threading import Thread, Lock
-import json
-import argparse
+from typing import Any, Iterable
 
-dirs = "."
-lock = Lock()
-result = []
-args = ""
 
-def readTests(args):
-  # remove useless case
-  cmd = "find ./test -name '*.fail' |xargs rm"
-  subprocess.getstatusoutput(cmd)
+def resolve_test262_paths(test262_dir: Path) -> tuple[Path, Path]:
+  selected = test262_dir.resolve()
+  if not selected.is_dir():
+    raise ValueError(f"test262 directory does not exist: {selected}")
+  for candidate in (selected, *selected.parents):
+    if (candidate / "package.json").is_file() and (candidate / "harness").is_dir():
+      return candidate, selected / "test" if (selected / "test").is_dir() else selected
+  raise ValueError(
+      f"cannot locate test262 root from {selected}; expected package.json and harness/")
 
-  cmd = "test262-harness --help"
-  status, output = subprocess.getstatusoutput(cmd)
-  if status == 0:
-     subprocess.getstatusoutput("npm install -g test262-harness")
-  cmd = "find %s -name '*.js'" % args.test262Dir
-  status, output = subprocess.getstatusoutput(cmd)
-  return output
 
-def run_test(tests):
-  global args
-  cmd = "test262-harness --reporter json --reporter-keys result,file --hostType %s --hostPath %s" % (args.type, args.bin)
-  print(("run_test: %d" % len(tests)))
-  success = 0
-  runned = 0
-  global result
-  localResult = []
-  for test in tests:
-    cmd = cmd + " " + test + " "
+def collect_tests(test_root: Path) -> list[Path]:
+  return sorted(path for path in test_root.rglob("*.js") if path.is_file())
 
-  status, output = subprocess.getstatusoutput(cmd)
-  retArray = (output.strip("[\n").strip("]\n").split("\n,"))
 
-  for ret in retArray:
+def batches(items: list[Path], size: int) -> Iterable[list[Path]]:
+  for start in range(0, len(items), size):
+    yield items[start:start + size]
+
+
+def extract_json_report(output: str) -> list[dict[str, Any]]:
+  stripped = output.strip()
+  candidates = [stripped]
+  first = stripped.find("[")
+  last = stripped.rfind("]")
+  if first >= 0 and last > first:
+    candidates.append(stripped[first:last + 1])
+
+  for candidate in candidates:
+    if not candidate:
+      continue
     try:
-      ret = json.loads(ret)
-      localResult.append(str(ret["result"]["pass"]) + " " + ret["file"] + "\n")
-    except:
-      print(ret)
+      value = json.loads(candidate)
+    except json.JSONDecodeError:
+      continue
+    if isinstance(value, list) and all(isinstance(item, dict) for item in value):
+      return value
+    if isinstance(value, dict):
+      return [value]
 
-  lock.acquire()
-  result.extend(localResult)
-  lock.release()
-  print("finish_test: %d" % len(tests))
+  records = []
+  for line in stripped.splitlines():
+    line = line.strip().lstrip(",")
+    if not line:
+      continue
+    try:
+      value = json.loads(line)
+    except json.JSONDecodeError:
+      continue
+    if isinstance(value, dict):
+      records.append(value)
+  return records
 
-def main():
-  parser = argparse.ArgumentParser(description="To run test262 cases")
-  parser.add_argument("--test262Dir", help="test262 root dirctory", type=str, default=".")
-  parser.add_argument("--type", help="host vm type example d8/node/qjs", type=str)
-  parser.add_argument("--bin", help="vm execute path", type=str)
-  parser.add_argument("--output", help="result output file", type=str, default="./result.output")
-  parser.add_argument("--t", help="thread count to run", type=int, default=5)
+
+def run_batch(harness: str, test262_root: Path, host_type: str, host_path: Path,
+              tests: list[Path]) -> list[tuple[str, str]]:
+  command = [
+      harness, "--reporter", "json", "--reporter-keys",
+      "result,file", "--host-type", host_type, "--host-path",
+      str(host_path), "--test262-dir", str(test262_root),
+      "--includes-dir", str(test262_root / "harness"),
+      *(str(path) for path in tests)
+  ]
+  proc = subprocess.run(command, stdout=subprocess.PIPE,
+                        stderr=subprocess.STDOUT, text=True, check=False)
+  records = extract_json_report(proc.stdout)
+  if not records:
+    detail = proc.stdout.strip() or f"exit status {proc.returncode}"
+    raise RuntimeError(f"test262-harness produced no JSON report:\n{detail}")
+
+  results = []
+  for record in records:
+    result = record.get("result")
+    filename = record.get("file")
+    if not isinstance(result, dict) or "pass" not in result or not filename:
+      raise RuntimeError(f"invalid test262-harness record: {record!r}")
+    pass_value = result["pass"]
+    if isinstance(pass_value, bool):
+      passed = str(pass_value).lower()
+    elif isinstance(pass_value, str) and pass_value.lower() in ("true", "false"):
+      passed = pass_value.lower()
+    else:
+      raise RuntimeError(f"invalid test262 pass value: {pass_value!r}")
+    results.append((str(filename), passed))
+  return results
 
 
-  global args
-  args = parser.parse_args()
+def parse_args() -> argparse.Namespace:
+  parser = argparse.ArgumentParser(description="Run test262 cases")
+  parser.add_argument("--test262Dir", default=".",
+                      help="test262 root directory or its test directory")
+  parser.add_argument("--type", required=True,
+                      help="test262-harness host type, for example qjs")
+  parser.add_argument("--bin", required=True,
+                      help="path to the host VM executable")
+  parser.add_argument("--output", default="./result.output",
+                      help="output file")
+  parser.add_argument("--t", type=int, default=5,
+                      help="maximum concurrent harness processes")
+  parser.add_argument("--batch-size", type=int, default=100,
+                      help="maximum tests passed to one harness process")
+  parser.add_argument("--harness", default=os.environ.get(
+      "TEST262_HARNESS", "test262-harness"),
+                      help="test262-harness executable")
+  return parser.parse_args()
 
-  with open(args.output, "w") as f:
-    f = f
-  # find all tests
-  tests = readTests(args).split("\n")
-  totalCount = len(tests)
-  print("Total case: %d" % totalCount)
 
-  thread_lists = []
-  thread_count = args.t
+def main() -> int:
+  args = parse_args()
+  if args.t <= 0:
+    raise ValueError("--t must be greater than zero")
+  if args.batch_size <= 0:
+    raise ValueError("--batch-size must be greater than zero")
 
-  prethread = totalCount / thread_count
-  # use 10 thread to run tests
-  for i in range(0, thread_count):
-    t = Thread(target=run_test, args=(tests[i*prethread : (i+1) * prethread ],))
-    thread_lists.append(t)
-    t.start()
+  harness = shutil.which(args.harness)
+  if harness is None:
+    raise RuntimeError(
+        f"cannot find {args.harness!r}; install test262-harness or pass "
+        "--harness /absolute/path/to/test262-harness")
+  host_path = Path(args.bin).expanduser().resolve()
+  if not host_path.is_file() or not os.access(host_path, os.X_OK):
+    raise ValueError(f"host executable is not executable: {host_path}")
 
-  for t in thread_lists:
-    t.join()
+  test262_root, test_root = resolve_test262_paths(Path(args.test262Dir))
+  tests = collect_tests(test_root)
+  if not tests:
+    raise ValueError(f"no JavaScript tests found under {args.test262Dir}")
+  work = list(batches(tests, args.batch_size))
+  print(f"Total cases: {len(tests)} in {len(work)} batches")
 
-  if  prethread * thread_count < totalCount:
-    run_test(tests[prethread * thread_count :])
+  all_results = []
+  with concurrent.futures.ThreadPoolExecutor(max_workers=args.t) as executor:
+    futures = [executor.submit(run_batch, harness, test262_root, args.type,
+                               host_path, batch)
+               for batch in work]
+    for completed, future in enumerate(concurrent.futures.as_completed(futures),
+                                       start=1):
+      all_results.extend(future.result())
+      print(f"Finished batches: {completed}/{len(work)}", flush=True)
 
-  # write to file
-  global result
-  print("Run case: %d" % len(result))
-  with open(args.output, "a") as f:
-    for line in result:
-      f.write(line)
+  all_results.sort(key=lambda item: item[0])
+  output = Path(args.output).expanduser()
+  output.parent.mkdir(parents=True, exist_ok=True)
+  with output.open("w", encoding="utf-8") as stream:
+    for filename, passed in all_results:
+      stream.write(f"{passed} {filename}\n")
 
-if __name__=="__main__":
-    main()
+  passed_count = sum(passed == "true" for _, passed in all_results)
+  print(f"Reported cases: {len(all_results)}; passed: {passed_count}; "
+        f"failed: {len(all_results) - passed_count}")
+  return 0
+
+
+if __name__ == "__main__":
+  try:
+    raise SystemExit(main())
+  except (OSError, RuntimeError, ValueError) as error:
+    print(f"run_test262: {error}", file=sys.stderr)
+    raise SystemExit(2)

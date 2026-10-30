@@ -495,28 +495,40 @@ JSBigInt *js_bigint_extend(LEPUSContext *ctx, JSBigInt *r, js_limb_t op1) {
   return r;
 }
 
-/* return NULL in case of error. Compute a + b (b_neg = 0) or a - b
-   (b_neg = 1) */
-/* XXX: optimize */
-JSBigInt *js_bigint_add(LEPUSContext *ctx, const JSBigInt *a, const JSBigInt *b,
-                        int b_neg) {
+/* Allocate a BigInt holding the 'len' limbs of 'tab' without their
+   redundant high order limbs. */
+static JSBigInt *js_bigint_new_from_tab(LEPUSContext *ctx, const js_limb_t *tab,
+                                        int len) {
   JSBigInt *r;
+  js_limb_t v;
+
+  while (len > 1) {
+    v = tab[len - 1];
+    if ((v != 0 && v != -1) || (v & 1) != (tab[len - 2] >> (JS_LIMB_BITS - 1)))
+      break;
+    len--;
+  }
+  r = js_bigint_new(ctx, len);
+  if (!r) return NULL;
+  memcpy(r->tab, tab, len * sizeof(tab[0]));
+  return r;
+}
+
+/* Store the max(a->len, b->len) low limbs of a + b (b_neg = 0) or a - b
+   (b_neg = 1) in 'tab' and return the next limb of the result. */
+static js_limb_t js_bigint_add_tab(js_limb_t *tab, const JSBigInt *a,
+                                   const JSBigInt *b, int b_neg) {
   int n1, n2, i;
   js_limb_t carry, op1, op2, a_sign, b_sign;
 
   n2 = max_int(a->len, b->len);
   n1 = min_int(a->len, b->len);
-  r = js_bigint_new(ctx, n2);
-  HandleScope func_scope(ctx);
-  func_scope.PushHandle(r, HANDLE_TYPE_DIR_HEAP_OBJ);
-  if (!r) return NULL;
-  /* XXX: optimize */
   /* common part */
   carry = b_neg;
   for (i = 0; i < n1; i++) {
     op1 = a->tab[i];
     op2 = b->tab[i] ^ (-b_neg);
-    ADDC(r->tab[i], carry, op1, op2, carry);
+    ADDC(tab[i], carry, op1, op2, carry);
   }
   a_sign = -js_bigint_sign(a);
   b_sign = (-js_bigint_sign(b)) ^ (-b_neg);
@@ -524,18 +536,47 @@ JSBigInt *js_bigint_add(LEPUSContext *ctx, const JSBigInt *a, const JSBigInt *b,
   if (a->len > b->len) {
     for (i = n1; i < n2; i++) {
       op1 = a->tab[i];
-      ADDC(r->tab[i], carry, op1, b_sign, carry);
+      ADDC(tab[i], carry, op1, b_sign, carry);
     }
   } else if (a->len < b->len) {
     for (i = n1; i < n2; i++) {
       op2 = b->tab[i] ^ (-b_neg);
-      ADDC(r->tab[i], carry, a_sign, op2, carry);
+      ADDC(tab[i], carry, a_sign, op2, carry);
     }
   }
+  /* part with sign extension for both operands */
+  return a_sign + b_sign + carry;
+}
 
-  /* part with sign extension for both operands. Extend the result
-     if necessary */
-  return js_bigint_extend(ctx, r, a_sign + b_sign + carry);
+/* return NULL in case of error. Compute a + b (b_neg = 0) or a - b
+   (b_neg = 1) */
+JSBigInt *js_bigint_add(LEPUSContext *ctx, const JSBigInt *a, const JSBigInt *b,
+                        int b_neg) {
+  JSBigInt *r;
+  int n2;
+  js_limb_t high;
+
+  if (a->len == 1 && b->len == 1) {
+    js_sdlimb_t v = (js_slimb_t)a->tab[0];
+    if (b_neg)
+      v -= (js_slimb_t)b->tab[0];
+    else
+      v += (js_slimb_t)b->tab[0];
+    return js_bigint_new_di(ctx, v);
+  }
+  n2 = max_int(a->len, b->len);
+  if (js_bigint_add_on_stack(a, b)) {
+    js_limb_t tab[JS_BIGINT_STACK_LIMBS];
+    tab[n2] = js_bigint_add_tab(tab, a, b, b_neg);
+    return js_bigint_new_from_tab(ctx, tab, n2 + 1);
+  }
+  r = js_bigint_new(ctx, n2);
+  HandleScope func_scope(ctx);
+  func_scope.PushHandle(r, HANDLE_TYPE_DIR_HEAP_OBJ);
+  if (!r) return NULL;
+  high = js_bigint_add_tab(r->tab, a, b, b_neg);
+  /* Extend the result if necessary */
+  return js_bigint_extend(ctx, r, high);
 }
 
 /* XXX: optimize */
@@ -546,20 +587,33 @@ JSBigInt *js_bigint_neg(LEPUSContext *ctx, const JSBigInt *a) {
   return js_bigint_add(ctx, b, a, 1);
 }
 
+/* Store the a->len + b->len limbs of a * b in 'tab'. */
+static void js_bigint_mul_tab(js_limb_t *tab, const JSBigInt *a,
+                              const JSBigInt *b) {
+  mp_mul_basecase(tab, a->tab, a->len, b->tab, b->len);
+  /* correct the result if negative operands (no overflow is
+     possible) */
+  if (js_bigint_sign(a)) mp_sub(tab + a->len, tab + a->len, b->tab, b->len, 0);
+  if (js_bigint_sign(b)) mp_sub(tab + b->len, tab + b->len, a->tab, a->len, 0);
+}
+
 JSBigInt *js_bigint_mul(LEPUSContext *ctx, const JSBigInt *a,
                         const JSBigInt *b) {
   JSBigInt *r;
 
+  if (a->len == 1 && b->len == 1) {
+    return js_bigint_new_di(
+        ctx, (js_sdlimb_t)(js_slimb_t)a->tab[0] * (js_slimb_t)b->tab[0]);
+  }
+  if (js_bigint_mul_on_stack(a, b)) {
+    js_limb_t tab[JS_BIGINT_STACK_LIMBS];
+    js_bigint_mul_tab(tab, a, b);
+    return js_bigint_new_from_tab(ctx, tab, a->len + b->len);
+  }
   r = js_bigint_new(ctx, a->len + b->len);
   HandleScope func_scope(ctx, r, HANDLE_TYPE_DIR_HEAP_OBJ);
   if (!r) return NULL;
-  mp_mul_basecase(r->tab, a->tab, a->len, b->tab, b->len);
-  /* correct the result if negative operands (no overflow is
-     possible) */
-  if (js_bigint_sign(a))
-    mp_sub(r->tab + a->len, r->tab + a->len, b->tab, b->len, 0);
-  if (js_bigint_sign(b))
-    mp_sub(r->tab + b->len, r->tab + b->len, a->tab, a->len, 0);
+  js_bigint_mul_tab(r->tab, a, b);
   return js_bigint_normalize(ctx, r);
 }
 
@@ -1581,7 +1635,7 @@ LEPUSValue js_dtoa2(LEPUSContext *ctx, double d, int32_t radix,
     buf = static_buf;
   }
   len = js_dtoa(buf, d, radix, n_digits, flags, &dtoa_mem);
-  res = js_new_string8(ctx, buf, len);
+  res = js_new_string8_len(ctx, buf, len);
   if (!ctx->gc_enable) lepus_free(ctx, tmp_buf);
   return res;
 }

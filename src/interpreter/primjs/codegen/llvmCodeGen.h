@@ -25,6 +25,11 @@ class LLVMModule;
 class LLVMAssembler : public base::ZoneObject {
  public:
   static constexpr int kMaxCallArgs = 16;
+  // Alignment of the first generated function. Handlers are emitted as one
+  // block, so aligning its start keeps the cache line placement of every
+  // handler independent of the size of the code linked before it. 128 bytes
+  // covers the instruction cache line size of the supported CPUs.
+  static constexpr unsigned kCodeBlockAlignment = 128;
 
   LLVMAssembler(const char* module_name) : _module_name(module_name) {}
   ~LLVMAssembler() {}
