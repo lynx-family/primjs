@@ -25636,6 +25636,21 @@ static LEPUSValue js_typed_array_copyWithin(LEPUSContext *ctx,
   return this_val;
 }
 
+static LEPUSValue js_typed_array_at(LEPUSContext *ctx, LEPUSValueConst this_val,
+                                    int argc, LEPUSValueConst *argv) {
+  int64_t idx;
+  int len;
+
+  len = js_typed_array_get_length_internal(ctx, this_val);
+  if (len < 0) return LEPUS_EXCEPTION;
+  if (JS_ToInt64Sat(ctx, &idx, argv[0])) return LEPUS_EXCEPTION;
+  if (idx < 0) idx += len;
+  // len is read before the index conversion, as the spec requires. If
+  // valueOf detaches the buffer, the element read returns undefined.
+  if (idx < 0 || idx >= len) return LEPUS_UNDEFINED;
+  return JS_GetPropertyInt64(ctx, this_val, idx);
+}
+
 static LEPUSValue js_typed_array_fill(LEPUSContext *ctx,
                                       LEPUSValueConst this_val, int argc,
                                       LEPUSValueConst *argv) {
@@ -26497,6 +26512,7 @@ static const LEPUSCFunctionListEntry js_typed_array_base_funcs[] = {
 
 static const LEPUSCFunctionListEntry js_typed_array_base_proto_funcs[] = {
     LEPUS_CGETSET_DEF("length", js_typed_array_get_length, NULL),
+    LEPUS_CFUNC_DEF("at", 1, js_typed_array_at),
     LEPUS_CGETSET_MAGIC_DEF("buffer", js_typed_array_get_buffer, NULL, 0),
     LEPUS_CGETSET_MAGIC_DEF("byteLength", js_typed_array_get_byteLength, NULL,
                             0),
