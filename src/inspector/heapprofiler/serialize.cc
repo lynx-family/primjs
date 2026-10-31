@@ -8,6 +8,8 @@
 
 #include "inspector/heapprofiler/serialize.h"
 
+#include <algorithm>
+#include <cstring>
 #include <string>
 #include <vector>
 
@@ -16,6 +18,41 @@
 namespace quickjs {
 
 namespace heapprofiler {
+OutputStreamWriter::OutputStreamWriter(OutputStream* stream)
+    : front_stream_(stream), chunk_size_(stream->GetChunkSize()) {}
+
+// Keep buffer growth and flushing shared by all serialization call sites.
+no_inline void OutputStreamWriter::AddBytes(const char* input, size_t size) {
+  buffer_.append(input, size);
+  if (buffer_.size() >= chunk_size_) Finalize();
+}
+
+void OutputStreamWriter::AddString(const char* input) {
+  AddBytes(input, std::strlen(input));
+}
+
+void OutputStreamWriter::AddString(const std::string& input) {
+  AddBytes(input.data(), input.size());
+}
+
+void OutputStreamWriter::AddString(char input) { AddBytes(&input, 1); }
+
+no_inline void OutputStreamWriter::AddNumber(uint64_t input) {
+  char digits[20];  // UINT64_MAX has 20 decimal digits.
+  char* const end = digits + sizeof(digits);
+  char* current = end;
+  do {
+    *--current = static_cast<char>('0' + input % 10);
+    input /= 10;
+  } while (input);
+  AddBytes(current, static_cast<size_t>(end - current));
+}
+
+no_inline void OutputStreamWriter::Finalize() {
+  front_stream_->WriteChunk(buffer_);
+  buffer_.clear();
+}
+
 uint32_t HeapSnapshotJSONSerializer::to_node_index(uint32_t entry_index) {
   return entry_index * kNodeFieldsCount;
 }
@@ -53,7 +90,30 @@ void HeapSnapshotJSONSerializer::SerializeImpl() {
   writer_->AddString("\"samples\":[");
   writer_->AddString("],\n");
   writer_->AddString("\"locations\":[");
+  bool first = true;
+  for (const auto& location : snapshot_->locations()) {
+    if (!first) writer_->AddString(',');
+    first = false;
+    writer_->AddNumber(to_node_index(location.entry_index));
+    writer_->AddString(',');
+    writer_->AddNumber(location.script_id);
+    writer_->AddString(',');
+    writer_->AddNumber(location.source_offset);
+  }
   writer_->AddString("],\n");
+
+  // Snapshot-local script IDs, shared filenames in the standard string table.
+  writer_->AddString(
+      "\"primjs_sources\":{\"version\":1,"
+      "\"fields\":[\"script_id\",\"name\"],\"scripts\":[");
+  const auto& sources = snapshot_->sources();
+  for (uint32_t i = 0; i < sources.size(); ++i) {
+    if (i) writer_->AddString(',');
+    writer_->AddNumber(i + 1);
+    writer_->AddString(',');
+    writer_->AddNumber(GetStringId(sources[i]));
+  }
+  writer_->AddString("]},\n");
 
   writer_->AddString("\"strings\":[");
   SerializeStrings();
@@ -62,14 +122,11 @@ void HeapSnapshotJSONSerializer::SerializeImpl() {
   writer_->Finalize();
 }
 
-uint32_t HeapSnapshotJSONSerializer::GetStringId(const std::string& str) {
-  auto itr = strings_map_.find(str);
-  if (itr == strings_map_.end()) {
-    strings_map_[str] = next_string_id_++;
-    return next_string_id_ - 1;
-  } else {
-    return itr->second;
-  }
+no_inline uint32_t
+HeapSnapshotJSONSerializer::GetStringId(const std::string& str) {
+  auto result = strings_map_.try_emplace(str, next_string_id_);
+  if (result.second) ++next_string_id_;
+  return result.first->second;
 }
 
 void HeapSnapshotJSONSerializer::SerializeEdges() {
@@ -81,19 +138,17 @@ void HeapSnapshotJSONSerializer::SerializeEdges() {
 
 void HeapSnapshotJSONSerializer::SerializeEdge(const HeapGraphEdge& edge,
                                                bool first_edge) {
-  int32_t edge_name_or_index =
+  uint32_t edge_name_or_index =
       edge.IsIndex() ? edge.index() : GetStringId(edge.name());
-  std::string buffer;
   if (!first_edge) {
-    buffer += ',';
+    writer_->AddString(',');
   }
-  buffer += std::to_string(edge.type());
-  buffer += ',';
-  buffer += std::to_string(edge_name_or_index);
-  buffer += ',';
-  buffer += std::to_string(to_node_index(edge.to()));
-  buffer += "\n\0";
-  writer_->AddString(buffer.c_str());
+  writer_->AddNumber(edge.type());
+  writer_->AddString(',');
+  writer_->AddNumber(edge_name_or_index);
+  writer_->AddString(',');
+  writer_->AddNumber(to_node_index(edge.to()));
+  writer_->AddString('\n');
 }
 
 void HeapSnapshotJSONSerializer::SerializeNodes() {
@@ -103,23 +158,19 @@ void HeapSnapshotJSONSerializer::SerializeNodes() {
 }
 
 void HeapSnapshotJSONSerializer::SerializeNode(const HeapEntry& entry) {
-  std::string buffer;
   if (to_node_index(entry) != 0) {
-    buffer += ',';
+    writer_->AddString(',');
   }
-  buffer += std::to_string(entry.type());
-  buffer += ",";
-  buffer += std::to_string(GetStringId(entry.name()));
-  buffer += ",";
-  buffer += std::to_string(entry.id());
-  buffer += ",";
-  buffer += std::to_string(entry.self_size());
-  buffer += ",";
-  buffer += std::to_string(entry.children_count());
-  buffer += ",";
-  buffer += std::to_string(0);  // trace node id
-  buffer += "\n\0";
-  writer_->AddString(buffer);
+  writer_->AddNumber(entry.type());
+  writer_->AddString(',');
+  writer_->AddNumber(GetStringId(entry.name()));
+  writer_->AddString(',');
+  writer_->AddNumber(entry.id());
+  writer_->AddString(',');
+  writer_->AddNumber(entry.self_size());
+  writer_->AddString(',');
+  writer_->AddNumber(entry.children_count());
+  writer_->AddString(",0\n");  // trace node id
 }
 
 void HeapSnapshotJSONSerializer::SerializeSnapshot() {
@@ -195,18 +246,17 @@ void HeapSnapshotJSONSerializer::SerializeSnapshot() {
     JSON_S("location_fields") ":" JSON_A(
         JSON_S("object_index") ","
         JSON_S("script_id") ","
-        JSON_S("line") ","
-        JSON_S("column"))));
+        JSON_S("source_offset"))));
 // clang-format on
 #undef JSON_S
 #undef JSON_O
 #undef JSON_A
   writer_->AddString(",\"node_count\":");
-  writer_->AddString(snapshot_->entries().size());
+  writer_->AddNumber(snapshot_->entries().size());
   writer_->AddString(",\"edge_count\":");
-  writer_->AddString(snapshot_->edges().size());
+  writer_->AddNumber(snapshot_->edges().size());
   writer_->AddString(",\"trace_function_count\":");
-  writer_->AddString(0);
+  writer_->AddNumber(0);
 }
 
 void HeapSnapshotJSONSerializer::SerializeStrings() const {
@@ -231,78 +281,12 @@ static void WriteUchar(OutputStreamWriter* w, uint32_t u) {
   w->AddString(hex_chars[u & 0xF]);
 }
 
-enum UTF8_byte : size_t {
-  kError = 0,
-  kOneByte,
-  kTwoBytes,
-  kThreeBytes,
-  kFourBytes
-};
-
-inline UTF8_byte GetUtf8ByteCount(char ch) {
-  // Range of the first byte of UTF-8 characters for different types.
-  constexpr uint8_t kOneByteFirstByteMin = 0;
-  constexpr uint8_t kOneByteFirstByteMax = 0x80;
-  constexpr uint8_t kTwoBytesFirstByteMin = 0xC2;
-  constexpr uint8_t kTwoBytesFirstByteMax = 0xE0;
-  constexpr uint8_t kThreeBytesFirstByteMin = 0xE0;
-  constexpr uint8_t kThreeBytesFirstByteMax = 0xF0;
-  constexpr uint8_t kFourBytesFirstByteMin = 0xF0;
-  constexpr uint8_t kFourBytesFirstByteMax = 0xF8;
-
-  uint8_t temp = static_cast<uint8_t>(ch);
-
-  if (kOneByteFirstByteMin <= temp && temp < kOneByteFirstByteMax) {
-    return UTF8_byte::kOneByte;
-  }
-  if (kTwoBytesFirstByteMin <= temp && temp < kTwoBytesFirstByteMax) {
-    return UTF8_byte::kTwoBytes;
-  }
-  if (kThreeBytesFirstByteMin <= temp && temp < kThreeBytesFirstByteMax) {
-    return UTF8_byte::kThreeBytes;
-  }
-  if (kFourBytesFirstByteMin <= temp && temp < kFourBytesFirstByteMax) {
-    return UTF8_byte::kFourBytes;
-  }
-  return UTF8_byte::kError;
-}
-
-bool NextUtf8Char(const char*& str, wchar_t& result) {
-  if (str == nullptr) return '?';
-
-  auto& cvt = std::use_facet<std::codecvt<char32_t, char, std::mbstate_t>>(
-      std::locale());
-  static std::mbstate_t state;
-
-  size_t utf8_length = GetUtf8ByteCount(str[0]);
-
-  if (utf8_length != 0) {
-    char32_t res[4], *internal_to_next = nullptr;
-    const char* extern_from_next = nullptr;
-    auto ret = cvt.in(state, str, str + utf8_length, extern_from_next, res,
-                      res + 3, internal_to_next);
-
-    str = extern_from_next - 1;
-    switch (ret) {
-      case std::codecvt_base::ok:
-      case std::codecvt_base::partial: {
-        result = res[0];
-        return true;
-        default:
-          break;
-      }
-    }
-  }
-
-  result = '?';
-  return false;
-}
-
 void HeapSnapshotJSONSerializer::SerializeString(const std::string& s) const {
   writer_->AddString('\n');
   writer_->AddString('\"');
   const char* utf8_str = s.c_str();
-  for (; *utf8_str != 0; ++utf8_str) {
+  const char* end = utf8_str + s.size();
+  for (; utf8_str < end; ++utf8_str) {
     switch (*utf8_str) {
       case '\b': {
         writer_->AddString("\\b");
@@ -331,18 +315,28 @@ void HeapSnapshotJSONSerializer::SerializeString(const std::string& s) const {
         } else if (uc <= 31) {
           WriteUchar(writer_, uc);
         } else {
-          wchar_t current_char;
-          auto is_success = NextUtf8Char(utf8_str, current_char);
-          WriteUchar(writer_, current_char);
-          if (!is_success) {
-            goto end;
+          const uint8_t* next = nullptr;
+          int current_char =
+              unicode_from_utf8(reinterpret_cast<const uint8_t*>(utf8_str),
+                                static_cast<int>(std::min<size_t>(
+                                    end - utf8_str, UTF8_CHAR_LEN_MAX)),
+                                &next);
+          if (current_char < 0 || current_char > 0x10ffff) {
+            WriteUchar(writer_, 0xfffd);
+            break;
+          }
+          utf8_str = reinterpret_cast<const char*>(next) - 1;
+          if (current_char > 0xffff) {
+            uint32_t supplementary = current_char - 0x10000;
+            WriteUchar(writer_, 0xd800 + (supplementary >> 10));
+            WriteUchar(writer_, 0xdc00 + (supplementary & 0x3ff));
+          } else {
+            WriteUchar(writer_, current_char);
           }
         }
       } break;
     }
   }
-
-end:
   writer_->AddString('\"');
 }
 

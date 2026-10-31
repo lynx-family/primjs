@@ -420,12 +420,12 @@ TEST(HeapProfiler, CodeObjects) {
 
   ASSERT_TRUE(compiled);
 
-  ASSERT_TRUE(compiled->name() == "Function");
+  ASSERT_EQ(compiled->name(), "compiled");
+  ASSERT_EQ(compiled->type(), HeapEntry::kClosure);
 
   auto* compile_bytecode =
       GetProperty(compiled, HeapGraphEdge::kInternal, "function_bytecode");
-  ASSERT_TRUE(compile_bytecode &&
-              compile_bytecode->type() == HeapEntry::kClosure);
+  ASSERT_TRUE(compile_bytecode && compile_bytecode->type() == HeapEntry::kCode);
   bool has_constant_pool_edge = false;
   for (size_t i = 0, count = compile_bytecode->children_count(); i < count;
        ++i) {
@@ -441,21 +441,23 @@ TEST(HeapProfiler, CodeObjects) {
   auto* lazy =
       GetGlobalProperty(heapsnapshot, HeapGraphEdge::kProperty, "lazy");
 
-  ASSERT_TRUE(lazy && lazy->name() == "Function");
+  ASSERT_TRUE(lazy && lazy->name() == "lazy");
+  ASSERT_EQ(lazy->type(), HeapEntry::kClosure);
   auto* lazy_bytecode =
       GetProperty(lazy, HeapGraphEdge::kInternal, "function_bytecode");
 
-  ASSERT_TRUE(lazy_bytecode && lazy_bytecode->type() == HeapEntry::kClosure);
+  ASSERT_TRUE(lazy_bytecode && lazy_bytecode->type() == HeapEntry::kCode);
 
   auto* anonymous =
       GetGlobalProperty(heapsnapshot, HeapGraphEdge::kProperty, "anonymous");
 
-  ASSERT_TRUE(anonymous && anonymous->name() == "Function");
+  ASSERT_TRUE(anonymous && anonymous->name() == "anonymous");
+  ASSERT_EQ(anonymous->type(), HeapEntry::kClosure);
   auto* anonymous_bytecode =
       GetProperty(anonymous, HeapGraphEdge::kInternal, "function_bytecode");
 
   ASSERT_TRUE(anonymous_bytecode &&
-              anonymous_bytecode->type() == HeapEntry::kClosure);
+              anonymous_bytecode->type() == HeapEntry::kCode);
 }
 
 TEST(HeapProfiler, HeapNumber) {
@@ -550,9 +552,6 @@ TEST(HeapProfiler, TracingGcTakeSnapshotPreservesConsoleMessages) {
 
 #ifdef ENABLE_QUICKJS_DEBUGGER
   ScopedQjsDebugger debugger(env.ctx);
-#else
-  GTEST_SKIP();
-#endif
 
   auto* info = env.ctx->debugger_info;
   ASSERT_TRUE(info);
@@ -574,6 +573,9 @@ TEST(HeapProfiler, TracingGcTakeSnapshotPreservesConsoleMessages) {
   ASSERT_FALSE(LEPUS_IsUndefined(info->console.messages));
   ASSERT_EQ(messages_ptr, LEPUS_VALUE_GET_PTR(info->console.messages));
   ASSERT_EQ(messages_length, info->console.length);
+#else
+  GTEST_SKIP();
+#endif
 }
 
 TEST(HeapProfiler, TracingGcGlobalHandlesRoot) {

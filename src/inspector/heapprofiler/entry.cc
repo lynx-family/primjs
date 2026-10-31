@@ -35,20 +35,24 @@ HeapEntry::HeapEntry(HeapSnapshot* snapshot, uint32_t index, Type type,
       self_size_(self_size),
       id_(id) {}
 
-void HeapEntry::SetNamedReference(HeapGraphEdge::Type type, const char* name,
-                                  HeapEntry* entry) {
+// Share edge insertion instead of expanding it at each reference site.
+no_inline void HeapEntry::SetNamedReference(HeapGraphEdge::Type type,
+                                            const char* name,
+                                            HeapEntry* entry) {
   ++children_count_;
   snapshot_->edges().emplace_back(type, name, this, entry);
 }
 
-void HeapEntry::SetNamedReference(HeapGraphEdge::Type type,
-                                  const std::string& name, HeapEntry* entry) {
+no_inline void HeapEntry::SetNamedReference(HeapGraphEdge::Type type,
+                                            const std::string& name,
+                                            HeapEntry* entry) {
   ++children_count_;
   snapshot_->edges().emplace_back(type, name, this, entry);
 }
 
-void HeapEntry::SetIndexedReference(HeapGraphEdge::Type type, uint32_t index,
-                                    HeapEntry* entry) {
+no_inline void HeapEntry::SetIndexedReference(HeapGraphEdge::Type type,
+                                              uint32_t index,
+                                              HeapEntry* entry) {
   ++children_count_;
   snapshot_->edges().emplace_back(type, index, this, entry);
 }

@@ -40,6 +40,60 @@ TEST(PointerSetTest, KeepsAllPointersAcrossGrowth) {
   EXPECT_EQ(Contents(set), expected);
 }
 
+TEST(PointerSetTest, ErasePreservesWrappedClustersAndAllowsReuse) {
+  ROS_GC::PointerSet set;
+  EXPECT_FALSE(set.Contains(nullptr));
+  EXPECT_FALSE(set.Contains(FakePointer(1)));
+  EXPECT_FALSE(set.Erase(FakePointer(1)));
+  std::vector<void *> cluster;
+  // Deliberately fill a cluster starting in the last bucket.
+  for (uintptr_t i = 0; cluster.size() < 32; ++i) {
+    void *ptr = FakePointer(i);
+    uint64_t h = reinterpret_cast<uintptr_t>(ptr) * 0x9E3779B97F4A7C15ull;
+    if (((h ^ (h >> 32)) & 63) == 63) cluster.push_back(ptr);
+  }
+  for (auto *ptr : cluster) EXPECT_TRUE(set.Insert(ptr));
+  size_t memory = set.MemoryUsage();
+  EXPECT_FALSE(set.Insert(cluster.front()));
+  EXPECT_EQ(set.MemoryUsage(), memory);
+  for (size_t index : {size_t{0}, size_t{16}, size_t{31}}) {
+    EXPECT_TRUE(set.Erase(cluster[index]));
+    EXPECT_FALSE(set.Erase(cluster[index]));
+    for (size_t i = 0; i < cluster.size(); ++i) {
+      EXPECT_EQ(set.Contains(cluster[i]), i != index);
+    }
+    EXPECT_TRUE(set.Insert(cluster[index]));
+    EXPECT_EQ(set.MemoryUsage(), memory);
+  }
+  for (auto *ptr : cluster) EXPECT_TRUE(set.Erase(ptr));
+  EXPECT_EQ(set.Size(), 0u);
+  EXPECT_TRUE(Contents(set).empty());
+  EXPECT_TRUE(set.Insert(cluster.front()));
+}
+
+TEST(PointerSetTest, ReserveFailureAndChurnPreserveContents) {
+  ROS_GC::PointerSet set;
+  ASSERT_TRUE(set.TryReserve(2048));
+  size_t memory = set.MemoryUsage();
+  EXPECT_FALSE(set.TryReserve(SIZE_MAX));
+  EXPECT_EQ(set.MemoryUsage(), memory);
+  std::set<void *> expected;
+  uint32_t random = 42;
+  for (int i = 0; i < 20000; ++i) {
+    random = random * 1664525 + 1013904223;
+    void *ptr = FakePointer((random >> 8) & 2047);
+    if (random & 1) {
+      EXPECT_EQ(set.Insert(ptr), expected.insert(ptr).second);
+    } else {
+      EXPECT_EQ(set.Erase(ptr), expected.erase(ptr) != 0);
+    }
+    EXPECT_EQ(set.Contains(ptr), expected.count(ptr) != 0);
+  }
+  EXPECT_EQ(Contents(set), expected);
+  EXPECT_EQ(set.Size(), expected.size());
+  EXPECT_EQ(set.MemoryUsage(), memory);
+}
+
 TEST(PointerSetTest, RetainIfDropsRejectedPointers) {
   ROS_GC::PointerSet set;
   for (uintptr_t i = 0; i < 1000; ++i) set.Insert(FakePointer(i));
