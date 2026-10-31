@@ -49,6 +49,7 @@ unittest_set("quickjs_testset") {
     "test_primjs_version.cc",
     "test_promise_rejection.cc",
     "test_read_function_overflow.cc",
+    "test_typed_array_at.cc",
     "test_unicode_normalization.cc",
     "test_varinfo_outside.cc",
     "test_weak_ref.cc",
