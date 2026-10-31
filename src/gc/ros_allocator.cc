@@ -1386,6 +1386,42 @@ address_t RosAllocImpl::AllocateObjWithMemorySlot(LEPUSRuntime *rt, size_t size,
   return AllocateObjInternal<true>(rt, size, alloc_tag);
 }
 
+address_t RosAllocImpl::TryAllocateObj(LEPUSRuntime *rt, size_t size,
+                                       int alloc_tag) {
+  auto ros = rt->ros_;
+  size_t alloc_size = AllocUtilRndUp(size + kHeaderSize, kAllocAlign);
+  if (UNLIKELY(alloc_size > kLargeObjSize)) return 0;
+  uint8_t memory_slot = LEPUS_MEMORY_CATEGORY_UNKNOWN;
+  if (UNLIKELY(ros->HasMemoryTracking())) {
+    int32_t *ptr_to_current_slot = rt->malloc_state.ptr_to_current_slot;
+    ROSIMPL_ASSERT(ptr_to_current_slot, "pointer to current slot is null");
+    int32_t slot = *ptr_to_current_slot;
+    ROSIMPL_ASSERT(slot >= LEPUS_MEMORY_CATEGORY_UNKNOWN &&
+                       slot <= rt->malloc_state.max_slot_index,
+                   "invalid memory slot");
+    memory_slot = static_cast<uint8_t>(slot);
+  }
+
+  NewObjPrologueForAsan();
+  address_t ret = ros->AllocFromRun(alloc_size, kEagerLevelMin);
+  if (UNLIKELY(ret == 0)) return 0;
+  NewObjEpilogueForAsan();
+
+  if (UNLIKELY(ros->should_mark_new_obj)) {
+    ros->MarkObjectNoInline(ret);
+  }
+  ros->allocatedInternalSize.fetch_add(alloc_size, std::memory_order_relaxed);
+  if (UNLIKELY(ros->HasMemoryTracking())) {
+    ros->AccumulateMemorySlotAllocation(memory_slot, alloc_size);
+  }
+  JS_UpdateGCInfo(rt, size);
+
+  void *ptr = reinterpret_cast<void *>(ret + kHeaderSize);
+  memset(ptr, 0, size);
+  init_obj_header(ptr, size, alloc_tag, memory_slot);
+  return reinterpret_cast<address_t>(ptr);
+}
+
 template <bool TrackMemory>
 address_t RosAllocImpl::ReallocateObjInternal(LEPUSRuntime *rt, void *ptr,
                                               size_t size, int alloc_tag) {

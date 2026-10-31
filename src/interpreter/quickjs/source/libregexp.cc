@@ -1896,14 +1896,26 @@ typedef enum {
   RE_EXEC_STATE_GREEDY_QUANT,
 } REExecStateEnum;
 
-typedef struct REExecState {
-  REExecStateEnum type : 8;
-  uint8_t stack_len;
-  size_t count; /* only used for RE_EXEC_STATE_GREEDY_QUANT */
-  const uint8_t *cptr;
-  const uint8_t *pc;
-  void *buf[0];
-} REExecState;
+/* The backtracking stack holds frames and undo records. A frame saves where
+   to resume after a failure. Each undo record above a frame holds the address
+   and the previous value of a capture or counter written after the frame was
+   pushed, so backtracking restores only what changed instead of copying all
+   the captures and counters at every split. */
+typedef union {
+  uintptr_t val;
+  const uint8_t *ptr;
+} StackElem;
+
+/* frame fields, as offsets from the end of the frame ('bp') */
+#define FRAME_PC (-5)
+#define FRAME_CPTR (-4)
+#define FRAME_PREV_BP (-3) /* offset of the end of the enclosing frame */
+#define FRAME_STATE (-2)   /* REExecStateEnum | (counter stack length << 2) */
+/* RE_EXEC_STATE_GREEDY_QUANT: number of matches that can still be given
+   back. Lookaheads: offset of the end of the enclosing lookahead frame, 0 if
+   none. */
+#define FRAME_EXTRA (-1)
+#define FRAME_SIZE 5
 
 typedef struct {
   const uint8_t *cbuf;
@@ -1917,127 +1929,299 @@ typedef struct {
   BOOL is_utf16;
   void *opaque; /* used for stack overflow check */
 
-  size_t state_size;
-  uint8_t *state_stack;
-  size_t state_stack_size;
-  size_t state_stack_len;
+  StackElem *stack_buf;
+  size_t stack_size;
+  /* avoids an allocation for most matches */
+  StackElem static_stack_buf[64];
 } REExecContext;
 
-static int push_state(REExecContext *s, uint8_t **capture, StackInt *stack,
-                      size_t stack_len, const uint8_t *pc, const uint8_t *cptr,
-                      REExecStateEnum type, size_t count) {
-  REExecState *rs;
-  uint8_t *new_stack;
-  size_t new_size, i, n;
-  StackInt *stack_buf;
+static no_inline int stack_realloc(REExecContext *s, size_t n) {
+  StackElem *new_stack;
+  size_t new_size;
 
-  if (unlikely((s->state_stack_len + 1) > s->state_stack_size)) {
-    /* reallocate the stack */
-    new_size = s->state_stack_size * 3 / 2;
-    if (new_size < 8) new_size = 8;
-    new_stack = static_cast<uint8_t *>(lre_realloc_addjudge(
-        s->opaque, s->state_stack, new_size * s->state_size, 1));
-
+  new_size = s->stack_size * 3 / 2;
+  if (new_size < n) new_size = n;
+  if (s->stack_buf == s->static_stack_buf) {
+    new_stack = static_cast<StackElem *>(
+        lre_realloc_addjudge(s->opaque, NULL, new_size * sizeof(StackElem), 1));
     if (!new_stack) return -1;
-    s->state_stack_size = new_size;
-    s->state_stack = new_stack;
+    memcpy(new_stack, s->stack_buf, s->stack_size * sizeof(StackElem));
+  } else {
+    new_stack = static_cast<StackElem *>(lre_realloc_addjudge(
+        s->opaque, s->stack_buf, new_size * sizeof(StackElem), 1));
+    if (!new_stack) return -1;
   }
-  rs = (REExecState *)(s->state_stack + s->state_stack_len * s->state_size);
-  s->state_stack_len++;
-  rs->type = type;
-  rs->count = count;
-  rs->stack_len = stack_len;
-  rs->cptr = cptr;
-  rs->pc = pc;
-  n = 2 * s->capture_count;
-  for (i = 0; i < n; i++) rs->buf[i] = capture[i];
-  stack_buf = (StackInt *)(rs->buf + n);
-  for (i = 0; i < stack_len; i++) stack_buf[i] = stack[i];
+  s->stack_size = new_size;
+  s->stack_buf = new_stack;
   return 0;
 }
 
-/* return 1 if match, 0 if not match or -1 if error. */
+/* 'pc' points to the range count of REOP_range */
+static inline BOOL lre_range_match(const uint8_t *pc, uint32_t c) {
+  uint32_t n, low, high, idx_min, idx_max, idx;
+
+  n = get_u16(pc); /* n must be >= 1 */
+  pc += 2;
+  low = get_u16(pc + 0 * 4);
+  if (c < low) return FALSE;
+  idx_max = n - 1;
+  high = get_u16(pc + idx_max * 4 + 2);
+  /* 0xffff in for last value means +infinity */
+  if (unlikely(c >= 0xffff) && high == 0xffff) return TRUE;
+  if (c > high) return FALSE;
+  idx_min = 0;
+  while (idx_min <= idx_max) {
+    idx = (idx_min + idx_max) / 2;
+    low = get_u16(pc + idx * 4);
+    high = get_u16(pc + idx * 4 + 2);
+    if (c < low)
+      idx_max = idx - 1;
+    else if (c > high)
+      idx_min = idx + 1;
+    else
+      return TRUE;
+  }
+  return FALSE;
+}
+
+/* 'pc' points to the range count of REOP_range32 */
+static inline BOOL lre_range32_match(const uint8_t *pc, uint32_t c) {
+  uint32_t n, low, high, idx_min, idx_max, idx;
+
+  n = get_u16(pc); /* n must be >= 1 */
+  pc += 2;
+  low = get_u32(pc + 0 * 8);
+  if (c < low) return FALSE;
+  idx_max = n - 1;
+  high = get_u32(pc + idx_max * 8 + 4);
+  if (c > high) return FALSE;
+  idx_min = 0;
+  while (idx_min <= idx_max) {
+    idx = (idx_min + idx_max) / 2;
+    low = get_u32(pc + idx * 8);
+    high = get_u32(pc + idx * 8 + 4);
+    if (c < low)
+      idx_max = idx - 1;
+    else if (c > high)
+      idx_min = idx + 1;
+    else
+      return TRUE;
+  }
+  return FALSE;
+}
+
+/* 'pc' points to a REOP_char, REOP_char32, REOP_range or REOP_range32
+   opcode. Return TRUE if 'c' passes it. */
+static inline BOOL lre_char_op_match(REExecContext *s, const uint8_t *pc,
+                                     uint32_t c) {
+  if (s->ignore_case) c = lre_canonicalize(c, s->is_utf16);
+  switch (pc[0]) {
+    case REOP_char:
+      return c == get_u16(pc + 1);
+    case REOP_char32:
+      return c == get_u32(pc + 1);
+    case REOP_range:
+      return lre_range_match(pc + 1, c);
+    default:
+      return lre_range32_match(pc + 1, c);
+  }
+}
+
+/* Return the size of the opcode at 'pc' if it tests exactly one character,
+   or -1. */
+static int lre_get_char_op_size(const uint8_t *pc) {
+  switch (pc[0]) {
+    case REOP_char:
+      return 3;
+    case REOP_char32:
+      return 5;
+    case REOP_dot:
+    case REOP_any:
+      return 1;
+    case REOP_range:
+      return 3 + 4 * get_u16(pc + 1);
+    case REOP_range32:
+      return 3 + 8 * get_u16(pc + 1);
+    default:
+      return -1;
+  }
+}
+
+/* Match the one character opcode at 'pc'. Return the position after the
+   character, or NULL. */
+static inline const uint8_t *lre_match_char_op(REExecContext *s,
+                                               const uint8_t *pc,
+                                               const uint8_t *cptr) {
+  int cbuf_type = s->cbuf_type;
+  const uint8_t *cbuf_end = s->cbuf_end;
+  uint32_t c;
+
+  if (cptr >= cbuf_end) return NULL;
+  GET_CHAR(c, cptr, cbuf_end);
+  switch (pc[0]) {
+    case REOP_dot:
+      return is_line_terminator(c) ? NULL : cptr;
+    case REOP_any:
+      return cptr;
+    default:
+      return lre_char_op_match(s, pc, c) ? cptr : NULL;
+  }
+}
+
+/* return 1 if match, 0 if not match or -1 if error. With 'no_recurse', run
+   the atom of a simple quantifier and return its end position or 0. */
 static intptr_t lre_exec_backtrack(REExecContext *s, uint8_t **capture,
                                    StackInt *stack, int stack_len,
                                    const uint8_t *pc, const uint8_t *cptr,
                                    BOOL no_recurse) {
-  int opcode, ret;
+  int opcode, type;
   int cbuf_type;
   uint32_t val, c;
   const uint8_t *cbuf_end;
+  StackElem *sp, *bp, *stack_end;
+  uintptr_t la; /* offset of the end of the innermost lookahead frame */
 
   cbuf_type = s->cbuf_type;
   cbuf_end = s->cbuf_end;
+  sp = s->stack_buf;
+  bp = s->stack_buf;
+  stack_end = s->stack_buf + s->stack_size;
+  la = 0;
+
+#define CHECK_STACK_SPACE(n)                                \
+  do {                                                      \
+    if (unlikely((size_t)(stack_end - sp) < (size_t)(n))) { \
+      size_t saved_sp = sp - s->stack_buf;                  \
+      size_t saved_bp = bp - s->stack_buf;                  \
+      if (stack_realloc(s, saved_sp + (n))) return -1;      \
+      stack_end = s->stack_buf + s->stack_size;             \
+      sp = s->stack_buf + saved_sp;                         \
+      bp = s->stack_buf + saved_bp;                         \
+    }                                                       \
+  } while (0)
+
+/* set a capture or a counter and record its previous value */
+#define SAVE_SLOT(slot, value)             \
+  do {                                     \
+    uintptr_t __v = (uintptr_t)(value);    \
+    uintptr_t __old;                       \
+    memcpy(&__old, (slot), sizeof(__old)); \
+    if (__old != __v) {                    \
+      CHECK_STACK_SPACE(2);                \
+      sp[0].val = (uintptr_t)(slot);       \
+      sp[1].val = __old;                   \
+      sp += 2;                             \
+      memcpy((slot), &__v, sizeof(__v));   \
+    }                                      \
+  } while (0)
+
+/* restore the slots set since the stack top was 'limit' */
+#define UNDO_TO(limit)                                            \
+  do {                                                            \
+    while (sp > (limit)) {                                        \
+      memcpy((void *)sp[-2].val, &sp[-1].val, sizeof(uintptr_t)); \
+      sp -= 2;                                                    \
+    }                                                             \
+  } while (0)
+
+#define PUSH_FRAME(type, pc1, cptr1, extra)                      \
+  do {                                                           \
+    CHECK_STACK_SPACE(FRAME_SIZE);                               \
+    sp[0].ptr = (pc1);                                           \
+    sp[1].ptr = (cptr1);                                         \
+    sp[2].val = bp - s->stack_buf;                               \
+    sp[3].val = (uintptr_t)(type) | ((uintptr_t)stack_len << 2); \
+    sp[4].val = (extra);                                         \
+    sp += FRAME_SIZE;                                            \
+    bp = sp;                                                     \
+  } while (0)
 
   for (;;) {
-    //        printf("top=%p: pc=%d\n", th_list.top, (int)(pc - (bc_buf +
-    //        RE_HEADER_LEN)));
     opcode = *pc++;
     switch (opcode) {
-      case REOP_match: {
-        REExecState *rs;
+      case REOP_match:
         if (no_recurse) return (intptr_t)cptr;
-        ret = 1;
-        goto recurse;
+        if (!la) return 1;
+        if (((s->stack_buf + la)[FRAME_STATE].val & 3) ==
+            RE_EXEC_STATE_LOOKAHEAD) {
+          /* The lookahead matched: drop the frames pushed since it started
+             but keep their undo records, which still apply if a later
+             failure backtracks past the lookahead. */
+          StackElem *la_bp = s->stack_buf + la;
+          StackElem *sp_top = sp, *sp1, *next_sp;
+          BOOL is_la;
+          for (;;) {
+            is_la = (bp == la_bp);
+            sp1 = sp;
+            sp = bp;
+            if (is_la) {
+              pc = sp[FRAME_PC].ptr;
+              cptr = sp[FRAME_CPTR].ptr;
+              stack_len = sp[FRAME_STATE].val >> 2;
+              la = sp[FRAME_EXTRA].val;
+            }
+            bp = s->stack_buf + sp[FRAME_PREV_BP].val;
+            /* remember where the undo records above this frame end */
+            sp[FRAME_EXTRA].val = (uintptr_t)sp1;
+            sp -= FRAME_SIZE;
+            if (is_la) break;
+          }
+          sp1 = sp;
+          while (sp1 < sp_top) {
+            next_sp = (StackElem *)sp1[FRAME_SIZE + FRAME_EXTRA].val;
+            sp1 += FRAME_SIZE;
+            while (sp1 < next_sp) *sp++ = *sp1++;
+          }
+        } else {
+          /* The negative lookahead matched, so it fails: undo everything
+             since it started, then backtrack. */
+          StackElem *la_bp = s->stack_buf + la;
+          BOOL is_la;
+          for (;;) {
+            is_la = (bp == la_bp);
+            UNDO_TO(bp);
+            sp = bp - FRAME_SIZE;
+            if (is_la) la = bp[FRAME_EXTRA].val;
+            bp = s->stack_buf + bp[FRAME_PREV_BP].val;
+            if (is_la) break;
+          }
+          goto no_match;
+        }
+        break;
       no_match:
         if (no_recurse) return 0;
-        ret = 0;
-      recurse:
         for (;;) {
-          if (s->state_stack_len == 0) return ret;
-          rs = (REExecState *)(s->state_stack +
-                               (s->state_stack_len - 1) * s->state_size);
-          if (rs->type == RE_EXEC_STATE_SPLIT) {
-            if (!ret) {
-            pop_state:
-              memcpy(capture, rs->buf,
-                     sizeof(capture[0]) * 2 * s->capture_count);
-            pop_state1:
-              pc = rs->pc;
-              cptr = rs->cptr;
-              stack_len = rs->stack_len;
-              memcpy(stack, rs->buf + 2 * s->capture_count,
-                     stack_len * sizeof(stack[0]));
-              s->state_stack_len--;
-              break;
-            }
-          } else if (rs->type == RE_EXEC_STATE_GREEDY_QUANT) {
-            if (!ret) {
-              uint32_t char_count, i;
-              memcpy(capture, rs->buf,
-                     sizeof(capture[0]) * 2 * s->capture_count);
-              stack_len = rs->stack_len;
-              memcpy(stack, rs->buf + 2 * s->capture_count,
-                     stack_len * sizeof(stack[0]));
-              pc = rs->pc;
-              cptr = rs->cptr;
-              /* go backward */
-              char_count = get_u32(pc + 12);
-              for (i = 0; i < char_count; i++) {
-                PREV_CHAR(cptr, s->cbuf);
-              }
-              pc = (pc + 16) + (int)get_u32(pc);
-              rs->cptr = cptr;
-              rs->count--;
-              if (rs->count == 0) {
-                s->state_stack_len--;
-              }
-              break;
-            }
-          } else {
-            ret = ((rs->type == RE_EXEC_STATE_LOOKAHEAD && ret) ||
-                   (rs->type == RE_EXEC_STATE_NEGATIVE_LOOKAHEAD && !ret));
-            if (ret) {
-              /* keep the capture in case of positive lookahead */
-              if (rs->type == RE_EXEC_STATE_LOOKAHEAD)
-                goto pop_state1;
-              else
-                goto pop_state;
-            }
+          if (bp == s->stack_buf) {
+            UNDO_TO(s->stack_buf);
+            return 0;
           }
-          s->state_stack_len--;
+          UNDO_TO(bp);
+          type = bp[FRAME_STATE].val & 3;
+          stack_len = bp[FRAME_STATE].val >> 2;
+          pc = bp[FRAME_PC].ptr;
+          cptr = bp[FRAME_CPTR].ptr;
+          if (type == RE_EXEC_STATE_GREEDY_QUANT) {
+            uint32_t char_count, i;
+            /* give back one more match of the quantified atom */
+            char_count = get_u32(pc + 12);
+            for (i = 0; i < char_count; i++) {
+              PREV_CHAR(cptr, s->cbuf);
+            }
+            bp[FRAME_CPTR].ptr = cptr;
+            pc = (pc + 16) + (int)get_u32(pc);
+            if (--bp[FRAME_EXTRA].val == 0) {
+              sp = bp - FRAME_SIZE;
+              bp = s->stack_buf + bp[FRAME_PREV_BP].val;
+            }
+            break;
+          }
+          sp = bp - FRAME_SIZE;
+          if (type != RE_EXEC_STATE_SPLIT) la = bp[FRAME_EXTRA].val;
+          bp = s->stack_buf + bp[FRAME_PREV_BP].val;
+          /* a failed lookahead also fails the enclosing alternative */
+          if (type != RE_EXEC_STATE_LOOKAHEAD) break;
         }
-      } break;
+        break;
       case REOP_char32:
         val = get_u32(pc);
         pc += 4;
@@ -2065,20 +2249,16 @@ static intptr_t lre_exec_backtrack(REExecContext *s, uint8_t **capture,
           pc1 = pc;
           pc = pc + (int)val;
         }
-        ret = push_state(s, capture, stack, stack_len, pc1, cptr,
-                         RE_EXEC_STATE_SPLIT, 0);
-        if (ret < 0) return -1;
+        PUSH_FRAME(RE_EXEC_STATE_SPLIT, pc1, cptr, 0);
         break;
       }
       case REOP_lookahead:
       case REOP_negative_lookahead:
         val = get_u32(pc);
         pc += 4;
-        ret = push_state(s, capture, stack, stack_len, pc + (int)val, cptr,
-                         static_cast<REExecStateEnum>(RE_EXEC_STATE_LOOKAHEAD +
-                                                      opcode - REOP_lookahead),
-                         0);
-        if (ret < 0) return -1;
+        PUSH_FRAME(RE_EXEC_STATE_LOOKAHEAD + opcode - REOP_lookahead,
+                   pc + (int)val, cptr, la);
+        la = bp - s->stack_buf;
         break;
 
       case REOP_goto:
@@ -2110,7 +2290,7 @@ static intptr_t lre_exec_backtrack(REExecContext *s, uint8_t **capture,
       case REOP_save_end:
         val = *pc++;
         assert(val < s->capture_count);
-        capture[2 * val + opcode - REOP_save_start] = (uint8_t *)cptr;
+        SAVE_SLOT(&capture[2 * val + opcode - REOP_save_start], cptr);
         break;
       case REOP_save_reset: {
         uint32_t val2;
@@ -2119,15 +2299,16 @@ static intptr_t lre_exec_backtrack(REExecContext *s, uint8_t **capture,
         pc += 2;
         assert(val2 < s->capture_count);
         while (val <= val2) {
-          capture[2 * val] = NULL;
-          capture[2 * val + 1] = NULL;
+          SAVE_SLOT(&capture[2 * val], NULL);
+          SAVE_SLOT(&capture[2 * val + 1], NULL);
           val++;
         }
       } break;
       case REOP_push_i32:
         val = get_u32(pc);
         pc += 4;
-        stack[stack_len++] = val;
+        SAVE_SLOT(&stack[stack_len], val);
+        stack_len++;
         break;
       case REOP_drop:
         stack_len--;
@@ -2135,12 +2316,14 @@ static intptr_t lre_exec_backtrack(REExecContext *s, uint8_t **capture,
       case REOP_loop:
         val = get_u32(pc);
         pc += 4;
-        if (--stack[stack_len - 1] != 0) {
+        SAVE_SLOT(&stack[stack_len - 1], stack[stack_len - 1] - 1);
+        if (stack[stack_len - 1] != 0) {
           pc += (int)val;
         }
         break;
       case REOP_push_char_pos:
-        stack[stack_len++] = (uintptr_t)cptr;
+        SAVE_SLOT(&stack[stack_len], cptr);
+        stack_len++;
         break;
       case REOP_bne_char_pos:
         val = get_u32(pc);
@@ -2202,72 +2385,24 @@ static intptr_t lre_exec_backtrack(REExecContext *s, uint8_t **capture,
           }
         }
       } break;
-      case REOP_range: {
-        int n;
-        uint32_t low, high, idx_min, idx_max, idx;
-
-        n = get_u16(pc); /* n must be >= 1 */
-        pc += 2;
+      case REOP_range:
         if (cptr >= cbuf_end) goto no_match;
         GET_CHAR(c, cptr, cbuf_end);
         if (s->ignore_case) {
           c = lre_canonicalize(c, s->is_utf16);
         }
-        idx_min = 0;
-        low = get_u16(pc + 0 * 4);
-        if (c < low) goto no_match;
-        idx_max = n - 1;
-        high = get_u16(pc + idx_max * 4 + 2);
-        /* 0xffff in for last value means +infinity */
-        if (unlikely(c >= 0xffff) && high == 0xffff) goto range_match;
-        if (c > high) goto no_match;
-        while (idx_min <= idx_max) {
-          idx = (idx_min + idx_max) / 2;
-          low = get_u16(pc + idx * 4);
-          high = get_u16(pc + idx * 4 + 2);
-          if (c < low)
-            idx_max = idx - 1;
-          else if (c > high)
-            idx_min = idx + 1;
-          else
-            goto range_match;
-        }
-        goto no_match;
-      range_match:
-        pc += 4 * n;
-      } break;
-      case REOP_range32: {
-        int n;
-        uint32_t low, high, idx_min, idx_max, idx;
-
-        n = get_u16(pc); /* n must be >= 1 */
-        pc += 2;
+        if (!lre_range_match(pc, c)) goto no_match;
+        pc += 2 + 4 * get_u16(pc);
+        break;
+      case REOP_range32:
         if (cptr >= cbuf_end) goto no_match;
         GET_CHAR(c, cptr, cbuf_end);
         if (s->ignore_case) {
           c = lre_canonicalize(c, s->is_utf16);
         }
-        idx_min = 0;
-        low = get_u32(pc + 0 * 8);
-        if (c < low) goto no_match;
-        idx_max = n - 1;
-        high = get_u32(pc + idx_max * 8 + 4);
-        if (c > high) goto no_match;
-        while (idx_min <= idx_max) {
-          idx = (idx_min + idx_max) / 2;
-          low = get_u32(pc + idx * 8);
-          high = get_u32(pc + idx * 8 + 4);
-          if (c < low)
-            idx_max = idx - 1;
-          else if (c > high)
-            idx_min = idx + 1;
-          else
-            goto range32_match;
-        }
-        goto no_match;
-      range32_match:
-        pc += 8 * n;
-      } break;
+        if (!lre_range32_match(pc, c)) goto no_match;
+        pc += 2 + 8 * get_u16(pc);
+        break;
       case REOP_prev:
         /* go to the previous char */
         if (cptr == s->cbuf) goto no_match;
@@ -2287,26 +2422,121 @@ static intptr_t lre_exec_backtrack(REExecContext *s, uint8_t **capture,
         pc += (int)next_pos;
 
         q = 0;
-        for (;;) {
-          res =
-              lre_exec_backtrack(s, capture, stack, stack_len, pc1, cptr, TRUE);
-          if (res == -1) return res;
-          if (!res) break;
-          cptr = (uint8_t *)res;
-          q++;
-          if (q >= quant_max && quant_max != INT32_MAX) break;
+        if ((int)next_pos == lre_get_char_op_size(pc1) + 1) {
+          /* the atom is a single character test: match it in place */
+          const uint8_t *cptr1;
+          while ((q < quant_max || quant_max == INT32_MAX) &&
+                 (cptr1 = lre_match_char_op(s, pc1, cptr)) != NULL) {
+            cptr = cptr1;
+            q++;
+          }
+        } else {
+          for (;;) {
+            res = lre_exec_backtrack(s, capture, stack, stack_len, pc1, cptr,
+                                     TRUE);
+            if (res == -1) return res;
+            if (!res) break;
+            cptr = (uint8_t *)res;
+            q++;
+            if (q >= quant_max && quant_max != INT32_MAX) break;
+          }
         }
         if (q < quant_min) goto no_match;
         if (q > quant_min) {
           /* will examine all matches down to quant_min */
-          ret = push_state(s, capture, stack, stack_len, pc1 - 16, cptr,
-                           RE_EXEC_STATE_GREEDY_QUANT, q - quant_min);
-          if (ret < 0) return -1;
+          PUSH_FRAME(RE_EXEC_STATE_GREEDY_QUANT, pc1 - 16, cptr, q - quant_min);
         }
       } break;
       default:
         abort();
     }
+  }
+#undef CHECK_STACK_SPACE
+#undef SAVE_SLOT
+#undef UNDO_TO
+#undef PUSH_FRAME
+}
+
+/* the '.*?' prefix that lre_compile() emits when the sticky flag is not set */
+#define RE_SEARCH_PREFIX_LEN (5 + 1 + 5)
+
+static BOOL lre_has_search_prefix(const uint8_t *pc) {
+  return pc[0] == REOP_split_goto_first && get_u32(pc + 1) == 1 + 5 &&
+         pc[5] == REOP_any && pc[6] == REOP_goto &&
+         get_u32(pc + 7) == (uint32_t)-RE_SEARCH_PREFIX_LEN;
+}
+
+/* Return the first character test that a match of 'pc' must pass at its
+   start position, or NULL if there may be none. */
+static const uint8_t *lre_get_first_char_test(const uint8_t *pc) {
+  for (;;) {
+    switch (pc[0]) {
+      case REOP_save_start:
+      case REOP_save_end:
+        pc += 2;
+        break;
+      case REOP_simple_greedy_quant:
+        if (get_u32(pc + 5) == 0) return NULL; /* quant_min */
+        pc += 17;
+        break;
+      case REOP_char:
+      case REOP_char32:
+      case REOP_range:
+      case REOP_range32:
+        return pc;
+      default:
+        return NULL;
+    }
+  }
+}
+
+/* Try 'pc' at each position from 'cptr' in turn, as the search prefix
+   does, without pushing a frame for each position. Positions where the first
+   character test fails are skipped. */
+static intptr_t lre_exec_search(REExecContext *s, uint8_t **capture,
+                                StackInt *stack, const uint8_t *pc,
+                                const uint8_t *cptr) {
+  int cbuf_type = s->cbuf_type;
+  const uint8_t *cbuf_end = s->cbuf_end;
+  const uint8_t *test = lre_get_first_char_test(pc);
+  const uint8_t *cptr1;
+  uint32_t c, first_char = 0;
+  BOOL scan_char = FALSE;
+  intptr_t ret;
+
+  if (test && test[0] == REOP_char && !s->ignore_case) {
+    first_char = get_u16(test + 1);
+    /* in UTF-16 mode a surrogate can be the second half of a pair, where
+       no match starts */
+    scan_char = cbuf_type != 2 || first_char < 0xd800 || first_char >= 0xe000;
+  }
+  for (;;) {
+    if (scan_char) {
+      if (cbuf_type == 0) {
+        if (first_char > 0xff) return 0;
+        cptr = static_cast<const uint8_t *>(
+            memchr(cptr, first_char, cbuf_end - cptr));
+        if (!cptr) return 0;
+      } else {
+        const uint16_t *p = reinterpret_cast<const uint16_t *>(cptr);
+        const uint16_t *end = reinterpret_cast<const uint16_t *>(cbuf_end);
+        while (p < end && *p != first_char) p++;
+        if (p >= end) return 0;
+        cptr = reinterpret_cast<const uint8_t *>(p);
+      }
+    } else if (test) {
+      for (;;) {
+        if (cptr >= cbuf_end) return 0;
+        cptr1 = cptr;
+        GET_CHAR(c, cptr1, cbuf_end);
+        if (lre_char_op_match(s, test, c)) break;
+        cptr = cptr1;
+      }
+    }
+    ret = lre_exec_backtrack(s, capture, stack, 0, pc, cptr, FALSE);
+    if (ret != 0) return ret;
+    if (cptr >= cbuf_end) return 0;
+    GET_CHAR(c, cptr, cbuf_end);
   }
 }
 
@@ -2316,8 +2546,10 @@ static intptr_t lre_exec_backtrack(REExecContext *s, uint8_t **capture,
 int lre_exec(uint8_t **capture, const uint8_t *bc_buf, const uint8_t *cbuf,
              int cindex, int clen, int cbuf_type, void *opaque) {
   REExecContext s_s, *s = &s_s;
-  int re_flags, i, alloca_size, ret;
+  int re_flags, i, alloca_size;
+  intptr_t ret;
   StackInt *stack_buf;
+  const uint8_t *pc, *cptr;
 
   re_flags = bc_buf[RE_HEADER_FLAGS];
   s->multi_line = (re_flags & LRE_FLAG_MULTILINE) != 0;
@@ -2331,12 +2563,8 @@ int lre_exec(uint8_t **capture, const uint8_t *bc_buf, const uint8_t *cbuf,
   if (s->cbuf_type == 1 && s->is_utf16) s->cbuf_type = 2;
   s->opaque = opaque;
 
-  s->state_size = sizeof(REExecState) +
-                  s->capture_count * sizeof(capture[0]) * 2 +
-                  s->stack_size_max * sizeof(stack_buf[0]);
-  s->state_stack = NULL;
-  s->state_stack_len = 0;
-  s->state_stack_size = 0;
+  s->stack_buf = s->static_stack_buf;
+  s->stack_size = countof(s->static_stack_buf);
 
   for (i = 0; i < s->capture_count * 2; i++) capture[i] = NULL;
   alloca_size = s->stack_size_max * sizeof(stack_buf[0]);
@@ -2345,10 +2573,19 @@ int lre_exec(uint8_t **capture, const uint8_t *bc_buf, const uint8_t *cbuf,
 #else
   stack_buf = static_cast<StackInt *>(_alloca(alloca_size));
 #endif
-  ret = lre_exec_backtrack(s, capture, stack_buf, 0, bc_buf + RE_HEADER_LEN,
-                           cbuf + (cindex << cbuf_type), FALSE);
+  /* counters are compared with their new value before being recorded */
+  memset(stack_buf, 0, alloca_size);
+  pc = bc_buf + RE_HEADER_LEN;
+  cptr = cbuf + (cindex << cbuf_type);
+  if (lre_has_search_prefix(pc)) {
+    ret =
+        lre_exec_search(s, capture, stack_buf, pc + RE_SEARCH_PREFIX_LEN, cptr);
+  } else {
+    ret = lre_exec_backtrack(s, capture, stack_buf, 0, pc, cptr, FALSE);
+  }
 
-  lre_realloc_addjudge(s->opaque, s->state_stack, 0, 1);
+  if (s->stack_buf != s->static_stack_buf)
+    lre_realloc_addjudge(s->opaque, s->stack_buf, 0, 1);
 
   return ret;
 }

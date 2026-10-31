@@ -32,6 +32,11 @@ void DispatchTable::InitDispatchState(PrimjsOpcode opcode) {
     SetDefaultState();
     return;
   }
+  if (_init_state != DispatchState::U0_U1 && is_table0_only_opcode(opcode)) {
+    // Spill the cached top values and jump to the table0 handler.
+    SetDefaultState();
+    return;
+  }
   int index = static_cast<int>(opcode);
   switch (index) {
 #define DEF_INTERP_DESP(name, state_use, state_out) \

@@ -213,9 +213,21 @@ js_slimb_t js_bigint_get_si_sat(const JSBigInt *a);
 /* add the op1 limb */
 JSBigInt *js_bigint_extend(LEPUSContext *ctx, JSBigInt *r, js_limb_t op1);
 
+/* Results of at most this many limbs are computed on the stack and then
+   allocated once with their normalized size. The operands are no longer
+   accessed when the result is allocated, so they need no handles. */
+#define JS_BIGINT_STACK_LIMBS 16
+
+inline bool js_bigint_add_on_stack(const JSBigInt *a, const JSBigInt *b) {
+  return max_int(a->len, b->len) < JS_BIGINT_STACK_LIMBS;
+}
+
+inline bool js_bigint_mul_on_stack(const JSBigInt *a, const JSBigInt *b) {
+  return a->len + b->len <= JS_BIGINT_STACK_LIMBS;
+}
+
 /* return NULL in case of error. Compute a + b (b_neg = 0) or a - b
    (b_neg = 1) */
-/* XXX: optimize */
 JSBigInt *js_bigint_add(LEPUSContext *ctx, const JSBigInt *a, const JSBigInt *b,
                         int b_neg);
 

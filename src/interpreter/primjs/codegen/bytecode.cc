@@ -81,10 +81,10 @@ bool is_call_bc_index(int call_index) {
   return false;
 }
 
-bool is_handler1_bc_index(int index) {
-  switch (index) {
-#define DEF_INTERP_DISP(name, ...)             \
-  case static_cast<int>(CallBcIndex::k##name): \
+bool is_multi_table_opcode(PrimjsOpcode opcode) {
+  switch (opcode) {
+#define DEF_INTERP_DESP(name, ...) \
+  case PrimjsOpcode::OP_##name:    \
     return true;
 #include "primjs/codegen/handler.def"
     default:
@@ -93,10 +93,10 @@ bool is_handler1_bc_index(int index) {
   return false;
 }
 
-bool is_handler2_bc_index(int index) {
-  switch (index) {
-#define DEF_INTERP_DISP(name, ...)             \
-  case static_cast<int>(CallBcIndex::k##name): \
+bool is_table0_only_opcode(PrimjsOpcode opcode) {
+  switch (opcode) {
+#define DEF_INTERP_TABLE0_ONLY(name) \
+  case PrimjsOpcode::OP_##name:      \
     return true;
 #include "primjs/codegen/handler.def"
     default:
