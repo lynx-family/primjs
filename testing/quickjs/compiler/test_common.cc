@@ -2662,4 +2662,25 @@ TEST_F(CommonQjsTest, SeparableStringWideFlattenOverflowRejected) {
   if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, ret);
 }
 
+TEST_F(CommonQjsTest, RopeTraversalStackGrowth) {
+  JSSeparableString nodes[130];
+  for (uint32_t depth : {0, 1, 8, 9, 64}) {
+    CStack stack(rt_, depth);
+    EXPECT_TRUE(stack.Empty());
+    EXPECT_EQ(stack.Top(), nullptr);
+    for (int round = 0; round < 2; round++) {
+      for (auto& node : nodes) stack.Push(&node);
+      for (int i = 129; i >= 0; i--) {
+        ASSERT_FALSE(stack.Empty());
+        EXPECT_EQ(stack.Top(), &nodes[i]);
+        stack.Pop();
+      }
+      EXPECT_TRUE(stack.Empty());
+      EXPECT_EQ(stack.Top(), nullptr);
+      stack.Pop();
+      EXPECT_TRUE(stack.Empty());
+    }
+  }
+}
+
 }  // namespace common_qjs_test
