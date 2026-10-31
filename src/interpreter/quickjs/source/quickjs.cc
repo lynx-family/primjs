@@ -3,6 +3,11 @@
  *
  * Copyright (c) 2017-2019 Fabrice Bellard
  * Copyright (c) 2017-2019 Charlie Gordon
+ * Relative indexing adapted from QuickJS-ng:
+ * Copyright (c) 2017-2026 Fabrice Bellard
+ * Copyright (c) 2017-2025 Charlie Gordon
+ * Copyright (c) 2023-2026 Ben Noordhuis
+ * Copyright (c) 2023-2026 Saúl Ibarra Corretgé
  *
  * Permission is hereby granted, free of charge, to any person
  * obtaining a copy of this software and associated documentation
@@ -36653,6 +36658,30 @@ exception:
   return LEPUS_EXCEPTION;
 }
 
+QJS_STATIC LEPUSValue js_array_at(LEPUSContext *ctx, LEPUSValueConst this_val,
+                                  int argc, LEPUSValueConst *argv) {
+  LEPUSValue obj, ret = LEPUS_EXCEPTION;
+  int64_t len;
+  double index;
+
+  obj = LEPUS_ToObject(ctx, this_val);
+  if (LEPUS_IsException(obj)) return obj;
+  if (js_get_length64(ctx, &len, obj)) goto exception;
+  if (LEPUS_ToFloat64(ctx, &index, argv[0])) goto exception;
+  index = isnan(index) ? 0 : trunc(index);
+  if (index < 0) index += len;
+  // ToLength bounds len to 2^53 - 1. Convert only an in-range index so
+  // infinities and numbers outside int64_t never reach an integer cast.
+  if (index < 0 || index >= len)
+    ret = LEPUS_UNDEFINED;
+  else
+    ret = JS_GetPropertyInt64(ctx, obj, static_cast<int64_t>(index));
+
+exception:
+  LEPUS_FreeValue(ctx, obj);
+  return ret;
+}
+
 QJS_STATIC LEPUSValue js_array_fill(LEPUSContext *ctx, LEPUSValueConst this_val,
                                     int argc, LEPUSValueConst *argv) {
   LEPUSValue obj;
@@ -37654,6 +37683,7 @@ static const LEPUSCFunctionListEntry js_array_unscopables_funcs[] = {
 };
 
 static const LEPUSCFunctionListEntry js_array_proto_funcs[] = {
+    LEPUS_CFUNC_DEF("at", 1, js_array_at),
     LEPUS_CFUNC_DEF("concat", 1, js_array_concat),
     LEPUS_CFUNC_MAGIC_DEF("every", 1, js_array_every, special_every),
     LEPUS_CFUNC_MAGIC_DEF("some", 1, js_array_every, special_some),
@@ -38368,6 +38398,28 @@ QJS_STATIC LEPUSValue js_string_charCodeAt(LEPUSContext *ctx,
       c = p->u.str8[idx];
     ret = LEPUS_NewInt32(ctx, c);
   }
+  LEPUS_FreeValue(ctx, val);
+  return ret;
+}
+
+QJS_STATIC LEPUSValue js_string_at(LEPUSContext *ctx, LEPUSValueConst this_val,
+                                   int argc, LEPUSValueConst *argv) {
+  LEPUSValue val, ret;
+  int index;
+
+  val = JS_ToStringCheckObject(ctx, this_val);
+  if (LEPUS_IsException(val)) return val;
+  if (JS_ToInt32Sat(ctx, &index, argv[0])) {
+    LEPUS_FreeValue(ctx, val);
+    return LEPUS_EXCEPTION;
+  }
+  JSString *p = LEPUS_VALUE_GET_STRING(val);
+  if (index < 0) index += p->len;
+  if (index < 0 || index >= p->len)
+    ret = LEPUS_UNDEFINED;
+  else
+    ret = js_new_string_char(
+        ctx, p->is_wide_char ? p->u.str16[index] : p->u.str8[index]);
   LEPUS_FreeValue(ctx, val);
   return ret;
 }
@@ -39496,6 +39548,7 @@ static const LEPUSCFunctionListEntry js_string_funcs[] = {
 };
 
 static const LEPUSCFunctionListEntry js_string_proto_funcs[] = {
+    LEPUS_CFUNC_DEF("at", 1, js_string_at),
     LEPUS_PROP_INT32_DEF("length", 0, LEPUS_PROP_CONFIGURABLE),
     LEPUS_CFUNC_DEF("charCodeAt", 1, js_string_charCodeAt),
     LEPUS_CFUNC_DEF("charAt", 1, js_string_charAt),
