@@ -4885,6 +4885,92 @@ LEPUSValue JS_GetSeparableStringContent(LEPUSContext *ctx, LEPUSValue val) {
   return LEPUS_DupValue(ctx, JS_GetSeparableStringContentNotDup(ctx, val));
 }
 
+namespace {
+// Walks the leaves of a string that may be a rope of any depth. The stack is
+// on the system heap, which the runtime memory limit does not cover.
+class SeparableStringLeafWalker {
+ public:
+  SeparableStringLeafWalker(LEPUSRuntime *rt, LEPUSValueConst value)
+      // A path from the root passes through at most |depth| ropes.
+      : stack_(rt, JS_IsSeparableString(value)
+                       ? JS_GetSeparableString(value)->depth
+                       : 1),
+        next_(value) {}
+
+  bool Valid() const { return stack_.Valid(); }
+
+  // Returns the next leaf, or nullptr after the last one.
+  JSString *Next() {
+    LEPUSValueConst value = next_;
+    next_ = LEPUS_UNDEFINED;
+    if (LEPUS_IsUndefined(value)) {
+      if (stack_.Empty()) return nullptr;
+      value = stack_.Top()->right_op;
+      stack_.Pop();
+    }
+    while (JS_IsSeparableString(value)) {
+      JSSeparableString *str = JS_GetSeparableString(value);
+      if (JS_IsSeparableStringFlat(str)) {
+        value = JS_GetSeparableStringFlatContent(str);
+        break;
+      }
+      stack_.Push(str);
+      value = str->left_op;
+    }
+    return LEPUS_VALUE_GET_STRING(value);
+  }
+
+ private:
+  CStack stack_;
+  LEPUSValueConst next_;
+};
+
+uint32_t string_or_separable_string_len(LEPUSValueConst value) {
+  return LEPUS_VALUE_IS_STRING(value) ? LEPUS_VALUE_GET_STRING(value)->len
+                                      : JS_GetSeparableString(value)->len;
+}
+}  // namespace
+
+bool JS_StringEqualAfterFlattenFailure(LEPUSContext *ctx, LEPUSValueConst op1,
+                                       LEPUSValueConst op2) {
+  LEPUSValue exception = LEPUS_GetException(ctx);
+  if (!ctx->gc_enable) LEPUS_FreeValue(ctx, exception);
+  uint32_t len = string_or_separable_string_len(op1);
+  if (len != string_or_separable_string_len(op2)) return false;
+  SeparableStringLeafWalker walker1(ctx->rt, op1);
+  SeparableStringLeafWalker walker2(ctx->rt, op2);
+  if (!walker1.Valid() || !walker2.Valid()) return false;
+
+  JSString *str1 = nullptr, *str2 = nullptr;
+  uint32_t pos1 = 0, pos2 = 0;
+  while (len != 0) {
+    while (!str1 || pos1 == str1->len) {
+      str1 = walker1.Next();
+      pos1 = 0;
+    }
+    while (!str2 || pos2 == str2->len) {
+      str2 = walker2.Next();
+      pos2 = 0;
+    }
+    uint32_t count = std::min({str1->len - pos1, str2->len - pos2, len});
+    if (!str1->is_wide_char && !str2->is_wide_char) {
+      if (memcmp(str1->u.str8 + pos1, str2->u.str8 + pos2, count) != 0) {
+        return false;
+      }
+    } else {
+      for (uint32_t i = 0; i < count; i++) {
+        if (string_get(str1, pos1 + i) != string_get(str2, pos2 + i)) {
+          return false;
+        }
+      }
+    }
+    pos1 += count;
+    pos2 += count;
+    len -= count;
+  }
+  return true;
+}
+
 QJS_STATIC int init_shape_hash(LEPUSRuntime *rt) {
   rt->shape_hash_bits = 4; /* 16 shapes */
   rt->shape_hash_size = 1 << rt->shape_hash_bits;
@@ -13361,7 +13447,12 @@ QJS_STATIC BOOL js_strict_eq2(LEPUSContext *ctx, LEPUSValue op1, LEPUSValue op2,
           res = FALSE;
         } else {
           auto content = JS_GetSeparableStringContent(ctx, op2);
-          res = js_strict_eq2(ctx, LEPUS_DupValue(ctx, op1), content, eq_mode);
+          if (LEPUS_IsException(content)) {
+            res = JS_StringEqualAfterFlattenFailure(ctx, op1, op2);
+          } else {
+            res =
+                js_strict_eq2(ctx, LEPUS_DupValue(ctx, op1), content, eq_mode);
+          }
         }
       } else if (tag1 != tag2) {
         res = FALSE;
@@ -13388,7 +13479,13 @@ QJS_STATIC BOOL js_strict_eq2(LEPUSContext *ctx, LEPUSValue op1, LEPUSValue op2,
         } else {
           auto content_1 = JS_GetSeparableStringContent(ctx, op1);
           auto content_2 = JS_GetSeparableStringContent(ctx, op2);
-          res = js_strict_eq2(ctx, content_1, content_2, eq_mode);
+          if (LEPUS_IsException(content_1) || LEPUS_IsException(content_2)) {
+            LEPUS_FreeValue(ctx, content_1);
+            LEPUS_FreeValue(ctx, content_2);
+            res = JS_StringEqualAfterFlattenFailure(ctx, op1, op2);
+          } else {
+            res = js_strict_eq2(ctx, content_1, content_2, eq_mode);
+          }
         }
       } else if (tag2 == LEPUS_TAG_STRING) {
         res = js_strict_eq2(ctx, LEPUS_DupValue(ctx, op2),
@@ -38114,6 +38211,8 @@ QJS_STATIC int js_string_get_own_property(LEPUSContext *ctx,
     auto &data = p->u.object_data;
     if (JS_IsSeparableString(data)) {
       auto content = JS_GetSeparableStringContent(ctx, data);
+      // Keep the rope on failure, so the object stays usable.
+      if (LEPUS_IsException(content)) return -1;
       LEPUS_FreeValue(ctx, data);
       data = content;  // set on p->u.object_data
     }
@@ -38196,6 +38295,8 @@ QJS_STATIC int js_string_define_own_property(LEPUSContext *ctx,
 
     if (JS_IsSeparableString(data)) {
       auto content = JS_GetSeparableStringContent(ctx, data);
+      // Keep the rope on failure, so the object stays usable.
+      if (LEPUS_IsException(content)) return -1;
       LEPUS_FreeValue(ctx, data);
       data = content;
     }

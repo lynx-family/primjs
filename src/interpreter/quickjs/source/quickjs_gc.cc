@@ -7542,6 +7542,10 @@ static BOOL js_strict_eq2(LEPUSContext *ctx, LEPUSValue op1, LEPUSValue op2,
           res = compare_result == 0;
         } else {
           auto content = JS_GetSeparableStringContent_GC(ctx, op2);
+          if (LEPUS_IsException(content)) {
+            res = JS_StringEqualAfterFlattenFailure(ctx, op1, op2);
+            break;
+          }
           HandleScope block_scope(ctx, &content, HANDLE_TYPE_LEPUS_VALUE);
           res = js_strict_eq2(ctx, op1, content, eq_mode);
         }
@@ -7570,6 +7574,10 @@ static BOOL js_strict_eq2(LEPUSContext *ctx, LEPUSValue op1, LEPUSValue op2,
         } else {
           auto content_1 = JS_GetSeparableStringContent_GC(ctx, op1);
           auto content_2 = JS_GetSeparableStringContent_GC(ctx, op2);
+          if (LEPUS_IsException(content_1) || LEPUS_IsException(content_2)) {
+            res = JS_StringEqualAfterFlattenFailure(ctx, op1, op2);
+            break;
+          }
           HandleScope block_scope(ctx, &content_1, HANDLE_TYPE_LEPUS_VALUE);
           block_scope.PushHandle(&content_2, HANDLE_TYPE_LEPUS_VALUE);
           res = js_strict_eq2(ctx, content_1, content_2, eq_mode);
@@ -17707,7 +17715,10 @@ QJS_STATIC int js_string_get_own_property(LEPUSContext *ctx,
     auto &data = p->u.object_data;
 
     if (JS_IsSeparableString(data)) {
-      data = JS_GetSeparableStringContent_GC(ctx, data);
+      LEPUSValue content = JS_GetSeparableStringContent_GC(ctx, data);
+      // Keep the rope on failure, so the object stays usable.
+      if (LEPUS_IsException(content)) return -1;
+      data = content;
     }
     if (LEPUS_VALUE_IS_STRING(p->u.object_data)) {
       p1 = LEPUS_VALUE_GET_STRING(p->u.object_data);
@@ -17788,6 +17799,8 @@ static int js_string_define_own_property(LEPUSContext *ctx,
 
     if (JS_IsSeparableString(data)) {
       auto content = JS_GetSeparableStringContent_GC(ctx, data);
+      // Keep the rope on failure, so the object stays usable.
+      if (LEPUS_IsException(content)) return -1;
       data = content;
     }
 
@@ -29614,9 +29627,11 @@ LEPUSValue prim_js_relation_slow_gc(LEPUSContext *ctx, LEPUSValue op1,
     } else if (!string_or_separable_string_compare(op1, op2, false, &res)) {
       if (JS_IsSeparableString(op1)) {
         op1 = JS_GetSeparableStringContent_GC(ctx, op1);
+        if (LEPUS_IsException(op1)) goto exception;
       }
       if (JS_IsSeparableString(op2)) {
         op2 = JS_GetSeparableStringContent_GC(ctx, op2);
+        if (LEPUS_IsException(op2)) goto exception;
       }
       res = js_string_compare(ctx, LEPUS_VALUE_GET_STRING(op1),
                               LEPUS_VALUE_GET_STRING(op2));
