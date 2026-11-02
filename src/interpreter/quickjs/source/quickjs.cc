@@ -4863,6 +4863,9 @@ LEPUSValue JS_GetSeparableStringContentNotDup(LEPUSContext *ctx,
     }
   }
   LEPUSValue flat_content = string_buffer_end(b);
+  /* Keep the rope intact on failure (e.g. out of memory), so that it can
+     still be read once memory is available again. */
+  if (LEPUS_IsException(flat_content)) return LEPUS_EXCEPTION;
   LEPUS_FreeValue(ctx, separable_string->left_op);
   LEPUS_FreeValue(ctx, separable_string->right_op);
   separable_string->left_op = flat_content;
@@ -40758,12 +40761,13 @@ QJS_STATIC LEPUSValue JS_RegExpReplaceString(LEPUSContext *ctx,
   str_val = JS_ToString_RC(ctx, arg);
   if (LEPUS_IsException(str_val)) goto fail;
   str = LEPUS_VALUE_GET_STRING(str_val);
+  /* lastIndex.valueOf() can recompile the regexp and free its bytecode, so
+     read the bytecode after it, as js_regexp_exec_internal() does. */
+  if (js_regexp_get_lastIndex(ctx, &last_index, this_val)) goto fail;
   re_bytecode = re->bytecode->u.str8;
   re_flags = lre_get_flags(re_bytecode);
   if ((re_flags & (LRE_FLAG_GLOBAL | LRE_FLAG_STICKY)) == 0) {
     last_index = 0;
-  } else {
-    if (js_regexp_get_lastIndex(ctx, &last_index, this_val)) goto fail;
   }
   capture_count = lre_get_capture_count(re_bytecode);
   if (capture_count * 2 > (int)countof(capture_buf)) {
@@ -52924,11 +52928,16 @@ LEPUSValue JS_StructuredClone(LEPUSContext *ctx, LEPUSValue src,
           LEPUS_SetOpaque(ret, ms);
           ms->is_weak = map_state->is_weak;
           ms->record_count = 0;
-          ms->hash_size = 1;
+          /* Same initial table as js_map_constructor(): map_hash_key()
+             needs hash_bits > 0. */
+          ms->hash_bits = 1;
+          ms->hash_size = 1U << ms->hash_bits;
           ms->hash_table = static_cast<struct list_head *>(
               lepus_malloc(ctx, sizeof(ms->hash_table[0]) * ms->hash_size));
           if (!ms->hash_table) goto fail;
-          init_list_head(&ms->hash_table[0]);
+          for (uint32_t i = 0; i < ms->hash_size; i++) {
+            init_list_head(&ms->hash_table[i]);
+          }
           ms->record_count_threshold = 4;
           LEPUSValue adder = JS_GetPropertyInternal_RC(
               ctx, ret, is_set ? JS_ATOM_add : JS_ATOM_set, ret, 0);
@@ -52937,34 +52946,64 @@ LEPUSValue JS_StructuredClone(LEPUSContext *ctx, LEPUSValue src,
             LEPUS_ThrowTypeError(ctx, "set/add is not a function");
             goto fail1;
           }
-          list_head *el;
-          JSMapRecord *rec;
-          LEPUSValue res;
-          list_for_each(el, &map_state->records) {
-            rec = list_entry(el, JSMapRecord, link);
-            if (rec->empty) continue;
-            LEPUSValue ms_key = JS_StructuredClone(ctx, rec->key, state);
-            if (LEPUS_IsException(ms_key)) {
-              goto fail1;
+          {
+            /* Copy the entries before cloning them: the adder and nested
+               clones can run user code that deletes, and so frees, records
+               of the source map. */
+            map_state = p->u.map_state;
+            size_t entry_capacity = map_state->record_count;
+            LEPUSValue *entries = static_cast<LEPUSValue *>(
+                lepus_malloc(ctx, sizeof(entries[0]) * 2 *
+                                      (entry_capacity ? entry_capacity : 1)));
+            if (!entries) goto fail1;
+            size_t entry_count = 0;
+            list_head *el;
+            list_for_each(el, &map_state->records) {
+              JSMapRecord *rec = list_entry(el, JSMapRecord, link);
+              if (rec->empty) continue;
+              if (entry_count == entry_capacity) break;
+              entries[2 * entry_count] = LEPUS_DupValue(ctx, rec->key);
+              entries[2 * entry_count + 1] = LEPUS_DupValue(ctx, rec->value);
+              entry_count++;
             }
-            LEPUSValue ms_value = LEPUS_UNDEFINED;
-            if (!is_set) {
-              LEPUSValue args[2];
-              args[0] = ms_key;
-              ms_value = JS_StructuredClone(ctx, rec->value, state);
-              if (LEPUS_IsException(ms_value)) {
-                goto fail1;
+            bool cloned = true;
+            for (size_t i = 0; i < entry_count; i++) {
+              LEPUSValue ms_key =
+                  JS_StructuredClone(ctx, entries[2 * i], state);
+              if (LEPUS_IsException(ms_key)) {
+                cloned = false;
+                break;
               }
-              args[1] = ms_value;
+              LEPUSValue res;
+              if (!is_set) {
+                LEPUSValue args[2];
+                args[0] = ms_key;
+                LEPUSValue ms_value =
+                    JS_StructuredClone(ctx, entries[2 * i + 1], state);
+                if (LEPUS_IsException(ms_value)) {
+                  LEPUS_FreeValue(ctx, ms_key);
+                  cloned = false;
+                  break;
+                }
+                args[1] = ms_value;
 
-              res = JS_Call_RC(ctx, adder, ret, 2, args);
-              LEPUS_FreeValue(ctx, ms_value);
-            } else {
-              res = JS_Call_RC(ctx, adder, ret, 1, &ms_key);
+                res = JS_Call_RC(ctx, adder, ret, 2, args);
+                LEPUS_FreeValue(ctx, ms_value);
+              } else {
+                res = JS_Call_RC(ctx, adder, ret, 1, &ms_key);
+              }
+              LEPUS_FreeValue(ctx, ms_key);
+              if (unlikely(LEPUS_IsException(res))) {
+                cloned = false;
+                break;
+              }
+              LEPUS_FreeValue(ctx, res);
             }
-            LEPUS_FreeValue(ctx, ms_key);
-            if (unlikely(LEPUS_IsException(res))) goto fail1;
-            LEPUS_FreeValue(ctx, res);
+            for (size_t i = 0; i < 2 * entry_count; i++) {
+              LEPUS_FreeValue(ctx, entries[i]);
+            }
+            lepus_free(ctx, entries);
+            if (!cloned) goto fail1;
           }
           LEPUS_FreeValue(ctx, adder);
           break;

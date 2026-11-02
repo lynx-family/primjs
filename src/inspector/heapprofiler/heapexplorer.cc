@@ -1789,6 +1789,17 @@ void QjsHeapExplorer::ExtractGcRootHandleReference() {
           ExtractValueReference(ctx, value_entry, value);
         }
       } break;
+      case HANDLE_TYPE_VALUE_ARRAY: {
+        auto& value_array = *reinterpret_cast<ValueArray*>(heap_obj.ptr);
+        for (size_t i = 0; i < value_array.count; ++i) {
+          const LEPUSValue& value = value_array.values[i];
+          auto* value_entry = GetEntry(ctx, value);
+          if (!value_entry) continue;
+          entry->SetNamedAutoIndexReference(HeapGraphEdge::kInternal,
+                                            value_entry);
+          ExtractValueReference(ctx, value_entry, value);
+        }
+      } break;
       case HANDLE_TYPE_CSTRING: {
 #ifdef ENABLE_COMPATIBLE_MM
         if (snapshot_->is_slot_snapshot()) {

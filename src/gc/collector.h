@@ -26,6 +26,7 @@ struct BCReaderState;
 struct JSToken;
 struct ValueBuffer;
 struct ValueSlotBuffer;
+struct ValueArray;
 
 force_inline void SetRunSlotHasFinalizer(LEPUSRuntime *rt, void *ptr) {
   rt->finalizerSet->Insert(ptr);
@@ -254,6 +255,7 @@ class Visitor {
                                 GCWorkStack &workStack) noexcept;
   static void GetValueSlotBufferPtr(ValueSlotBuffer *b,
                                     GCWorkStack &workStack) noexcept;
+  static void GetValueArrayPtr(ValueArray *a, GCWorkStack &workStack) noexcept;
 
   // visitor
   /* LEPUSValue with tag -> begin */
