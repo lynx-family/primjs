@@ -3361,6 +3361,9 @@ TEST_F(QjsDebugMethods, TestExpiredConsoleMessageCollectedAfterForcedGC) {
 
   LEPUS_RunGC(rt_);
   LEPUS_RunGC(rt_);
+  LEPUSContext* job_ctx;
+  while (LEPUS_ExecutePendingJob(rt_, &job_ctx) > 0) {
+  }
   ASSERT_TRUE(
       EvalScriptToBoolExpectNoException(ctx_,
                                         R"(

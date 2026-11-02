@@ -920,16 +920,17 @@ void JS_RaiseStartupHeapLimit_GC(LEPUSRuntime *rt, size_t limit) {
   rt->ros_->GetGCTracer()->RaiseStartupHeapLimit(limit);
 }
 
-/* return 0 if OK, < 0 if exception */
-int JS_EnqueueJob_GC(LEPUSContext *ctx, LEPUSJobFunc *job_func, int argc,
-                     LEPUSValueConst *argv) {
+/* Leaves the pending exception untouched on allocation failure. */
+QJS_STATIC BOOL enqueue_job_no_throw_gc(LEPUSContext *ctx,
+                                        LEPUSJobFunc *job_func, int argc,
+                                        LEPUSValueConst *argv) {
   LEPUSRuntime *rt = ctx->rt;
   JSJobEntry *e;
   int i;
 
-  e = static_cast<JSJobEntry *>(lepus_malloc_gc(
-      ctx, sizeof(*e) + argc * sizeof(LEPUSValue), ALLOC_TAG_WITHOUT_PTR));
-  if (!e) return -1;
+  e = static_cast<JSJobEntry *>(lepus_malloc_rt(
+      rt, sizeof(*e) + argc * sizeof(LEPUSValue), ALLOC_TAG_WITHOUT_PTR));
+  if (!e) return FALSE;
   e->ctx = ctx;
   e->job_func = job_func;
   e->argc = argc;
@@ -937,6 +938,16 @@ int JS_EnqueueJob_GC(LEPUSContext *ctx, LEPUSJobFunc *job_func, int argc,
     HeapObjStore(ctx, &e->argv[i], argv[i]);
   }
   list_add_tail(&e->link, &rt->job_list);
+  return TRUE;
+}
+
+/* return 0 if OK, < 0 if exception */
+int JS_EnqueueJob_GC(LEPUSContext *ctx, LEPUSJobFunc *job_func, int argc,
+                     LEPUSValueConst *argv) {
+  if (!enqueue_job_no_throw_gc(ctx, job_func, argc, argv)) {
+    LEPUS_ThrowOutOfMemory(ctx);
+    return -1;
+  }
   return 0;
 }
 
@@ -1261,6 +1272,30 @@ LEPUSValue JS_GetClassProto_GC(LEPUSContext *ctx, LEPUSClassID class_id) {
   return ctx->class_proto[class_id];
 }
 
+/* argv: callback, held value. Only uncatchable errors reach the job loop:
+   hosts drain jobs after unrelated calls and would misattribute the rest. */
+QJS_STATIC LEPUSValue js_finalization_registry_cleanup_job_gc(
+    LEPUSContext *ctx, int argc, LEPUSValueConst *argv) {
+  LEPUSValue ret = LEPUS_Call(ctx, argv[0], LEPUS_UNDEFINED, 1, &argv[1]);
+  if (!LEPUS_IsException(ret) ||
+      JS_IsUncatchableError_GC(ctx, ctx->rt->current_exception)) {
+    return ret;
+  }
+  LEPUS_GetException(ctx);
+  return LEPUS_UNDEFINED;
+}
+
+QJS_STATIC void drop_finalization_registry_cleanup_jobs_gc(LEPUSContext *ctx) {
+  struct list_head *el, *el1;
+  list_for_each_safe(el, el1, &ctx->rt->job_list) {
+    JSJobEntry *e = list_entry(el, JSJobEntry, link);
+    if (e->ctx == ctx &&
+        e->job_func == js_finalization_registry_cleanup_job_gc) {
+      list_del(&e->link);
+    }
+  }
+}
+
 void JS_FreeContext_GC(LEPUSContext *ctx) {
   js_free_shape_null(ctx->object_shape);
   js_free_shape_null(ctx->array_shape);
@@ -1268,6 +1303,7 @@ void JS_FreeContext_GC(LEPUSContext *ctx) {
   js_free_shape_null(ctx->non_strict_arguments_shape);
   list_del(&ctx->link);
   ctx->fg_ctx->ctx = nullptr;
+  drop_finalization_registry_cleanup_jobs_gc(ctx);
   if (ctx->napi_scope) {
     delete ctx->napi_scope;
     ctx->napi_scope = nullptr;
@@ -31218,12 +31254,16 @@ QJS_STATIC void reset_weak_ref_gc(LEPUSRuntime *rt, LEPUSObject *p) {
     if (wr->kind == WEAK_REF_KIND_FINALIZATION_REGISTRY) {
       FinalizationRegistryEntry *fin_node = wr->u.fin_node;
       FinalizationRegistryData *frd = fin_node->data;
+      // An unmarked frd means the registry dies in this cycle; reviving its
+      // callback would leave frd alive after its finalizer has run.
+      if (!rt->ros_->IsObjectMarked((address_t)frd - kHeaderSize)) continue;
       LEPUSContext *ctx = frd->fg_ctx->ctx;
       if (ctx) {
-        rt->collector_->GetVisitor()->AddObjectDuringFinalizer(
-            fin_node->held_value);
-        rt->collector_->GetVisitor()->AddObjectDuringFinalizer(frd->cbs);
-        LEPUS_Call(ctx, frd->cbs, LEPUS_UNDEFINED, 1, &fin_node->held_value);
+        // A marked frd keeps the callback and held values marked. GC runs
+        // inside allocations, so JS must not run here; OOM skips the callback.
+        LEPUSValueConst args[2] = {frd->cbs, fin_node->held_value};
+        enqueue_job_no_throw_gc(ctx, js_finalization_registry_cleanup_job_gc, 2,
+                                args);
       }
     }
   }

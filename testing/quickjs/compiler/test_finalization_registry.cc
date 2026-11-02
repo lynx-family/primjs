@@ -31,6 +31,12 @@ class FinalizationRegistryTest : public ::testing::Test {
     LEPUS_FreeRuntime(rt_);
   }
 
+  void DrainJobs() {
+    LEPUSContext* job_ctx;
+    while (LEPUS_ExecutePendingJob(rt_, &job_ctx) > 0) {
+    }
+  }
+
   LEPUSContext* ctx_;
   LEPUSRuntime* rt_;
 };
@@ -157,6 +163,7 @@ TEST_F(FinalizationRegistryTest, ClearWeakRefsBeforeCycleCleanupCallback) {
   LEPUS_FreeValue(ctx_, result);
 
   LEPUS_RunGC(rt_);
+  DrainJobs();
 
   const char* check = "cleanupCalled === true && cleanupResult === undefined";
   result =
@@ -188,438 +195,116 @@ class CollectionCleanupTest : public FinalizationRegistryTest {
                                    LEPUS_EVAL_TYPE_GLOBAL);
     ASSERT_FALSE(LEPUS_IsException(result)) << js_get_exception_string(ctx_);
     EXPECT_TRUE(LEPUS_ToBool(ctx_, result));
-    LEPUS_FreeValue(ctx_, result);
+    if (!LEPUS_IsGCMode(ctx_)) LEPUS_FreeValue(ctx_, result);
   }
 };
 
-TEST_F(CollectionCleanupTest, MapDeleteCommitsRecordBeforeCleanup) {
+// These releases used to run cleanup synchronously, letting it reshape objects
+// whose storage the releasing code was still using.
+TEST_F(CollectionCleanupTest, CleanupRunsOnlyFromJobQueue) {
+  Check(R"(
+    var calls = 0;
+    var receiver = {};
+    var registry = new FinalizationRegistry(function() {
+      calls++;
+      for (var i = 0; i < 64; i++) receiver['field' + i] = i;
+    });
+    function tracked() {
+      var target = {};
+      registry.register(target, 0);
+      return target;
+    }
+    receiver.slot = tracked();
+    delete receiver.slot;
+    receiver.slot = tracked();
+    Object.defineProperty(receiver, 'slot', { value: 0 });
+    var map = new Map([[0, tracked()]]);
+    map.delete(0);
+    var array = [tracked()];
+    array.length = 0;
+    forceGC();
+    calls === 0
+  )");
+  // Tracing GC does not promise to collect every target in one cycle.
+  if (LEPUS_IsGCMode(ctx_)) return;
+  DrainJobs();
+  Check("calls === 4 && Object.keys(receiver).length === 65");
+}
+
+TEST_F(CollectionCleanupTest, FreeContextDropsQueuedCleanup) {
+  Check(R"(
+    var registry = new FinalizationRegistry(function() {});
+    (function() { registry.register({}, 0); })();
+    forceGC();
+    true
+  )");
+  LEPUS_FreeContext(ctx_);
+  ctx_ = LEPUS_NewContext(rt_);
+  EXPECT_FALSE(LEPUS_IsJobPending(rt_));
+}
+
+// The target and the registry die in the same cycle sweep, in either order.
+TEST_F(CollectionCleanupTest, CycleSweepSkipsDyingCallback) {
   if (LEPUS_IsGCMode(ctx_)) GTEST_SKIP();
   Check(R"(
-    (function() {
-      var map = new Map();
-      var calls = 0;
-      var sawCommittedState = false;
-      var registry = new FinalizationRegistry(function() {
-        calls++;
-        sawCommittedState = map.size === 0 && !map.has('victim');
-        map.clear();
-        map.set('added', 42);
-      });
-      (function() {
-        var target = {};
-        registry.register(target, 0);
-        map.set('victim', target);
-      })();
-      var deleted = map.delete('victim');
-      return deleted && calls === 1 && sawCommittedState && map.size === 1 &&
-             map.get('added') === 42;
-    })()
+    var calls = 0;
+    function makeCycles(callbackFirst) {
+      var callback = callbackFirst ? function() { calls++; } : null;
+      var target = {};
+      target.self = target;
+      callback = callback || function() { calls++; };
+      var registry = new FinalizationRegistry(callback);
+      callback.registry = registry;
+      registry.register(target, 0);
+    }
+    makeCycles(true);
+    makeCycles(false);
+    forceGC();
+    true
   )");
+  DrainJobs();
+  Check("calls === 0");
 }
 
-TEST_F(CollectionCleanupTest, MapClearCommitsAllRecordsBeforeCleanup) {
+TEST_F(CollectionCleanupTest, CleanupTerminationReachesJobLoop) {
   if (LEPUS_IsGCMode(ctx_)) GTEST_SKIP();
   Check(R"(
-    (function() {
-      var map = new Map();
-      var calls = 0;
-      var sawCommittedState = false;
-      var nestedDeleteResult = true;
-      var registry = new FinalizationRegistry(function() {
-        calls++;
-        sawCommittedState = map.size === 0 && !map.has('first') &&
-                            !map.has('second');
-        nestedDeleteResult = map.delete('second');
-        map.set('added', 42);
-      });
-      (function() {
-        var target = {};
-        registry.register(target, 0);
-        map.set('first', target);
-        map.set('second', 2);
-      })();
-      map.clear();
-      return calls === 1 && sawCommittedState && !nestedDeleteResult &&
-             map.size === 1 && map.get('added') === 42;
-    })()
+    var registry = new FinalizationRegistry(function() { for (;;) {} });
+    (function() { registry.register({}, 0); })();
+    true
   )");
+  LEPUS_SetInterruptHandler(
+      rt_, [](LEPUSRuntime*, void*) { return 1; }, nullptr);
+  LEPUSContext* job_ctx;
+  EXPECT_EQ(-1, LEPUS_ExecutePendingJob(rt_, &job_ctx));
+  LEPUS_SetInterruptHandler(rt_, nullptr, nullptr);
+  LEPUS_FreeValue(ctx_, LEPUS_GetException(ctx_));
 }
 
-TEST_F(CollectionCleanupTest, SetClearCommitsAllRecordsBeforeCleanup) {
+TEST_F(CollectionCleanupTest, EnqueueFailureKeepsPendingException) {
   if (LEPUS_IsGCMode(ctx_)) GTEST_SKIP();
   Check(R"(
-    (function() {
-      var set = new Set();
-      var calls = 0;
-      var sawCommittedState = false;
-      var registry = new FinalizationRegistry(function() {
-        calls++;
-        sawCommittedState = set.size === 0;
-        set.clear();
-        set.add('added');
-      });
-      (function() {
-        var target = {};
-        registry.register(target, 0);
-        set.add(target);
-        set.add(2);
-      })();
-      set.clear();
-      return calls === 1 && sawCommittedState && set.size === 1 &&
-             set.has('added');
-    })()
+    var registry = new FinalizationRegistry(function() {});
+    globalThis.target = {};
+    registry.register(target, 0);
+    true
   )");
+  LEPUSValue global = LEPUS_GetGlobalObject(ctx_);
+  LEPUSValue target = LEPUS_GetPropertyStr(ctx_, global, "target");
+  LEPUS_SetPropertyStr(ctx_, global, "target", LEPUS_UNDEFINED);
+  LEPUS_FreeValue(ctx_, global);
+  LEPUS_Throw(ctx_, LEPUS_NewInt32(ctx_, 123));
+  size_t saved_limit = rt_->malloc_state.malloc_limit;
+  LEPUS_SetMemoryLimit(rt_, 0);
+  LEPUS_FreeValue(ctx_, target);  // last reference: queues cleanup
+  LEPUS_SetMemoryLimit(rt_, saved_limit);
+  int32_t exception = 0;
+  LEPUS_ToInt32(ctx_, &exception, LEPUS_GetException(ctx_));
+  EXPECT_EQ(123, exception);
+  EXPECT_FALSE(LEPUS_IsJobPending(rt_));
 }
 
-TEST_F(CollectionCleanupTest, WeakMapDeleteHidesRetiringValueFromCycleGC) {
-  if (LEPUS_IsGCMode(ctx_)) GTEST_SKIP();
-  Check(R"(
-    (function() {
-      var weakMap = new WeakMap();
-      var key = {};
-      var calls = 0;
-      var sawCommittedState = false;
-      var registry = new FinalizationRegistry(function() {
-        calls++;
-        sawCommittedState = !weakMap.has(key);
-        forceGC();
-        weakMap.set(key, { replacement: true });
-      });
-      (function() {
-        var target = {};
-        registry.register(target, 0);
-        weakMap.set(key, target);
-      })();
-      var deleted = weakMap.delete(key);
-      return deleted && calls === 1 && sawCommittedState && weakMap.has(key) &&
-             weakMap.get(key).replacement;
-    })()
-  )");
-}
-
-TEST_F(CollectionCleanupTest, MapClearKeepsIteratorRecordsAliveDuringCleanup) {
-  if (LEPUS_IsGCMode(ctx_)) GTEST_SKIP();
-  Check(R"(
-    (function() {
-      var map = new Map();
-      var iterator;
-      var calls = 0;
-      var sawCommittedState = false;
-      var iteratorDone = false;
-      var registry = new FinalizationRegistry(function() {
-        calls++;
-        sawCommittedState = map.size === 0;
-        iteratorDone = iterator.next().done;
-        map.set('added', 42);
-      });
-      (function() {
-        var target = {};
-        registry.register(target, 0);
-        map.set('first', target);
-        map.set('second', 2);
-      })();
-      iterator = map.values();
-      iterator.next();
-      map.clear();
-      return calls === 1 && sawCommittedState && iteratorDone &&
-             map.size === 1 && map.get('added') === 42;
-    })()
-  )");
-}
-
-TEST_F(CollectionCleanupTest, MapIteratorExhaustionCommitsBeforeCleanup) {
-  if (LEPUS_IsGCMode(ctx_)) GTEST_SKIP();
-  Check(R"(
-    (function() {
-      function check(method) {
-        var iterator;
-        var calls = 0;
-        var nestedResult;
-        var registry = new FinalizationRegistry(function() {
-          calls++;
-          nestedResult = iterator.next();
-        });
-        (function() {
-          var map = new Map([['key', 42]]);
-          // Trigger cleanup before records are freed so an incorrect nested
-          // yield remains safe to inspect.
-          registry.register(map, 0);
-          iterator = map[method]();
-          if (iterator.next().done) throw new Error('missing map entry');
-        })();
-        var result = iterator.next();
-        var repeated = iterator.next();
-        return calls === 1 && nestedResult.done === true &&
-               nestedResult.value === undefined && result.done === true &&
-               result.value === undefined && repeated.done === true &&
-               repeated.value === undefined;
-      }
-      return ['keys', 'values', 'entries', Symbol.iterator].every(check);
-    })()
-  )");
-}
-
-TEST_F(CollectionCleanupTest, SetIteratorExhaustionCommitsBeforeCleanup) {
-  if (LEPUS_IsGCMode(ctx_)) GTEST_SKIP();
-  Check(R"(
-    (function() {
-      function check(method) {
-        var iterator;
-        var calls = 0;
-        var nestedResult;
-        var registry = new FinalizationRegistry(function() {
-          calls++;
-          nestedResult = iterator.next();
-        });
-        (function() {
-          var set = new Set([42]);
-          registry.register(set, 0);
-          iterator = set[method]();
-          if (iterator.next().done) throw new Error('missing set entry');
-        })();
-        var result = iterator.next();
-        var repeated = iterator.next();
-        return calls === 1 && nestedResult.done === true &&
-               nestedResult.value === undefined && result.done === true &&
-               result.value === undefined && repeated.done === true &&
-               repeated.value === undefined;
-      }
-      return ['keys', 'values', 'entries', Symbol.iterator].every(check);
-    })()
-  )");
-}
-
-TEST_F(CollectionCleanupTest, ArrayIteratorExhaustionCommitsBeforeCleanup) {
-  if (LEPUS_IsGCMode(ctx_)) GTEST_SKIP();
-  Check(R"(
-    (function() {
-      function check(method) {
-        var iterator;
-        var calls = 0;
-        var nestedResult;
-        var registry = new FinalizationRegistry(function() {
-          calls++;
-          nestedResult = iterator.next();
-        });
-        (function() {
-          var array = [42];
-          registry.register(array, 0);
-          iterator = array[method]();
-          if (iterator.next().done) throw new Error('missing array element');
-        })();
-        var result = iterator.next();
-        var repeated = iterator.next();
-        return calls === 1 && nestedResult.done === true &&
-               nestedResult.value === undefined && result.done === true &&
-               result.value === undefined && repeated.done === true &&
-               repeated.value === undefined;
-      }
-      return ['keys', 'values', 'entries', Symbol.iterator].every(check);
-    })()
-  )");
-}
-
-TEST_F(FinalizationRegistryTest, DefinePropertyCommitsFlagsBeforeCleanup) {
-  if (LEPUS_IsGCMode(ctx_)) GTEST_SKIP();
-
-  // Only inspect property names in the callback, not the retiring value.
-  // This detects the old ordering without accessing invalid object storage.
-  const char* source = R"(
-    (function() {
-      var receiver = { slot: {} };
-      var calls = 0;
-      var sawCommittedFlags = false;
-      var registry = new FinalizationRegistry(function() {
-        calls++;
-        sawCommittedFlags = Object.keys(receiver).indexOf('slot') === -1;
-      });
-      registry.register(receiver.slot, 0);
-      Object.defineProperty(receiver, 'slot', {
-        value: 42, writable: false, enumerable: false, configurable: false
-      });
-      var descriptor = Object.getOwnPropertyDescriptor(receiver, 'slot');
-      return calls === 1 && sawCommittedFlags && descriptor.value === 42 &&
-             !descriptor.writable && !descriptor.enumerable &&
-             !descriptor.configurable;
-    })()
-  )";
-  LEPUSValue result = LEPUS_Eval(ctx_, source, strlen(source), "test.js",
-                                 LEPUS_EVAL_TYPE_GLOBAL);
-  ASSERT_FALSE(LEPUS_IsException(result)) << js_get_exception_string(ctx_);
-  EXPECT_TRUE(LEPUS_ToBool(ctx_, result));
-  LEPUS_FreeValue(ctx_, result);
-}
-
-class DefinePropertyCleanupTest : public FinalizationRegistryTest {
- protected:
-  void Check(const char* source) {
-    LEPUSValue result = LEPUS_Eval(ctx_, source, strlen(source), "test.js",
-                                   LEPUS_EVAL_TYPE_GLOBAL);
-    ASSERT_FALSE(LEPUS_IsException(result)) << js_get_exception_string(ctx_);
-    EXPECT_TRUE(LEPUS_ToBool(ctx_, result));
-    LEPUS_FreeValue(ctx_, result);
-  }
-};
-
-TEST_F(DefinePropertyCleanupTest, ReceiverMutationAfterCommit) {
-  if (LEPUS_IsGCMode(ctx_)) GTEST_SKIP();
-  Check(R"(
-    (function() {
-      for (var action = 0; action < 3; action++) {
-        var receiver = { slot: {} };
-        var calls = 0;
-        var consistent = false;
-        var registry = new FinalizationRegistry(function() {
-          calls++;
-          var d = Object.getOwnPropertyDescriptor(receiver, 'slot');
-          consistent = d.value === 42 && !d.writable && !d.enumerable &&
-                       d.configurable;
-          // Exercise ordinary growth only; no heap reclamation or forged data.
-          for (var i = 0; i < 64; i++) receiver['field' + i] = i;
-          if (action === 1) delete receiver.slot;
-          if (action === 2)
-            Object.defineProperty(receiver, 'slot', {
-              get: function() { return 73; }, configurable: true
-            });
-        });
-        registry.register(receiver.slot, 0);
-        Object.defineProperty(receiver, 'slot', {
-          value: 42, writable: false, enumerable: false, configurable: true
-        });
-        if (calls !== 1 || !consistent || receiver.field63 !== 63) return false;
-        if (action === 0 && receiver.slot !== 42) return false;
-        if (action === 1 && Object.prototype.hasOwnProperty.call(receiver, 'slot'))
-          return false;
-        if (action === 2 && receiver.slot !== 73) return false;
-      }
-      return true;
-    })()
-  )");
-}
-
-TEST_F(DefinePropertyCleanupTest, AccessorTransitions) {
-  if (LEPUS_IsGCMode(ctx_)) GTEST_SKIP();
-  Check(R"(
-    (function() {
-      // data -> accessor, accessor -> data, getter/setter replacements,
-      // including releasing two references to the same function.
-      for (var mode = 0; mode < 6; mode++) {
-        var receiver = {};
-        var newGet = function() { return 42; };
-        var newSet = function(v) {};
-        var calls = 0;
-        var consistent = true;
-        var registry = new FinalizationRegistry(function() {
-          calls++;
-          var d = Object.getOwnPropertyDescriptor(receiver, 'slot');
-          if (mode === 1 || mode === 5)
-            consistent = consistent && d.value === 42 && !d.writable;
-          else
-            consistent = consistent && d.get === newGet && d.set === newSet;
-          consistent = consistent && !d.enumerable && d.configurable;
-          for (var i = 0; i < 64; i++) receiver['field' + i] = i;
-        });
-        if (mode === 0) {
-          receiver.slot = {};
-          registry.register(receiver.slot, 0);
-        } else {
-          var oldGet = mode === 3 ? newGet : function() { return 1; };
-          var oldSet = mode === 2 ? newSet : function(v) {};
-          if (mode === 5) oldSet = oldGet;
-          Object.defineProperty(receiver, 'slot', {
-            get: oldGet, set: oldSet, enumerable: true, configurable: true
-          });
-          if (mode !== 3) registry.register(oldGet, 0);
-          if (mode !== 2 && mode !== 5) registry.register(oldSet, 1);
-          oldGet = null;
-          oldSet = null;
-        }
-        if (mode === 1 || mode === 5)
-          Object.defineProperty(receiver, 'slot', {
-            value: 42, writable: false, enumerable: false
-          });
-        else if (mode === 2)
-          Object.defineProperty(receiver, 'slot', {
-            get: newGet, enumerable: false
-          });
-        else if (mode === 3)
-          Object.defineProperty(receiver, 'slot', {
-            set: newSet, enumerable: false
-          });
-        else
-          Object.defineProperty(receiver, 'slot', {
-            get: newGet, set: newSet, enumerable: false
-          });
-        var expectedCalls = mode === 1 || mode === 4 ? 2 : 1;
-        if (!consistent || calls !== expectedCalls || receiver.slot !== 42)
-          return false;
-      }
-      return true;
-    })()
-  )");
-}
-
-TEST_F(DefinePropertyCleanupTest, MappedArgumentsTransitions) {
-  if (LEPUS_IsGCMode(ctx_)) GTEST_SKIP();
-  Check(R"(
-    (function() {
-      for (var mode = 0; mode < 3; mode++) {
-        var receiver;
-        var calls = 0;
-        var consistent = false;
-        var newGet = function() { return 42; };
-        var registry = new FinalizationRegistry(function() {
-          calls++;
-          var d = Object.getOwnPropertyDescriptor(receiver, '0');
-          consistent = !d.enumerable && d.configurable &&
-            (mode === 2 ? d.get === newGet :
-             d.value === 42 && d.writable === (mode === 0));
-          for (var i = 0; i < 64; i++) receiver['field' + i] = i;
-        });
-        (function(value) {
-          registry.register(value, 0);
-          receiver = arguments;
-        })({});
-        if (mode === 0)
-          Object.defineProperty(receiver, '0', { value: 42, enumerable: false });
-        else if (mode === 1)
-          Object.defineProperty(receiver, '0', {
-            value: 42, writable: false, enumerable: false
-          });
-        else
-          Object.defineProperty(receiver, '0', { get: newGet, enumerable: false });
-        if (calls !== 1 || !consistent || receiver[0] !== 42) return false;
-      }
-      return true;
-    })()
-  )");
-}
-
-TEST_F(DefinePropertyCleanupTest, SameValueRetainsOwnership) {
-  if (LEPUS_IsGCMode(ctx_)) GTEST_SKIP();
-  Check(R"(
-    (function() {
-      var calls = 0;
-      var registry = new FinalizationRegistry(function() { calls++; });
-      var receiver = { slot: {} };
-      registry.register(receiver.slot, 0);
-      Object.defineProperty(receiver, 'slot', { value: receiver.slot });
-      if (calls !== 0) return false;
-      delete receiver.slot;
-      if (calls !== 1) return false;
-      Object.defineProperty(receiver, 'slot', {
-        get: function() { return 42; }, configurable: true
-      });
-      var getter = Object.getOwnPropertyDescriptor(receiver, 'slot').get;
-      registry.register(getter, 0);
-      Object.defineProperty(receiver, 'slot', { get: getter });
-      getter = null;
-      if (calls !== 1 || receiver.slot !== 42) return false;
-      delete receiver.slot;
-      return calls === 2;
-    })()
-  )");
-}
+class DefinePropertyCleanupTest : public FinalizationRegistryTest {};
 
 TEST_F(DefinePropertyCleanupTest, ShapeAllocationFailurePreservesDataProperty) {
   if (LEPUS_IsGCMode(ctx_)) GTEST_SKIP();
