@@ -1980,6 +1980,7 @@ TEST_F(HeapTest, ShapeStoreMarksTargetDuringConcurrentMark) {
     GTEST_SKIP() << "shape barriers are specific to tracing GC";
   }
 
+#ifdef ENABLE_COMPATIBLE_MM
   constexpr char first_setter_source[] =
       "(function(object, value) { object.first = value; })";
   LEPUSValue first_setter =
@@ -2020,19 +2021,45 @@ TEST_F(HeapTest, ShapeStoreMarksTargetDuringConcurrentMark) {
   address_t shape_addr =
       reinterpret_cast<address_t>(shape) - ROS_GC::kHeaderSize;
 
-  ctx->rt->ros_->UnMarkObject(shape_addr);
-  EXPECT_FALSE(ctx->rt->ros_->IsObjectMarked(shape_addr));
+  // A real concurrent mark scans every hashed shape as a root, which would
+  // hide the barrier, so the store runs under a simulated marking state.
+  // Run a GC first: the buffer the barrier records into is set up by the
+  // first collection, and without it the recorded page is later unmapped
+  // with the wrong size. Then keep the GC from starting a phase: a
+  // concurrent sweep would free the shape once it is unmarked.
+  LEPUSRuntime *rt = ctx->rt;
+  rt->collector_->EnureConcurrentIsCompleted();
+  LEPUS_RunGC(rt);
+  rt->collector_->SetForbidGC();
+  rt->ros_->UnMarkObject(shape_addr);
+  bool marked_before_store = rt->ros_->IsObjectMarked(shape_addr);
 
   ctx->con_mark_state = true;
-  ctx->rt->con_mark_state = true;
+  rt->con_mark_state = true;
   LEPUSValueConst argv[] = {objects[2], LEPUS_NewInt32(ctx, 3)};
   LEPUSValue result = LEPUS_Call(ctx, second_setter, LEPUS_UNDEFINED, 2, argv);
-  ctx->rt->con_mark_state = false;
+  rt->con_mark_state = false;
   ctx->con_mark_state = false;
+  bool marked_after_store = rt->ros_->IsObjectMarked(shape_addr);
+
+  // Drop what the barrier recorded outside a real cycle. The next cycle would
+  // otherwise start with the shape marked, and so not trace from it, and
+  // would scan the recorded reference.
+  rt->collector_->ResetBitmap();
+  rt->ros_->GetPageGroups().ResetPageListIfNeeded();
+  rt->collector_->ResetForbidGC();
 
   ASSERT_FALSE(LEPUS_IsException(result));
-  EXPECT_TRUE(ctx->rt->ros_->IsObjectMarked(shape_addr));
+  EXPECT_FALSE(marked_before_store);
+  EXPECT_TRUE(marked_after_store);
   EXPECT_EQ(pending_object->shape, shape);
+
+  // The shape survives a GC and still describes the object.
+  LEPUS_RunGC(rt);
+  LEPUSValue value = LEPUS_GetPropertyStr(ctx, objects[2], "second");
+  ASSERT_TRUE(LEPUS_VALUE_IS_INT(value));
+  EXPECT_EQ(LEPUS_VALUE_GET_INT(value), 3);
+#endif
 }
 
 TEST_F(HeapTest, CompactAccessorAndAutoInitSurviveGC) {

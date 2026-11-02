@@ -654,21 +654,37 @@ class ScopedGCRawBuffer {
   GCRawBufferStack::State state_;
 };
 
+// Roots the values with a single handle, so the handle table does not grow
+// with the number of values.
 class ScopedLEPUSValueArray {
  public:
   explicit ScopedLEPUSValueArray(LEPUSContext *ctx)
-      : storage_(ctx), handles_(ctx->rt->ptr_handles), handle_scope_(ctx) {}
+      : storage_(ctx), array_{nullptr, 0}, handle_scope_(ctx) {
+    handle_scope_.PushHandle(&array_, HANDLE_TYPE_VALUE_ARRAY);
+  }
 
   ScopedLEPUSValueArray(const ScopedLEPUSValueArray &) = delete;
   ScopedLEPUSValueArray &operator=(const ScopedLEPUSValueArray &) = delete;
 
+  // Returns 'count' values set to undefined. Call at most once.
   LEPUSValue *Allocate(size_t count) {
-    return handles_->AllocateValueSlots(count);
+    DCHECK(!array_.values);
+    size_t allocation_count = count ? count : 1;
+    if (allocation_count > static_cast<size_t>(-1) / sizeof(LEPUSValue)) {
+      return nullptr;
+    }
+    auto *values = static_cast<LEPUSValue *>(
+        storage_.Allocate(allocation_count * sizeof(LEPUSValue)));
+    if (!values) return nullptr;
+    for (size_t i = 0; i < allocation_count; i++) values[i] = LEPUS_UNDEFINED;
+    array_.values = values;
+    array_.count = count;
+    return values;
   }
 
  private:
   ScopedGCRawBuffer storage_;
-  PtrHandles *handles_;
+  ValueArray array_;
   HandleScope handle_scope_;
 };
 
@@ -2657,7 +2673,11 @@ LEPUSValue JS_GetSeparableStringContentNotDup_GC(LEPUSContext *ctx,
       }
     }
   }
-  HeapObjStore(ctx, &separable_string->left_op, string_buffer_end(b));
+  LEPUSValue flat_content = string_buffer_end(b);
+  /* Keep the rope intact on failure (e.g. out of memory), so that it can
+     still be read once memory is available again. */
+  if (LEPUS_IsException(flat_content)) return LEPUS_EXCEPTION;
+  HeapObjStore(ctx, &separable_string->left_op, flat_content);
   separable_string->right_op = LEPUS_NULL;
   return JS_GetSeparableStringFlatContent(separable_string);
 }
@@ -20158,12 +20178,13 @@ static LEPUSValue JS_RegExpReplaceString(LEPUSContext *ctx,
   if (LEPUS_IsException(str_val)) goto fail;
   func_scope.PushHandle(&str_val, HANDLE_TYPE_LEPUS_VALUE);
   str = LEPUS_VALUE_GET_STRING(str_val);
+  /* lastIndex.valueOf() can recompile the regexp and free its bytecode, so
+     read the bytecode after it, as js_regexp_exec_internal() does. */
+  if (js_regexp_get_lastIndex(ctx, &last_index, this_val)) goto fail;
   re_bytecode = re->bytecode->u.str8;
   re_flags = lre_get_flags(re_bytecode);
   if ((re_flags & (LRE_FLAG_GLOBAL | LRE_FLAG_STICKY)) == 0) {
     last_index = 0;
-  } else {
-    if (js_regexp_get_lastIndex(ctx, &last_index, this_val)) goto fail;
   }
   capture_count = lre_get_capture_count(re_bytecode);
   if (capture_count * 2 <= (int)countof(capture_buf)) {
@@ -28744,7 +28765,6 @@ static LEPUSValue JS_StructuredClone(LEPUSContext *ctx, LEPUSValue src,
               ctx, kInitialMapBucketCount, kInitialMapEntryCapacity, is_weak);
           if (!table) goto fail;
           LEPUS_SetHeapOpaque(ctx, ret, table);
-          uint32_t source_entry_used = source_table->entry_used;
           LEPUSValue adder = JS_GetPropertyInternal_GC(
               ctx, ret, is_set ? JS_ATOM_add : JS_ATOM_set, ret, 0);
           if (unlikely(LEPUS_IsException(adder))) goto fail;
@@ -28753,33 +28773,54 @@ static LEPUSValue JS_StructuredClone(LEPUSContext *ctx, LEPUSValue src,
             LEPUS_ThrowTypeError(ctx, "set/add is not a function");
             goto fail1;
           }
-          for (uint32_t i = 0; i < source_entry_used; i++) {
-            JSLinkedHashMapEntry &entry =
-                JSLinkedHashMapEntries(source_table)[i];
-            if (!JSLinkedHashMapEntryIsLive(&entry)) continue;
-            LEPUSValue ms_key = JS_StructuredClone(ctx, entry.key, state);
-            if (LEPUS_IsException(ms_key)) {
+          {
+            /* Copy the entries before cloning them: the adder and nested
+               clones can run user code that changes or rebuilds the source
+               table, and a rebuilt table is no longer reachable. */
+            source_table = static_cast<JSLinkedHashMap *>(p->u.opaque);
+            uint32_t source_entry_used = source_table->entry_used;
+            ScopedLEPUSValueArray source_entries(ctx);
+            LEPUSValue *entries = source_entries.Allocate(
+                2 * static_cast<size_t>(source_entry_used));
+            if (!entries) {
+              LEPUS_ThrowOutOfMemory(ctx);
               goto fail1;
             }
-            HandleScope block_scope(ctx, &ms_key, HANDLE_TYPE_LEPUS_VALUE);
-            LEPUSValue ms_value = LEPUS_UNDEFINED;
-            block_scope.PushHandle(&ms_value, HANDLE_TYPE_LEPUS_VALUE);
-            LEPUSValue res;
-            if (!is_set) {
-              LEPUSValueConst args[2];
-              block_scope.PushLEPUSValueArrayHandle(args, 2);
-              args[0] = ms_key;
-              ms_value = JS_StructuredClone(ctx, entry.value, state);
-              if (LEPUS_IsException(ms_value)) {
+            uint32_t entry_count = 0;
+            for (uint32_t i = 0; i < source_entry_used; i++) {
+              JSLinkedHashMapEntry &entry =
+                  JSLinkedHashMapEntries(source_table)[i];
+              if (!JSLinkedHashMapEntryIsLive(&entry)) continue;
+              entries[2 * entry_count] = entry.key;
+              entries[2 * entry_count + 1] = entry.value;
+              entry_count++;
+            }
+            for (uint32_t i = 0; i < entry_count; i++) {
+              LEPUSValue ms_key =
+                  JS_StructuredClone(ctx, entries[2 * i], state);
+              if (LEPUS_IsException(ms_key)) {
                 goto fail1;
               }
-              args[1] = ms_value;
+              HandleScope block_scope(ctx, &ms_key, HANDLE_TYPE_LEPUS_VALUE);
+              LEPUSValue ms_value = LEPUS_UNDEFINED;
+              block_scope.PushHandle(&ms_value, HANDLE_TYPE_LEPUS_VALUE);
+              LEPUSValue res;
+              if (!is_set) {
+                LEPUSValueConst args[2];
+                block_scope.PushLEPUSValueArrayHandle(args, 2);
+                args[0] = ms_key;
+                ms_value = JS_StructuredClone(ctx, entries[2 * i + 1], state);
+                if (LEPUS_IsException(ms_value)) {
+                  goto fail1;
+                }
+                args[1] = ms_value;
 
-              res = JS_Call_GC(ctx, adder, ret, 2, args);
-            } else {
-              res = JS_Call_GC(ctx, adder, ret, 1, &ms_key);
+                res = JS_Call_GC(ctx, adder, ret, 2, args);
+              } else {
+                res = JS_Call_GC(ctx, adder, ret, 1, &ms_key);
+              }
+              if (unlikely(LEPUS_IsException(res))) goto fail1;
             }
-            if (unlikely(LEPUS_IsException(res))) goto fail1;
           }
           break;
         fail1:
@@ -30186,6 +30227,9 @@ void Visitor::GetHandlePtr(void *ptr, HandleType type,
       GetValueSlotBufferPtr(reinterpret_cast<ValueSlotBuffer *>(ptr),
                             workStack);
       break;
+    case HANDLE_TYPE_VALUE_ARRAY:
+      GetValueArrayPtr(reinterpret_cast<ValueArray *>(ptr), workStack);
+      break;
     case HANDLE_TYPE_CSTRING:
       workStack.push_back(
           (address_t)(GetCStringPtr(*(reinterpret_cast<char **>(ptr)))));
@@ -30287,6 +30331,13 @@ void Visitor::GetValueSlotBufferPtr(ValueSlotBuffer *b,
     if (b->slots[i].str) workStack.push_back((address_t)b->slots[i].str);
   }
   workStack.push_back((address_t)b->slots);
+}
+
+void Visitor::GetValueArrayPtr(ValueArray *a, GCWorkStack &workStack) noexcept {
+  DCHECK(a != nullptr);
+  for (size_t i = 0; i < a->count; i++) {
+    PushObjLEPUSValue(a->values[i], workStack);
+  }
 }
 
 void Visitor::PushObjLEPUSValue(LEPUSValue val,
@@ -31381,22 +31432,6 @@ PtrHandles::~PtrHandles() {
   if (handles) system_free(handles);
 }
 
-#ifdef ENABLE_COMPATIBLE_MM
-LEPUSValue *PtrHandles::AllocateValueSlots(size_t count) {
-  if (count > static_cast<size_t>(INT32_MAX)) return nullptr;
-  size_t allocation_count = count ? count : 1;
-  if (allocation_count > static_cast<size_t>(-1) / sizeof(LEPUSValue)) {
-    return nullptr;
-  }
-  auto *slots = static_cast<LEPUSValue *>(
-      rt_->raw_buffer_stack->Allocate(allocation_count * sizeof(LEPUSValue)));
-  if (!slots) return nullptr;
-  if (count == 0) slots[0] = LEPUS_UNDEFINED;
-  PushLEPUSValueArrayHandle(slots, static_cast<int>(count));
-  return slots;
-}
-#endif
-
 void PtrHandles::PushHandle(void *ptr, HandleType type) {
   if (UNLIKELY(handle_idx == handle_size - 1)) {
     ResizeHandles();
@@ -31480,7 +31515,9 @@ void __attribute__((noinline)) PtrHandles::ResizeHandles() {
   int new_size = handle_size * 2;
   HeapStruct *new_handles = static_cast<HeapStruct *>(
       system_realloc(handles, new_size * sizeof(HeapStruct)));
-  if (!new_handles) assert(false);
+  // Pushing a handle cannot fail, so stop here instead of crashing later on
+  // a null table in release builds.
+  if (!new_handles) abort();
   handles = new_handles;
   handle_size = new_size;
 }

@@ -3665,6 +3665,14 @@ typedef struct ValueSlotBuffer {
   size_t count;
 } ValueSlotBuffer;
 
+/* Temporary value arrays in tracing GC mode, such as the arguments built by
+   Function.prototype.apply. A HANDLE_TYPE_VALUE_ARRAY handle scans the first
+   'count' values as roots; 'values' itself is not a GC object. */
+typedef struct ValueArray {
+  LEPUSValue *values;
+  size_t count;
+} ValueArray;
+
 struct array_sort_context {
   LEPUSContext *ctx;
   int exception;

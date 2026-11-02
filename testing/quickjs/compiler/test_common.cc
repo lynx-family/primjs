@@ -3965,4 +3965,180 @@ TEST_F(CommonQjsTest, RegExpCompilerPreservesLegacyFormat) {
   if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, re);
 }
 
+// Adds a global collect() that runs a full GC.
+static void AddCollect(LEPUSContext* ctx) {
+  auto collect = LEPUS_NewCFunction(
+      ctx,
+      [](LEPUSContext* ctx, LEPUSValue, int32_t, LEPUSValue*) {
+        LEPUS_RunGC(LEPUS_GetRuntime(ctx));
+        return LEPUS_UNDEFINED;
+      },
+      "collect", 0);
+  ASSERT_GE(LEPUS_SetPropertyStr(ctx, ctx->global_obj, "collect", collect), 0);
+}
+
+static void EvalOrFail(LEPUSContext* ctx, const char* source) {
+  LEPUSValue ret = LEPUS_Eval(ctx, source, strlen(source), "test.js",
+                              LEPUS_EVAL_TYPE_GLOBAL);
+  ASSERT_FALSE(LEPUS_IsException(ret)) << js_get_exception_string(ctx);
+  if (!ctx->gc_enable) LEPUS_FreeValue(ctx, ret);
+}
+
+// Running out of memory while flattening a rope used to store the exception
+// as the rope's content, so reading the rope after catching the error
+// crashed.
+TEST_F(CommonQjsTest, SeparableStringFlattenOOMKeepsRope) {
+  EvalOrFail(ctx_, R"(
+    var piece = 'x'.repeat(1 << 16);
+    var rope = piece;
+    for (var i = 0; i < 255; i++) rope = rope + piece;
+    rope = rope + 'end';
+  )");
+  LEPUS_RunGC(rt_);
+  LEPUS_SetMemoryLimit(rt_, LEPUS_GetHeapSize(rt_) + (1 << 20));
+  EvalOrFail(ctx_, R"(
+    var outOfMemory = false;
+    try {
+      rope.indexOf('y');
+    } catch (e) {
+      outOfMemory = e instanceof InternalError;
+    }
+  )");
+  LEPUS_SetMemoryLimit(rt_, SIZE_MAX);
+  EvalOrFail(ctx_, R"(
+    if (!outOfMemory) throw new Error('flattening did not run out of memory');
+    var length = (256 << 16) + 3;
+    if (rope.length !== length || rope[0] !== 'x' ||
+        rope.charCodeAt(1) !== 0x78 || rope.slice(-3) !== 'end' ||
+        JSON.stringify(rope).length !== length + 2 ||
+        rope !== 'x'.repeat(256 << 16) + 'end') {
+      throw new Error('rope content changed after running out of memory');
+    }
+  )");
+}
+
+// RegExp replace used to read the bytecode before lastIndex.valueOf(), which
+// can recompile the regexp and free that bytecode.
+TEST_F(CommonQjsTest, RegExpReplaceReadsBytecodeAfterLastIndex) {
+  AddCollect(ctx_);
+  // An empty replacement takes the fast path in all builds.
+  EvalOrFail(ctx_, R"(
+    var re = /(a)(b)(c)(d)(e)(f)(g)(h)(i)/g;
+    Object.defineProperty(re, 'constructor', {
+      get() {
+        re.lastIndex = {
+          valueOf() {
+            re.compile('z', 'g');
+            collect();
+            return 0;
+          }
+        };
+        return RegExp;
+      }
+    });
+    var result = 'abcdefghi-abcdefghi-zz'.replace(re, '');
+    if (result !== 'abcdefghi-abcdefghi-')
+      throw new Error('replace used the old regexp: ' + result);
+  )");
+}
+
+// StructuredClone of a Map or Set used to keep reading the source table
+// while user code changed it, and in tracing GC mode after the table was
+// rebuilt and collected.
+TEST_F(CommonQjsTest, StructuredCloneMapSetCopiesEntriesFirst) {
+  JS_AddStructuredClone(ctx_);
+  AddCollect(ctx_);
+  EvalOrFail(ctx_, R"(
+    function mutate(source, add, remove) {
+      // Grow past the capacity so the table is rebuilt, then remove the rest.
+      for (var j = 0; j < 64; j++) add('n' + j);
+      for (var j = 1; j < 8; j++) remove('k' + j);
+      for (var j = 0; j < 64; j++) remove('n' + j);
+      var garbage = [];
+      for (var j = 0; j < 20000; j++) garbage.push({j: j, s: 'g' + j});
+      garbage = null;
+      collect();
+    }
+    function check(copy, expected) {
+      var entries = [];
+      copy.forEach(function (v, k) { entries.push(k + '=' + v); });
+      if (entries.join() !== expected)
+        throw new Error('unexpected clone: ' + entries.join());
+    }
+
+    var map = new Map();
+    for (var i = 0; i < 8; i++) map.set('k' + i, i);
+    var set = Map.prototype.set;
+    var mutated = false;
+    Map.prototype.set = function (k, v) {
+      if (this !== map && !mutated) {
+        mutated = true;
+        mutate(map, function (k) { set.call(map, k, 0); },
+               function (k) { map.delete(k); });
+        set.call(map, 'k0', 'changed');
+      }
+      return set.call(this, k, v);
+    };
+    var mapCopy;
+    try {
+      mapCopy = structuredClone(map);
+    } finally {
+      Map.prototype.set = set;
+    }
+    check(mapCopy, 'k0=0,k1=1,k2=2,k3=3,k4=4,k5=5,k6=6,k7=7');
+
+    var setSource = new Set();
+    for (var i = 0; i < 8; i++) setSource.add('k' + i);
+    var add = Set.prototype.add;
+    mutated = false;
+    Set.prototype.add = function (k) {
+      if (this !== setSource && !mutated) {
+        mutated = true;
+        mutate(setSource, function (k) { add.call(setSource, k); },
+               function (k) { setSource.delete(k); });
+      }
+      return add.call(this, k);
+    };
+    var setCopy;
+    try {
+      setCopy = structuredClone(setSource);
+    } finally {
+      Set.prototype.add = add;
+    }
+    check(setCopy, 'k0=k0,k1=k1,k2=k2,k3=k3,k4=k4,k5=k5,k6=k6,k7=k7');
+  )");
+}
+
+// Function.prototype.apply and Reflect.construct used to root every argument
+// with its own handle, and the handle table never shrinks.
+TEST_F(CommonQjsTest, ApplyArgumentsDoNotGrowHandleTable) {
+  if (!ctx_->gc_enable) GTEST_SKIP() << "handles are specific to tracing GC";
+  AddCollect(ctx_);
+  // The arguments are created by a getter and collected in between, so they
+  // must stay rooted while the argument list is built.
+  EvalOrFail(ctx_, R"(
+    var n = 1 << 16;
+    var args = new Proxy({}, {
+      get(target, key) {
+        if (key === 'length') return n;
+        var i = +key;
+        if (i % 8192 === 0) collect();
+        return {i: i};
+      }
+    });
+    function check(values) {
+      if (values.length !== n) throw new Error('length ' + values.length);
+      for (var i = 0; i < n; i++) {
+        if (values[i].i !== i) throw new Error('argument ' + i);
+      }
+    }
+    var pushed = [];
+    Array.prototype.push.apply(pushed, args);
+    check(pushed);
+    check(Reflect.construct(Array, args));
+    check(Reflect.apply(Array.of, null, args));
+  )");
+  EXPECT_LT(rt_->ptr_handles->GetHandleSize(), 1 << 16);
+}
+
 }  // namespace common_qjs_test
