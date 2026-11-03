@@ -5934,6 +5934,21 @@ QJS_STATIC void js_for_in_iterator_mark(LEPUSRuntime *rt, LEPUSValueConst val,
   JS_MarkValue_RC(rt, it->obj, mark_func);
 }
 
+/* Empty every WeakRef to a dying object and drop its records, so cleanup JS
+   that runs while the object is released cannot dereference it again. */
+QJS_STATIC void clear_weak_ref_targets(LEPUSRuntime *rt, LEPUSObject *p) {
+  WeakRefRecord *wr, **pwr = &p->first_weak_ref;
+  while ((wr = *pwr) != nullptr) {
+    if (wr->kind == WEAK_REF_KIND_WEAK_REF) {
+      wr->u.weak_ref->target = LEPUS_UNDEFINED;
+      *pwr = wr->next_weak_ref;
+      lepus_free_rt(rt, wr);
+    } else {
+      pwr = &wr->next_weak_ref;
+    }
+  }
+}
+
 QJS_STATIC void free_object_struct(LEPUSRuntime *rt, LEPUSObject *p) {
   int i;
   LEPUSClassFinalizer *finalizer;
@@ -5945,6 +5960,7 @@ QJS_STATIC void free_object_struct(LEPUSRuntime *rt, LEPUSObject *p) {
   if (sh == NULL) {
     return;
   }
+  clear_weak_ref_targets(rt, p);
   pr = get_shape_prop(sh);
   for (i = 0; i < sh->prop_count; i++) {
     free_property(rt, &p->prop[i], pr->flags);
@@ -6658,8 +6674,6 @@ gc_scan_incref_child2_label:
 
 QJS_STATIC void gc_clear_dead_weak_refs(LEPUSRuntime *rt) {
   struct list_head *el;
-  LEPUSObject *p;
-  WeakRefRecord *wr, **pwr;
 
   /* Clear WeakRef targets for the entire dead set before running any
      finalizers. A finalizer for one object must not be able to dereference
@@ -6667,17 +6681,7 @@ QJS_STATIC void gc_clear_dead_weak_refs(LEPUSRuntime *rt) {
      Detach each record at the same time so the WeakRef finalizer can safely
      release its WeakRefData before the target object is swept. */
   list_for_each(el, &rt->tmp_obj_list) {
-    p = list_entry(el, LEPUSObject, link);
-    pwr = &p->first_weak_ref;
-    while ((wr = *pwr) != nullptr) {
-      if (wr->kind == WEAK_REF_KIND_WEAK_REF) {
-        wr->u.weak_ref->target = LEPUS_UNDEFINED;
-        *pwr = wr->next_weak_ref;
-        lepus_free_rt(rt, wr);
-      } else {
-        pwr = &wr->next_weak_ref;
-      }
-    }
+    clear_weak_ref_targets(rt, list_entry(el, LEPUSObject, link));
   }
 }
 
@@ -8107,10 +8111,16 @@ int JS_SetPrototypeInternal(LEPUSContext *ctx, LEPUSValueConst obj,
     LEPUS_DupValue(ctx, proto_val);
   }
 
-  if (js_shape_prepare_update(ctx, p, NULL)) return -1;
+  if (js_shape_prepare_update(ctx, p, NULL)) {
+    if (proto) LEPUS_FreeValue(ctx, proto_val);
+    return -1;
+  }
+  /* Commit the new prototype first: releasing the old one can run cleanup JS
+     that reads the chain or reshapes p. */
   sh = p->shape;
-  if (sh->proto) LEPUS_FreeValue(ctx, LEPUS_MKPTR(LEPUS_TAG_OBJECT, sh->proto));
+  LEPUSObject *old_proto = sh->proto;
   sh->proto = proto;
+  if (old_proto) LEPUS_FreeValue(ctx, LEPUS_MKPTR(LEPUS_TAG_OBJECT, old_proto));
   return TRUE;
 }
 

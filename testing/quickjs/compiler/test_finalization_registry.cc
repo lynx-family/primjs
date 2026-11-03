@@ -711,4 +711,150 @@ TEST_F(DefinePropertyCleanupTest, ShapeAllocationFailurePreservesDataProperty) {
   LEPUS_FreeValue(ctx_, sibling);
 }
 
+TEST_F(FinalizationRegistryTest, SetPrototypeCommitsBeforeCleanup) {
+  if (LEPUS_IsGCMode(ctx_)) GTEST_SKIP();
+
+  const char* source = R"(
+    (function() {
+      function check(replacement, action, useReflect) {
+        var receiver = Object.create({ retired: true });
+        var nestedPrototype = { inherited: 73 };
+        var calls = 0;
+        var sawCommittedPrototype = false;
+        if (action === 1)
+          for (var i = 0; i < 64; i++) receiver['field' + i] = i;
+        var registry = new FinalizationRegistry(function() {
+          calls++;
+          sawCommittedPrototype = Object.getPrototypeOf(receiver) === replacement;
+          if (action === 1) {
+            for (var i = 0; i < 64; i++) delete receiver['field' + i];
+            receiver.afterCleanup = 42;
+          } else {
+            for (var i = 0; i < 64; i++) receiver['field' + i] = i;
+          }
+          if (action === 2) Object.setPrototypeOf(receiver, nestedPrototype);
+        });
+        registry.register(Object.getPrototypeOf(receiver), 0);
+        var result = useReflect ? Reflect.setPrototypeOf(receiver, replacement) :
+                                  Object.setPrototypeOf(receiver, replacement);
+        var expected = action === 2 ? nestedPrototype : replacement;
+        if (result !== (useReflect ? true : receiver) || calls !== 1 ||
+            !sawCommittedPrototype || Object.getPrototypeOf(receiver) !== expected)
+          return false;
+        if (receiver.retired !== undefined ||
+            receiver.inherited !== (expected === null ? undefined : expected.inherited))
+          return false;
+        if (action === 1)
+          return Object.keys(receiver).length === 1 && receiver.afterCleanup === 42;
+        return receiver.field63 === 63;
+      }
+      for (var action = 0; action < 3; action++) {
+        for (var useReflect = 0; useReflect < 2; useReflect++) {
+          if (!check({ inherited: 42 }, action, useReflect) ||
+              !check(null, action, useReflect)) return false;
+        }
+      }
+      return true;
+    })()
+  )";
+  LEPUSValue result = LEPUS_Eval(ctx_, source, strlen(source), "test.js",
+                                 LEPUS_EVAL_TYPE_GLOBAL);
+  ASSERT_FALSE(LEPUS_IsException(result)) << js_get_exception_string(ctx_);
+  EXPECT_TRUE(LEPUS_ToBool(ctx_, result));
+  LEPUS_FreeValue(ctx_, result);
+}
+
+class DeletePropertyCleanupTest : public DefinePropertyCleanupTest {};
+
+TEST_F(DeletePropertyCleanupTest, CommitsBeforeCleanupGrowsReceiver) {
+  if (LEPUS_IsGCMode(ctx_)) GTEST_SKIP();
+  Check(R"(
+    (function() {
+      // mode 0: data value, 1: accessor, 2: cleanup re-adds the key.
+      for (var mode = 0; mode < 3; mode++) {
+        var receiver = {};
+        var calls = 0;
+        var committed = false;
+        var registry = new FinalizationRegistry(function() {
+          calls++;
+          committed = !Object.prototype.hasOwnProperty.call(receiver, 'slot');
+          // Growth moves the property storage and rehashes every live slot.
+          for (var i = 0; i < 64; i++) receiver['field' + i] = i;
+          if (mode === 2) receiver.slot = 73;
+        });
+        var value = mode === 1 ? function() {} : new ArrayBuffer(8);
+        registry.register(value, 0);
+        if (mode === 1)
+          Object.defineProperty(receiver, 'slot', { get: value, configurable: true });
+        else
+          receiver.slot = value;
+        value = null;
+        if (!(delete receiver.slot) || calls !== 1 || !committed ||
+            receiver.field63 !== 63) return false;
+        var names = Object.getOwnPropertyNames(receiver);
+        var expected = mode === 2 ? 73 : undefined;
+        if (receiver.slot !== expected ||
+            names.length !== (mode === 2 ? 65 : 64)) return false;
+      }
+      return true;
+    })()
+  )");
+}
+
+TEST_F(DeletePropertyCleanupTest, DyingObjectIsNotRevivedByWeakRef) {
+  if (LEPUS_IsGCMode(ctx_)) GTEST_SKIP();
+  Check(R"(
+    (function() {
+      var weak;
+      var revived;
+      var calls = 0;
+      var registry = new FinalizationRegistry(function() {
+        calls++;
+        revived = weak.deref();
+      });
+      (function() {
+        var dying = { child: {} };
+        registry.register(dying.child, 0);
+        weak = new WeakRef(dying);
+      })();
+      return calls === 1 && revived === undefined && weak.deref() === undefined;
+    })()
+  )");
+}
+
+TEST_F(DeletePropertyCleanupTest, AccessorCleanupPreservesReaddedProperty) {
+  if (LEPUS_IsGCMode(ctx_)) GTEST_SKIP();
+  Check(R"(
+    (function() {
+      // Exercise two distinct functions, a shared function, and a setter only.
+      for (var mode = 0; mode < 3; mode++) {
+        var receiver = {};
+        var calls = 0;
+        var consistent = true;
+        var registry = new FinalizationRegistry(function() {
+          calls++;
+          consistent = consistent && (calls === 1 ?
+              !Object.prototype.hasOwnProperty.call(receiver, 'slot') :
+              receiver.slot === 73);
+          for (var i = 0; i < 64; i++) receiver['field' + i] = i;
+          receiver.slot = 73;
+        });
+        var getter = mode === 2 ? undefined : function() {};
+        var setter = mode === 1 ? getter : function(v) {};
+        if (getter) registry.register(getter, 0);
+        if (setter !== getter) registry.register(setter, 1);
+        Object.defineProperty(receiver, 'slot', {
+          get: getter, set: setter, configurable: true
+        });
+        getter = setter = null;
+        if (!Reflect.deleteProperty(receiver, 'slot') || !consistent ||
+            calls !== (mode === 0 ? 2 : 1) || receiver.slot !== 73 ||
+            receiver.field63 !== 63 || Object.keys(receiver).length !== 65)
+          return false;
+      }
+      return true;
+    })()
+  )");
+}
+
 }  // namespace finalization_registry_test
