@@ -4042,6 +4042,62 @@ TEST_F(CommonQjsTest, RegExpReplaceReadsBytecodeAfterLastIndex) {
   )");
 }
 
+// Recompiles 're' and allocates strings that can reuse the memory of its old
+// bytecode, then checks that a match of /(?<first>a)(?<second>b)/ still has
+// the group names of the old bytecode.
+static constexpr const char kRegExpExecRecompile[] = R"(
+  var keep = [];
+  function recompile(re) {
+    re.compile('q', 'g');
+    if (typeof collect === 'function') collect();
+    for (var n = 16; n < 160; n++)
+      for (var i = 0; i < 64; i++) keep.push('Z'.repeat(n) + i);
+  }
+  function check(m) {
+    var groups = JSON.stringify(m && m.groups);
+    if (groups !== '{"first":"a","second":"b"}')
+      throw new Error('exec read the freed bytecode: ' + groups);
+  }
+)";
+
+// RegExp exec used to read the group names from the bytecode after setting
+// lastIndex. Releasing the old lastIndex runs FinalizationRegistry cleanups,
+// which can recompile the regexp and free that bytecode.
+TEST_F(CommonQjsTest, RegExpExecKeepsBytecodeDuringFinalizer) {
+  if (LEPUS_IsGCMode(ctx_)) {
+    GTEST_SKIP() << "Requires synchronous reference-counted finalization";
+  }
+  EvalOrFail(ctx_, kRegExpExecRecompile);
+  EvalOrFail(ctx_, R"(
+    var re = new RegExp('(?<first>a)(?<second>b)', 'g');
+    var registry = new FinalizationRegistry(function() { recompile(re); });
+    (function() {
+      var lastIndex = { valueOf() { return 0; } };
+      registry.register(lastIndex, 0);
+      re.lastIndex = lastIndex;
+    })();
+    check(re.exec('ab'));
+  )");
+}
+
+// In builds that keep RegExp.$1, RegExp exec reads rx.constructor after
+// reading the group names' position in the bytecode. A getter can recompile
+// the regexp there.
+TEST_F(CommonQjsTest, RegExpExecKeepsBytecodeDuringConstructorGetter) {
+  AddCollect(ctx_);
+  EvalOrFail(ctx_, kRegExpExecRecompile);
+  EvalOrFail(ctx_, R"(
+    var re = new RegExp('(?<first>a)(?<second>b)');
+    Object.defineProperty(re, 'constructor', {
+      get() {
+        recompile(re);
+        return RegExp;
+      }
+    });
+    check(re.exec('ab'));
+  )");
+}
+
 // StructuredClone of a Map or Set used to keep reading the source table
 // while user code changed it, and in tracing GC mode after the table was
 // rebuilt and collected.

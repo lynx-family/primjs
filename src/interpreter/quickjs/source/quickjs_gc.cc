@@ -20025,7 +20025,12 @@ static LEPUSValue js_regexp_exec_internal(LEPUSContext *ctx,
   if (js_regexp_get_lastIndex(ctx, &last_index, this_val)) {
     return LEPUS_EXCEPTION;
   }
-  re_bytecode = re->bytecode->u.str8;
+  /* Code run below can recompile the regexp: a FinalizationRegistry cleanup
+     called by a GC that an allocation runs, or a constructor getter for
+     RegExp.$1. Keep the bytecode alive while it is used. */
+  LEPUSValue bc = LEPUS_MKPTR(LEPUS_TAG_STRING, re->bytecode);
+  func_scope.PushHandle(&bc, HANDLE_TYPE_LEPUS_VALUE);
+  re_bytecode = LEPUS_VALUE_GET_STRING(bc)->u.str8;
   re_flags = lre_get_flags(re_bytecode);
   if ((re_flags & (LRE_FLAG_GLOBAL | LRE_FLAG_STICKY)) == 0) {
     last_index = 0;
@@ -20159,8 +20164,8 @@ static LEPUSValue JS_RegExpReplaceString(LEPUSContext *ctx,
                                          LEPUSValueConst arg, JSString *rep) {
   JSRegExp *re = js_get_regexp(ctx, this_val, TRUE);
   JSString *str;
-  LEPUSValue str_val;
-  HandleScope func_scope(ctx);
+  LEPUSValue str_val, bc = LEPUS_UNDEFINED;
+  HandleScope func_scope(ctx, &bc, HANDLE_TYPE_LEPUS_VALUE);
   uint8_t *re_bytecode;
   int ret;
   uint8_t **capture, *str_buf, *capture_buf[16];
@@ -20181,7 +20186,10 @@ static LEPUSValue JS_RegExpReplaceString(LEPUSContext *ctx,
   /* lastIndex.valueOf() can recompile the regexp and free its bytecode, so
      read the bytecode after it, as js_regexp_exec_internal() does. */
   if (js_regexp_get_lastIndex(ctx, &last_index, this_val)) goto fail;
-  re_bytecode = re->bytecode->u.str8;
+  /* A GC run by the allocations below calls FinalizationRegistry cleanups,
+     which can recompile the regexp, so keep the bytecode alive. */
+  bc = LEPUS_MKPTR(LEPUS_TAG_STRING, re->bytecode);
+  re_bytecode = LEPUS_VALUE_GET_STRING(bc)->u.str8;
   re_flags = lre_get_flags(re_bytecode);
   if ((re_flags & (LRE_FLAG_GLOBAL | LRE_FLAG_STICKY)) == 0) {
     last_index = 0;

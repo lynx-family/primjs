@@ -40595,7 +40595,7 @@ QJS_STATIC LEPUSValue js_regexp_exec_internal(LEPUSContext *ctx,
                                               BOOL test_only) {
   JSRegExp *re = js_get_regexp(ctx, this_val, TRUE);
   JSString *str;
-  LEPUSValue str_val, obj, val, groups = LEPUS_UNDEFINED;
+  LEPUSValue str_val, obj, val, groups = LEPUS_UNDEFINED, bc;
   uint8_t *re_bytecode;
   int ret;
   uint8_t **capture, *str_buf, *capture_buf[16];
@@ -40612,7 +40612,12 @@ QJS_STATIC LEPUSValue js_regexp_exec_internal(LEPUSContext *ctx,
     LEPUS_FreeValue(ctx, str_val);
     return LEPUS_EXCEPTION;
   }
-  re_bytecode = re->bytecode->u.str8;
+  /* Code run after the match can recompile the regexp and free its bytecode:
+     a FinalizationRegistry cleanup run when the old lastIndex is released,
+     or a constructor getter for RegExp.$1. The group names are read from the
+     bytecode after that, so keep it alive. */
+  bc = LEPUS_DupValue(ctx, LEPUS_MKPTR(LEPUS_TAG_STRING, re->bytecode));
+  re_bytecode = LEPUS_VALUE_GET_STRING(bc)->u.str8;
   re_flags = lre_get_flags(re_bytecode);
   if ((re_flags & (LRE_FLAG_GLOBAL | LRE_FLAG_STICKY)) == 0) {
     last_index = 0;
@@ -40625,6 +40630,7 @@ QJS_STATIC LEPUSValue js_regexp_exec_internal(LEPUSContext *ctx,
     capture = static_cast<uint8_t **>(
         lepus_malloc(ctx, sizeof(capture[0]) * capture_count * 2));
     if (!capture) {
+      LEPUS_FreeValue(ctx, bc);
       LEPUS_FreeValue(ctx, str_val);
       return LEPUS_EXCEPTION;
     }
@@ -40659,6 +40665,7 @@ QJS_STATIC LEPUSValue js_regexp_exec_internal(LEPUSContext *ctx,
     /* the legacy RegExp.$1 properties below are not kept in these builds,
        so the match array is not needed */
     if (test_only) {
+      LEPUS_FreeValue(ctx, bc);
       LEPUS_FreeValue(ctx, str_val);
       if (capture != capture_buf) lepus_free(ctx, capture);
       return LEPUS_NewBool(ctx, TRUE);
@@ -40733,6 +40740,7 @@ QJS_STATIC LEPUSValue js_regexp_exec_internal(LEPUSContext *ctx,
     if (js_regexp_add_result_property(ctx, p, JS_ATOM_input, str_val) < 0)
       goto fail1;
   }
+  LEPUS_FreeValue(ctx, bc);
   LEPUS_FreeValue(ctx, regexp_obj);
   if (capture != capture_buf) lepus_free(ctx, capture);
   if (test_only) {
@@ -40744,6 +40752,7 @@ QJS_STATIC LEPUSValue js_regexp_exec_internal(LEPUSContext *ctx,
 fail:
   LEPUS_FreeValue(ctx, str_val);
 fail1:
+  LEPUS_FreeValue(ctx, bc);
   LEPUS_FreeValue(ctx, regexp_obj);
   LEPUS_FreeValue(ctx, groups);
   LEPUS_FreeValue(ctx, obj);
