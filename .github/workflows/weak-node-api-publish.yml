@@ -15,7 +15,7 @@ jobs:
       version: ${{ steps.check.outputs.version }}
     steps:
       - name: Download Source
-        uses: actions/checkout@v4.2.2
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           path: primjs
           # We only need the last 2 commits to compare package.json versions
@@ -59,12 +59,12 @@ jobs:
     environment: npm
     steps:
       - name: Download Source
-        uses: actions/checkout@v4.2.2
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
           path: primjs
 
       - name: Node Setup
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '24.14.1'
           registry-url: 'https://registry.npmjs.org'
