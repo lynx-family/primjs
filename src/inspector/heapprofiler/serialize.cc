@@ -257,6 +257,10 @@ void HeapSnapshotJSONSerializer::SerializeSnapshot() {
   writer_->AddNumber(snapshot_->edges().size());
   writer_->AddString(",\"trace_function_count\":");
   writer_->AddNumber(0);
+  if (snapshot_->is_slot_snapshot()) {
+    writer_->AddString(",\"slot\":");
+    writer_->AddNumber(snapshot_->slot());
+  }
 }
 
 void HeapSnapshotJSONSerializer::SerializeStrings() const {

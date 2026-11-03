@@ -923,11 +923,10 @@ TEST_P(NativeSlotHeapProfiler, ConsoleClearingRequiresExplicitFlag) {
         SCOPED_TRACE(flags);
         Eval(a, R"(
         globalThis.kept = {};
-        globalThis.onlyConsole = {};
+        globalThis.onlyConsole = {onlyConsoleMarker: "console-only"};
         console.log(kept, onlyConsole);
       )");
         const auto kept = Id(profiler, Object("kept"));
-        const auto only_console = Id(profiler, Object("onlyConsole"));
         Eval(b, "onlyConsole = null;");
         auto& console = ctx->debugger_info->console;
         const auto generation = console.generations[0];
@@ -935,8 +934,18 @@ TEST_P(NativeSlotHeapProfiler, ConsoleClearingRequiresExplicitFlag) {
         auto* snapshot = profiler.TakeSnapshot(ctx, nullptr, slot, flags);
         ASSERT_NE(snapshot, nullptr);
         EXPECT_NE(snapshot->GetEntryById(kept), nullptr);
-        EXPECT_EQ(snapshot->GetEntryById(only_console) == nullptr,
-                  clear != 0 || (options & kSummarize) != 0);
+        // Released addresses may be reused; identify the object's property.
+        bool found_marker = false;
+        for (auto& entry : snapshot->entries()) {
+          for (uint32_t i = 0; i < entry.children_count(); ++i) {
+            auto* edge = entry.child(i);
+            if (edge->type() == HeapGraphEdge::kProperty &&
+                edge->name() == "onlyConsoleMarker") {
+              found_marker = true;
+            }
+          }
+        }
+        EXPECT_EQ(found_marker, clear == 0 && !(options & kSummarize));
         const int32_t expected_length = clear ? 0 : 1;
         EXPECT_EQ(console.length, expected_length);
         EXPECT_EQ(console.head, 0);

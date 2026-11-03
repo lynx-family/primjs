@@ -2249,11 +2249,21 @@ void LEPUS_FreeRuntime(LEPUSRuntime *rt) {
 #define realloc(p, s) realloc_is_forbidden(p, s)
 
 #if defined(EMSCRIPTEN)
+#ifndef __has_feature
+#define __has_feature(feature) 0
+#endif
+
 uintptr_t get_thread_stack_limit() {
+  // ASan-instrumented frames need more stack to construct the overflow error.
+#if defined(__SANITIZE_ADDRESS__) || __has_feature(address_sanitizer)
+  constexpr uintptr_t stack_reserve_size = 256 * 1024;
+#else
+  constexpr uintptr_t stack_reserve_size = 52 * 1024;
+#endif
 #if defined(_WIN32)
   MEMORY_BASIC_INFORMATION mem;
   VirtualQuery(&mem, &mem, sizeof mem);
-  return (uintptr_t)(mem.AllocationBase) + (52 * 1024);
+  return (uintptr_t)(mem.AllocationBase) + stack_reserve_size;
 #else
   uintptr_t stack_limit = 0;
   void *stack;
@@ -2262,14 +2272,14 @@ uintptr_t get_thread_stack_limit() {
 #if defined(APPLE) || defined(__APPLE__)
   stack = pthread_get_stackaddr_np(tid);
   stack_size = pthread_get_stacksize_np(tid);
-  stack_limit = reinterpret_cast<uintptr_t>(stack) - stack_size +
-                (52 * 1024);  // reserve 52k
+  stack_limit =
+      reinterpret_cast<uintptr_t>(stack) - stack_size + stack_reserve_size;
 #elif defined(QJS_PTHREAD_STACKADDR_NP_RETURNS_LOW_ADDR)
   stack = pthread_get_stackaddr_np(tid);
   auto stack_size_np = pthread_get_stacksize_np(tid);
   if (stack != nullptr && stack_size_np > 0) {
     uintptr_t stack_size_value = static_cast<uintptr_t>(stack_size_np);
-    uintptr_t reserve_size = 52 * 1024;
+    uintptr_t reserve_size = stack_reserve_size;
     if (stack_size_value < reserve_size) {
       reserve_size = stack_size_value;
     }
@@ -2279,8 +2289,7 @@ uintptr_t get_thread_stack_limit() {
     if (pthread_getattr_np(tid, &attr) == 0) {
       if (pthread_attr_getstack(&attr, &stack, &stack_size) == 0 &&
           stack != nullptr && stack_size > 0) {
-        stack_limit =
-            reinterpret_cast<uintptr_t>(stack) + (52 * 1024);  // reserve 52k
+        stack_limit = reinterpret_cast<uintptr_t>(stack) + stack_reserve_size;
       }
       pthread_attr_destroy(&attr);
     }
@@ -2289,8 +2298,7 @@ uintptr_t get_thread_stack_limit() {
   pthread_attr_t attr;
   pthread_getattr_np(tid, &attr);
   pthread_attr_getstack(&attr, &stack, &stack_size);
-  stack_limit =
-      reinterpret_cast<uintptr_t>(stack) + (52 * 1024);  // reserve 52k
+  stack_limit = reinterpret_cast<uintptr_t>(stack) + stack_reserve_size;
   pthread_attr_destroy(&attr);
 #endif
   return stack_limit;
