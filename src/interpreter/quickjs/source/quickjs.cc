@@ -9351,14 +9351,17 @@ redo:
       } else {
         sh->hash_table[h1] = pr->hash_next;
       }
-      /* free the entry */
+      /* Detach the entry before releasing it: finalizers may reenter JS and
+         move the object's shape or property storage. */
       pr1 = &p->prop[h - 1];
-      free_property(ctx->rt, pr1, pr->flags);
-      LEPUS_FreeAtom(ctx, pr->atom);
+      JSProperty old_prop = *pr1;
+      int prop_flags = pr->flags;
       /* put default values */
       pr->flags = 0;
       pr->atom = JS_ATOM_NULL;
       pr1->u.value = LEPUS_UNDEFINED;
+      LEPUS_FreeAtom(ctx, atom);
+      free_property(ctx->rt, &old_prop, prop_flags);
       return TRUE;
     }
     lpr = pr;

@@ -419,6 +419,60 @@ TEST_F(CollectionCleanupTest, ArrayIteratorExhaustionCommitsBeforeCleanup) {
   )");
 }
 
+TEST_F(FinalizationRegistryTest, DeletePropertyCommitsBeforeCleanup) {
+  if (LEPUS_IsGCMode(ctx_)) GTEST_SKIP();
+
+  const char* source = R"(
+    (function() {
+      for (var mode = 0; mode < 3; mode++) {
+        for (var recreate = 0; recreate < 2; recreate++) {
+          var receiver = { keep: 17 };
+          var calls = 0;
+          var consistent = true;
+          var registry = new FinalizationRegistry(function() {
+            calls++;
+            var hasSlot = Object.getOwnPropertyNames(receiver).indexOf('slot') >= 0;
+            consistent = consistent && hasSlot === (recreate === 1 && calls > 1);
+            for (var i = 0; i < 64; i++) receiver['field' + calls + '_' + i] = i;
+            if (recreate === 1 && calls === 1) receiver.slot = 42;
+          });
+          if (mode === 0) {
+            receiver.slot = new ArrayBuffer(8);
+            registry.register(receiver.slot, 0);
+          } else {
+            var getter = function() { return 1; };
+            var setter = mode === 1 ? function(v) {} : getter;
+            Object.defineProperty(receiver, 'slot', {
+              get: getter, set: setter, enumerable: true, configurable: true
+            });
+            registry.register(getter, 0);
+            if (mode === 1) registry.register(setter, 1);
+            getter = null;
+            setter = null;
+          }
+          if (!delete receiver.slot || !consistent ||
+              calls !== (mode === 1 ? 2 : 1)) return false;
+          var names = Object.getOwnPropertyNames(receiver);
+          var descriptor = Object.getOwnPropertyDescriptor(receiver, 'slot');
+          if (names.length !== 1 + calls * 64 + recreate || receiver.keep !== 17 ||
+              receiver.field1_63 !== 63) return false;
+          if (recreate === 0 && (descriptor !== undefined || 'slot' in receiver))
+            return false;
+          if (recreate === 1 && (!descriptor || descriptor.value !== 42 ||
+              !descriptor.writable || !descriptor.enumerable ||
+              !descriptor.configurable)) return false;
+        }
+      }
+      return true;
+    })()
+  )";
+  LEPUSValue result = LEPUS_Eval(ctx_, source, strlen(source), "test.js",
+                                 LEPUS_EVAL_TYPE_GLOBAL);
+  ASSERT_FALSE(LEPUS_IsException(result)) << js_get_exception_string(ctx_);
+  EXPECT_TRUE(LEPUS_ToBool(ctx_, result));
+  LEPUS_FreeValue(ctx_, result);
+}
+
 TEST_F(FinalizationRegistryTest, DefinePropertyCommitsFlagsBeforeCleanup) {
   if (LEPUS_IsGCMode(ctx_)) GTEST_SKIP();
 
