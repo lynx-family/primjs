@@ -7802,7 +7802,11 @@ void build_backtrace(LEPUSContext *ctx, LEPUSValueConst error_obj,
 
   LEPUSStackFrame *sf;
   LEPUSValue str = LEPUS_UNDEFINED;
+  /* error_obj is often the pending exception. An allocation failing below
+     replaces that exception, which would release this object. */
+  LEPUSValue error = LEPUS_DupValue(ctx, error_obj);
   HandleScope func_scope(ctx, &str, HANDLE_TYPE_LEPUS_VALUE);
+  func_scope.PushHandle(&error, HANDLE_TYPE_LEPUS_VALUE);
   DynBuf dbuf;
 
   ctx->rt->exception_needs_backtrace = FALSE;
@@ -7833,16 +7837,17 @@ void build_backtrace(LEPUSContext *ctx, LEPUSValueConst error_obj,
     }
     dbuf_putc(&dbuf, '\n');
     str = LEPUS_NewString(ctx, filename);
-    LEPUS_DefinePropertyValue(ctx, error_obj, JS_ATOM_fileName, str,
+    if (LEPUS_IsException(str)) str = LEPUS_NULL;
+    LEPUS_DefinePropertyValue(ctx, error, JS_ATOM_fileName, str,
                               LEPUS_PROP_WRITABLE | LEPUS_PROP_CONFIGURABLE);
-    LEPUS_DefinePropertyValue(ctx, error_obj, JS_ATOM_lineNumber,
+    LEPUS_DefinePropertyValue(ctx, error, JS_ATOM_lineNumber,
                               LEPUS_NewInt32(ctx, line_num),
                               LEPUS_PROP_WRITABLE | LEPUS_PROP_CONFIGURABLE);
   }
 
-  get_backtrace(ctx, &dbuf, is_debug_mode, error_obj, cur_pc, backtrace_flags);
+  get_backtrace(ctx, &dbuf, is_debug_mode, error, cur_pc, backtrace_flags);
 #ifdef BUILD_ASYNC_STACK
-  build_async_backtrace(ctx, cur_pc, &dbuf, is_debug_mode, error_obj);
+  build_async_backtrace(ctx, cur_pc, &dbuf, is_debug_mode, error);
 #endif
   dbuf_putc(&dbuf, '\0');
   if (dbuf_error(&dbuf))
@@ -7850,7 +7855,8 @@ void build_backtrace(LEPUSContext *ctx, LEPUSValueConst error_obj,
   else
     str = LEPUS_NewString(ctx, (char *)dbuf.buf);
   if (!ctx->gc_enable) dbuf_free(&dbuf);
-  LEPUS_DefinePropertyValue(ctx, error_obj, JS_ATOM_stack, str,
+  if (LEPUS_IsException(str)) str = LEPUS_NULL;
+  LEPUS_DefinePropertyValue(ctx, error, JS_ATOM_stack, str,
                             LEPUS_PROP_WRITABLE | LEPUS_PROP_CONFIGURABLE);
 
   // <Primjs begin>
@@ -7861,6 +7867,7 @@ void build_backtrace(LEPUSContext *ctx, LEPUSValueConst error_obj,
   }
 #endif
   // <Primjs end>
+  if (!ctx->gc_enable) LEPUS_FreeValue(ctx, error);
 }
 
 void get_backtrace(LEPUSContext *ctx, DynBuf *dbuf, BOOL is_debug_mode,
