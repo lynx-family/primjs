@@ -11718,6 +11718,9 @@ static __exception int js_parse_for_in_of(JSParseState *s, int label_name,
 
   pos_expr = s->cur_func->byte_code.size;
   emit_label(s, label_expr);
+  /* The loop state is not on the stack until OP_for_*_start, so a yield in the
+     initializer or the RHS expression must not drop it in emit_return(). */
+  break_entry.drop_count = 0;
   if (s->token.val == '=') {
     /* XXX: potential scoping issue if inside `with` statement */
     has_initializer = TRUE;
@@ -11768,10 +11771,11 @@ static __exception int js_parse_for_in_of(JSParseState *s, int label_name,
     /* Keep the GC parser in sync with quickjs.cc: the RHS expression may
        yield before the iterator record exists on the stack. */
     break_entry.has_iterator = TRUE;
-    break_entry.drop_count += 2;
+    break_entry.drop_count = 3;
     /* on stack: enum_rec */
   } else {
     emit_op(s, OP_for_in_start);
+    break_entry.drop_count = 1;
     /* on stack: enum_obj */
   }
   emit_goto(s, OP_goto, label_cont);

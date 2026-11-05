@@ -24121,6 +24121,9 @@ QJS_STATIC __exception int js_parse_for_in_of(JSParseState *s, int label_name,
 
   pos_expr = s->cur_func->byte_code.size;
   emit_label(s, label_expr);
+  /* The loop state is not on the stack until OP_for_*_start, so a yield in the
+     initializer or the RHS expression must not drop it in emit_return(). */
+  break_entry.drop_count = 0;
   if (s->token.val == '=') {
     /* XXX: potential scoping issue if inside `with` statement */
     has_initializer = TRUE;
@@ -24174,10 +24177,11 @@ QJS_STATIC __exception int js_parse_for_in_of(JSParseState *s, int label_name,
        the iterator cleanup metadata until after OP_for_of_start so
        emit_return() does not try to close a non-existent iterator. */
     break_entry.has_iterator = TRUE;
-    break_entry.drop_count += 2;
+    break_entry.drop_count = 3;
     /* on stack: enum_rec */
   } else {
     emit_op(s, OP_for_in_start);
+    break_entry.drop_count = 1;
     /* on stack: enum_obj */
   }
   emit_goto(s, OP_goto, label_cont);
@@ -30355,16 +30359,16 @@ QJS_STATIC __exception int compute_stack_size_rec(LEPUSContext *ctx,
 #if 0
         printf("%5d: %d\n", pos, stack_len);
 #endif
-    if (s->stack_level_tab[pos] != 0xffff) {
-      /* already explored: check that the stack size is consistent */
-      if (s->stack_level_tab[pos] != stack_len) {
-        s->stack_level_tab[pos] = max_int(stack_len, s->stack_level_tab[pos]);
-      } else {
-        return 0;
-      }
-    } else {
-      s->stack_level_tab[pos] = stack_len;
+    /* A finally block can be reached at several stack depths because
+       emit_return() does not count the operands below a yield. Only a deeper
+       stack can raise the maximum, and revisiting a loop at a shallower depth
+       would never end, so explore this position again only when it is deeper.
+     */
+    if (s->stack_level_tab[pos] != 0xffff &&
+        stack_len <= s->stack_level_tab[pos]) {
+      return 0;
     }
+    s->stack_level_tab[pos] = stack_len;
 
     op = bc_buf[pos];
     if (op == 0 || op >= OP_COUNT) {

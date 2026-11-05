@@ -963,6 +963,263 @@ TEST_F(CommonQjsTest, YieldInForOfHeadDoesNotUnderflowStack) {
   if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
 }
 
+TEST_F(CommonQjsTest, YieldInForHeadUnderTryDoesNotUnderflowStack) {
+  std::string src = R"(
+    let log = [];
+
+    // Runs to completion, then checks return() while suspended in the head.
+    function check(makeGen, expected) {
+      log = [];
+      let iter = makeGen();
+      Assert(iter.next().value === 1);
+      Assert(iter.next().done === true);
+      Assert(log.join() === expected);
+
+      log = [];
+      iter = makeGen();
+      Assert(iter.next().value === 1);
+      const result = iter.return(5);
+      Assert(result.done === true);
+      Assert(result.value === 5);
+      return log.join();
+    }
+
+    Assert(check(function* () {
+      try {
+        for (const x of (yield 1, ["a"])) log.push(x);
+      } catch (e) {
+        log.push("catch");
+      }
+    }, "a") === "");
+
+    Assert(check(function* () {
+      try {
+        for (const k in (yield 1, { a: 1 })) log.push(k);
+      } catch (e) {
+        log.push("catch");
+      }
+    }, "a") === "");
+
+    Assert(check(function* () {
+      try {
+        for (var k = yield 1 in { a: 1 }) log.push(k);
+      } catch (e) {
+        log.push("catch");
+      }
+    }, "a") === "");
+
+    Assert(check(function* () {
+      try {
+        for (const x of (yield 1, ["a"])) log.push(x);
+      } finally {
+        log.push("finally");
+      }
+    }, "a,finally") === "finally");
+
+    Assert(check(function* () {
+      try {
+        for (const k in (yield 1, { a: 1 })) log.push(k);
+      } finally {
+        log.push("finally");
+      }
+    }, "a,finally") === "finally");
+
+    // The yield is nested in a call with operands already on the stack.
+    Assert(check(function* () {
+      const pair = (a, b) => [a, b];
+      try {
+        for (const x of pair("a", yield 1)) log.push(x === undefined);
+      } catch (e) {
+        log.push("catch");
+      }
+    }, "false,true") === "");
+
+    // A loop outside the try has to be closed once, after the try is left.
+    function outer() {
+      return {
+        [Symbol.iterator]() { return this; },
+        next() { return { value: 0, done: log.length !== 0 }; },
+        return() { log.push("close"); return {}; },
+      };
+    }
+
+    Assert(check(function* () {
+      for (const y of outer()) {
+        try {
+          for (const x of (yield 1, ["a"])) log.push(x);
+        } catch (e) {
+          log.push("catch");
+        }
+      }
+    }, "a") === "close");
+
+    Assert(check(function* () {
+      for (const y of outer()) {
+        try {
+          for (const x of (yield 1, ["a"])) log.push(x);
+        } finally {
+          log.push("finally");
+        }
+      }
+    }, "a,finally") === "finally,close");
+
+    // yield* and async generators emit their own returns.
+    function* inner() { yield 1; return ["a"]; }
+    Assert(check(function* () {
+      try {
+        for (const x of yield* inner()) log.push(x);
+      } catch (e) {
+        log.push("catch");
+      }
+    }, "a") === "");
+
+    async function* asyncFor() {
+      try {
+        for await (const x of (yield 1, ["a"])) log.push(x);
+      } catch (e) {
+        log.push("catch");
+      }
+    }
+    async function* asyncForIn() {
+      try {
+        for (const k in (yield 1, { a: 1 })) log.push(k);
+      } finally {
+        log.push("finally");
+      }
+    }
+    Assert(typeof asyncFor === "function");
+    Assert(typeof asyncForIn === "function");
+  )";
+
+  auto ret = LEPUS_Eval(ctx_, src.c_str(), src.length(), "test.js",
+                        LEPUS_EVAL_TYPE_GLOBAL);
+  ASSERT_TRUE(!LEPUS_IsException(ret));
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+}
+
+TEST_F(CommonQjsTest, FinallyLoopReachedAtDifferentStackDepths) {
+  std::string src = R"(
+    const log = [];
+    const pair = (a, b) => [a, b];
+
+    // Leaves through return() at each yield and by running to completion.
+    function check(makeGen, yields, expected) {
+      for (let stop = 1; stop <= yields; stop++) {
+        log.length = 0;
+        const iter = makeGen();
+        for (let i = 0; i < stop; i++) Assert(iter.next().done === false);
+        const result = iter.return(5);
+        Assert(result.done === true);
+        Assert(result.value === 5);
+        Assert(log.join() === expected);
+      }
+
+      log.length = 0;
+      const iter = makeGen();
+      while (!iter.next().done) {}
+      Assert(log.join() === expected);
+    }
+
+    // The later yield has more operands below it than the earlier one.
+    check(function* () {
+      try {
+        yield 1;
+        pair(1, yield 2);
+      } finally {
+        for (let i = 0; i < 2; i++) log.push(i);
+      }
+    }, 2, "0,1");
+
+    check(function* () {
+      try {
+        yield 1;
+        pair(1, yield 2);
+      } finally {
+        for (const x of [0, 1]) log.push(x);
+      }
+    }, 2, "0,1");
+
+    check(function* () {
+      try {
+        yield 1;
+        pair(1, yield 2);
+      } finally {
+        let i = 0;
+        while (i < 2) log.push(i++);
+      }
+    }, 2, "0,1");
+
+    check(function* () {
+      try {
+        pair(1, yield 1);
+        pair(1, pair(2, pair(3, yield 2)));
+      } finally {
+        for (const x of [0, 1]) for (const y of [x]) log.push(y);
+      }
+    }, 2, "0,1");
+
+    // The same depths in the opposite order.
+    check(function* () {
+      try {
+        pair(1, pair(2, pair(3, yield 1)));
+        yield 2;
+      } finally {
+        for (const x of [0, 1]) for (const y of [x]) log.push(y);
+      }
+    }, 2, "0,1");
+
+    // A yield in a loop head leaves the stack shallower than a later operand.
+    check(function* () {
+      try {
+        for (const x of (yield 1, [])) {}
+        pair(1, pair(2, yield 2));
+      } finally {
+        for (let i = 0; i < 2; i++) log.push(i);
+      }
+    }, 2, "0,1");
+
+    // Each finally is reached at its own set of depths.
+    check(function* () {
+      try {
+        try {
+          yield 1;
+          pair(1, yield 2);
+        } finally {
+          for (let i = 0; i < 1; i++) log.push("inner");
+        }
+        pair(1, pair(2, yield 3));
+      } finally {
+        for (let i = 0; i < 1; i++) log.push("outer");
+      }
+    }, 1, "inner,outer");
+
+    function* inner() { yield 1; }
+    check(function* () {
+      try {
+        yield 1;
+        pair(1, yield* inner());
+      } finally {
+        for (let i = 0; i < 2; i++) log.push(i);
+      }
+    }, 2, "0,1");
+
+    async function* asyncGen() {
+      try {
+        yield 1;
+        pair(1, yield 2);
+      } finally {
+        for (let i = 0; i < 2; i++) log.push(i);
+      }
+    }
+    Assert(typeof asyncGen === "function");
+  )";
+
+  auto ret = LEPUS_Eval(ctx_, src.c_str(), src.length(), "test.js",
+                        LEPUS_EVAL_TYPE_GLOBAL);
+  ASSERT_TRUE(!LEPUS_IsException(ret));
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+}
+
 TEST_F(CommonQjsTest, SetIteratorSkipsDeletedPrefix) {
   std::string src = R"(
     const values = new Set();
