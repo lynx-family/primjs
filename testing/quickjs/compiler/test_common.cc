@@ -4274,6 +4274,106 @@ TEST_F(CommonQjsTest, SeparableStringFlattenOOMKeepsRope) {
   )");
 }
 
+// Two equal ropes deeper than JS_STRING_ROPE_MAX_DEPTH, so comparing them
+// flattens them, which needs 16 MB each.
+static const char kDeepRopes[] = R"(
+  var piece = 'x'.repeat(1 << 16);
+  var r1 = piece, r2 = piece;
+  for (var i = 0; i < 255; i++) {
+    r1 = r1 + piece;
+    r2 = r2 + piece;
+  }
+)";
+
+// Whether the global |name| is a rope that has not been flattened.
+static bool IsUnflattenedRope(LEPUSContext* ctx, const char* name) {
+  LEPUSValue value = LEPUS_GetPropertyStr(ctx, ctx->global_obj, name);
+  bool result = JS_IsSeparableString(value) &&
+                !JS_IsSeparableStringFlat(JS_GetSeparableString(value));
+  if (!ctx->gc_enable) LEPUS_FreeValue(ctx, value);
+  return result;
+}
+
+// Comparing ropes with < used to crash in tracing GC mode when flattening
+// them ran out of memory.
+TEST_F(CommonQjsTest, SeparableStringCompareOOMThrows) {
+  EvalOrFail(ctx_, kDeepRopes);
+  LEPUS_RunGC(rt_);
+  LEPUS_SetMemoryLimit(rt_, LEPUS_GetHeapSize(rt_) + (1 << 20));
+  EvalOrFail(ctx_, R"(
+    var outOfMemory = false;
+    try {
+      r1 < r2;
+    } catch (e) {
+      outOfMemory = e instanceof InternalError;
+    }
+  )");
+  LEPUS_SetMemoryLimit(rt_, SIZE_MAX);
+  EvalOrFail(ctx_, R"(
+    if (!outOfMemory) throw new Error('comparing did not run out of memory');
+    if (r1 < r2 || !(r1 <= r2) || !(r1 < r2 + 'x'))
+      throw new Error('wrong comparison after running out of memory');
+  )");
+}
+
+// Strict equality cannot throw, so it used to report equal ropes as different
+// when flattening them ran out of memory, leaving the exception pending.
+TEST_F(CommonQjsTest, SeparableStringStrictEqualityOOMComparesInPlace) {
+  EvalOrFail(ctx_, kDeepRopes);
+  EvalOrFail(ctx_, R"(
+    var flat = 'x'.repeat(256 << 16);
+    var differs = piece;
+    for (var i = 0; i < 254; i++) differs = differs + piece;
+    differs = differs + ('x'.repeat((1 << 16) - 1) + 'y');
+    var wide1 = r1 + '一', wide2 = r2 + '一';
+  )");
+  LEPUS_RunGC(rt_);
+  LEPUS_SetMemoryLimit(rt_, LEPUS_GetHeapSize(rt_) + (1 << 20));
+  EvalOrFail(ctx_, R"(
+    var results = [r1 === r2, flat === r1, r1 === flat, r1 === differs,
+                   wide1 === wide2, wide1 === r2 + '丁'].join();
+  )");
+  for (const char* name : {"r1", "r2", "differs", "wide1", "wide2"}) {
+    EXPECT_TRUE(IsUnflattenedRope(ctx_, name)) << name;
+  }
+  LEPUS_SetMemoryLimit(rt_, SIZE_MAX);
+  EvalOrFail(ctx_, R"(
+    if (results !== 'true,true,true,false,true,false')
+      throw new Error('wrong strict equality: ' + results);
+  )");
+}
+
+// A String object holding a rope used to store the exception as its value
+// when flattening the rope ran out of memory, which broke the object.
+TEST_F(CommonQjsTest, StringObjectRopeOOMKeepsRope) {
+  EvalOrFail(ctx_, kDeepRopes);
+  EvalOrFail(ctx_, "var wrapper = Object(r1 + 'end');");
+  LEPUS_RunGC(rt_);
+  LEPUS_SetMemoryLimit(rt_, LEPUS_GetHeapSize(rt_) + (1 << 20));
+  EvalOrFail(ctx_, R"(
+    var outOfMemory = [];
+    try {
+      Object.getOwnPropertyDescriptor(wrapper, '0');
+    } catch (e) {
+      outOfMemory.push(e instanceof InternalError);
+    }
+    try {
+      Object.defineProperty(wrapper, '0', {value: 'x'});
+    } catch (e) {
+      outOfMemory.push(e instanceof InternalError);
+    }
+  )");
+  LEPUS_SetMemoryLimit(rt_, SIZE_MAX);
+  EvalOrFail(ctx_, R"(
+    if (outOfMemory.join() !== 'true,true')
+      throw new Error('String object did not run out of memory');
+    var desc = Object.getOwnPropertyDescriptor(wrapper, '0');
+    if (!desc || desc.value !== 'x' || wrapper[0] !== 'x' ||
+        String(wrapper) !== r1 + 'end' || wrapper.length !== (256 << 16) + 3)
+      throw new Error('String object changed after running out of memory');
+  )");
+}
+
 // RegExp replace used to read the bytecode before lastIndex.valueOf(), which
 // can recompile the regexp and free that bytecode.
 TEST_F(CommonQjsTest, RegExpReplaceReadsBytecodeAfterLastIndex) {
