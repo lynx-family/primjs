@@ -628,17 +628,6 @@ test/built-ins/Symbol/toPrimitive/cross-realm.js:12: TypeError: $262.createRealm
 test/built-ins/Symbol/toStringTag/cross-realm.js:12: TypeError: $262.createRealm is not a function
 test/built-ins/Symbol/unscopables/cross-realm.js:12: TypeError: $262.createRealm is not a function
 test/built-ins/ThrowTypeError/distinct-cross-realm.js:15: TypeError: $262.createRealm is not a function
-test/built-ins/TypedArray/prototype/at/index-argument-tointeger.js:16: Test262Error: The value of `typeof TypedArray.prototype.at` is "function" Expected SameValue(«undefined», «function») to be true
-test/built-ins/TypedArray/prototype/at/index-non-numeric-argument-tointeger-invalid.js:16: Test262Error: The value of `typeof TypedArray.prototype.at` is "function" Expected SameValue(«undefined», «function») to be true
-test/built-ins/TypedArray/prototype/at/index-non-numeric-argument-tointeger.js:16: Test262Error: The value of `typeof TypedArray.prototype.at` is "function" Expected SameValue(«undefined», «function») to be true
-test/built-ins/TypedArray/prototype/at/length.js:16: Test262Error: The value of `typeof TypedArray.prototype.at` is "function" Expected SameValue(«undefined», «function») to be true
-test/built-ins/TypedArray/prototype/at/name.js:16: Test262Error: The value of `typeof TypedArray.prototype.at` is "function" Expected SameValue(«undefined», «function») to be true
-test/built-ins/TypedArray/prototype/at/prop-desc.js:15: Test262Error: The value of `typeof TypedArray.prototype.at` is "function" Expected SameValue(«undefined», «function») to be true
-test/built-ins/TypedArray/prototype/at/return-abrupt-from-this.js:17: Test262Error: The value of `typeof TypedArray.prototype.at` is "function" Expected SameValue(«undefined», «function») to be true
-test/built-ins/TypedArray/prototype/at/returns-item-relative-index.js:25: Test262Error: The value of `typeof TypedArray.prototype.at` is "function" Expected SameValue(«undefined», «function») to be true
-test/built-ins/TypedArray/prototype/at/returns-item.js:25: Test262Error: The value of `typeof TypedArray.prototype.at` is "function" Expected SameValue(«undefined», «function») to be true
-test/built-ins/TypedArray/prototype/at/returns-undefined-for-holes-in-sparse-arrays.js:25: Test262Error: The value of `typeof TypedArray.prototype.at` is "function" Expected SameValue(«undefined», «function») to be true
-test/built-ins/TypedArray/prototype/at/returns-undefined-for-out-of-range-index.js:16: Test262Error: The value of `typeof TypedArray.prototype.at` is "function" Expected SameValue(«undefined», «function») to be true
 test/built-ins/TypedArray/prototype/set/array-arg-targetbuffer-detached-on-get-src-value-no-throw.js:30: TypeError: out-of-bound numeric index (Testing with Float64Array.)
 test/built-ins/TypedArray/prototype/sort/sort-tonumber.js:30: TypeError: ArrayBuffer is detached (Testing with Float64Array.)
 test/built-ins/TypedArray/prototype/sort/sorted-values.js:17: Test262Error: 0s (Testing with Float64Array.)
