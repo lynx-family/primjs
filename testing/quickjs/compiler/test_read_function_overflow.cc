@@ -2,6 +2,7 @@
 // Licensed under the Apache License Version 2.0 that can be found in the
 // LICENSE file in the root directory of this source tree.
 
+#include <climits>
 #include <cstring>
 #include <string>
 
@@ -797,4 +798,89 @@ TEST_F(ReadFunctionOverflowTest, ClosureVarCountOverflowIsRejected) {
 
   free(crafted_buf);
   if (!ctx_->rt->gc_enable) lepus_free(ctx_, orig_buf);
+}
+
+namespace {
+
+struct StringSample {
+  const char* text;
+  bool is_wide_char;
+};
+
+constexpr StringSample kStringSamples[] = {
+    {"", false},
+    {"ascii text", false},
+    {"wide \xE4\xB8\xAD\xE6\x96\x87", true},
+};
+
+uint8_t* SerializeString(LEPUSContext* ctx, const char* text, size_t* out_len) {
+  LEPUSValue val = LEPUS_NewString(ctx, text);
+  HandleScope func_scope(ctx, &val, HANDLE_TYPE_LEPUS_VALUE);
+  uint8_t* buf = LEPUS_WriteObject(ctx, out_len, val, 0);
+  if (!ctx->rt->gc_enable) LEPUS_FreeValue(ctx, val);
+  return buf;
+}
+
+std::string ToStdString(LEPUSContext* ctx, LEPUSValueConst val) {
+  const char* str = LEPUS_ToCString(ctx, val);
+  if (!str) return "";
+  std::string result(str);
+  if (!ctx->rt->gc_enable) LEPUS_FreeCString(ctx, str);
+  return result;
+}
+
+}  // namespace
+
+TEST_F(ReadFunctionOverflowTest, SerializedStringsRoundTrip) {
+  for (const StringSample& sample : kStringSamples) {
+    size_t buf_len = 0;
+    uint8_t* buf = SerializeString(ctx_, sample.text, &buf_len);
+    ASSERT_NE(buf, nullptr);
+
+    LEPUSValue result = LEPUS_ReadObject(ctx_, buf, buf_len, 0);
+    HandleScope func_scope(ctx_, &result, HANDLE_TYPE_LEPUS_VALUE);
+    ASSERT_TRUE(LEPUS_IsString(result)) << sample.text;
+    EXPECT_EQ(LEPUS_VALUE_GET_STRING(result)->is_wide_char, sample.is_wide_char)
+        << sample.text;
+    EXPECT_EQ(ToStdString(ctx_, result), sample.text);
+
+    if (!ctx_->rt->gc_enable) {
+      LEPUS_FreeValue(ctx_, result);
+      lepus_free(ctx_, buf);
+    }
+  }
+}
+
+TEST_F(ReadFunctionOverflowTest, TruncatedStringIsRejected) {
+  for (const StringSample& sample : kStringSamples) {
+    size_t buf_len = 0;
+    uint8_t* buf = SerializeString(ctx_, sample.text, &buf_len);
+    ASSERT_NE(buf, nullptr);
+    ASSERT_GT(buf_len, 0u);
+
+    LEPUSValue result = LEPUS_ReadObject(ctx_, buf, buf_len - 1, 0);
+    EXPECT_TRUE(LEPUS_IsException(result)) << sample.text;
+
+    LEPUSValue exc = LEPUS_GetException(ctx_);
+    HandleScope func_scope(ctx_, &exc, HANDLE_TYPE_LEPUS_VALUE);
+    EXPECT_NE(ToStdString(ctx_, exc).find("read after the end of the buffer"),
+              std::string::npos)
+        << sample.text;
+
+    if (!ctx_->rt->gc_enable) {
+      LEPUS_FreeValue(ctx_, exc);
+      lepus_free(ctx_, buf);
+    }
+  }
+}
+
+TEST_F(ReadFunctionOverflowTest, StringAllocationRejectsLengthOutsideLimit) {
+  for (int is_wide_char : {0, 1}) {
+    for (int max_len : {-1, JS_STRING_LEN_MAX + 1, INT_MAX}) {
+      EXPECT_EQ(js_alloc_string(ctx_, max_len, is_wide_char), nullptr)
+          << "max_len=" << max_len << " is_wide_char=" << is_wide_char;
+      LEPUSValue exc = LEPUS_GetException(ctx_);
+      if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, exc);
+    }
+  }
 }

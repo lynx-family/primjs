@@ -2600,10 +2600,8 @@ static LEPUSValue JS_ConcatSeparableString(LEPUSContext *ctx, LEPUSValue op1,
 
   /* Enforce the same length limit as the eager path (JS_ConcatString1).
      Without this check the rope's logical length can be driven up to the
-     31-bit bitfield maximum, and flattening a wide rope later computes
-     `max_len << is_wide_char` on an `int` in js_alloc_string_rt, which
-     overflows and under-allocates the backing JSString, leading to a heap
-     buffer overflow write. */
+     31-bit bitfield maximum, and a rope that long could never be flattened
+     because js_alloc_string_rt rejects it. */
   if (len > JS_STRING_LEN_MAX) {
     return LEPUS_ThrowInternalError(ctx, "string too long");
   }
