@@ -2532,6 +2532,21 @@ QJS_STATIC inline void set_value(LEPUSContext *ctx, LEPUSValue *pval,
   LEPUS_FreeValue(ctx, old_val);
 }
 
+/* Holds a reference for a C frame that keeps using an object, or data owned by
+   it, across a call that can run JS and drop every other reference. */
+class ObjectPin {
+ public:
+  ObjectPin(LEPUSContext *ctx, LEPUSValueConst obj)
+      : ctx_(ctx), obj_(LEPUS_DupValue(ctx, obj)) {}
+  ~ObjectPin() { LEPUS_FreeValue(ctx_, obj_); }
+  ObjectPin(const ObjectPin &) = delete;
+  ObjectPin &operator=(const ObjectPin &) = delete;
+
+ private:
+  LEPUSContext *ctx_;
+  LEPUSValue obj_;
+};
+
 void LEPUS_SetClassProto(LEPUSContext *ctx, LEPUSClassID class_id,
                          LEPUSValue obj) {
   CallGCFunc(JS_SetClassProto_GC, ctx, class_id, obj);
@@ -8189,6 +8204,14 @@ LEPUSValueConst LEPUS_GetPrototype(LEPUSContext *ctx, LEPUSValueConst val) {
   return JS_GetPrototype_RC(ctx, val);
 }
 
+/* Release obj and return an owned prototype. A proxy's result is only kept
+   alive by the proxy, so it must be duplicated before obj is released. */
+QJS_STATIC LEPUSValue JS_GetPrototypeFree(LEPUSContext *ctx, LEPUSValue obj) {
+  LEPUSValue proto = LEPUS_DupValue(ctx, JS_GetPrototype_RC(ctx, obj));
+  LEPUS_FreeValue(ctx, obj);
+  return proto;
+}
+
 static LEPUSValue JS_GetPropertyInternal_RC(LEPUSContext *ctx,
                                             LEPUSValueConst obj, JSAtom prop,
                                             LEPUSValueConst this_obj,
@@ -8223,22 +8246,27 @@ QJS_STATIC int JS_OrdinaryIsInstanceOf(LEPUSContext *ctx, LEPUSValueConst val,
   proto = LEPUS_VALUE_GET_OBJ(obj_proto);
   p = LEPUS_VALUE_GET_OBJ(val);
   for (;;) {
-    proto1 = p->shape->proto;
-    if (!proto1) {
-      if (p->class_id == JS_CLASS_PROXY) {
-        LEPUSValueConst proto_val;
-        proto_val = JS_GetPrototype_RC(
-            ctx, LEPUS_MKPTR(LEPUS_TAG_OBJECT, (LEPUSObject *)p));
-        if (LEPUS_IsException(proto_val)) {
+    if (unlikely(p->class_id == JS_CLASS_PROXY)) {
+      /* Traps can release the borrowed links, so continue on owned ones. */
+      LEPUSValue v =
+          LEPUS_DupValue(ctx, LEPUS_MKPTR(LEPUS_TAG_OBJECT, (LEPUSObject *)p));
+      for (;;) {
+        v = JS_GetPrototypeFree(ctx, v);
+        if (LEPUS_IsException(v)) {
           ret = -1;
-          goto done;
+          break;
         }
-        proto1 = LEPUS_VALUE_GET_OBJ(proto_val);
-        if (LEPUS_VALUE_IS_NOT_OBJECT(proto_val) || !proto1) break;
-      } else {
-        break;
+        if (LEPUS_VALUE_IS_NOT_OBJECT(v)) break;
+        if (LEPUS_VALUE_GET_OBJ(v) == proto) {
+          ret = TRUE;
+          break;
+        }
       }
+      LEPUS_FreeValue(ctx, v);
+      break;
     }
+    proto1 = p->shape->proto;
+    if (!proto1) break;
     p = proto1;
     if (proto == p) {
       ret = TRUE;
@@ -13860,6 +13888,8 @@ QJS_STATIC LEPUSValue build_for_in_iterator(LEPUSContext *ctx, LEPUSValue obj) {
   /* fast path: assume no enumerable properties in the prototype chain */
   p1 = p->shape->proto;
   while (p1 != NULL) {
+    /* Traps of a proxy in the chain can drop its last reference. */
+    ObjectPin pin(ctx, LEPUS_MKPTR(LEPUS_TAG_OBJECT, p1));
     if (JS_GetOwnPropertyNamesInternal(
             ctx, &tab_atom, &tab_atom_count, p1,
             LEPUS_GPN_STRING_MASK | LEPUS_GPN_ENUM_ONLY))
@@ -13899,6 +13929,7 @@ slow_path:
   /* non enumerable properties hide the enumerables ones in the
      prototype chain */
   while (p != NULL) {
+    ObjectPin pin(ctx, LEPUS_MKPTR(LEPUS_TAG_OBJECT, p));
     if (JS_GetOwnPropertyNamesInternal(
             ctx, &tab_atom, &tab_atom_count, p,
             LEPUS_GPN_STRING_MASK | LEPUS_GPN_SET_ENUM))
@@ -35515,16 +35546,15 @@ QJS_STATIC LEPUSValue js_object_set___proto__(LEPUSContext *ctx,
 QJS_STATIC LEPUSValue js_object_isPrototypeOf(LEPUSContext *ctx,
                                               LEPUSValueConst this_val,
                                               int argc, LEPUSValueConst *argv) {
-  LEPUSValue obj;
-  LEPUSValueConst v;
+  LEPUSValue obj, v;
   int max_depth = 1000, res = -1;
 
-  v = argv[0];
-  if (!LEPUS_IsObject(v)) return LEPUS_FALSE;
+  if (!LEPUS_IsObject(argv[0])) return LEPUS_FALSE;
   obj = LEPUS_ToObject(ctx, this_val);
   if (LEPUS_IsException(obj)) return LEPUS_EXCEPTION;
+  v = LEPUS_DupValue(ctx, argv[0]);
   while (--max_depth > 0) {
-    v = JS_GetPrototype_RC(ctx, v);
+    v = JS_GetPrototypeFree(ctx, v);
     if (LEPUS_IsException(v)) goto exception;
     if (LEPUS_IsNull(v)) {
       res = FALSE;
@@ -35537,6 +35567,7 @@ QJS_STATIC LEPUSValue js_object_isPrototypeOf(LEPUSContext *ctx,
     }
   }
   LEPUS_FreeValue(ctx, obj);
+  LEPUS_FreeValue(ctx, v);
   if (res < 0)
     return LEPUS_ThrowInternalError(ctx, "prototype chain cycle");
   else
@@ -35582,8 +35613,7 @@ QJS_STATIC LEPUSValue js_object___lookupGetter__(LEPUSContext *ctx,
                                                  int argc,
                                                  LEPUSValueConst *argv,
                                                  int setter) {
-  LEPUSValue obj, res = LEPUS_EXCEPTION;
-  LEPUSValueConst v;
+  LEPUSValue obj, v = LEPUS_UNDEFINED, res = LEPUS_EXCEPTION;
   JSAtom prop = JS_ATOM_NULL;
   LEPUSPropertyDescriptor desc;
   int has_prop;
@@ -35593,7 +35623,7 @@ QJS_STATIC LEPUSValue js_object___lookupGetter__(LEPUSContext *ctx,
   prop = js_value_to_atom(ctx, argv[0]);
   if (unlikely(prop == JS_ATOM_NULL)) goto exception;
 
-  for (v = obj;;) {
+  for (v = LEPUS_DupValue(ctx, obj);;) {
     has_prop =
         JS_GetOwnPropertyInternal(ctx, &desc, LEPUS_VALUE_GET_OBJ(v), prop);
     if (has_prop < 0) goto exception;
@@ -35605,7 +35635,7 @@ QJS_STATIC LEPUSValue js_object___lookupGetter__(LEPUSContext *ctx,
       js_free_desc(ctx, &desc);
       break;
     }
-    v = JS_GetPrototype_RC(ctx, v);
+    v = JS_GetPrototypeFree(ctx, v);
     if (LEPUS_IsException(v)) goto exception;
     if (LEPUS_IsNull(v)) {
       res = LEPUS_UNDEFINED;
@@ -35614,6 +35644,7 @@ QJS_STATIC LEPUSValue js_object___lookupGetter__(LEPUSContext *ctx,
   }
 
 exception:
+  LEPUS_FreeValue(ctx, v);
   LEPUS_FreeAtom(ctx, prop);
   LEPUS_FreeValue(ctx, obj);
   return res;
@@ -44584,6 +44615,8 @@ QJS_STATIC LEPUSValue JS_ThrowTypeErrorRevokedProxy(LEPUSContext *ctx) {
   return LEPUS_ThrowTypeError(ctx, "revoked proxy");
 }
 
+/* Every caller must pin the proxy first: the returned record dies with it, and
+   the handler lookup and the trap can both drop its last reference. */
 QJS_STATIC JSProxyData *get_proxy_method(LEPUSContext *ctx, LEPUSValue *pmethod,
                                          LEPUSValueConst obj, JSAtom name) {
   JSProxyData *s =
@@ -44618,6 +44651,7 @@ QJS_STATIC LEPUSValueConst js_proxy_getPrototypeOf(LEPUSContext *ctx,
   /* must check for timeout to avoid infinite loop in instanceof */
   if (js_poll_interrupts(ctx)) return LEPUS_EXCEPTION;
 
+  ObjectPin pin(ctx, obj);
   s = get_proxy_method(ctx, &method, obj, JS_ATOM_getPrototypeOf);
   if (!s) return LEPUS_EXCEPTION;
   if (LEPUS_IsUndefined(method)) return JS_GetPrototype_RC(ctx, s->target);
@@ -44644,9 +44678,10 @@ QJS_STATIC LEPUSValueConst js_proxy_getPrototypeOf(LEPUSContext *ctx,
       return LEPUS_ThrowTypeError(ctx, "proxy: inconsistent prototype");
     }
   }
-  /* store the prototype in the proxy so that its refcount is at least 1 */
+  /* store the prototype in the proxy so that its refcount is at least 1.
+     Releasing the old one can re-enter here and free ret: return the slot. */
   set_value(ctx, &s->proto, ret);
-  return (LEPUSValueConst)ret;
+  return s->proto;
 }
 
 QJS_STATIC int js_proxy_setPrototypeOf(LEPUSContext *ctx, LEPUSValueConst obj,
@@ -44658,6 +44693,7 @@ QJS_STATIC int js_proxy_setPrototypeOf(LEPUSContext *ctx, LEPUSValueConst obj,
   BOOL res;
   int res2;
 
+  ObjectPin pin(ctx, obj);
   s = get_proxy_method(ctx, &method, obj, JS_ATOM_setPrototypeOf);
   if (!s) return -1;
   if (LEPUS_IsUndefined(method))
@@ -44694,6 +44730,7 @@ QJS_STATIC int js_proxy_isExtensible(LEPUSContext *ctx, LEPUSValueConst obj) {
   BOOL res;
   int res2;
 
+  ObjectPin pin(ctx, obj);
   s = get_proxy_method(ctx, &method, obj, JS_ATOM_isExtensible);
   if (!s) return -1;
   if (LEPUS_IsUndefined(method)) return LEPUS_IsExtensible(ctx, s->target);
@@ -44716,6 +44753,7 @@ QJS_STATIC int js_proxy_preventExtensions(LEPUSContext *ctx,
   BOOL res;
   int res2;
 
+  ObjectPin pin(ctx, obj);
   s = get_proxy_method(ctx, &method, obj, JS_ATOM_preventExtensions);
   if (!s) return -1;
   if (LEPUS_IsUndefined(method)) return LEPUS_PreventExtensions(ctx, s->target);
@@ -44742,6 +44780,7 @@ QJS_STATIC int js_proxy_has(LEPUSContext *ctx, LEPUSValueConst obj,
   LEPUSValueConst args[2];
   BOOL res2;
 
+  ObjectPin pin(ctx, obj);
   s = get_proxy_method(ctx, &method, obj, JS_ATOM_has);
   if (!s) return -1;
   if (LEPUS_IsUndefined(method)) return LEPUS_HasProperty(ctx, s->target, atom);
@@ -44781,6 +44820,7 @@ QJS_STATIC LEPUSValue js_proxy_get(LEPUSContext *ctx, LEPUSValueConst obj,
   LEPUSValueConst args[3];
   LEPUSPropertyDescriptor desc;
 
+  ObjectPin pin(ctx, obj);
   s = get_proxy_method(ctx, &method, obj, JS_ATOM_get);
   if (!s) return LEPUS_EXCEPTION;
   /* Note: recursion is possible thru the prototype of s->target */
@@ -44831,6 +44871,7 @@ QJS_STATIC int js_proxy_set(LEPUSContext *ctx, LEPUSValueConst obj, JSAtom atom,
   int ret, res;
   LEPUSValueConst args[4];
 
+  ObjectPin pin(ctx, obj);
   s = get_proxy_method(ctx, &method, obj, JS_ATOM_set);
   if (!s) return -1;
   if (LEPUS_IsUndefined(method)) {
@@ -44930,6 +44971,7 @@ QJS_STATIC int js_proxy_get_own_property(LEPUSContext *ctx,
   LEPUSValueConst args[2];
   LEPUSPropertyDescriptor desc, target_desc;
 
+  ObjectPin pin(ctx, obj);
   s = get_proxy_method(ctx, &method, obj, JS_ATOM_getOwnPropertyDescriptor);
   if (!s) return -1;
   p = LEPUS_VALUE_GET_OBJ(s->target);
@@ -45014,6 +45056,7 @@ QJS_STATIC int js_proxy_define_own_property(LEPUSContext *ctx,
   LEPUSPropertyDescriptor desc;
   BOOL setting_not_configurable;
 
+  ObjectPin pin(ctx, obj);
   s = get_proxy_method(ctx, &method, obj, JS_ATOM_defineProperty);
   if (!s) return -1;
   if (LEPUS_IsUndefined(method)) {
@@ -45094,6 +45137,7 @@ QJS_STATIC int js_proxy_delete_property(LEPUSContext *ctx, LEPUSValueConst obj,
   int res, res2;
   LEPUSValueConst args[2];
 
+  ObjectPin pin(ctx, obj);
   s = get_proxy_method(ctx, &method, obj, JS_ATOM_deleteProperty);
   if (!s) return -1;
   if (LEPUS_IsUndefined(method)) {
@@ -45149,6 +45193,7 @@ QJS_STATIC int js_proxy_get_own_property_names(LEPUSContext *ctx,
   LEPUSPropertyDescriptor desc;
   int res, is_extensible, idx;
 
+  ObjectPin pin(ctx, obj);
   s = get_proxy_method(ctx, &method, obj, JS_ATOM_ownKeys);
   if (!s) return -1;
   if (LEPUS_IsUndefined(method)) {
@@ -45261,6 +45306,7 @@ QJS_STATIC LEPUSValue js_proxy_call_constructor(LEPUSContext *ctx,
   LEPUSValue method, arg_array, ret;
   LEPUSValueConst args[3];
 
+  ObjectPin pin(ctx, func_obj);
   s = get_proxy_method(ctx, &method, func_obj, JS_ATOM_construct);
   if (!s) return LEPUS_EXCEPTION;
   if (!LEPUS_IsConstructor(ctx, s->target))
@@ -45296,6 +45342,7 @@ QJS_STATIC LEPUSValue js_proxy_call(LEPUSContext *ctx, LEPUSValueConst func_obj,
   if (flags & LEPUS_CALL_FLAG_CONSTRUCTOR)
     return js_proxy_call_constructor(ctx, func_obj, this_obj, argc, argv);
 
+  ObjectPin pin(ctx, func_obj);
   s = get_proxy_method(ctx, &method, func_obj, JS_ATOM_apply);
   if (!s) return LEPUS_EXCEPTION;
   if (!s->is_func) {
