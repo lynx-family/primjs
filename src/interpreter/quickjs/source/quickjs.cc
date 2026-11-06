@@ -7493,7 +7493,10 @@ LEPUSValue LEPUS_GetGlobalObject(LEPUSContext *ctx) {
 /* WARNING: obj is freed */
 LEPUSValue LEPUS_Throw(LEPUSContext *ctx, LEPUSValue obj) {
   LEPUSRuntime *rt = ctx->rt;
-  if (!ctx->gc_enable) LEPUS_FreeValue(ctx, rt->current_exception);
+  /* Releasing the old exception can re-enter the engine, which must not find
+     it still in the slot and free it a second time. */
+  LEPUSValue old_exception = LEPUS_GetException(ctx);
+  if (!ctx->gc_enable) LEPUS_FreeValue(ctx, old_exception);
   rt->current_exception = obj;
   rt->exception_needs_backtrace = LEPUS_IsError(ctx, obj);
   if (LEPUS_IsObject(rt->current_exception) &&
@@ -17660,8 +17663,10 @@ QJS_STATIC LEPUSValue async_func_resume(LEPUSContext *ctx,
 
 QJS_STATIC void free_generator_stack_rt(LEPUSRuntime *rt, JSGeneratorData *s) {
   if (s->state == JS_GENERATOR_STATE_COMPLETED) return;
-  async_func_free(rt, &s->func_state);
+  /* Releasing the frame can run cleanup code that calls next() on this
+     generator, which must not resume a frame being freed. */
   s->state = JS_GENERATOR_STATE_COMPLETED;
+  async_func_free(rt, &s->func_state);
 }
 
 QJS_STATIC void js_generator_finalizer(LEPUSRuntime *rt, LEPUSValue obj) {
@@ -45380,8 +45385,7 @@ QJS_STATIC LEPUSValue js_proxy_revoke(LEPUSContext *ctx,
     /* We do not free the handler and target in case they are
        referenced as constants in the C call stack */
     s->is_revoked = TRUE;
-    LEPUS_FreeValue(ctx, func_data[0]);
-    func_data[0] = LEPUS_NULL;
+    set_value(ctx, &func_data[0], LEPUS_NULL);
   }
   return LEPUS_UNDEFINED;
 }
@@ -46010,6 +46014,25 @@ QJS_STATIC void map_decref_record(LEPUSRuntime *rt, JSMapRecord *mr) {
   }
 }
 
+/* Cleanup runs inside a release or GC finalizer, so it must not disturb an
+   exception being propagated. Nothing can observe its own errors: drop them. */
+void JS_RunFinalizationCleanup(LEPUSContext *ctx, LEPUSValueConst cleanup,
+                               LEPUSValueConst *held_value) {
+  LEPUSRuntime *rt = ctx->rt;
+  LEPUSValue pending = rt->current_exception;
+  BOOL pending_needs_backtrace = rt->exception_needs_backtrace;
+
+  rt->current_exception = LEPUS_NULL;
+  LEPUSValue result = LEPUS_Call(ctx, cleanup, LEPUS_UNDEFINED, 1, held_value);
+  LEPUSValue thrown = LEPUS_GetException(ctx);
+  rt->current_exception = pending;
+  rt->exception_needs_backtrace = pending_needs_backtrace;
+  if (!ctx->gc_enable) {
+    LEPUS_FreeValue(ctx, result);
+    LEPUS_FreeValue(ctx, thrown);
+  }
+}
+
 QJS_STATIC void reset_weak_ref(LEPUSRuntime *rt, LEPUSObject *p) {
   WeakRefRecord *wr, *wr_next;
   list_head *el, *el1;
@@ -46053,8 +46076,7 @@ QJS_STATIC void reset_weak_ref(LEPUSRuntime *rt, LEPUSObject *p) {
         FinalizationRegistryData *frd = fin_node->data;
         LEPUSContext *ctx = frd->fg_ctx->ctx;
         if (ctx) {
-          LEPUS_FreeValueRT(rt, LEPUS_Call(ctx, frd->cbs, LEPUS_UNDEFINED, 1,
-                                           &fin_node->held_value));
+          JS_RunFinalizationCleanup(ctx, frd->cbs, &fin_node->held_value);
         }
         LEPUS_FreeValueRT(rt, fin_node->held_value);
         LEPUS_FreeValueRT(rt, fin_node->token);
@@ -47786,9 +47808,12 @@ QJS_STATIC __exception int perform_promise_then(
           list_entry(el, JSUnhandledRejectionEntry, link);
       if (!LEPUS_IsNull(e->promise) &&
           LEPUS_GetOpaque(e->promise, JS_CLASS_PROMISE) == s) {
-        LEPUS_FreeValue(ctx, e->error);
+        /* Releasing the error can run cleanup code that re-enters then() and
+           scans this list, which must not find this entry again. */
+        LEPUSValue error = e->error;
         list_del(el);
         lepus_free_rt(ctx->rt, el);
+        LEPUS_FreeValue(ctx, error);
         break;
       }
     }
