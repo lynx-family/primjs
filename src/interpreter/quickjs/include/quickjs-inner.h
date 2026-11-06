@@ -2271,6 +2271,9 @@ QJS_HIDE void DebuggerCallEachFunc(LEPUSContext *ctx, const uint8_t *pc);
 QJS_HIDE LEPUSValue __JS_AtomToValue_GC(LEPUSContext *ctx, JSAtom atom,
                                         BOOL force_string);
 QJS_HIDE LEPUSValue JS_ThrowStackOverflow(LEPUSContext *ctx);
+QJS_HIDE void JS_RunFinalizationCleanup(LEPUSContext *ctx,
+                                        LEPUSValueConst cleanup,
+                                        LEPUSValueConst *held_value);
 QJS_HIDE void build_backtrace(
     LEPUSContext *ctx, LEPUSValueConst error_obj, const char *filename,
     /* <Primjs begin> */ int64_t line_num, /* <Primjs end> */

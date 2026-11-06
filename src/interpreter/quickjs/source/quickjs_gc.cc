@@ -31235,7 +31235,7 @@ QJS_STATIC void reset_weak_ref_gc(LEPUSRuntime *rt, LEPUSObject *p) {
         rt->collector_->GetVisitor()->AddObjectDuringFinalizer(
             fin_node->held_value);
         rt->collector_->GetVisitor()->AddObjectDuringFinalizer(frd->cbs);
-        LEPUS_Call(ctx, frd->cbs, LEPUS_UNDEFINED, 1, &fin_node->held_value);
+        JS_RunFinalizationCleanup(ctx, frd->cbs, &fin_node->held_value);
       }
     }
   }
