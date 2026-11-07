@@ -2832,6 +2832,9 @@ napi_status napi_get_all_property_names_internal(
 
   LEPUSValue proto = raw_val;
   while (!LEPUS_IsNull(proto)) {
+    // A proxy trap can drop the chain's references to this borrowed link, and
+    // its prototype is only kept alive by the proxy.
+    env->ctx->CreateHandle(JS_DupValue_Comp(ctx, proto));
     LEPUSPropertyEnum* props = NULL;
     uint32_t props_length = 0;
     CHECK_QJS(env, LEPUS_GetOwnPropertyNames(ctx, &props, &props_length, proto,

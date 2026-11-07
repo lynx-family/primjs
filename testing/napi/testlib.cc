@@ -608,6 +608,22 @@ TEST_P(NAPITest, ObjectWrapTest) {
   EXPECT_TRUE(eval("Test.prototype.testMethod").IsFunction());
 }
 
+TEST_P(NAPITest, AllPropertyNamesSurviveProxyDetachedByTrap) {
+  HandleScope hscope(env);
+  eval(R"(host = Object.create(new Proxy({}, {
+    ownKeys: function() {
+      Object.setPrototypeOf(host, null);
+      return [];
+    },
+  })))");
+  napi_env raw_env = env;
+  napi_value names;
+  EXPECT_EQ(raw_env->napi_get_all_property_names(
+                raw_env, env.Global().Get("host"), napi_key_include_prototypes,
+                napi_key_all_properties, napi_key_numbers_to_strings, &names),
+            napi_ok);
+}
+
 TEST_P(NAPITest, ArrayTest) {
   HandleScope hscope(env);
   eval("x = {1:2, '3':4, 5:'six', 'seven':['eight', 'nine']}");

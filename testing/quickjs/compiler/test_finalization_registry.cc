@@ -764,6 +764,128 @@ TEST_F(FinalizationRegistryTest, SetPrototypeCommitsBeforeCleanup) {
   LEPUS_FreeValue(ctx_, result);
 }
 
+class ProxyTrapLifetimeTest : public DefinePropertyCleanupTest {
+ protected:
+  // detach() returns a host whose prototype slot owns the only reference to a
+  // proxy; its `name` trap empties that slot before running `act`.
+  void CheckDetached(const std::string& body) {
+    const std::string source = R"((function() {
+      function F() {}
+      function detach(name, act, target) {
+        var host, handler = {};
+        handler[name] = function() {
+          Object.setPrototypeOf(host, null);
+          return act();
+        };
+        return host = Object.create(new Proxy(target || {}, handler));
+      }
+      function chained() { return Object.create(F.prototype); }
+    )" + body + "})()";
+    Check(source.c_str());
+  }
+};
+
+TEST_F(ProxyTrapLifetimeTest, Get) {
+  CheckDetached("return detach('get', function() { return 8; }).key === 8;");
+}
+
+TEST_F(ProxyTrapLifetimeTest, Set) {
+  CheckDetached(R"(
+    detach('set', function() { return true; }).key = 1;
+    return true;
+  )");
+}
+
+TEST_F(ProxyTrapLifetimeTest, Has) {
+  CheckDetached("return !('key' in detach('has', function() {}));");
+}
+
+TEST_F(ProxyTrapLifetimeTest, ForInOwnKeys) {
+  CheckDetached(R"(
+    for (var k in detach('ownKeys', function() { return []; })) return false;
+    return true;
+  )");
+}
+
+TEST_F(ProxyTrapLifetimeTest, ForInDescriptor) {
+  CheckDetached(R"(
+    var host = detach('getOwnPropertyDescriptor', function() {}, { a: 1 });
+    for (var k in host) return false;
+    return true;
+  )");
+}
+
+TEST_F(ProxyTrapLifetimeTest, InstanceOf) {
+  CheckDetached("return detach('getPrototypeOf', chained) instanceof F;");
+}
+
+TEST_F(ProxyTrapLifetimeTest, IsPrototypeOf) {
+  CheckDetached(
+      "return F.prototype.isPrototypeOf(detach('getPrototypeOf', chained));");
+}
+
+TEST_F(ProxyTrapLifetimeTest, LookupGetter) {
+  CheckDetached(R"(
+    Object.defineProperty(F.prototype, 'x', { get: function() {} });
+    var host = detach('getPrototypeOf', chained);
+    return typeof host.__lookupGetter__('x') === 'function';
+  )");
+}
+
+TEST_F(ProxyTrapLifetimeTest, RevokeInsideTrap) {
+  CheckDetached(R"(
+    var host, revoke;
+    (function(r) {
+      revoke = r.revoke;
+      host = Object.create(r.proxy);
+    })(Proxy.revocable({}, { get: function() {
+      revoke();
+      Object.setPrototypeOf(host, null);
+      return 8;
+    } }));
+    return host.key === 8;
+  )");
+}
+
+TEST_F(ProxyTrapLifetimeTest, ThrowingTrap) {
+  CheckDetached(R"(
+    var host = detach('get', function() { throw 1; });
+    try { host.key; } catch (e) { return e === 1; }
+    return false;
+  )");
+}
+
+TEST_F(ProxyTrapLifetimeTest, TargetIsExtensibleDetachesOuterProxy) {
+  CheckDetached(R"(
+    var host = Object.create(new Proxy(new Proxy({}, {
+      isExtensible: function() {
+        Object.setPrototypeOf(host, null);
+        return true;
+      },
+    }), { ownKeys: function() { return []; } }));
+    for (var k in host) return false;
+    return true;
+  )");
+}
+
+TEST_F(ProxyTrapLifetimeTest, GetPrototypeOfReenteredByRelease) {
+  if (LEPUS_IsGCMode(ctx_)) GTEST_SKIP();
+  CheckDetached(R"(
+    // Releasing the first prototype re-enters the trap, whose next result
+    // replaces, and so frees, the one the outer call is about to return.
+    var latest, reentered = false;
+    var proxy = new Proxy({}, {
+      getPrototypeOf: function() { return latest = {}; },
+    });
+    var registry = new FinalizationRegistry(function() {
+      reentered = true;
+      Object.getPrototypeOf(proxy);
+    });
+    registry.register(Object.getPrototypeOf(proxy), 0);
+    return Object.getPrototypeOf(proxy) === latest && reentered;
+  )");
+}
+
 class DeletePropertyCleanupTest : public DefinePropertyCleanupTest {};
 
 TEST_F(DeletePropertyCleanupTest, CommitsBeforeCleanupGrowsReceiver) {
