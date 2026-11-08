@@ -644,22 +644,31 @@ static inline const uint32_t *JSLinkedHashMapWeakBuckets(
   return JSLinkedHashMapHashNext(table) + table->entry_capacity;
 }
 
+struct WeakRefRecord;
+
+// Weak tables keep, for each entry, the record that links the entry into its
+// key's weak reference list, so the record can be unlinked without a search.
+// The pointers are not traced: a record lives as long as its key, and the slot
+// is cleared whenever the record is unlinked.
+static inline struct WeakRefRecord **JSLinkedHashMapWeakRecords(
+    JSLinkedHashMap *table) {
+  return reinterpret_cast<struct WeakRefRecord **>(
+      JSLinkedHashMapWeakBuckets(table) + table->entry_capacity);
+}
+
 static inline JSLinkedHashMapEntry *JSLinkedHashMapEntries(
     JSLinkedHashMap *table) {
-  uint32_t *entry_base = JSLinkedHashMapWeakBuckets(table);
   if (table->is_weak) {
-    entry_base += table->entry_capacity;
+    return reinterpret_cast<JSLinkedHashMapEntry *>(
+        JSLinkedHashMapWeakRecords(table) + table->entry_capacity);
   }
-  return reinterpret_cast<JSLinkedHashMapEntry *>(entry_base);
+  return reinterpret_cast<JSLinkedHashMapEntry *>(
+      JSLinkedHashMapWeakBuckets(table));
 }
 
 static inline const JSLinkedHashMapEntry *JSLinkedHashMapEntries(
     const JSLinkedHashMap *table) {
-  const uint32_t *entry_base = JSLinkedHashMapWeakBuckets(table);
-  if (table->is_weak) {
-    entry_base += table->entry_capacity;
-  }
-  return reinterpret_cast<const JSLinkedHashMapEntry *>(entry_base);
+  return JSLinkedHashMapEntries(const_cast<JSLinkedHashMap *>(table));
 }
 
 typedef struct JSMapState {
@@ -868,6 +877,32 @@ QJS_STATIC inline const JSStringMeta *js_string_meta(const JSString *str) {
 
 QJS_STATIC inline size_t js_string_aux_size(const JSString *str) {
   return str->has_aux ? sizeof(JSStringAux) : 0;
+}
+
+// Converts a string of at most 9 ASCII digits, optionally after a minus sign,
+// which covers most numeric strings, without copying it to a C string for the
+// general number parser. Returns false for anything else, including "-0".
+QJS_STATIC inline bool js_string_to_int32_fast(const JSString *p,
+                                               int32_t *pres) {
+  uint32_t len = p->len;
+  if (p->is_wide_char || len == 0) return false;
+  const uint8_t *s = p->u.str8;
+  bool negative = s[0] == '-';
+  uint32_t i = negative ? 1 : 0;
+  if (len == i || len - i > 9) return false;
+  uint32_t value = 0;
+  for (; i < len; i++) {
+    uint32_t digit = s[i] - '0';
+    if (digit > 9) return false;
+    value = value * 10 + digit;
+  }
+  if (negative) {
+    if (value == 0) return false;
+    *pres = -static_cast<int32_t>(value);
+  } else {
+    *pres = static_cast<int32_t>(value);
+  }
+  return true;
 }
 
 #ifdef ENABLE_LEPUSNG
@@ -1105,6 +1140,11 @@ struct LEPUSContext {
   JSShape *arguments_shape; /* initial shape for Arguments objects */
   JSShape *non_strict_arguments_shape;
   struct JSPropertyAutoInit *function_proto_autoinit;
+  // Initial shapes of RegExp objects (lastIndex) and of RegExp exec results
+  // (length, groups, index, input). Only tracing GC contexts create them.
+  // Keep new fields at the end: the interpreter handlers use field offsets.
+  JSShape *regexp_shape = nullptr;
+  JSShape *regexp_result_shape = nullptr;
 };
 
 typedef union JSFloat64Union {
@@ -1555,6 +1595,10 @@ typedef struct WeakRefData {
 typedef struct WeakRefRecord {
   WeakRefRecordKind kind;
   struct WeakRefRecord *next_weak_ref;
+  // Previous record in the list, or nullptr at the head. Not traced by the
+  // GC. Only tracing GC runtimes read it; reference counting runtimes do not
+  // keep it up to date when they unlink records.
+  struct WeakRefRecord *prev_weak_ref;
   union {
     JSMapRecord *map_record;
     struct {
@@ -3786,9 +3830,21 @@ enum class GCInfoUpdateReason {
   kForcedReport,
   kFullGC,
 };
-void JS_UpdateGCInfo(
+// Sends a GC info report to the runtime's observer and restarts the interval.
+void JS_ReportGCInfo(LEPUSRuntime *rt, GCInfoUpdateReason reason);
+// Called on every allocation, so only reaching the reporting threshold leaves
+// the inline path.
+static inline void JS_UpdateGCInfo(
     LEPUSRuntime *rt, size_t size,
-    GCInfoUpdateReason reason = GCInfoUpdateReason::kAllocation);
+    GCInfoUpdateReason reason = GCInfoUpdateReason::kAllocation) {
+  if (unlikely(rt == nullptr)) return;
+  if (likely(reason == GCInfoUpdateReason::kAllocation)) {
+    if (rt->gc_info_threshold == 0) return;
+    rt->gc_info_interval_size += size;
+    if (likely(rt->gc_info_interval_size < rt->gc_info_threshold)) return;
+  }
+  JS_ReportGCInfo(rt, reason);
+}
 // Reports the first failed allocation of rt to the out of memory callback.
 QJS_HIDE void JS_NotifyOutOfMemory(LEPUSRuntime *rt, size_t request_size);
 

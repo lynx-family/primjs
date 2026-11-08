@@ -3798,22 +3798,104 @@ LBB88_15:                               ; %B17
                                         ; -- End function
 	.p2align	2                               ; -- Begin function put_var_0_asm_h
 l_put_var_0_asm_h:                      ; @put_var_0_asm_h
-; %bb.0:                                ; %B1
-	ldur	x22, [x20, #-8]
+; %bb.0:                                ; %B0
+	ldr	x8, [x24, #216]
 	ldr	w1, [x19]
-	mov	x0, x24
-	mov	w3, wzr
-	str	x20, [x23, #48]
-	mov	x2, x22
-	bl	_JS_SetGlobalVar_GC
-	tbnz	w0, #31, LBB89_2
-; %bb.1:                                ; %B3
+	ldur	x22, [x20, #-8]
+	ldr	x9, [x8, #8]
+	ldr	w10, [x9, #12]
+	add	x12, x9, #64
+	lsl	w11, w10, #2
+	and	w9, w1, w10
+	ldr	w9, [x12, w9, sxtw #2]
+	add	w10, w11, #4
+	add	x10, x12, x10
+	cbz	w9, LBB89_3
+LBB89_1:                                ; %B1
+                                        ; =>This Inner Loop Header: Depth=1
+	lsl	w11, w9, #3
+	sub	w11, w11, #8
+	add	x11, x10, x11
+	ldp	w11, w12, [x11]
+	cmp	w12, w1
+	b.eq	LBB89_6
+; %bb.2:                                ; %B16
+                                        ;   in Loop: Header=BB89_1 Depth=1
+	and	w9, w11, #0x3ffffff
+	cbnz	w9, LBB89_1
+LBB89_3:                                ; %B19
+	ldr	x8, [x24, #208]
+	ldr	x9, [x8, #8]
+	ldr	w10, [x9, #12]
+	add	x12, x9, #64
+	lsl	w11, w10, #2
+	and	w9, w1, w10
+	ldr	w9, [x12, w9, sxtw #2]
+	add	w10, w11, #4
+	add	x10, x12, x10
+	cbz	w9, LBB89_13
+LBB89_4:                                ; %B26
+                                        ; =>This Inner Loop Header: Depth=1
+	lsl	w11, w9, #3
+	sub	w11, w11, #8
+	add	x11, x10, x11
+	ldp	w11, w12, [x11]
+	cmp	w12, w1
+	b.eq	LBB89_10
+; %bb.5:                                ; %B31
+                                        ;   in Loop: Header=BB89_4 Depth=1
+	and	w9, w11, #0x3ffffff
+	cbnz	w9, LBB89_4
+	b	LBB89_13
+LBB89_6:                                ; %B13
+	mov	w10, #58                        ; =0x3a
+	and	w10, w10, w11, lsr #26
+	cmp	w10, #2
+	b.ne	LBB89_13
+; %bb.7:                                ; %B3
+	ldr	x8, [x8, #16]
+	sub	w9, w9, #1
+	ldr	x10, [x8, w9, sxtw #3]
+	cmp	x10, #34
+	b.eq	LBB89_13
+; %bb.8:                                ; %B20
+	str	x22, [x8, w9, sxtw #3]
+	ldrb	w8, [x24, #384]
+	cbnz	w8, LBB89_12
+LBB89_9:                                ; %B8
 	ldrb	w8, [x19, #4]
 	sub	x20, x20, #8
 	add	x19, x19, #5
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB89_2:                                ; %B2
+LBB89_10:                               ; %B28
+	mov	w10, #58                        ; =0x3a
+	and	w10, w10, w11, lsr #26
+	cmp	w10, #2
+	b.ne	LBB89_13
+; %bb.11:                               ; %B20
+	ldr	x8, [x8, #16]
+	sub	w9, w9, #1
+	str	x22, [x8, w9, sxtw #3]
+	ldrb	w8, [x24, #384]
+	cbz	w8, LBB89_9
+LBB89_12:
+	mov	x1, x24
+	mov	x0, x22
+	bl	_prim_WriteBarrierNoStore
+	ldrb	w8, [x19, #4]
+	sub	x20, x20, #8
+	add	x19, x19, #5
+	ldr	x1, [x25, x8, lsl #3]
+	br	x1
+LBB89_13:                               ; %B34
+	mov	x0, x24
+	mov	x2, x22
+	mov	w3, wzr
+	str	x20, [x23, #48]
+	bl	_JS_SetGlobalVar_GC
+	tbz	w0, #31, LBB89_9
+; %bb.14:                               ; %B35
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function put_var_init_0_asm_h
@@ -3838,30 +3920,113 @@ LBB90_2:                                ; %B2
                                         ; -- End function
 	.p2align	2                               ; -- Begin function put_var_strict_0_asm_h
 l_put_var_strict_0_asm_h:               ; @put_var_strict_0_asm_h
-; %bb.0:                                ; %B5
+; %bb.0:                                ; %B38
 	ldp	x22, x21, [x20, #-16]
 	cmp	x22, #7
-	b.ne	LBB91_3
-; %bb.1:                                ; %B1
+	b.ne	LBB91_16
+; %bb.1:                                ; %B40
+	ldr	x8, [x24, #216]
 	ldr	w1, [x19]
-	mov	x0, x24
-	mov	x2, x21
-	mov	w3, #2                          ; =0x2
-	str	x20, [x23, #48]
-	bl	_JS_SetGlobalVar_GC
-	tbnz	w0, #31, LBB91_4
-; %bb.2:                                ; %B3
+	ldr	x9, [x8, #8]
+	ldr	w10, [x9, #12]
+	add	x12, x9, #64
+	lsl	w11, w10, #2
+	and	w9, w1, w10
+	ldr	w9, [x12, w9, sxtw #2]
+	add	w10, w11, #4
+	add	x10, x12, x10
+	cbz	w9, LBB91_4
+LBB91_2:                                ; %B30
+                                        ; =>This Inner Loop Header: Depth=1
+	lsl	w11, w9, #3
+	sub	w11, w11, #8
+	add	x11, x10, x11
+	ldp	w11, w12, [x11]
+	cmp	w12, w1
+	b.eq	LBB91_7
+; %bb.3:                                ; %B32
+                                        ;   in Loop: Header=BB91_2 Depth=1
+	and	w9, w11, #0x3ffffff
+	cbnz	w9, LBB91_2
+LBB91_4:                                ; %B34
+	ldr	x8, [x24, #208]
+	ldr	x9, [x8, #8]
+	ldr	w10, [x9, #12]
+	add	x12, x9, #64
+	lsl	w11, w10, #2
+	and	w9, w1, w10
+	ldr	w9, [x12, w9, sxtw #2]
+	add	w10, w11, #4
+	add	x10, x12, x10
+	cbz	w9, LBB91_14
+LBB91_5:                                ; %B23
+                                        ; =>This Inner Loop Header: Depth=1
+	lsl	w11, w9, #3
+	sub	w11, w11, #8
+	add	x11, x10, x11
+	ldp	w11, w12, [x11]
+	cmp	w12, w1
+	b.eq	LBB91_11
+; %bb.6:                                ; %B25
+                                        ;   in Loop: Header=BB91_5 Depth=1
+	and	w9, w11, #0x3ffffff
+	cbnz	w9, LBB91_5
+	b	LBB91_14
+LBB91_7:                                ; %B1
+	mov	w10, #58                        ; =0x3a
+	and	w10, w10, w11, lsr #26
+	cmp	w10, #2
+	b.ne	LBB91_14
+; %bb.8:                                ; %B9
+	ldr	x8, [x8, #16]
+	sub	w9, w9, #1
+	ldr	x10, [x8, w9, sxtw #3]
+	cmp	x10, #34
+	b.eq	LBB91_14
+; %bb.9:                                ; %B14
+	str	x21, [x8, w9, sxtw #3]
+	ldrb	w8, [x24, #384]
+	cbnz	w8, LBB91_13
+LBB91_10:                               ; %B6
 	ldrb	w8, [x19, #4]
 	sub	x20, x20, #16
 	add	x19, x19, #5
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB91_3:                                ; %B6
+LBB91_11:                               ; %B18
+	mov	w10, #58                        ; =0x3a
+	and	w10, w10, w11, lsr #26
+	cmp	w10, #2
+	b.ne	LBB91_14
+; %bb.12:                               ; %B14
+	ldr	x8, [x8, #16]
+	sub	w9, w9, #1
+	str	x21, [x8, w9, sxtw #3]
+	ldrb	w8, [x24, #384]
+	cbz	w8, LBB91_10
+LBB91_13:
+	mov	x1, x24
+	mov	x0, x21
+	bl	_prim_WriteBarrierNoStore
+	ldrb	w8, [x19, #4]
+	sub	x20, x20, #16
+	add	x19, x19, #5
+	ldr	x1, [x25, x8, lsl #3]
+	br	x1
+LBB91_14:                               ; %B35
+	mov	x0, x24
+	mov	x2, x21
+	mov	w3, #2                          ; =0x2
+	str	x20, [x23, #48]
+	bl	_JS_SetGlobalVar_GC
+	tbz	w0, #31, LBB91_10
+; %bb.15:                               ; %B36
+	b	l_exception_asm_h
+LBB91_16:                               ; %B39
 	ldr	w1, [x19]
 	mov	x0, x24
 	str	x20, [x23, #48]
 	bl	_JS_ThrowReferenceErrorNotDefined_GC
-LBB91_4:                                ; %B2
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function get_ref_value_0_asm_h
@@ -11645,8 +11810,94 @@ LBB331_15:                              ; %B17
                                         ; -- End function
 	.p2align	2                               ; -- Begin function put_var_1_asm_h
 l_put_var_1_asm_h:                      ; @put_var_1_asm_h
-; %bb.0:                                ; %B1
+; %bb.0:                                ; %B0
+	ldr	x8, [x24, #216]
 	ldr	w1, [x19]
+	ldr	x9, [x8, #8]
+	ldr	w10, [x9, #12]
+	add	x12, x9, #64
+	lsl	w11, w10, #2
+	and	w9, w1, w10
+	ldr	w9, [x12, w9, sxtw #2]
+	add	w10, w11, #4
+	add	x10, x12, x10
+	cbz	w9, LBB332_3
+LBB332_1:                               ; %B1
+                                        ; =>This Inner Loop Header: Depth=1
+	lsl	w11, w9, #3
+	sub	w11, w11, #8
+	add	x11, x10, x11
+	ldp	w11, w12, [x11]
+	cmp	w12, w1
+	b.eq	LBB332_6
+; %bb.2:                                ; %B16
+                                        ;   in Loop: Header=BB332_1 Depth=1
+	and	w9, w11, #0x3ffffff
+	cbnz	w9, LBB332_1
+LBB332_3:                               ; %B19
+	ldr	x8, [x24, #208]
+	ldr	x9, [x8, #8]
+	ldr	w10, [x9, #12]
+	add	x12, x9, #64
+	lsl	w11, w10, #2
+	and	w9, w1, w10
+	ldr	w9, [x12, w9, sxtw #2]
+	add	w10, w11, #4
+	add	x10, x12, x10
+	cbz	w9, LBB332_13
+LBB332_4:                               ; %B26
+                                        ; =>This Inner Loop Header: Depth=1
+	lsl	w11, w9, #3
+	sub	w11, w11, #8
+	add	x11, x10, x11
+	ldp	w11, w12, [x11]
+	cmp	w12, w1
+	b.eq	LBB332_10
+; %bb.5:                                ; %B31
+                                        ;   in Loop: Header=BB332_4 Depth=1
+	and	w9, w11, #0x3ffffff
+	cbnz	w9, LBB332_4
+	b	LBB332_13
+LBB332_6:                               ; %B13
+	mov	w10, #58                        ; =0x3a
+	and	w10, w10, w11, lsr #26
+	cmp	w10, #2
+	b.ne	LBB332_13
+; %bb.7:                                ; %B3
+	ldr	x8, [x8, #16]
+	sub	w9, w9, #1
+	ldr	x10, [x8, w9, sxtw #3]
+	cmp	x10, #34
+	b.eq	LBB332_13
+; %bb.8:                                ; %B20
+	str	x22, [x8, w9, sxtw #3]
+	ldrb	w8, [x24, #384]
+	cbnz	w8, LBB332_12
+LBB332_9:                               ; %B8
+	ldrb	w8, [x19, #4]
+	add	x19, x19, #5
+	ldr	x1, [x25, x8, lsl #3]
+	br	x1
+LBB332_10:                              ; %B28
+	mov	w10, #58                        ; =0x3a
+	and	w10, w10, w11, lsr #26
+	cmp	w10, #2
+	b.ne	LBB332_13
+; %bb.11:                               ; %B20
+	ldr	x8, [x8, #16]
+	sub	w9, w9, #1
+	str	x22, [x8, w9, sxtw #3]
+	ldrb	w8, [x24, #384]
+	cbz	w8, LBB332_9
+LBB332_12:
+	mov	x1, x24
+	mov	x0, x22
+	bl	_prim_WriteBarrierNoStore
+	ldrb	w8, [x19, #4]
+	add	x19, x19, #5
+	ldr	x1, [x25, x8, lsl #3]
+	br	x1
+LBB332_13:                              ; %B34
 	mov	x8, x20
 	mov	x0, x24
 	mov	x2, x22
@@ -11654,13 +11905,8 @@ l_put_var_1_asm_h:                      ; @put_var_1_asm_h
 	str	x22, [x8], #8
 	str	x8, [x23, #48]
 	bl	_JS_SetGlobalVar_GC
-	tbnz	w0, #31, LBB332_2
-; %bb.1:                                ; %B3
-	ldrb	w8, [x19, #4]
-	add	x19, x19, #5
-	ldr	x1, [x25, x8, lsl #3]
-	br	x1
-LBB332_2:                               ; %B2
+	tbz	w0, #31, LBB332_9
+; %bb.14:                               ; %B35
 	b	l_exception_spill_top0_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function put_var_init_1_asm_h
@@ -17895,8 +18141,96 @@ LBB574_15:                              ; %B17
                                         ; -- End function
 	.p2align	2                               ; -- Begin function put_var_2_asm_h
 l_put_var_2_asm_h:                      ; @put_var_2_asm_h
-; %bb.0:                                ; %B1
+; %bb.0:                                ; %B0
+	ldr	x8, [x24, #216]
 	ldr	w1, [x19]
+	ldr	x9, [x8, #8]
+	ldr	w10, [x9, #12]
+	add	x12, x9, #64
+	lsl	w11, w10, #2
+	and	w9, w1, w10
+	ldr	w9, [x12, w9, sxtw #2]
+	add	w10, w11, #4
+	add	x10, x12, x10
+	cbz	w9, LBB575_3
+LBB575_1:                               ; %B1
+                                        ; =>This Inner Loop Header: Depth=1
+	lsl	w11, w9, #3
+	sub	w11, w11, #8
+	add	x11, x10, x11
+	ldp	w11, w12, [x11]
+	cmp	w12, w1
+	b.eq	LBB575_6
+; %bb.2:                                ; %B16
+                                        ;   in Loop: Header=BB575_1 Depth=1
+	and	w9, w11, #0x3ffffff
+	cbnz	w9, LBB575_1
+LBB575_3:                               ; %B19
+	ldr	x8, [x24, #208]
+	ldr	x9, [x8, #8]
+	ldr	w10, [x9, #12]
+	add	x12, x9, #64
+	lsl	w11, w10, #2
+	and	w9, w1, w10
+	ldr	w9, [x12, w9, sxtw #2]
+	add	w10, w11, #4
+	add	x10, x12, x10
+	cbz	w9, LBB575_13
+LBB575_4:                               ; %B26
+                                        ; =>This Inner Loop Header: Depth=1
+	lsl	w11, w9, #3
+	sub	w11, w11, #8
+	add	x11, x10, x11
+	ldp	w11, w12, [x11]
+	cmp	w12, w1
+	b.eq	LBB575_10
+; %bb.5:                                ; %B31
+                                        ;   in Loop: Header=BB575_4 Depth=1
+	and	w9, w11, #0x3ffffff
+	cbnz	w9, LBB575_4
+	b	LBB575_13
+LBB575_6:                               ; %B13
+	mov	w10, #58                        ; =0x3a
+	and	w10, w10, w11, lsr #26
+	cmp	w10, #2
+	b.ne	LBB575_13
+; %bb.7:                                ; %B3
+	ldr	x8, [x8, #16]
+	sub	w9, w9, #1
+	ldr	x10, [x8, w9, sxtw #3]
+	cmp	x10, #34
+	b.eq	LBB575_13
+; %bb.8:                                ; %B20
+	str	x21, [x8, w9, sxtw #3]
+	ldrb	w8, [x24, #384]
+	cbnz	w8, LBB575_12
+LBB575_9:                               ; %B8
+	ldrb	w8, [x19, #4]
+	add	x19, x19, #5
+	add	w8, w8, #243
+	ldr	x1, [x25, w8, uxtw #3]
+	br	x1
+LBB575_10:                              ; %B28
+	mov	w10, #58                        ; =0x3a
+	and	w10, w10, w11, lsr #26
+	cmp	w10, #2
+	b.ne	LBB575_13
+; %bb.11:                               ; %B20
+	ldr	x8, [x8, #16]
+	sub	w9, w9, #1
+	str	x21, [x8, w9, sxtw #3]
+	ldrb	w8, [x24, #384]
+	cbz	w8, LBB575_9
+LBB575_12:
+	mov	x1, x24
+	mov	x0, x21
+	bl	_prim_WriteBarrierNoStore
+	ldrb	w8, [x19, #4]
+	add	x19, x19, #5
+	add	w8, w8, #243
+	ldr	x1, [x25, w8, uxtw #3]
+	br	x1
+LBB575_13:                              ; %B34
 	add	x8, x20, #16
 	mov	x0, x24
 	mov	x2, x21
@@ -17904,14 +18238,8 @@ l_put_var_2_asm_h:                      ; @put_var_2_asm_h
 	stp	x22, x21, [x20]
 	str	x8, [x23, #48]
 	bl	_JS_SetGlobalVar_GC
-	tbnz	w0, #31, LBB575_2
-; %bb.1:                                ; %B3
-	ldrb	w8, [x19, #4]
-	add	x19, x19, #5
-	add	w8, w8, #243
-	ldr	x1, [x25, w8, uxtw #3]
-	br	x1
-LBB575_2:                               ; %B2
+	tbz	w0, #31, LBB575_9
+; %bb.14:                               ; %B35
 	b	l_exception_spill_top0_top1_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function put_var_init_2_asm_h

@@ -239,16 +239,34 @@ QJS_HIDE void dbuf_init2(DynBuf *s, void *opaque,
 QJS_HIDE int dbuf_realloc(DynBuf *s, size_t new_size, int alloc_tag = 1);
 QJS_HIDE int dbuf_put(DynBuf *s, const uint8_t *data, size_t len);
 QJS_HIDE int dbuf_put_self(DynBuf *s, size_t offset, size_t len);
-QJS_HIDE int dbuf_putc(DynBuf *s, uint8_t c);
 QJS_HIDE int dbuf_putstr(DynBuf *s, const char *str);
+/* The bytecode emitter calls these for almost every byte it writes, so the
+   common case of enough room is inlined and only growth calls dbuf_put(). */
+QJS_HIDE static inline int dbuf_putc(DynBuf *s, uint8_t c) {
+  if (unlikely(s->allocated_size - s->size < 1)) return dbuf_put(s, &c, 1);
+  s->buf[s->size++] = c;
+  return 0;
+}
 QJS_HIDE static inline int dbuf_put_u16(DynBuf *s, uint16_t val) {
-  return dbuf_put(s, (uint8_t *)&val, 2);
+  if (unlikely(s->allocated_size - s->size < 2))
+    return dbuf_put(s, (uint8_t *)&val, 2);
+  memcpy(s->buf + s->size, &val, 2);
+  s->size += 2;
+  return 0;
 }
 QJS_HIDE static inline int dbuf_put_u32(DynBuf *s, uint32_t val) {
-  return dbuf_put(s, (uint8_t *)&val, 4);
+  if (unlikely(s->allocated_size - s->size < 4))
+    return dbuf_put(s, (uint8_t *)&val, 4);
+  memcpy(s->buf + s->size, &val, 4);
+  s->size += 4;
+  return 0;
 }
 QJS_HIDE static inline int dbuf_put_u64(DynBuf *s, uint64_t val) {
-  return dbuf_put(s, (uint8_t *)&val, 8);
+  if (unlikely(s->allocated_size - s->size < 8))
+    return dbuf_put(s, (uint8_t *)&val, 8);
+  memcpy(s->buf + s->size, &val, 8);
+  s->size += 8;
+  return 0;
 }
 int __attribute__((format(printf, 2, 3))) QJS_HIDE dbuf_printf(DynBuf *s,
                                                                const char *fmt,

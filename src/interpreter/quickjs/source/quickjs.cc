@@ -11407,7 +11407,13 @@ redo:
       const char *str;
       const char *p;
       size_t len;
+      int32_t int_value;
 
+      if (js_string_to_int32_fast(LEPUS_VALUE_GET_STRING(val), &int_value)) {
+        LEPUS_FreeValue(ctx, val);
+        ret = LEPUS_NewInt32(ctx, int_value);
+        break;
+      }
       str = JS_ToCStringLen2_RC(ctx, &len, val, 0);
       LEPUS_FreeValue(ctx, val);
       if (!str) return LEPUS_EXCEPTION;
@@ -53343,6 +53349,8 @@ bool LEPUS_GetGCPauseSuppressionMode(LEPUSRuntime *rt) {
 
 void insert_weakref_record(LEPUSContext *ctx, LEPUSObject *p,
                            struct WeakRefRecord *record) {
+  record->prev_weak_ref = nullptr;
+  if (p->first_weak_ref) p->first_weak_ref->prev_weak_ref = record;
   HeapObjStore(ctx, &record->next_weak_ref, p->first_weak_ref);
   HeapObjStore(ctx, &p->first_weak_ref, record);
   if (ctx->rt->obj_finalizer_recoder) {

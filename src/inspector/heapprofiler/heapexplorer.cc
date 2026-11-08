@@ -228,6 +228,9 @@ HeapEntry* QjsHeapExplorer::AddEntry(LEPUSContext* ctx, const HeapObjPtr& obj) {
           static_cast<size_t>(table->entry_capacity) * (table->is_weak ? 2 : 1);
       size_t size = sizeof(JSLinkedHashMap) + sizeof(uint32_t) * index_count +
                     sizeof(JSLinkedHashMapEntry) * table->entry_capacity;
+      if (table->is_weak) {
+        size += sizeof(WeakRefRecord*) * table->entry_capacity;
+      }
       entry = snapshot_->AddEntry(HeapEntry::kNative,
                                   "system / linked_hash_map", obj_id, size);
     } break;
