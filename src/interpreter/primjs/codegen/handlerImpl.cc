@@ -1775,6 +1775,59 @@ void HandlerImpl::GenGetGlobalVar(PrimjsOpcode opcode) {
   }
 }
 
+void HandlerImpl::GenPutGlobalVarFast(PrimjsOpcode opcode,
+                                      son::node::Node* atom,
+                                      son::node::Node* val, int pop_count,
+                                      son::node::Label* slow_put) {
+  // Covers two cases of JS_SetGlobalVar_GC() with flag 0 or 2: an initialized
+  // writable binding in global_var_obj, and when the name is not there, a
+  // writable own data property of the global object. Bindings that throw and
+  // all other properties take the runtime call.
+  son::node::Label try_global_obj(this);
+  son::node::Label success(this);
+  auto mask =
+      IntValue(LEPUS_PROP_TMASK | LEPUS_PROP_WRITABLE | LEPUS_PROP_LENGTH);
+  auto property_size = Int32Value(sizeof(JSPropertyGC) / sizeof(int64_t));
+
+  auto store = [&](son::node::Node* obj, son::node::Node* prs,
+                   son::node::Node* h, bool check_uninitialized) {
+    son::node::Label writable(this);
+    auto flags = LoadJsShapePropertyHashFlags(prs);
+    Branch(Equal(Int32And(flags, mask), IntValue(LEPUS_PROP_WRITABLE)),
+           &writable, slow_put, son::node::BranchHint::kTrue);
+    Bind(&writable);
+    // pr = &p->prop[h - 1];
+    auto pr = LoadObjectProp(obj);
+    auto index = Int32Mul(Int32Sub(h, IntValue(1)), property_size);
+    if (check_uninitialized) {
+      BranchIf(Equal(LoadLepusVal(pr, index), Uninitialized()), slow_put,
+               son::node::BranchHint::kFalse);
+    }
+    // set_value_gc(ctx, &pr->u.value, val);
+    StoreHeapVal(GetCtx(), pr, index, val);
+    Jump(&success);
+  };
+
+  auto var_obj = CastToRaw(GetGlobalVar());
+  FindOwnProperty(var_obj, atom, &try_global_obj,
+                  [&](son::node::Node* prs, son::node::Node* h) {
+                    store(var_obj, prs, h, true);
+                  });
+  Bind(&try_global_obj);
+  auto global_obj = CastToRaw(GetGlobal());
+  FindOwnProperty(global_obj, atom, slow_put,
+                  [&](son::node::Node* prs, son::node::Node* h) {
+                    store(global_obj, prs, h, false);
+                  });
+
+  Bind(&success);
+  {
+    ClearNewSp();
+    DecSp(pop_count);
+    Dispatch(opcode);
+  }
+}
+
 void HandlerImpl::GenGetField(PrimjsOpcode opcode) {
   auto obj = LoadTop0();
   auto obj_raw = CastToRaw(obj);

@@ -129,6 +129,12 @@ class HandlerImpl : public InterpreterAssembler {
   void GenPutField(PrimjsOpcode opcode);
   void GenGetGlobalVar(PrimjsOpcode opcode);
   void GenGetGlobalVarCommon(PrimjsOpcode opcode, son::node::Label* slow_get);
+  // Stores |val| to an existing global binding without a runtime call when
+  // JS_SetGlobalVar_GC() would store it unchanged, then pops |pop_count|
+  // values and dispatches. Jumps to |slow_put| otherwise.
+  void GenPutGlobalVarFast(PrimjsOpcode opcode, son::node::Node* atom,
+                           son::node::Node* val, int pop_count,
+                           son::node::Label* slow_put);
   void GenSetProperty();
   void GenSetPropertyValue();
   son::node::Node* TryGetInternedStringAtom(son::node::Node* prop,

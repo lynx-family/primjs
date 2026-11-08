@@ -1266,6 +1266,8 @@ void JS_FreeContext_GC(LEPUSContext *ctx) {
   js_free_shape_null(ctx->array_shape);
   js_free_shape_null(ctx->arguments_shape);
   js_free_shape_null(ctx->non_strict_arguments_shape);
+  js_free_shape_null(ctx->regexp_shape);
+  js_free_shape_null(ctx->regexp_result_shape);
   list_del(&ctx->link);
   ctx->fg_ctx->ctx = nullptr;
   if (ctx->napi_scope) {
@@ -3008,7 +3010,7 @@ QJS_HIDE LEPUSValue JS_NewObjectFromShape_GC(LEPUSContext *ctx, JSShape *sh,
       p->is_exotic = 1;
       p->fast_array = 1;
       JSPropertyGC *pr;
-      if (likely(sh == ctx->array_shape)) {
+      if (likely(sh == ctx->array_shape || sh == ctx->regexp_result_shape)) {
         /* the length property is always the first one */
         pr = &p->gc_prop[0];
         pr->u.value = LEPUS_NewInt32(ctx, 0);
@@ -6474,6 +6476,19 @@ int JS_SetGlobalVar_GC(LEPUSContext *ctx, JSAtom prop, LEPUSValue val,
     return 0;
   }
 
+  /* Fast case of JS_SetPropertyInternal_GC(): an existing writable data
+     property of the global object, such as a global 'var'. */
+  p = LEPUS_VALUE_GET_OBJ(ctx->global_obj);
+  prs = find_own_property(&pr, p, prop);
+  if (likely(prs &&
+             (prs->flags & (LEPUS_PROP_TMASK | LEPUS_PROP_WRITABLE |
+                            LEPUS_PROP_LENGTH)) == LEPUS_PROP_WRITABLE)) {
+    CheckObjectCtxIfEnabled(ctx, ctx->global_obj);
+    CheckObjectCtxIfEnabled(ctx, val);
+    set_value_gc(ctx, &pr->u.value, val);
+    return TRUE;
+  }
+
   flags = LEPUS_PROP_THROW_STRICT;
   if (flag != 2 && is_strict_mode(ctx)) flags |= LEPUS_PROP_NO_ADD;
   return JS_SetPropertyInternal_GC(ctx, ctx->global_obj, prop, val, flags);
@@ -6696,7 +6711,12 @@ redo:
       const char *str;
       const char *p;
       size_t len;
+      int32_t int_value;
 
+      if (js_string_to_int32_fast(LEPUS_VALUE_GET_STRING(val), &int_value)) {
+        ret = LEPUS_NewInt32(ctx, int_value);
+        break;
+      }
       str = JS_ToCStringLen2_GC(ctx, &len, val, 0);
       if (!str) return LEPUS_EXCEPTION;
       HandleScope block_scope(ctx, &str, HANDLE_TYPE_CSTRING);
@@ -19633,6 +19653,25 @@ LEPUSValue js_regexp_constructor_internal_gc(LEPUSContext *ctx,
     return LEPUS_EXCEPTION;
   }
 
+  /* RegExp.prototype cannot be redefined, so a literal or a direct
+     'new RegExp()' can use the precomputed shape without reading it. */
+  if (ctx->regexp_shape &&
+      ctx->regexp_shape->proto ==
+          LEPUS_VALUE_GET_OBJ(ctx->class_proto[JS_CLASS_REGEXP]) &&
+      (LEPUS_IsUndefined(ctor) ||
+       (LEPUS_IsObject(ctor) &&
+        LEPUS_VALUE_GET_OBJ(ctor) == LEPUS_VALUE_GET_OBJ(ctx->regexp_ctor)))) {
+    obj = JS_NewObjectFromShape_GC(ctx, js_dup_shape(ctx->regexp_shape),
+                                   JS_CLASS_REGEXP);
+    if (LEPUS_IsException(obj)) goto fail;
+    p = LEPUS_VALUE_GET_OBJ(obj);
+    p->gc_prop[0].u.value = LEPUS_NewInt32(ctx, 0);
+    func_scope.PushHandle(&obj, HANDLE_TYPE_LEPUS_VALUE);
+    re = &p->u.regexp;
+    HeapObjStore(ctx, &re->pattern, LEPUS_VALUE_GET_STRING(pattern));
+    HeapObjStore(ctx, &re->bytecode, LEPUS_VALUE_GET_STRING(bc));
+    return obj;
+  }
   obj = js_create_from_ctor_GC(ctx, ctor, JS_CLASS_REGEXP);
   if (LEPUS_IsException(obj)) goto fail;
   func_scope.PushHandle(&obj, HANDLE_TYPE_LEPUS_VALUE);
@@ -20081,9 +20120,23 @@ static LEPUSValue js_regexp_exec_internal(LEPUSContext *ctx,
        so the match array is not needed */
     if (test_only) return LEPUS_NewBool(ctx, TRUE);
 #endif
-    obj = JS_NewArray_GC(ctx);
-    if (LEPUS_IsException(obj)) goto fail;
-    p = LEPUS_VALUE_GET_OBJ(obj);
+    /* The result shape already has groups, index and input (slots 1 to 3)
+       after length. */
+    bool use_result_shape =
+        ctx->regexp_result_shape &&
+        ctx->regexp_result_shape->proto ==
+            LEPUS_VALUE_GET_OBJ(ctx->class_proto[JS_CLASS_ARRAY]);
+    if (use_result_shape) {
+      obj = JS_NewObjectFromShape_GC(
+          ctx, js_dup_shape(ctx->regexp_result_shape), JS_CLASS_ARRAY);
+      if (LEPUS_IsException(obj)) goto fail;
+      p = LEPUS_VALUE_GET_OBJ(obj);
+      for (i = 1; i <= 3; i++) p->gc_prop[i].u.value = LEPUS_UNDEFINED;
+    } else {
+      obj = JS_NewArray_GC(ctx);
+      if (LEPUS_IsException(obj)) goto fail;
+      p = LEPUS_VALUE_GET_OBJ(obj);
+    }
     if (expand_fast_array(ctx, p, capture_count)) goto fail;
     prop_flags = LEPUS_PROP_C_W_E | LEPUS_PROP_THROW;
     group_name_ptr = NULL;
@@ -20143,12 +20196,19 @@ static LEPUSValue js_regexp_exec_internal(LEPUSContext *ctx,
     js_clear_regexp_caputre_property(ctx, regexp_obj, capture_count);
 #endif
 
-    if (js_regexp_add_result_property(ctx, p, JS_ATOM_groups, groups) < 0 ||
-        js_regexp_add_result_property(
-            ctx, p, JS_ATOM_index,
-            LEPUS_NewInt32(ctx, (capture[0] - str_buf) >> shift)) < 0 ||
-        js_regexp_add_result_property(ctx, p, JS_ATOM_input, str_val) < 0)
+    LEPUSValue index = LEPUS_NewInt32(ctx, (capture[0] - str_buf) >> shift);
+    if (use_result_shape) {
+      HeapObjStore(ctx, &p->gc_prop[1].u.value, groups);
+      HeapObjStore(ctx, &p->gc_prop[2].u.value, index);
+      HeapObjStore(ctx, &p->gc_prop[3].u.value, str_val);
+    } else if (js_regexp_add_result_property(ctx, p, JS_ATOM_groups, groups) <
+                   0 ||
+               js_regexp_add_result_property(ctx, p, JS_ATOM_index, index) <
+                   0 ||
+               js_regexp_add_result_property(ctx, p, JS_ATOM_input, str_val) <
+                   0) {
       goto fail;
+    }
   }
   if (test_only) return LEPUS_NewBool(ctx, !LEPUS_IsNull(obj));
   return obj;
@@ -20933,6 +20993,43 @@ void JS_AddIntrinsicRegExpCompiler_GC(LEPUSContext *ctx) {
   ctx->compile_regexp = js_compile_regexp;
 }
 
+/* Builds in '*psh', a context root, a shape with 'proto' and the given
+   properties. Leaves nullptr on failure. */
+static void js_init_context_shape(LEPUSContext *ctx, JSShape **psh,
+                                  LEPUSValueConst proto, const JSAtom *atoms,
+                                  const int *flags, int count) {
+  *psh = nullptr;
+  if (!LEPUS_IsObject(proto)) return;
+  *psh = js_new_shape2(ctx, LEPUS_VALUE_GET_OBJ(proto),
+                       JS_PROP_INITIAL_HASH_SIZE, count);
+  if (!*psh) return;
+  for (int i = 0; i < count; i++) {
+    if (add_shape_property(ctx, psh, nullptr, atoms[i], flags[i]) < 0) {
+      js_free_shape_null(*psh);
+      *psh = nullptr;
+      return;
+    }
+  }
+}
+
+static void JS_InitRegExpShapes_GC_Helper(LEPUSContext *ctx) {
+  static const JSAtom regexp_atoms[] = {JS_ATOM_lastIndex};
+  static const int regexp_flags[] = {LEPUS_PROP_WRITABLE};
+  js_init_context_shape(ctx, &ctx->regexp_shape,
+                        ctx->class_proto[JS_CLASS_REGEXP], regexp_atoms,
+                        regexp_flags, countof(regexp_atoms));
+
+  /* The order matches the properties that RegExp exec used to add. */
+  static const JSAtom result_atoms[] = {JS_ATOM_length, JS_ATOM_groups,
+                                        JS_ATOM_index, JS_ATOM_input};
+  static const int result_flags[] = {LEPUS_PROP_WRITABLE | LEPUS_PROP_LENGTH,
+                                     LEPUS_PROP_C_W_E, LEPUS_PROP_C_W_E,
+                                     LEPUS_PROP_C_W_E};
+  js_init_context_shape(ctx, &ctx->regexp_result_shape,
+                        ctx->class_proto[JS_CLASS_ARRAY], result_atoms,
+                        result_flags, countof(result_atoms));
+}
+
 void JS_AddIntrinsicRegExp_GC(LEPUSContext *ctx) {
   JS_AddIntrinsicRegExpCompiler_GC(ctx);
 
@@ -20941,6 +21038,7 @@ void JS_AddIntrinsicRegExp_GC(LEPUSContext *ctx) {
       LEPUS_CFUNC_constructor_or_func, 0, LEPUS_UNDEFINED, js_regexp_funcs,
       countof(js_regexp_funcs), js_regexp_proto_funcs,
       countof(js_regexp_proto_funcs), 0);
+  JS_InitRegExpShapes_GC_Helper(ctx);
 
 #if defined(__WASI_SDK__) || defined(QJS_UNITTEST)
   js_clear_regexp_caputre_property(ctx, ctx->regexp_ctor, 0);
@@ -22852,7 +22950,20 @@ static void delete_weak_ref(LEPUSRuntime *rt, LEPUSObject *p, void *ptr) {
   }
   assert(wr != nullptr);
   *pwr = wr->next_weak_ref;
+  if (wr->next_weak_ref) wr->next_weak_ref->prev_weak_ref = wr->prev_weak_ref;
   WriteBarrierNoStore(rt, wr->next_weak_ref);
+}
+
+static void unlink_weak_ref_record(LEPUSObject *p, WeakRefRecord *wr) {
+  WeakRefRecord *next = wr->next_weak_ref;
+  WeakRefRecord *prev = wr->prev_weak_ref;
+  if (prev) {
+    prev->next_weak_ref = next;
+  } else {
+    assert(p->first_weak_ref == wr);
+    p->first_weak_ref = next;
+  }
+  if (next) next->prev_weak_ref = prev;
 }
 
 constexpr uint32_t kInvalidMapEntry = UINT32_MAX;
@@ -22877,7 +22988,7 @@ static JSLinkedHashMap *linked_hash_map_alloc(LEPUSContext *ctx,
   }
   size_t size = sizeof(JSLinkedHashMap) + sizeof(uint32_t) * bucket_count;
   size_t entry_storage_size = sizeof(uint32_t) + sizeof(JSLinkedHashMapEntry);
-  if (is_weak) entry_storage_size += sizeof(uint32_t);
+  if (is_weak) entry_storage_size += sizeof(uint32_t) + sizeof(WeakRefRecord *);
   if (entry_capacity > (SIZE_MAX - size) / entry_storage_size) return nullptr;
   size += entry_storage_size * entry_capacity;
   auto *table = static_cast<JSLinkedHashMap *>(
@@ -22929,18 +23040,6 @@ static JSLinkedHashMapLookup linked_hash_map_find(LEPUSContext *ctx,
   return result;
 }
 
-static WeakRefRecord *find_weak_map_entry_record(LEPUSObject *key,
-                                                 JSLinkedHashMap *table,
-                                                 uint32_t entry_index) {
-  for (WeakRefRecord *wr = key->first_weak_ref; wr; wr = wr->next_weak_ref) {
-    if (wr->kind == WEAK_REF_KIND_WEAK_MAP && wr->u.map_entry.table == table &&
-        wr->u.map_entry.entry_index == entry_index) {
-      return wr;
-    }
-  }
-  return nullptr;
-}
-
 static bool insert_weak_map_entry_record(LEPUSContext *ctx, LEPUSValueConst key,
                                          JSLinkedHashMap *table,
                                          uint32_t entry_index) {
@@ -22951,35 +23050,37 @@ static bool insert_weak_map_entry_record(LEPUSContext *ctx, LEPUSValueConst key,
   wr->u.map_entry.table = table;
   wr->u.map_entry.entry_index = entry_index;
   insert_weakref_record(ctx, LEPUS_VALUE_GET_OBJ(key), wr);
+  JSLinkedHashMapWeakRecords(table)[entry_index] = wr;
   return true;
 }
 
+/* Unlinks the record of a live entry from its key. A WeakMap that dies
+   between collections unlinks every entry, and a key can be held by many such
+   maps, so this must not search the key's list. */
 static void delete_weak_map_entry_record(LEPUSObject *key,
                                          JSLinkedHashMap *table,
                                          uint32_t entry_index) {
-  WeakRefRecord **slot = &key->first_weak_ref;
-  while (*slot) {
-    WeakRefRecord *wr = *slot;
-    if (wr->kind == WEAK_REF_KIND_WEAK_MAP && wr->u.map_entry.table == table &&
-        wr->u.map_entry.entry_index == entry_index) {
-      *slot = wr->next_weak_ref;
-      return;
-    }
-    slot = &wr->next_weak_ref;
-  }
+  WeakRefRecord *&slot = JSLinkedHashMapWeakRecords(table)[entry_index];
+  WeakRefRecord *wr = slot;
+  if (!wr) return;
+  assert(wr->kind == WEAK_REF_KIND_WEAK_MAP && wr->u.map_entry.table == table &&
+         wr->u.map_entry.entry_index == entry_index);
+  unlink_weak_ref_record(key, wr);
+  slot = nullptr;
 }
 
-static void rebind_weak_map_entry_record(LEPUSValueConst key,
-                                         JSLinkedHashMap *old_table,
+static void rebind_weak_map_entry_record(JSLinkedHashMap *old_table,
                                          uint32_t old_index,
                                          JSLinkedHashMap *new_table,
                                          uint32_t new_index) {
-  WeakRefRecord *wr = find_weak_map_entry_record(LEPUS_VALUE_GET_OBJ(key),
-                                                 old_table, old_index);
+  WeakRefRecord *&old_slot = JSLinkedHashMapWeakRecords(old_table)[old_index];
+  WeakRefRecord *wr = old_slot;
   assert(wr);
   if (!wr) return;
   wr->u.map_entry.table = new_table;
   wr->u.map_entry.entry_index = new_index;
+  JSLinkedHashMapWeakRecords(new_table)[new_index] = wr;
+  old_slot = nullptr;
 }
 
 static uint32_t linked_hash_map_compute_capacity(uint32_t entry_count) {
@@ -23031,7 +23132,7 @@ static bool linked_hash_map_rebuild(LEPUSContext *ctx, LEPUSValueConst map_obj,
     JSLinkedHashMapBuckets(new_table)[bucket] = dst_index;
     new_table->live_count++;
     if (is_weak) {
-      rebind_weak_map_entry_record(key, old_table, i, new_table, dst_index);
+      rebind_weak_map_entry_record(old_table, i, new_table, dst_index);
     }
   }
   if (!is_weak) old_table->deleted_count = deleted_count;
@@ -23148,6 +23249,8 @@ static void linked_hash_map_remove_dead_weak_entry(JSLinkedHashMap *table,
   if (!table || !table->is_weak || entry_index >= table->entry_used) {
     return;
   }
+  // The key is dying, and its records with it.
+  JSLinkedHashMapWeakRecords(table)[entry_index] = nullptr;
   JSLinkedHashMapEntry &entry = JSLinkedHashMapEntries(table)[entry_index];
   if (!JSLinkedHashMapEntryIsLive(&entry)) return;
   uint32_t bucket = JSLinkedHashMapWeakBuckets(table)[entry_index];
@@ -30182,6 +30285,10 @@ void Visitor::ScanContext(GCWorkStack &workStack, bool isFinalRemark) noexcept {
     if (ctx->non_strict_arguments_shape) {
       workStack.push_back((address_t)ctx->non_strict_arguments_shape);
     }
+    if (ctx->regexp_shape) workStack.push_back((address_t)ctx->regexp_shape);
+    if (ctx->regexp_result_shape) {
+      workStack.push_back((address_t)ctx->regexp_result_shape);
+    }
 
     for (int32_t i = 0; i < kFunctionShapeSize; ++i) {
       JSShape *shape = ctx->function_shape[i];
@@ -31287,7 +31394,10 @@ void Finalizer::JSLinkedHashMapFinalizer(void *ptr) noexcept {
   auto *table = static_cast<JSLinkedHashMap *>(ptr);
   if (!table->is_weak) return;
   JSLinkedHashMapEntry *entries = JSLinkedHashMapEntries(table);
+  WeakRefRecord **records = JSLinkedHashMapWeakRecords(table);
   for (uint32_t i = 0; i < table->entry_used; i++) {
+    // Entries moved to a rebuilt table have no record here.
+    if (!records[i]) continue;
     JSLinkedHashMapEntry &entry = entries[i];
     if (!JSLinkedHashMapEntryIsLive(&entry)) continue;
     delete_weak_map_entry_record(LEPUS_VALUE_GET_OBJ(entry.key), table, i);
@@ -31565,14 +31675,7 @@ bool CheckTools::IsValidTid(int tid) {
   return false;
 }
 
-void JS_UpdateGCInfo(LEPUSRuntime *rt, size_t size, GCInfoUpdateReason reason) {
-  if (unlikely(rt == nullptr)) return;
-  bool force_report = reason != GCInfoUpdateReason::kAllocation;
-  if (likely(!force_report)) {
-    if (rt->gc_info_threshold == 0) return;
-    rt->gc_info_interval_size += size;
-    if (likely(rt->gc_info_interval_size < rt->gc_info_threshold)) return;
-  }
+void JS_ReportGCInfo(LEPUSRuntime *rt, GCInfoUpdateReason reason) {
   GCObserver *observer = static_cast<GCObserver *>(rt->gc_observer);
   if (likely(observer)) {
     std::stringstream gc_info;

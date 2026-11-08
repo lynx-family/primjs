@@ -776,8 +776,14 @@ DEFINE_BYTECODE_HANDLER(put_var) {
   //   TAIL_CALL return exception_h(HANDLER_PARAM(pc));
   // }
   auto atom = Fetch_32(0);
-  auto desc = son::node::CallDescriptors::JS_SetGlobalVar_GC();
   auto val = LoadTop0();
+  if (_use_fast_path) {
+    son::node::Label slow_put(this);
+    GenPutGlobalVarFast(opcode, atom, val, 1, &slow_put);
+    Bind(&slow_put);
+    ClearNewSp();
+  }
+  auto desc = son::node::CallDescriptors::JS_SetGlobalVar_GC();
   auto ret_val = CallIntRetRuntime(desc, GetCtx(), atom, val, IntValue(0));
   DecSp();
   Dispatch(opcode);
@@ -820,6 +826,12 @@ DEFINE_BYTECODE_HANDLER(put_var_strict) {
   BranchIf(cond, &throw_e, son::node::BranchHint::kFalse);
 
   auto obj = LoadTop0();
+  if (_use_fast_path) {
+    son::node::Label slow_put(this);
+    GenPutGlobalVarFast(opcode, atom, obj, 2, &slow_put);
+    Bind(&slow_put);
+    ClearNewSp();
+  }
   auto desc = son::node::CallDescriptors::JS_SetGlobalVar_GC();
   CallIntRetRuntime(desc, GetCtx(), atom, obj, IntValue(2));
   DecSp(2);

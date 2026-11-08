@@ -147,8 +147,6 @@ int dbuf_put_self(DynBuf *s, size_t offset, size_t len) {
   return 0;
 }
 
-int dbuf_putc(DynBuf *s, uint8_t c) { return dbuf_put(s, &c, 1); }
-
 int dbuf_putstr(DynBuf *s, const char *str) {
   return dbuf_put(s, (const uint8_t *)str, strlen(str));
 }
