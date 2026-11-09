@@ -1,0 +1,44 @@
+# Copyright (c) 2025 The Lynx Authors.
+# Licensed under the Apache License Version 2.0 that can be found in the LICENSE file in the root directory of this source tree.
+# Derived work includes upstream generated headers/content; see NOTICE.md for details.
+
+# GN build for weak-node-api
+
+# Public headers for downstream reference
+public_headers = [
+  "include/js_native_api_types.h",
+  "include/js_native_api.h",
+  "include/napi-inl.deprecated.h",
+  "include/napi-inl.h",
+  "include/napi.h",
+  "include/node_api_types.h",
+  "include/node_api.h",
+  "include/weak_napi_defines.h",
+  "include/weak_napi_undefs.h",
+  "generated/NodeApiHost.hpp",
+  "generated/weak_node_api.hpp",
+]
+
+config("weak_node_api_config") {
+  include_dirs = [ "." ]
+}
+
+# Source set for direct source code reference
+source_set("weak_node_api_source") {
+  sources = [
+    "generated/weak_node_api.cpp",
+  ]
+  public_configs = [ ":weak_node_api_config" ]
+  public = public_headers
+  defines = []
+  if (is_win) {
+    defines += [
+      "WIN32_LEAN_AND_MEAN",
+      "NOMINMAX",
+    ]
+  }
+  cflags_cc = [ "-std=c++17" ]
+  if (is_mac) {
+    cflags = [ "-fPIC" ]
+  }
+}
