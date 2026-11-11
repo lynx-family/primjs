@@ -725,7 +725,6 @@ test/language/expressions/class/private-static-field-multiple-evaluations-of-cla
 test/language/expressions/class/private-static-getter-multiple-evaluations-of-class-realm.js:26: TypeError: $262.createRealm is not a function
 test/language/expressions/class/private-static-method-brand-check-multiple-evaluations-of-class-realm.js:26: TypeError: $262.createRealm is not a function
 test/language/expressions/class/private-static-setter-multiple-evaluations-of-class-realm.js:26: TypeError: $262.createRealm is not a function
-test/language/expressions/class/static-init-await-reference.js:18: SyntaxError: invalid property name
 test/language/expressions/coalesce/tco-pos-null.js:24: strict mode: InternalError: stack overflow
 test/language/expressions/coalesce/tco-pos-undefined.js:24: strict mode: InternalError: stack overflow
 test/language/expressions/comma/tco-final.js:12: strict mode: InternalError: stack overflow
@@ -777,11 +776,7 @@ test/language/expressions/compound-assignment/left-hand-side-private-reference-a
 test/language/expressions/conditional/tco-cond.js:17: strict mode: InternalError: stack overflow
 test/language/expressions/conditional/tco-pos.js:17: strict mode: InternalError: stack overflow
 test/language/expressions/delete/super-property-null-base.js:26: Test262Error: Expected a ReferenceError but got a TypeError
-test/language/expressions/function/static-init-await-binding.js:15: SyntaxError: invalid property name
-test/language/expressions/function/static-init-await-reference.js:18: SyntaxError: invalid property name
 test/language/expressions/generators/eval-body-proto-realm.js:24: TypeError: $262.createRealm is not a function
-test/language/expressions/generators/static-init-await-binding.js:15: SyntaxError: invalid property name
-test/language/expressions/generators/static-init-await-reference.js:18: SyntaxError: invalid property name
 test/language/expressions/import.meta/distinct-for-each-module.js:28: SyntaxError: expecting '('
 test/language/expressions/import.meta/import-meta-is-an-ordinary-object.js:27: SyntaxError: expecting '('
 test/language/expressions/import.meta/same-object-returned.js:27: SyntaxError: expecting '('
@@ -873,14 +868,6 @@ test/language/expressions/object/cpn-obj-lit-computed-property-name-from-assignm
 test/language/expressions/object/cpn-obj-lit-computed-property-name-from-await-expression.js:29: SyntaxError: unexpected 'await' keyword
 test/language/expressions/object/dstr/object-rest-proxy-get-not-called-on-dontenum-keys.js:37: Test262Error: Expected [1, enumerableString, Symbol(enumerable_symbol)] and [Symbol(enumerable_symbol), enumerableString, 1] to have the same contents. 
 test/language/expressions/object/dstr/object-rest-proxy-gopd-not-called-on-excluded-keys.js:35: Test262Error: Expected [Symbol(excluded_symbol), excludedString, 0, Symbol(included_symbol), includedString, 1] and [Symbol(included_symbol), includedString, 1] to have the same contents. 
-test/language/expressions/object/ident-name-prop-name-literal-await-static-init.js:18: SyntaxError: invalid property name
-test/language/expressions/object/identifier-shorthand-static-init-await-valid.js:15: SyntaxError: invalid property name
-test/language/expressions/object/method-definition/static-init-await-binding-accessor.js:15: SyntaxError: invalid property name
-test/language/expressions/object/method-definition/static-init-await-binding-generator.js:15: SyntaxError: invalid property name
-test/language/expressions/object/method-definition/static-init-await-binding-normal.js:15: SyntaxError: invalid property name
-test/language/expressions/object/method-definition/static-init-await-reference-accessor.js:18: SyntaxError: invalid property name
-test/language/expressions/object/method-definition/static-init-await-reference-generator.js:18: SyntaxError: invalid property name
-test/language/expressions/object/method-definition/static-init-await-reference-normal.js:18: SyntaxError: invalid property name
 test/language/expressions/object/object-spread-proxy-get-not-called-on-dontenum-keys.js:37: Test262Error: Expected [1, enumerableString, Symbol(enumerable_symbol)] and [Symbol(enumerable_symbol), enumerableString, 1] to have the same contents. 
 test/language/expressions/optional-chaining/optional-call-preserves-this.js:21: TypeError: cannot read property 'c' of undefined
 test/language/expressions/postfix-decrement/operator-x-postfix-decrement-calls-putvalue-lhs-newvalue--1.js:19: Test262Error: Expected a ReferenceError to be thrown but no exception was thrown at all
@@ -1244,23 +1231,6 @@ test/language/statements/class/private-non-static-getter-static-setter-early-err
 test/language/statements/class/private-non-static-setter-static-getter-early-error.js:13: unexpected error type: Test262: This statement should not be evaluated.
 test/language/statements/class/private-static-getter-non-static-setter-early-error.js:13: unexpected error type: Test262: This statement should not be evaluated.
 test/language/statements/class/private-static-setter-non-static-getter-early-error.js:13: unexpected error type: Test262: This statement should not be evaluated.
-test/language/statements/class/static-init-abrupt.js:30: SyntaxError: invalid property name
-test/language/statements/class/static-init-arguments-functions.js:20: SyntaxError: invalid property name
-test/language/statements/class/static-init-arguments-methods.js:23: SyntaxError: invalid property name
-test/language/statements/class/static-init-await-binding-valid.js:15: SyntaxError: invalid property name
-test/language/statements/class/static-init-expr-new-target.js:18: SyntaxError: invalid property name
-test/language/statements/class/static-init-expr-this.js:18: SyntaxError: invalid property name
-test/language/statements/class/static-init-scope-lex-close.js:19: SyntaxError: invalid property name
-test/language/statements/class/static-init-scope-lex-derived.js:18: SyntaxError: invalid property name
-test/language/statements/class/static-init-scope-lex-open.js:19: SyntaxError: invalid property name
-test/language/statements/class/static-init-scope-private.js:20: SyntaxError: invalid property name
-test/language/statements/class/static-init-scope-var-close.js:19: SyntaxError: invalid property name
-test/language/statements/class/static-init-scope-var-derived.js:19: SyntaxError: invalid property name
-test/language/statements/class/static-init-scope-var-open.js:19: SyntaxError: invalid property name
-test/language/statements/class/static-init-sequence.js:26: SyntaxError: invalid property name
-test/language/statements/class/static-init-statement-list-optional.js:17: SyntaxError: invalid property name
-test/language/statements/class/static-init-super-property.js:19: SyntaxError: invalid property name
-test/language/statements/const/static-init-await-binding-valid.js:15: SyntaxError: invalid property name
 test/language/statements/do-while/tco-body.js:12: strict mode: InternalError: stack overflow
 test/language/statements/for-await-of/async-gen-decl-dstr-array-elem-iter-rtrn-close-null.js:81: TypeError: $DONE() not called
 test/language/statements/for-of/head-lhs-async-invalid.js:14: unexpected error type: Test262: This statement should not be evaluated.
@@ -1268,22 +1238,16 @@ test/language/statements/for/tco-const-body.js:12: strict mode: InternalError: s
 test/language/statements/for/tco-let-body.js:12: strict mode: InternalError: stack overflow
 test/language/statements/for/tco-lhs-body.js:12: strict mode: InternalError: stack overflow
 test/language/statements/for/tco-var-body.js:12: strict mode: InternalError: stack overflow
-test/language/statements/function/static-init-await-binding-valid.js:15: SyntaxError: invalid property name
 test/language/statements/if/tco-else-body.js:12: strict mode: InternalError: stack overflow
 test/language/statements/if/tco-if-body.js:12: strict mode: InternalError: stack overflow
 test/language/statements/labeled/tco.js:12: strict mode: InternalError: stack overflow
-test/language/statements/let/static-init-await-binding-valid.js:15: SyntaxError: invalid property name
 test/language/statements/return/tco.js:12: strict mode: InternalError: stack overflow
 test/language/statements/switch/tco-case-body-dflt.js:12: strict mode: InternalError: stack overflow
 test/language/statements/switch/tco-case-body.js:12: strict mode: InternalError: stack overflow
 test/language/statements/switch/tco-dftl-body.js:12: strict mode: InternalError: stack overflow
-test/language/statements/try/static-init-await-binding-valid.js:15: SyntaxError: invalid property name
 test/language/statements/try/tco-catch-finally.js:12: strict mode: InternalError: stack overflow
 test/language/statements/try/tco-catch.js:20: strict mode: InternalError: stack overflow
 test/language/statements/try/tco-finally.js:12: strict mode: InternalError: stack overflow
-test/language/statements/variable/dstr/ary-ptrn-elem-id-static-init-await-valid.js:15: SyntaxError: invalid property name
-test/language/statements/variable/dstr/obj-ptrn-elem-id-static-init-await-valid.js:15: SyntaxError: invalid property name
-test/language/statements/variable/static-init-await-binding-valid.js:15: SyntaxError: invalid property name
 test/language/statements/while/tco-body.js:12: strict mode: InternalError: stack overflow
 test/language/types/reference/get-value-prop-base-primitive-realm.js:20: TypeError: $262.createRealm is not a function
 test/language/types/reference/put-value-prop-base-primitive-realm.js:24: TypeError: $262.createRealm is not a function
