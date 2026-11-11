@@ -36,9 +36,7 @@ test/annexB/built-ins/TypedArrayConstructors/from/iterator-method-emulates-undef
 test/annexB/language/expressions/assignment/dstr/array-pattern-emulates-undefined.js:28: Test262Error: Expected SameValue(«1», «0») to be true
 test/annexB/language/expressions/assignment/dstr/object-pattern-emulates-undefined.js:31: Test262Error: Expected SameValue(«1», «0») to be true
 test/annexB/language/expressions/coalesce/emulates-undefined.js:20: ReferenceError: unresolved is not defined
-test/annexB/language/expressions/logical-assignment/emulates-undefined-and.js:24: SyntaxError: unexpected token in expression: '='
-test/annexB/language/expressions/logical-assignment/emulates-undefined-coalesce.js:18: SyntaxError: expecting ','
-test/annexB/language/expressions/logical-assignment/emulates-undefined-or.js:25: SyntaxError: unexpected token in expression: '='
+test/annexB/language/expressions/logical-assignment/emulates-undefined-coalesce.js:18: ReferenceError: unresolved is not defined
 test/annexB/language/expressions/strict-does-not-equals/emulates-undefined.js:21: Test262Error: !== with `undefined`
 test/annexB/language/expressions/strict-equals/emulates-undefined.js:19: Test262Error: === with `undefined` Expected SameValue(«true», «false») to be true
 test/annexB/language/expressions/yield/star-iterable-return-emulates-undefined-throws-when-called.js:13: Test262Error: Expected a TypeError to be thrown but no exception was thrown at all
@@ -697,21 +695,9 @@ test/language/expressions/call/tco-non-eval-function-dynamic.js:41: Test262Error
 test/language/expressions/call/tco-non-eval-function.js:41: Test262Error: Expected SameValue(«0», «1») to be true
 test/language/expressions/call/tco-non-eval-global.js:41: Test262Error: Expected SameValue(«0», «1») to be true
 test/language/expressions/call/tco-non-eval-with.js:44: Test262Error: Expected SameValue(«0», «1») to be true
-test/language/expressions/class/cpn-class-expr-accessors-computed-property-name-from-assignment-expression-coalesce.js:40: SyntaxError: expecting ']'
-test/language/expressions/class/cpn-class-expr-accessors-computed-property-name-from-assignment-expression-logical-and.js:40: SyntaxError: unexpected token in expression: '='
-test/language/expressions/class/cpn-class-expr-accessors-computed-property-name-from-assignment-expression-logical-or.js:40: SyntaxError: unexpected token in expression: '='
 test/language/expressions/class/cpn-class-expr-accessors-computed-property-name-from-await-expression.js:40: SyntaxError: unexpected 'await' keyword
-test/language/expressions/class/cpn-class-expr-computed-property-name-from-assignment-expression-coalesce.js:40: SyntaxError: expecting ']'
-test/language/expressions/class/cpn-class-expr-computed-property-name-from-assignment-expression-logical-and.js:40: SyntaxError: unexpected token in expression: '='
-test/language/expressions/class/cpn-class-expr-computed-property-name-from-assignment-expression-logical-or.js:40: SyntaxError: unexpected token in expression: '='
 test/language/expressions/class/cpn-class-expr-computed-property-name-from-await-expression.js:40: SyntaxError: unexpected 'await' keyword
-test/language/expressions/class/cpn-class-expr-fields-computed-property-name-from-assignment-expression-coalesce.js:40: SyntaxError: expecting ']'
-test/language/expressions/class/cpn-class-expr-fields-computed-property-name-from-assignment-expression-logical-and.js:40: SyntaxError: unexpected token in expression: '='
-test/language/expressions/class/cpn-class-expr-fields-computed-property-name-from-assignment-expression-logical-or.js:40: SyntaxError: unexpected token in expression: '='
 test/language/expressions/class/cpn-class-expr-fields-computed-property-name-from-await-expression.js:40: SyntaxError: unexpected 'await' keyword
-test/language/expressions/class/cpn-class-expr-fields-methods-computed-property-name-from-assignment-expression-coalesce.js:40: SyntaxError: expecting ']'
-test/language/expressions/class/cpn-class-expr-fields-methods-computed-property-name-from-assignment-expression-logical-and.js:40: SyntaxError: unexpected token in expression: '='
-test/language/expressions/class/cpn-class-expr-fields-methods-computed-property-name-from-assignment-expression-logical-or.js:40: SyntaxError: unexpected token in expression: '='
 test/language/expressions/class/cpn-class-expr-fields-methods-computed-property-name-from-await-expression.js:40: SyntaxError: unexpected 'await' keyword
 test/language/expressions/class/elements/class-name-static-initializer-anonymous.js:20: Test262Error: Expected SameValue(«», «C») to be true
 test/language/expressions/class/name.js:40: Test262Error: obj should have an own property name
@@ -799,77 +785,11 @@ test/language/expressions/in/private-field-rhs-non-object.js:41: SyntaxError: un
 test/language/expressions/in/private-field-rhs-unresolvable.js:20: SyntaxError: unexpected token in expression: '#field'
 test/language/expressions/in/private-field-rhs-yield-present.js:26: SyntaxError: unexpected token in expression: '#field'
 test/language/expressions/logical-and/tco-right.js:17: strict mode: InternalError: stack overflow
-test/language/expressions/logical-assignment/left-hand-side-private-reference-accessor-property-and.js:52: SyntaxError: unexpected token in expression: '='
-test/language/expressions/logical-assignment/left-hand-side-private-reference-accessor-property-nullish.js:51: SyntaxError: expecting ';'
-test/language/expressions/logical-assignment/left-hand-side-private-reference-accessor-property-or.js:52: SyntaxError: unexpected token in expression: '='
-test/language/expressions/logical-assignment/left-hand-side-private-reference-accessor-property-short-circuit-and.js:56: SyntaxError: unexpected token in expression: '='
-test/language/expressions/logical-assignment/left-hand-side-private-reference-accessor-property-short-circuit-nullish.js:55: SyntaxError: expecting ';'
-test/language/expressions/logical-assignment/left-hand-side-private-reference-accessor-property-short-circuit-or.js:56: SyntaxError: unexpected token in expression: '='
-test/language/expressions/logical-assignment/left-hand-side-private-reference-data-property-and.js:44: SyntaxError: unexpected token in expression: '='
-test/language/expressions/logical-assignment/left-hand-side-private-reference-data-property-nullish.js:43: SyntaxError: expecting ';'
-test/language/expressions/logical-assignment/left-hand-side-private-reference-data-property-or.js:44: SyntaxError: unexpected token in expression: '='
-test/language/expressions/logical-assignment/left-hand-side-private-reference-data-property-short-circuit-and.js:48: SyntaxError: unexpected token in expression: '='
-test/language/expressions/logical-assignment/left-hand-side-private-reference-data-property-short-circuit-nullish.js:47: SyntaxError: expecting ';'
-test/language/expressions/logical-assignment/left-hand-side-private-reference-data-property-short-circuit-or.js:48: SyntaxError: unexpected token in expression: '='
-test/language/expressions/logical-assignment/left-hand-side-private-reference-method-and.js:44: SyntaxError: unexpected token in expression: '='
-test/language/expressions/logical-assignment/left-hand-side-private-reference-method-short-circuit-nullish.js:47: SyntaxError: expecting ';'
-test/language/expressions/logical-assignment/left-hand-side-private-reference-method-short-circuit-or.js:48: SyntaxError: unexpected token in expression: '='
-test/language/expressions/logical-assignment/left-hand-side-private-reference-readonly-accessor-property-and.js:46: SyntaxError: unexpected token in expression: '='
-test/language/expressions/logical-assignment/left-hand-side-private-reference-readonly-accessor-property-nullish.js:45: SyntaxError: expecting ';'
-test/language/expressions/logical-assignment/left-hand-side-private-reference-readonly-accessor-property-or.js:46: SyntaxError: unexpected token in expression: '='
-test/language/expressions/logical-assignment/left-hand-side-private-reference-readonly-accessor-property-short-circuit-and.js:50: SyntaxError: unexpected token in expression: '='
-test/language/expressions/logical-assignment/left-hand-side-private-reference-readonly-accessor-property-short-circuit-nullish.js:49: SyntaxError: expecting ';'
-test/language/expressions/logical-assignment/left-hand-side-private-reference-readonly-accessor-property-short-circuit-or.js:50: SyntaxError: unexpected token in expression: '='
-test/language/expressions/logical-assignment/lgcl-and-assignment-operator-bigint.js:24: SyntaxError: unexpected token in expression: '='
-test/language/expressions/logical-assignment/lgcl-and-assignment-operator-lhs-before-rhs.js:23: SyntaxError: unexpected token in expression: '='
-test/language/expressions/logical-assignment/lgcl-and-assignment-operator-namedevaluation-arrow-function.js:18: SyntaxError: unexpected token in expression: '='
-test/language/expressions/logical-assignment/lgcl-and-assignment-operator-namedevaluation-class-expression.js:18: SyntaxError: unexpected token in expression: '='
-test/language/expressions/logical-assignment/lgcl-and-assignment-operator-namedevaluation-function.js:18: SyntaxError: unexpected token in expression: '='
-test/language/expressions/logical-assignment/lgcl-and-assignment-operator-no-set-put.js:26: strict mode: SyntaxError: unexpected token in expression: '='
-test/language/expressions/logical-assignment/lgcl-and-assignment-operator-no-set.js:25: strict mode: SyntaxError: unexpected token in expression: '='
-test/language/expressions/logical-assignment/lgcl-and-assignment-operator-non-extensible.js:18: strict mode: SyntaxError: unexpected token in expression: '='
-test/language/expressions/logical-assignment/lgcl-and-assignment-operator-non-writeable-put.js:24: strict mode: SyntaxError: unexpected token in expression: '='
-test/language/expressions/logical-assignment/lgcl-and-assignment-operator-non-writeable.js:23: strict mode: SyntaxError: unexpected token in expression: '='
-test/language/expressions/logical-assignment/lgcl-and-assignment-operator-unresolved-lhs.js:15: strict mode: SyntaxError: unexpected token in expression: '='
-test/language/expressions/logical-assignment/lgcl-and-assignment-operator-unresolved-rhs-put.js:17: SyntaxError: unexpected token in expression: '='
-test/language/expressions/logical-assignment/lgcl-and-assignment-operator-unresolved-rhs.js:16: SyntaxError: unexpected token in expression: '='
-test/language/expressions/logical-assignment/lgcl-and-assignment-operator.js:24: SyntaxError: unexpected token in expression: '='
-test/language/expressions/logical-assignment/lgcl-and-whitespace.js:15: SyntaxError: unexpected token in expression: '='
-test/language/expressions/logical-assignment/lgcl-nullish-assignment-operator-bigint.js:23: SyntaxError: expecting ','
-test/language/expressions/logical-assignment/lgcl-nullish-assignment-operator-lhs-before-rhs.js:23: SyntaxError: expecting ';'
-test/language/expressions/logical-assignment/lgcl-nullish-assignment-operator-namedevaluation-arrow-function.js:18: SyntaxError: expecting ';'
-test/language/expressions/logical-assignment/lgcl-nullish-assignment-operator-namedevaluation-class-expression.js:18: SyntaxError: expecting ';'
-test/language/expressions/logical-assignment/lgcl-nullish-assignment-operator-namedevaluation-function.js:18: SyntaxError: expecting ';'
-test/language/expressions/logical-assignment/lgcl-nullish-assignment-operator-no-set-put.js:26: strict mode: SyntaxError: expecting ';'
-test/language/expressions/logical-assignment/lgcl-nullish-assignment-operator-no-set.js:25: strict mode: SyntaxError: expecting ','
-test/language/expressions/logical-assignment/lgcl-nullish-assignment-operator-non-extensible.js:19: strict mode: SyntaxError: expecting ';'
-test/language/expressions/logical-assignment/lgcl-nullish-assignment-operator-non-writeable-put.js:24: strict mode: SyntaxError: expecting ';'
-test/language/expressions/logical-assignment/lgcl-nullish-assignment-operator-non-writeable.js:23: strict mode: SyntaxError: expecting ','
-test/language/expressions/logical-assignment/lgcl-nullish-assignment-operator-unresolved-lhs.js:15: strict mode: SyntaxError: expecting ';'
-test/language/expressions/logical-assignment/lgcl-nullish-assignment-operator-unresolved-rhs-put.js:17: SyntaxError: expecting ';'
-test/language/expressions/logical-assignment/lgcl-nullish-assignment-operator-unresolved-rhs.js:16: SyntaxError: expecting ','
-test/language/expressions/logical-assignment/lgcl-nullish-assignment-operator.js:23: SyntaxError: expecting ','
-test/language/expressions/logical-assignment/lgcl-nullish-whitespace.js:15: SyntaxError: expecting ','
-test/language/expressions/logical-assignment/lgcl-or-assignment-operator-bigint.js:24: SyntaxError: unexpected token in expression: '='
-test/language/expressions/logical-assignment/lgcl-or-assignment-operator-lhs-before-rhs.js:23: SyntaxError: unexpected token in expression: '='
-test/language/expressions/logical-assignment/lgcl-or-assignment-operator-namedevaluation-arrow-function.js:18: SyntaxError: unexpected token in expression: '='
-test/language/expressions/logical-assignment/lgcl-or-assignment-operator-namedevaluation-class-expression.js:18: SyntaxError: unexpected token in expression: '='
-test/language/expressions/logical-assignment/lgcl-or-assignment-operator-namedevaluation-function.js:18: SyntaxError: unexpected token in expression: '='
-test/language/expressions/logical-assignment/lgcl-or-assignment-operator-no-set-put.js:26: strict mode: SyntaxError: unexpected token in expression: '='
-test/language/expressions/logical-assignment/lgcl-or-assignment-operator-no-set.js:25: strict mode: SyntaxError: unexpected token in expression: '='
-test/language/expressions/logical-assignment/lgcl-or-assignment-operator-non-extensible.js:19: strict mode: SyntaxError: unexpected token in expression: '='
-test/language/expressions/logical-assignment/lgcl-or-assignment-operator-non-writeable-put.js:24: strict mode: SyntaxError: unexpected token in expression: '='
-test/language/expressions/logical-assignment/lgcl-or-assignment-operator-non-writeable.js:23: strict mode: SyntaxError: unexpected token in expression: '='
-test/language/expressions/logical-assignment/lgcl-or-assignment-operator-unresolved-lhs.js:15: strict mode: SyntaxError: unexpected token in expression: '='
-test/language/expressions/logical-assignment/lgcl-or-assignment-operator-unresolved-rhs-put.js:17: SyntaxError: unexpected token in expression: '='
-test/language/expressions/logical-assignment/lgcl-or-assignment-operator-unresolved-rhs.js:16: SyntaxError: unexpected token in expression: '='
-test/language/expressions/logical-assignment/lgcl-or-assignment-operator.js:24: SyntaxError: unexpected token in expression: '='
-test/language/expressions/logical-assignment/lgcl-or-whitespace.js:15: SyntaxError: unexpected token in expression: '='
+test/language/expressions/logical-assignment/left-hand-side-private-reference-accessor-property-and.js:60: Test262Error: The expression should evaluate to the result Expected SameValue(«undefined», «false») to be true
+test/language/expressions/logical-assignment/left-hand-side-private-reference-accessor-property-nullish.js:59: Test262Error: The expression should evaluate to the result Expected SameValue(«undefined», «1») to be true
+test/language/expressions/logical-assignment/left-hand-side-private-reference-accessor-property-or.js:60: Test262Error: The expression should evaluate to the result Expected SameValue(«undefined», «true») to be true
 test/language/expressions/logical-or/tco-right.js:17: strict mode: InternalError: stack overflow
 test/language/expressions/new/non-ctor-err-realm.js:22: TypeError: $262.createRealm is not a function
-test/language/expressions/object/cpn-obj-lit-computed-property-name-from-assignment-expression-coalesce.js:29: SyntaxError: expecting ']'
-test/language/expressions/object/cpn-obj-lit-computed-property-name-from-assignment-expression-logical-and.js:29: SyntaxError: unexpected token in expression: '='
-test/language/expressions/object/cpn-obj-lit-computed-property-name-from-assignment-expression-logical-or.js:29: SyntaxError: unexpected token in expression: '='
 test/language/expressions/object/cpn-obj-lit-computed-property-name-from-await-expression.js:29: SyntaxError: unexpected 'await' keyword
 test/language/expressions/object/dstr/object-rest-proxy-get-not-called-on-dontenum-keys.js:37: Test262Error: Expected [1, enumerableString, Symbol(enumerable_symbol)] and [Symbol(enumerable_symbol), enumerableString, 1] to have the same contents. 
 test/language/expressions/object/dstr/object-rest-proxy-gopd-not-called-on-excluded-keys.js:35: Test262Error: Expected [Symbol(excluded_symbol), excludedString, 0, Symbol(included_symbol), includedString, 1] and [Symbol(included_symbol), includedString, 1] to have the same contents. 
@@ -1218,21 +1138,9 @@ test/language/module-code/top-level-await/void-await-expr.js:31: SyntaxError: un
 test/language/module-code/top-level-await/while-dynamic-evaluation.js:41: SyntaxError: unexpected 'await' keyword
 test/language/statements/block/tco-stmt-list.js:12: strict mode: InternalError: stack overflow
 test/language/statements/block/tco-stmt.js:12: strict mode: InternalError: stack overflow
-test/language/statements/class/cpn-class-decl-accessors-computed-property-name-from-assignment-expression-coalesce.js:40: SyntaxError: expecting ']'
-test/language/statements/class/cpn-class-decl-accessors-computed-property-name-from-assignment-expression-logical-and.js:40: SyntaxError: unexpected token in expression: '='
-test/language/statements/class/cpn-class-decl-accessors-computed-property-name-from-assignment-expression-logical-or.js:40: SyntaxError: unexpected token in expression: '='
 test/language/statements/class/cpn-class-decl-accessors-computed-property-name-from-await-expression.js:40: SyntaxError: unexpected 'await' keyword
-test/language/statements/class/cpn-class-decl-computed-property-name-from-assignment-expression-coalesce.js:40: SyntaxError: expecting ']'
-test/language/statements/class/cpn-class-decl-computed-property-name-from-assignment-expression-logical-and.js:40: SyntaxError: unexpected token in expression: '='
-test/language/statements/class/cpn-class-decl-computed-property-name-from-assignment-expression-logical-or.js:40: SyntaxError: unexpected token in expression: '='
 test/language/statements/class/cpn-class-decl-computed-property-name-from-await-expression.js:40: SyntaxError: unexpected 'await' keyword
-test/language/statements/class/cpn-class-decl-fields-computed-property-name-from-assignment-expression-coalesce.js:40: SyntaxError: expecting ']'
-test/language/statements/class/cpn-class-decl-fields-computed-property-name-from-assignment-expression-logical-and.js:40: SyntaxError: unexpected token in expression: '='
-test/language/statements/class/cpn-class-decl-fields-computed-property-name-from-assignment-expression-logical-or.js:40: SyntaxError: unexpected token in expression: '='
 test/language/statements/class/cpn-class-decl-fields-computed-property-name-from-await-expression.js:40: SyntaxError: unexpected 'await' keyword
-test/language/statements/class/cpn-class-decl-fields-methods-computed-property-name-from-assignment-expression-coalesce.js:40: SyntaxError: expecting ']'
-test/language/statements/class/cpn-class-decl-fields-methods-computed-property-name-from-assignment-expression-logical-and.js:40: SyntaxError: unexpected token in expression: '='
-test/language/statements/class/cpn-class-decl-fields-methods-computed-property-name-from-assignment-expression-logical-or.js:40: SyntaxError: unexpected token in expression: '='
 test/language/statements/class/cpn-class-decl-fields-methods-computed-property-name-from-await-expression.js:40: SyntaxError: unexpected 'await' keyword
 test/language/statements/class/definition/fn-length-static-precedence-order.js:29: Test262Error: Expected [length, prototype, name, method] and [length, name, prototype, method] to have the same contents. 
 test/language/statements/class/definition/fn-name-static-precedence-order.js:26: Test262Error: Expected [length, prototype, name, method] and [length, name, prototype, method] to have the same contents. 

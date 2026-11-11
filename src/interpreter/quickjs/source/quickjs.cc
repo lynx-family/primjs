@@ -19431,8 +19431,13 @@ redo:
         p += 2;
         s->token.val = TOK_AND_ASSIGN;
       } else if (p[1] == '&') {
-        p += 2;
-        s->token.val = TOK_LAND;
+        if (p[2] == '=') {
+          p += 3;
+          s->token.val = TOK_LAND_ASSIGN;
+        } else {
+          p += 2;
+          s->token.val = TOK_LAND;
+        }
       } else {
         goto def_token;
       }
@@ -19450,8 +19455,13 @@ redo:
         p += 2;
         s->token.val = TOK_OR_ASSIGN;
       } else if (p[1] == '|') {
-        p += 2;
-        s->token.val = TOK_LOR;
+        if (p[2] == '=') {
+          p += 3;
+          s->token.val = TOK_LOR_ASSIGN;
+        } else {
+          p += 2;
+          s->token.val = TOK_LOR;
+        }
       } else {
         goto def_token;
       }
@@ -23681,6 +23691,69 @@ __exception int js_parse_assign_expr(JSParseState *s, int parse_flags) {
       emit_op(s, op);
     }
     put_lvalue(s, opcode, scope, name, label, PUT_LVALUE_KEEP_TOP, FALSE);
+  } else if (op >= TOK_LAND_ASSIGN && op <= TOK_DOUBLE_QUESTION_MARK_ASSIGN) {
+    int label, label_skip, label_end, depth, coverage_slot, i;
+    if (next_token(s)) return -1;
+    if (get_lvalue(s, &opcode, &scope, &name, &label, &depth, TRUE, op) < 0)
+      return -1;
+#ifdef ENABLE_COMPATIBLE_MM
+    func_scope.PushLEPUSAtom(name);
+#endif
+
+    /* [depth] value: the right-hand side is evaluated and stored only when
+       the current value selects it */
+    emit_op(s, OP_dup);
+    if (op == TOK_DOUBLE_QUESTION_MARK_ASSIGN) {
+      int label_assign;
+      emit_op(s, OP_is_undefined);
+      label_assign = emit_goto(s, OP_if_true, -1);
+      emit_op(s, OP_dup);
+      emit_op(s, OP_is_null);
+      label_skip = emit_goto(s, OP_if_false, -1);
+      emit_label(s, label_assign);
+    } else {
+      label_skip =
+          emit_goto(s, op == TOK_LOR_ASSIGN ? OP_if_true : OP_if_false, -1);
+    }
+    emit_op(s, OP_drop);
+
+    coverage_slot = emit_coverage_slot(s, s->token.ptr);
+    if (js_parse_assign_expr(s, parse_flags)) {
+      if (!s->ctx->gc_enable) LEPUS_FreeAtom(s->ctx, name);
+      return -1;
+    }
+    set_coverage_slot_end(s, coverage_slot, s->last_ptr);
+
+    if ((opcode == OP_get_ref_value || opcode == OP_scope_get_var) &&
+        name == name0) {
+      set_object_name(s, name);
+    }
+
+    /* [depth] v -> v [depth] v, then store: the depth must stay as it is
+       because the other branch drops the same operands */
+    switch (depth) {
+      case 0:
+        emit_op(s, OP_dup);
+        break;
+      case 1:
+        emit_op(s, OP_insert2);
+        break;
+      case 2:
+        emit_op(s, OP_insert3);
+        break;
+      case 3:
+        emit_op(s, OP_insert4);
+        break;
+      default:
+        abort();
+    }
+    put_lvalue(s, opcode, scope, name, label, PUT_LVALUE_NOKEEP_DEPTH, FALSE);
+    label_end = emit_goto(s, OP_goto, -1);
+
+    emit_label(s, label_skip);
+    for (i = 0; i < depth; i++) emit_op(s, OP_nip);
+    emit_label(s, label_end);
+    emit_coverage_token_slot(s);
   }
   return 0;
 }
