@@ -17199,6 +17199,140 @@ fail:
   return LEPUS_EXCEPTION;
 }
 
+static LEPUSValue js_array_toReversed(LEPUSContext *ctx,
+                                      LEPUSValueConst this_val, int argc,
+                                      LEPUSValueConst *argv) {
+  LEPUSValue obj = LEPUS_UNDEFINED, arr = LEPUS_UNDEFINED;
+  LEPUSValue val = LEPUS_UNDEFINED;
+  HandleScope func_scope(ctx, &obj, HANDLE_TYPE_LEPUS_VALUE);
+  func_scope.PushHandle(&arr, HANDLE_TYPE_LEPUS_VALUE);
+  func_scope.PushHandle(&val, HANDLE_TYPE_LEPUS_VALUE);
+  int64_t i, len;
+
+  obj = JS_ToObject_GC(ctx, this_val);
+  if (js_get_length64(ctx, &len, obj)) return LEPUS_EXCEPTION;
+  if (len > UINT32_MAX)
+    return LEPUS_ThrowRangeError(ctx, "invalid array length");
+  arr = JS_NewArray_GC(ctx);
+  if (LEPUS_IsException(arr)) return LEPUS_EXCEPTION;
+  for (i = 0; i < len; i++) {
+    val = JS_GetPropertyInt64(ctx, obj, len - 1 - i);
+    if (LEPUS_IsException(val)) return LEPUS_EXCEPTION;
+    if (JS_DefinePropertyValueInt64_GC(ctx, arr, i, val,
+                                       LEPUS_PROP_C_W_E | LEPUS_PROP_THROW) < 0)
+      return LEPUS_EXCEPTION;
+  }
+  return arr;
+}
+
+static LEPUSValue js_array_with(LEPUSContext *ctx, LEPUSValueConst this_val,
+                                int argc, LEPUSValueConst *argv) {
+  LEPUSValue obj = LEPUS_UNDEFINED, arr = LEPUS_UNDEFINED;
+  LEPUSValue val = LEPUS_UNDEFINED;
+  HandleScope func_scope(ctx, &obj, HANDLE_TYPE_LEPUS_VALUE);
+  func_scope.PushHandle(&arr, HANDLE_TYPE_LEPUS_VALUE);
+  func_scope.PushHandle(&val, HANDLE_TYPE_LEPUS_VALUE);
+  int64_t i, len, actual;
+  double index;
+
+  obj = JS_ToObject_GC(ctx, this_val);
+  if (js_get_length64(ctx, &len, obj)) return LEPUS_EXCEPTION;
+  if (LEPUS_ToFloat64(ctx, &index, argv[0])) return LEPUS_EXCEPTION;
+  index = isnan(index) ? 0 : trunc(index);
+  if (index < 0) index += len;
+  // The index is validated before the copy is created.
+  if (index < 0 || index >= len)
+    return LEPUS_ThrowRangeError(ctx, "invalid array index");
+  if (len > UINT32_MAX)
+    return LEPUS_ThrowRangeError(ctx, "invalid array length");
+  actual = static_cast<int64_t>(index);
+  arr = JS_NewArray_GC(ctx);
+  if (LEPUS_IsException(arr)) return LEPUS_EXCEPTION;
+  for (i = 0; i < len; i++) {
+    val = i == actual ? argv[1] : JS_GetPropertyInt64(ctx, obj, i);
+    if (LEPUS_IsException(val)) return LEPUS_EXCEPTION;
+    if (JS_DefinePropertyValueInt64_GC(ctx, arr, i, val,
+                                       LEPUS_PROP_C_W_E | LEPUS_PROP_THROW) < 0)
+      return LEPUS_EXCEPTION;
+  }
+  return arr;
+}
+
+static LEPUSValue js_array_toSpliced(LEPUSContext *ctx,
+                                     LEPUSValueConst this_val, int argc,
+                                     LEPUSValueConst *argv) {
+  LEPUSValue obj = LEPUS_UNDEFINED, arr = LEPUS_UNDEFINED;
+  LEPUSValue val = LEPUS_UNDEFINED;
+  HandleScope func_scope(ctx, &obj, HANDLE_TYPE_LEPUS_VALUE);
+  func_scope.PushHandle(&arr, HANDLE_TYPE_LEPUS_VALUE);
+  func_scope.PushHandle(&val, HANDLE_TYPE_LEPUS_VALUE);
+  int64_t i, j, len, start, skip, new_len, item_count;
+
+  obj = JS_ToObject_GC(ctx, this_val);
+  if (js_get_length64(ctx, &len, obj)) return LEPUS_EXCEPTION;
+  start = 0;
+  skip = 0;
+  if (argc > 0 && JS_ToInt64Clamp(ctx, &start, argv[0], 0, len, len))
+    return LEPUS_EXCEPTION;
+  if (argc == 1) {
+    skip = len - start;
+  } else if (argc > 1 &&
+             JS_ToInt64Clamp(ctx, &skip, argv[1], 0, len - start, 0)) {
+    return LEPUS_EXCEPTION;
+  }
+  item_count = argc > 2 ? argc - 2 : 0;
+  new_len = len + item_count - skip;
+  if (new_len > MAX_SAFE_INTEGER)
+    return LEPUS_ThrowTypeError(ctx, "invalid array length");
+  if (new_len > UINT32_MAX)
+    return LEPUS_ThrowRangeError(ctx, "invalid array length");
+  arr = JS_NewArray_GC(ctx);
+  if (LEPUS_IsException(arr)) return LEPUS_EXCEPTION;
+  for (i = 0, j = 0; i < new_len; i++) {
+    if (i < start) {
+      val = JS_GetPropertyInt64(ctx, obj, i);
+    } else if (i < start + item_count) {
+      val = argv[2 + (i - start)];
+    } else {
+      val = JS_GetPropertyInt64(ctx, obj, start + skip + j++);
+    }
+    if (LEPUS_IsException(val)) return LEPUS_EXCEPTION;
+    if (JS_DefinePropertyValueInt64_GC(ctx, arr, i, val,
+                                       LEPUS_PROP_C_W_E | LEPUS_PROP_THROW) < 0)
+      return LEPUS_EXCEPTION;
+  }
+  return arr;
+}
+
+static LEPUSValue js_array_toSorted(LEPUSContext *ctx, LEPUSValueConst this_val,
+                                    int argc, LEPUSValueConst *argv) {
+  LEPUSValue obj = LEPUS_UNDEFINED, arr = LEPUS_UNDEFINED;
+  LEPUSValue val = LEPUS_UNDEFINED;
+  HandleScope func_scope(ctx, &obj, HANDLE_TYPE_LEPUS_VALUE);
+  func_scope.PushHandle(&arr, HANDLE_TYPE_LEPUS_VALUE);
+  func_scope.PushHandle(&val, HANDLE_TYPE_LEPUS_VALUE);
+  int64_t i, len;
+
+  // The comparator is validated before the receiver is converted.
+  if (!LEPUS_IsUndefined(argv[0]) && check_function(ctx, argv[0]))
+    return LEPUS_EXCEPTION;
+  obj = JS_ToObject_GC(ctx, this_val);
+  if (js_get_length64(ctx, &len, obj)) return LEPUS_EXCEPTION;
+  if (len > UINT32_MAX)
+    return LEPUS_ThrowRangeError(ctx, "invalid array length");
+  arr = JS_NewArray_GC(ctx);
+  if (LEPUS_IsException(arr)) return LEPUS_EXCEPTION;
+  // Holes are read through the prototype chain, so the copy is dense.
+  for (i = 0; i < len; i++) {
+    val = JS_GetPropertyInt64(ctx, obj, i);
+    if (LEPUS_IsException(val)) return LEPUS_EXCEPTION;
+    if (JS_DefinePropertyValueInt64_GC(ctx, arr, i, val,
+                                       LEPUS_PROP_C_W_E | LEPUS_PROP_THROW) < 0)
+      return LEPUS_EXCEPTION;
+  }
+  return js_array_sort(ctx, arr, argc, argv);
+}
+
 static LEPUSValue js_create_array_iterator(LEPUSContext *ctx,
                                            LEPUSValueConst this_val, int argc,
                                            LEPUSValueConst *argv, int magic) {
@@ -17355,6 +17489,10 @@ static const LEPUSCFunctionListEntry js_array_proto_funcs[] = {
     LEPUS_CFUNC_MAGIC_DEF("unshift", 1, js_array_push, 1),
     LEPUS_CFUNC_DEF("reverse", 0, js_array_reverse),
     LEPUS_CFUNC_DEF("sort", 1, js_array_sort),
+    LEPUS_CFUNC_DEF("toSorted", 1, js_array_toSorted),
+    LEPUS_CFUNC_DEF("toReversed", 0, js_array_toReversed),
+    LEPUS_CFUNC_DEF("toSpliced", 2, js_array_toSpliced),
+    LEPUS_CFUNC_DEF("with", 2, js_array_with),
     LEPUS_CFUNC_MAGIC_DEF("slice", 2, js_array_slice, 0),
     LEPUS_CFUNC_MAGIC_DEF("splice", 2, js_array_slice, 1),
     LEPUS_CFUNC_DEF("copyWithin", 2, js_array_copyWithin),
