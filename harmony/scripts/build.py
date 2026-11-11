@@ -2,6 +2,7 @@
 
 import argparse
 import os
+import shutil
 import sys
 from subprocess import check_call
 import tempfile
@@ -95,7 +96,38 @@ def publish_primjs(version, unofficial_publish, modules):
     os.system("git tag %s" % tag_name)
     os.system("git push origin %s --no-verify" % tag_name)
 
+def packNapiAdapterHeaderFiles():
+    # Publish the C adapter headers and their transitive dependencies.
+    napi_dest = os.path.join(HARMONY_DIR, 'primjs/src/main/napi/include')
+    if os.path.exists(napi_dest):
+        shutil.rmtree(napi_dest)
+    os.makedirs(napi_dest, exist_ok=True)
+    napi_headers = [
+        'src/napi/js_native_api_types.h',
+        'src/napi/js_native_api.h',
+        'src/napi/shim_js_native_api.h',
+        'src/napi/napi_module.h',
+        'src/napi/adapter/js_native_api_adapter.h',
+        'src/napi/internal/primjs_napi_defines.h',
+        'src/napi/internal/primjs_napi_undefs.h',
+    ]
+    for header in napi_headers:
+        shutil.copy2(os.path.join(PRIMJS_DIR, header), napi_dest)
+
+    logging_dest = os.path.join(napi_dest, 'basic/log')
+    os.makedirs(logging_dest, exist_ok=True)
+    shutil.copy2(
+        os.path.join(PRIMJS_DIR, 'src/basic/log/logging.h'), logging_dest)
+
+    quickjs_dest = os.path.join(napi_dest, 'quickjs/include')
+    os.makedirs(quickjs_dest, exist_ok=True)
+    shutil.copy2(
+        os.path.join(PRIMJS_DIR,
+                     'src/interpreter/quickjs/include/base_export.h'),
+        quickjs_dest)
+
 def packJsPrimjsHeaderFiles():
+    packNapiAdapterHeaderFiles()
     src_path = os.path.join(PRIMJS_DIR, "include")
 
     # copy quickjs header files
