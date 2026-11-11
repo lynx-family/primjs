@@ -456,14 +456,14 @@ test/built-ins/RegExp/property-escapes/generated/Uppercase.js:16: Test262Error: 
 test/built-ins/RegExp/property-escapes/generated/Variation_Selector.js:16: Test262Error: `\p{Variation_Selector}` should match U+00180F (`᠏`)
 test/built-ins/RegExp/property-escapes/generated/XID_Continue.js:16: Test262Error: `\p{XID_Continue}` should match U+000C5D (`ౝ`)
 test/built-ins/RegExp/property-escapes/generated/XID_Start.js:16: Test262Error: `\p{XID_Start}` should match U+000C5D (`ౝ`)
-test/built-ins/RegExp/property-escapes/generated/strings/Basic_Emoji.js:17: SyntaxError: invalid regular expression flags
-test/built-ins/RegExp/property-escapes/generated/strings/Emoji_Keycap_Sequence.js:17: SyntaxError: invalid regular expression flags
-test/built-ins/RegExp/property-escapes/generated/strings/Emoji_Test.js:17: SyntaxError: invalid regular expression flags
-test/built-ins/RegExp/property-escapes/generated/strings/RGI_Emoji.js:17: SyntaxError: invalid regular expression flags
-test/built-ins/RegExp/property-escapes/generated/strings/RGI_Emoji_Flag_Sequence.js:17: SyntaxError: invalid regular expression flags
-test/built-ins/RegExp/property-escapes/generated/strings/RGI_Emoji_Modifier_Sequence.js:17: SyntaxError: invalid regular expression flags
-test/built-ins/RegExp/property-escapes/generated/strings/RGI_Emoji_Tag_Sequence.js:17: SyntaxError: invalid regular expression flags
-test/built-ins/RegExp/property-escapes/generated/strings/RGI_Emoji_ZWJ_Sequence.js:17: SyntaxError: invalid regular expression flags
+test/built-ins/RegExp/property-escapes/generated/strings/Basic_Emoji.js:17: SyntaxError: unknown unicode property name
+test/built-ins/RegExp/property-escapes/generated/strings/Emoji_Keycap_Sequence.js:17: SyntaxError: unknown unicode property name
+test/built-ins/RegExp/property-escapes/generated/strings/Emoji_Test.js:17: SyntaxError: unknown unicode property name
+test/built-ins/RegExp/property-escapes/generated/strings/RGI_Emoji.js:17: SyntaxError: unknown unicode property name
+test/built-ins/RegExp/property-escapes/generated/strings/RGI_Emoji_Flag_Sequence.js:17: SyntaxError: unknown unicode property name
+test/built-ins/RegExp/property-escapes/generated/strings/RGI_Emoji_Modifier_Sequence.js:17: SyntaxError: unknown unicode property name
+test/built-ins/RegExp/property-escapes/generated/strings/RGI_Emoji_Tag_Sequence.js:17: SyntaxError: unknown unicode property name
+test/built-ins/RegExp/property-escapes/generated/strings/RGI_Emoji_ZWJ_Sequence.js:17: SyntaxError: unknown unicode property name
 test/built-ins/RegExp/proto-from-ctor-realm.js:24: TypeError: $262.createRealm is not a function
 test/built-ins/RegExp/prototype/Symbol.replace/coerce-lastindex.js:27: Test262Error: Expected SameValue(«0», «9007199254740992») to be true
 test/built-ins/RegExp/prototype/Symbol.replace/poisoned-stdlib.js:23: Test262Error: 0 setter should be unreachable.
