@@ -38820,16 +38820,43 @@ exception:
   return LEPUS_EXCEPTION;
 }
 
+// replaceAll rejects a regular expression that lacks the global flag.
+QJS_STATIC int js_string_require_global_regexp(LEPUSContext *ctx,
+                                               LEPUSValueConst search_value) {
+  LEPUSValue flags;
+  int is_regexp, is_global;
+
+  is_regexp = js_is_regexp(ctx, search_value);
+  if (is_regexp <= 0) return is_regexp;
+  flags = JS_GetPropertyInternal_RC(ctx, search_value, JS_ATOM_flags,
+                                    search_value, 0);
+  if (LEPUS_IsException(flags)) return -1;
+  if (LEPUS_IsUndefined(flags) || LEPUS_IsNull(flags)) {
+    LEPUS_ThrowTypeError(ctx, "cannot convert to object");
+    return -1;
+  }
+  flags = JS_ToStringFree(ctx, flags);
+  if (LEPUS_IsException(flags)) return -1;
+  is_global = string_indexof_char(LEPUS_VALUE_GET_STRING(flags), 'g', 0) >= 0;
+  LEPUS_FreeValue(ctx, flags);
+  if (!is_global) {
+    LEPUS_ThrowTypeError(ctx, "replaceAll must be called with a global RegExp");
+    return -1;
+  }
+  return 0;
+}
+
 QJS_STATIC LEPUSValue js_string_replace(LEPUSContext *ctx,
                                         LEPUSValueConst this_val, int argc,
-                                        LEPUSValueConst *argv) {
-  // replace(rx, rep)
+                                        LEPUSValueConst *argv,
+                                        int is_replace_all) {
+  // replace(rx, rep), replaceAll(rx, rep)
   LEPUSValueConst O = this_val, searchValue = argv[0], replaceValue = argv[1];
   LEPUSValueConst args[6];
   LEPUSValue str, search_str, replaceValue_str, repl_str;
   JSString *sp, *searchp;
   StringBuffer b_s, *b = &b_s;
-  int pos, functionalReplace;
+  int pos, functionalReplace, end_of_last_match, advance_by;
 
   if (LEPUS_IsUndefined(O) || LEPUS_IsNull(O))
     return LEPUS_ThrowTypeError(ctx, "cannot convert to object");
@@ -38840,6 +38867,8 @@ QJS_STATIC LEPUSValue js_string_replace(LEPUSContext *ctx,
 
   if (!LEPUS_IsUndefined(searchValue) && !LEPUS_IsNull(searchValue)) {
     LEPUSValue replacer;
+    if (is_replace_all && js_string_require_global_regexp(ctx, searchValue))
+      return LEPUS_EXCEPTION;
     replacer = JS_GetPropertyInternal_RC(
         ctx, searchValue, JS_ATOM_Symbol_replace, searchValue, 0);
     if (LEPUS_IsException(replacer)) return LEPUS_EXCEPTION;
@@ -38871,26 +38900,35 @@ QJS_STATIC LEPUSValue js_string_replace(LEPUSContext *ctx,
     LEPUS_FreeValue(ctx, replaceValue_str);
     return str;
   }
-  if (functionalReplace) {
-    args[0] = search_str;
-    args[1] = LEPUS_NewInt32(ctx, pos);
-    args[2] = str;
-    repl_str = JS_ToStringFree(
-        ctx, JS_Call_RC(ctx, replaceValue, LEPUS_UNDEFINED, 3, args));
-  } else {
-    args[0] = search_str;
-    args[1] = str;
-    args[2] = LEPUS_NewInt32(ctx, pos);
-    args[3] = LEPUS_UNDEFINED;
-    args[4] = LEPUS_UNDEFINED;
-    args[5] = replaceValue_str;
-    repl_str = js_string___GetSubstitution(ctx, LEPUS_UNDEFINED, 6, args);
-  }
-  if (LEPUS_IsException(repl_str)) goto exception;
+  // An empty search string matches before every code unit and at the end.
+  advance_by = max_int(1, searchp->len);
+  end_of_last_match = 0;
+  for (;;) {
+    if (functionalReplace) {
+      args[0] = search_str;
+      args[1] = LEPUS_NewInt32(ctx, pos);
+      args[2] = str;
+      repl_str = JS_ToStringFree(
+          ctx, JS_Call_RC(ctx, replaceValue, LEPUS_UNDEFINED, 3, args));
+    } else {
+      args[0] = search_str;
+      args[1] = str;
+      args[2] = LEPUS_NewInt32(ctx, pos);
+      args[3] = LEPUS_UNDEFINED;
+      args[4] = LEPUS_UNDEFINED;
+      args[5] = replaceValue_str;
+      repl_str = js_string___GetSubstitution(ctx, LEPUS_UNDEFINED, 6, args);
+    }
+    if (LEPUS_IsException(repl_str)) goto exception;
 
-  string_buffer_concat(b, sp, 0, pos);
-  string_buffer_concat_value_free(b, repl_str);
-  string_buffer_concat(b, sp, pos + searchp->len, sp->len);
+    string_buffer_concat(b, sp, end_of_last_match, pos);
+    string_buffer_concat_value_free(b, repl_str);
+    end_of_last_match = pos + searchp->len;
+    if (!is_replace_all || pos + advance_by > (int)sp->len) break;
+    pos = string_indexof(sp, searchp, pos + advance_by);
+    if (pos < 0) break;
+  }
+  string_buffer_concat(b, sp, end_of_last_match, sp->len);
   LEPUS_FreeValue(ctx, search_str);
   LEPUS_FreeValue(ctx, replaceValue_str);
   LEPUS_FreeValue(ctx, str);
@@ -39591,7 +39629,8 @@ static const LEPUSCFunctionListEntry js_string_proto_funcs[] = {
     LEPUS_CFUNC_DEF("substr", 2, js_string_substr),
     LEPUS_CFUNC_DEF("slice", 2, js_string_slice),
     LEPUS_CFUNC_DEF("repeat", 1, js_string_repeat),
-    LEPUS_CFUNC_DEF("replace", 2, js_string_replace),
+    LEPUS_CFUNC_MAGIC_DEF("replace", 2, js_string_replace, 0),
+    LEPUS_CFUNC_MAGIC_DEF("replaceAll", 2, js_string_replace, 1),
     LEPUS_CFUNC_MAGIC_DEF("padEnd", 1, js_string_pad, 1),
     LEPUS_CFUNC_MAGIC_DEF("padStart", 1, js_string_pad, 0),
     LEPUS_CFUNC_MAGIC_DEF("trim", 0, js_string_trim, 3),
