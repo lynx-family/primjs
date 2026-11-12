@@ -18943,6 +18943,15 @@ fail:
 QJS_STATIC void js_gen_debugger_statement(JSParseState *s, LEPUSContext *ctx);
 #endif
 
+/* a class static block reserves 'await' in its own statements and in the
+   parameters of the arrow functions written there, but not in their bodies */
+QJS_STATIC BOOL js_in_class_static_block(JSFunctionDef *fd) {
+  if (!fd) return FALSE;
+  if (fd->func_type == JS_PARSE_FUNC_ARROW && !fd->in_function_body)
+    fd = fd->parent;
+  return fd && fd->func_type == JS_PARSE_FUNC_CLASS_STATIC_INIT;
+}
+
 /* classify the current identifier token as a keyword according to the
    current function type. Precondition: s->token.val == TOK_IDENT and
    s->token.u.ident.{atom,has_escape} are set. */
@@ -18956,7 +18965,7 @@ void update_token_ident(JSParseState *s) {
          !s->cur_func->in_function_body && s->cur_func->parent &&
          (s->cur_func->parent->func_kind & JS_FUNC_GENERATOR)))) ||
       (s->token.u.ident.atom == JS_ATOM_await &&
-       (s->is_module ||
+       (s->is_module || js_in_class_static_block(s->cur_func) ||
         (s->cur_func &&
          ((s->cur_func->func_kind & JS_FUNC_ASYNC) ||
           (s->cur_func->func_type == JS_PARSE_FUNC_ARROW &&
@@ -21239,6 +21248,26 @@ __exception int js_parse_class(JSParseState *s, BOOL is_class_expr,
     prop_type = -1;
     if (is_static) {
       if (next_token(s)) goto fail;
+      if (s->token.val == '{') {
+        /* class static block: its statements form a function with the
+           bindings of an arrow function, called when the static fields
+           around it are initialized */
+        ClassFieldsDef *cf = &class_fields[1];
+        if (!cf->fields_init_fd) {
+          if (emit_class_init_start(s, cf)) goto fail;
+        }
+        HeapObjStore(ctx, &s->cur_func, cf->fields_init_fd);
+        if (js_parse_function_decl2(s, JS_PARSE_FUNC_CLASS_STATIC_INIT,
+                                    JS_FUNC_NORMAL, JS_ATOM_NULL, s->token.ptr,
+                                    s->token.line_num, JS_PARSE_EXPORT_NONE,
+                                    NULL))
+          goto fail;
+        emit_op(s, OP_call);
+        emit_u16(s, 0);
+        emit_op(s, OP_drop);
+        HeapObjStore(ctx, &s->cur_func, s->cur_func->parent);
+        continue;
+      }
       /* allow "static" field name */
       if (s->token.val == ';' || s->token.val == '=') {
         is_static = FALSE;
@@ -21532,6 +21561,16 @@ __exception int js_parse_class(JSParseState *s, BOOL is_class_expr,
   /* drop the prototype */
   emit_op(s, OP_drop);
 
+  if (class_name != JS_ATOM_NULL) {
+    /* store the class name in the scoped class name variable (it
+       is independent from the class statement variable
+       definition). The static fields and blocks may refer to it. */
+    emit_op(s, OP_dup);
+    emit_op(s, OP_scope_put_var_init);
+    emit_atom(s, class_name);
+    emit_u16(s, fd->scope_level);
+  }
+
   /* initialize the static fields */
   if (class_fields[1].fields_init_fd != NULL) {
     ClassFieldsDef *cf = &class_fields[1];
@@ -21540,16 +21579,6 @@ __exception int js_parse_class(JSParseState *s, BOOL is_class_expr,
     emit_op(s, OP_call_method);
     emit_u16(s, 0);
     emit_op(s, OP_drop);
-  }
-
-  if (class_name != JS_ATOM_NULL) {
-    /* store the class name in the scoped class name variable (it
-       is independent from the class statement variable
-       definition) */
-    emit_op(s, OP_dup);
-    emit_op(s, OP_scope_put_var_init);
-    emit_atom(s, class_name);
-    emit_u16(s, fd->scope_level);
   }
   pop_scope(s);
   pop_scope(s);
@@ -24339,7 +24368,8 @@ QJS_STATIC __exception int js_parse_statement_or_decl(JSParseState *s,
       if (js_parse_block(s)) goto fail;
       break;
     case TOK_RETURN:
-      if (s->cur_func->is_eval) {
+      if (s->cur_func->is_eval ||
+          s->cur_func->func_type == JS_PARSE_FUNC_CLASS_STATIC_INIT) {
         js_parse_error(s, "return not in a function");
         goto fail;
       }
@@ -31264,11 +31294,13 @@ QJS_STATIC __exception int js_parse_function_decl2(
        func_type == JS_PARSE_FUNC_SETTER ||
        func_type == JS_PARSE_FUNC_CLASS_CONSTRUCTOR ||
        func_type == JS_PARSE_FUNC_DERIVED_CLASS_CONSTRUCTOR);
-  fd->has_arguments_binding = (func_type != JS_PARSE_FUNC_ARROW);
+  fd->has_arguments_binding = (func_type != JS_PARSE_FUNC_ARROW &&
+                               func_type != JS_PARSE_FUNC_CLASS_STATIC_INIT);
   fd->has_this_binding = fd->has_arguments_binding;
   fd->is_derived_class_constructor =
       (func_type == JS_PARSE_FUNC_DERIVED_CLASS_CONSTRUCTOR);
-  if (func_type == JS_PARSE_FUNC_ARROW) {
+  if (func_type == JS_PARSE_FUNC_ARROW ||
+      func_type == JS_PARSE_FUNC_CLASS_STATIC_INIT) {
     fd->new_target_allowed = fd->parent->new_target_allowed;
     fd->super_call_allowed = fd->parent->super_call_allowed;
     fd->super_allowed = fd->parent->super_allowed;
@@ -31311,7 +31343,7 @@ QJS_STATIC __exception int js_parse_function_decl2(
     name = s->token.u.ident.atom;
     if (add_arg(ctx, fd, name) < 0) goto fail;
     fd->defined_arg_count = 1;
-  } else {
+  } else if (func_type != JS_PARSE_FUNC_CLASS_STATIC_INIT) {
     if (s->token.val == '(') {
       int skip_bits;
       BOOL has_ellipsis = FALSE;
@@ -31490,7 +31522,8 @@ QJS_STATIC __exception int js_parse_function_decl2(
     fd->scope_first = fd->scopes[fd->scope_level].first;
   }
 
-  if (next_token(s)) goto fail;
+  /* a class static block has no parameter list to leave */
+  if (func_type != JS_PARSE_FUNC_CLASS_STATIC_INIT && next_token(s)) goto fail;
 
   /* generator function: yield after the parameters are evaluated */
   if (func_kind == JS_FUNC_GENERATOR || func_kind == JS_FUNC_ASYNC_GENERATOR)
@@ -31531,7 +31564,8 @@ QJS_STATIC __exception int js_parse_function_decl2(
 
   if (js_parse_expect(s, '{')) goto fail;
 
-  if (js_parse_directives(s)) goto fail;
+  if (func_type != JS_PARSE_FUNC_CLASS_STATIC_INIT && js_parse_directives(s))
+    goto fail;
 
   /* in strict_mode, check function and argument names */
   if (js_parse_function_check_names(s, fd, func_name)) goto fail;

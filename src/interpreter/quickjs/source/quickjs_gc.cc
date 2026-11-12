@@ -11947,7 +11947,8 @@ static __exception int js_parse_statement_or_decl(JSParseState *s,
       if (js_parse_block(s)) goto fail;
       break;
     case TOK_RETURN:
-      if (s->cur_func->is_eval) {
+      if (s->cur_func->is_eval ||
+          s->cur_func->func_type == JS_PARSE_FUNC_CLASS_STATIC_INIT) {
         js_parse_error(s, "return not in a function");
         goto fail;
       }
@@ -12808,11 +12809,13 @@ __exception int js_parse_function_decl2_GC(
        func_type == JS_PARSE_FUNC_SETTER ||
        func_type == JS_PARSE_FUNC_CLASS_CONSTRUCTOR ||
        func_type == JS_PARSE_FUNC_DERIVED_CLASS_CONSTRUCTOR);
-  fd->has_arguments_binding = (func_type != JS_PARSE_FUNC_ARROW);
+  fd->has_arguments_binding = (func_type != JS_PARSE_FUNC_ARROW &&
+                               func_type != JS_PARSE_FUNC_CLASS_STATIC_INIT);
   fd->has_this_binding = fd->has_arguments_binding;
   fd->is_derived_class_constructor =
       (func_type == JS_PARSE_FUNC_DERIVED_CLASS_CONSTRUCTOR);
-  if (func_type == JS_PARSE_FUNC_ARROW) {
+  if (func_type == JS_PARSE_FUNC_ARROW ||
+      func_type == JS_PARSE_FUNC_CLASS_STATIC_INIT) {
     fd->new_target_allowed = fd->parent->new_target_allowed;
     fd->super_call_allowed = fd->parent->super_call_allowed;
     fd->super_allowed = fd->parent->super_allowed;
@@ -12855,7 +12858,7 @@ __exception int js_parse_function_decl2_GC(
     name = s->token.u.ident.atom;
     if (add_arg(ctx, fd, name) < 0) goto fail;
     fd->defined_arg_count = 1;
-  } else {
+  } else if (func_type != JS_PARSE_FUNC_CLASS_STATIC_INIT) {
     if (s->token.val == '(') {
       int skip_bits;
       BOOL has_ellipsis = FALSE;
@@ -13034,7 +13037,8 @@ __exception int js_parse_function_decl2_GC(
     fd->scope_first = fd->scopes[fd->scope_level].first;
   }
 
-  if (next_token(s)) goto fail;
+  /* a class static block has no parameter list to leave */
+  if (func_type != JS_PARSE_FUNC_CLASS_STATIC_INIT && next_token(s)) goto fail;
 
   /* generator function: yield after the parameters are evaluated */
   if (func_kind == JS_FUNC_GENERATOR || func_kind == JS_FUNC_ASYNC_GENERATOR)
@@ -13075,7 +13079,8 @@ __exception int js_parse_function_decl2_GC(
 
   if (js_parse_expect(s, '{')) goto fail;
 
-  if (js_parse_directives(s)) goto fail;
+  if (func_type != JS_PARSE_FUNC_CLASS_STATIC_INIT && js_parse_directives(s))
+    goto fail;
 
   /* in strict_mode, check function and argument names */
   if (js_parse_function_check_names(s, fd, func_name)) goto fail;
