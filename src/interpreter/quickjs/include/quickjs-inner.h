@@ -2265,6 +2265,9 @@ class CStack {
   }
 
   int32_t Empty() { return top_ == base_; }
+
+  // Whether the initial allocation succeeded.
+  bool Valid() const { return base_ != nullptr; }
 };
 
 QJS_STATIC inline int32_t JS_IsSeparableString(LEPUSValue val) {
@@ -2284,6 +2287,13 @@ QJS_STATIC inline LEPUSValueConst JS_GetSeparableStringFlatContent(
   DCHECK(JS_IsSeparableStringFlat(str));
   return str->left_op;
 }
+
+/* Strict equality cannot throw, so when a rope cannot be flattened (e.g. out
+   of memory), this clears the exception and compares the strings in place,
+   without allocating on the JS heap. */
+QJS_HIDE bool JS_StringEqualAfterFlattenFailure(LEPUSContext *ctx,
+                                                LEPUSValueConst op1,
+                                                LEPUSValueConst op2);
 
 QJS_HIDE LEPUSValue JS_GetPropertyInternalImpl_GC(LEPUSContext *ctx,
                                                   LEPUSValueConst obj,
