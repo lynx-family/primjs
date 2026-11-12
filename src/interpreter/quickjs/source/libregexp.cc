@@ -85,6 +85,7 @@ typedef struct {
   const uint8_t *buf_start;
   int re_flags;
   BOOL is_utf16;
+  BOOL unicode_sets;
   BOOL ignore_case;
   BOOL dotall;
   int capture_count;
@@ -889,6 +890,403 @@ fail:
   return -1;
 }
 
+/* Character classes in unicode sets mode (the 'v' flag). */
+
+/* A class set holds code points and strings that are empty or longer than
+   one code point. A string is stored as its length then its code points. */
+typedef struct {
+  CharRange cr;
+  DynBuf strings;
+  int string_count;
+} REClassSet;
+
+#define RE_CLASS_SET_DEPTH_MAX 64
+
+static int re_parse_nested_class(REParseState *s, REClassSet *set,
+                                 const uint8_t **pp, int depth);
+
+static void re_class_set_init(REParseState *s, REClassSet *set) {
+  cr_init(&set->cr, s->mem_opaque, lre_realloc_addjudge);
+  dbuf_init2(&set->strings, s->mem_opaque, lre_realloc_addjudge);
+  set->string_count = 0;
+}
+
+static void re_class_set_free(REClassSet *set) {
+  cr_free(&set->cr);
+  dbuf_free(&set->strings);
+}
+
+static BOOL re_class_set_has_string(const REClassSet *set, const uint32_t *str,
+                                    uint32_t len) {
+  const uint32_t *q = (const uint32_t *)set->strings.buf;
+  int i;
+  for (i = 0; i < set->string_count; i++) {
+    if (q[0] == len && (len == 0 || !memcmp(q + 1, str, len * sizeof(*q))))
+      return TRUE;
+    q += 1 + q[0];
+  }
+  return FALSE;
+}
+
+static int re_class_set_add_string(REClassSet *set, const uint32_t *str,
+                                   uint32_t len) {
+  if (re_class_set_has_string(set, str, len)) return 0;
+  if (dbuf_put(&set->strings, (const uint8_t *)&len, sizeof(len))) return -1;
+  if (len != 0 &&
+      dbuf_put(&set->strings, (const uint8_t *)str, len * sizeof(*str)))
+    return -1;
+  set->string_count++;
+  return 0;
+}
+
+/* a = a op b, where op is '|', '&' or '-' */
+static int re_class_set_op(REParseState *s, REClassSet *a, const REClassSet *b,
+                           int op) {
+  CharRange cr, inv;
+  DynBuf kept;
+  const uint32_t *q;
+  int i, ret, kept_count;
+
+  cr_init(&cr, s->mem_opaque, lre_realloc_addjudge);
+  if (op == '-') {
+    cr_init(&inv, s->mem_opaque, lre_realloc_addjudge);
+    ret = cr_copy(&inv, &b->cr);
+    if (!ret) ret = cr_invert(&inv);
+    if (!ret)
+      ret =
+          cr_op(&cr, a->cr.points, a->cr.len, inv.points, inv.len, CR_OP_INTER);
+    cr_free(&inv);
+  } else {
+    ret = cr_op(&cr, a->cr.points, a->cr.len, b->cr.points, b->cr.len,
+                op == '|' ? CR_OP_UNION : CR_OP_INTER);
+  }
+  if (ret) {
+    cr_free(&cr);
+    return -1;
+  }
+  cr_free(&a->cr);
+  a->cr = cr;
+
+  if (op == '|') {
+    q = (const uint32_t *)b->strings.buf;
+    for (i = 0; i < b->string_count; i++) {
+      if (re_class_set_add_string(a, q + 1, q[0])) return -1;
+      q += 1 + q[0];
+    }
+    return 0;
+  }
+  /* keep the strings of a that b has for '&' and that b lacks for '-' */
+  dbuf_init2(&kept, s->mem_opaque, lre_realloc_addjudge);
+  kept_count = 0;
+  q = (const uint32_t *)a->strings.buf;
+  for (i = 0; i < a->string_count; i++) {
+    if (re_class_set_has_string(b, q + 1, q[0]) == (op == '&')) {
+      if (dbuf_put(&kept, (const uint8_t *)q, (1 + q[0]) * sizeof(*q))) {
+        dbuf_free(&kept);
+        return -1;
+      }
+      kept_count++;
+    }
+    q += 1 + q[0];
+  }
+  dbuf_free(&a->strings);
+  a->strings = kept;
+  a->string_count = kept_count;
+  return 0;
+}
+
+/* For case insensitive matching the input is canonicalized, so a set only
+   needs the canonical form of each of its code points. */
+static int re_class_set_fold(REParseState *s, CharRange *cr) {
+  CharRange cased, part;
+  uint32_t c, c1;
+  int i, ret;
+
+  cr_init(&cased, s->mem_opaque, lre_realloc_addjudge);
+  cr_init(&part, s->mem_opaque, lre_realloc_addjudge);
+#ifdef CONFIG_ALL_UNICODE
+  ret = unicode_prop(&cased, "Changes_When_Casefolded");
+#else
+  ret = cr_union_interval(&cased, 'A', 'Z' + 1);
+#endif
+  if (!ret)
+    ret =
+        cr_op(&part, cr->points, cr->len, cased.points, cased.len, CR_OP_INTER);
+  for (i = 0; !ret && i < part.len; i += 2) {
+    for (c = part.points[i]; !ret && c < part.points[i + 1]; c++) {
+      c1 = lre_canonicalize(c, TRUE);
+      if (c1 != c) ret = cr_union_interval(cr, c1, c1);
+    }
+  }
+  cr_free(&cased);
+  cr_free(&part);
+  return ret;
+}
+
+/* ClassSetCharacter or a class escape. Returns the code point,
+   CLASS_RANGE_BASE if a class escape filled cr, or -1 on error. */
+static int re_parse_class_set_char(REParseState *s, CharRange *cr,
+                                   const uint8_t **pp) {
+  const uint8_t *p = *pp;
+  int c;
+
+  if (p >= s->buf_end) return re_parse_error(s, "unexpected end");
+  c = *p;
+  if (c == '\\') {
+    if (p[1] != '\0' && strchr("&-!#%,:;<=>@`~", p[1])) {
+      *pp = p + 2;
+      return p[1];
+    }
+    return get_class_atom(s, cr, pp, TRUE);
+  }
+  if (strchr("()[]{}/-|", c))
+    return re_parse_error(s, "invalid character in a class set");
+  if (strchr("&!#$%*+,.:;<=>?@^`~", c) && p[1] == c)
+    return re_parse_error(s, "invalid operator in a class set");
+  return get_class_atom(s, cr, pp, TRUE);
+}
+
+/* \q{...}: alternatives of several code points become strings and the
+   others code points */
+static int re_parse_class_string_disjunction(REParseState *s, REClassSet *set,
+                                             const uint8_t **pp) {
+  const uint8_t *p = *pp + 3; /* skip '\q{' */
+  CharRange unused;
+  DynBuf str;
+  uint32_t count, c32;
+  int c, ret = -1;
+
+  dbuf_init2(&str, s->mem_opaque, lre_realloc_addjudge);
+  for (;;) {
+    str.size = 0;
+    count = 0;
+    while (*p != '|' && *p != '}') {
+      cr_init(&unused, s->mem_opaque, lre_realloc_addjudge);
+      c = re_parse_class_set_char(s, &unused, &p);
+      cr_free(&unused);
+      if (c < 0) goto done;
+      if (c >= CLASS_RANGE_BASE) {
+        re_parse_error(s, "invalid character in a class string");
+        goto done;
+      }
+      c32 = s->ignore_case ? lre_canonicalize(c, TRUE) : (uint32_t)c;
+      if (dbuf_put(&str, (const uint8_t *)&c32, sizeof(c32))) goto memory_error;
+      count++;
+    }
+    if (count == 1) {
+      c32 = *(const uint32_t *)str.buf;
+      if (cr_union_interval(&set->cr, c32, c32)) goto memory_error;
+    } else if (re_class_set_add_string(set, (const uint32_t *)str.buf, count)) {
+      goto memory_error;
+    }
+    if (*p == '}') break;
+    p++;
+  }
+  *pp = p + 1;
+  ret = 0;
+  goto done;
+memory_error:
+  re_parse_error(s, "out of memory");
+done:
+  dbuf_free(&str);
+  return ret;
+}
+
+/* One item of a class set: a nested class, a class string disjunction, a
+   class escape, a character or, when allowed, a range of characters. */
+static int re_parse_class_set_item(REParseState *s, REClassSet *set,
+                                   const uint8_t **pp, BOOL allow_range,
+                                   BOOL *pis_range, int depth) {
+  const uint8_t *p = *pp;
+  CharRange unused;
+  int c1, c2;
+
+  *pis_range = FALSE;
+  if (*p == '[') {
+    if (re_parse_nested_class(s, set, &p, depth)) return -1;
+  } else if (p[0] == '\\' && p[1] == 'q' && p[2] == '{') {
+    if (re_parse_class_string_disjunction(s, set, &p)) return -1;
+  } else {
+    c1 = re_parse_class_set_char(s, &set->cr, &p);
+    if (c1 < 0) return -1;
+    if (c1 < CLASS_RANGE_BASE) {
+      c2 = c1;
+      if (allow_range && p[0] == '-' && p[1] != '-') {
+        p++;
+        cr_init(&unused, s->mem_opaque, lre_realloc_addjudge);
+        c2 = re_parse_class_set_char(s, &unused, &p);
+        cr_free(&unused);
+        if (c2 < 0) return -1;
+        if (c2 >= CLASS_RANGE_BASE || c2 < c1)
+          return re_parse_error(s, "invalid class range");
+        *pis_range = TRUE;
+      }
+      if (cr_union_interval(&set->cr, c1, c2))
+        return re_parse_error(s, "out of memory");
+    }
+    if (s->ignore_case && re_class_set_fold(s, &set->cr))
+      return re_parse_error(s, "out of memory");
+  }
+  *pp = p;
+  return 0;
+}
+
+/* ClassSetExpression: a union, an intersection or a subtraction, up to the
+   closing ']', which is left to the caller */
+static int re_parse_class_set_expr(REParseState *s, REClassSet *set,
+                                   const uint8_t **pp, int depth) {
+  const uint8_t *p = *pp;
+  REClassSet operand;
+  BOOL is_range, first = TRUE;
+  int op = 0, next_op, ret;
+
+  for (;;) {
+    if (p >= s->buf_end) return re_parse_error(s, "unexpected end");
+    if (*p == ']') break;
+    next_op = '|';
+    if (!first) {
+      if (p[0] == '&' && p[1] == '&') {
+        next_op = '&';
+        p += 2;
+        if (*p == '&') goto invalid_operation;
+      } else if (p[0] == '-' && p[1] == '-') {
+        next_op = '-';
+        p += 2;
+      }
+      /* operators cannot be mixed, and only a union has ranges */
+      if (op != 0 && op != next_op) goto invalid_operation;
+      op = next_op;
+    }
+    re_class_set_init(s, &operand);
+    if (re_parse_class_set_item(s, &operand, &p, next_op == '|', &is_range,
+                                depth)) {
+      re_class_set_free(&operand);
+      return -1;
+    }
+    if (is_range) op = '|';
+    ret = re_class_set_op(s, set, &operand, next_op);
+    re_class_set_free(&operand);
+    if (ret) return re_parse_error(s, "out of memory");
+    first = FALSE;
+  }
+  *pp = p;
+  return 0;
+invalid_operation:
+  return re_parse_error(s, "invalid operation in a class set");
+}
+
+/* a class in unicode sets mode, from its '[' to its ']' */
+static int re_parse_nested_class(REParseState *s, REClassSet *set,
+                                 const uint8_t **pp, int depth) {
+  const uint8_t *p = *pp;
+  BOOL invert = FALSE;
+
+  if (depth > RE_CLASS_SET_DEPTH_MAX)
+    return re_parse_error(s, "too many nested classes");
+  p++; /* skip '[' */
+  if (*p == '^') {
+    p++;
+    invert = TRUE;
+  }
+  if (re_parse_class_set_expr(s, set, &p, depth + 1)) return -1;
+  p++; /* skip ']' */
+  if (invert) {
+    if (set->string_count != 0)
+      return re_parse_error(s, "negated class may contain strings");
+    if (cr_invert(&set->cr)) return re_parse_error(s, "out of memory");
+  }
+  *pp = p;
+  return 0;
+}
+
+static void re_emit_class_set_char(REParseState *s, uint32_t c,
+                                   BOOL is_backward_dir) {
+  if (is_backward_dir) re_emit_op(s, REOP_prev);
+  if (c <= 0xffff)
+    re_emit_op_u16(s, REOP_char, c);
+  else
+    re_emit_op_u32(s, REOP_char32, c);
+  if (is_backward_dir) re_emit_op(s, REOP_prev);
+}
+
+/* an alternative of a class: every one but the last starts with a split */
+static int re_class_set_alternative_start(REParseState *s, int *premaining) {
+  if (--*premaining > 0) return re_emit_op_u32(s, REOP_split_next_first, 0);
+  return -1;
+}
+
+static void re_class_set_alternative_end(REParseState *s, int split_pos,
+                                         int *plast_goto) {
+  if (split_pos < 0) return;
+  /* the pending gotos are chained through their operands */
+  *plast_goto = re_emit_op_u32(s, REOP_goto, *plast_goto);
+  put_u32(s->byte_code.buf + split_pos, s->byte_code.size - (split_pos + 4));
+}
+
+/* Parse and emit a class in unicode sets mode. Its strings are tried
+   longest first, then its code points, then the empty string. */
+static int re_parse_class_set_term(REParseState *s, const uint8_t **pp,
+                                   BOOL is_backward_dir) {
+  REClassSet set;
+  const uint32_t *q;
+  uint32_t len, max_len;
+  int i, j, remaining, last_goto, split_pos, pos;
+  BOOL has_empty, has_range;
+
+  re_class_set_init(s, &set);
+  if (re_parse_nested_class(s, &set, pp, 0)) goto fail;
+
+  max_len = 0;
+  has_empty = FALSE;
+  q = (const uint32_t *)set.strings.buf;
+  for (i = 0; i < set.string_count; i++) {
+    if (q[0] == 0)
+      has_empty = TRUE;
+    else if (q[0] > max_len)
+      max_len = q[0];
+    q += 1 + q[0];
+  }
+  /* a set without strings emits its range even when it is empty */
+  has_range = set.cr.len != 0 || set.string_count == 0;
+  remaining = set.string_count + has_range;
+  last_goto = -1;
+
+  for (len = max_len; len >= 2; len--) {
+    q = (const uint32_t *)set.strings.buf;
+    for (i = 0; i < set.string_count; i++) {
+      if (q[0] == len) {
+        split_pos = re_class_set_alternative_start(s, &remaining);
+        for (j = 0; j < (int)len; j++) {
+          re_emit_class_set_char(
+              s, q[1 + (is_backward_dir ? (int)len - 1 - j : j)],
+              is_backward_dir);
+        }
+        re_class_set_alternative_end(s, split_pos, &last_goto);
+      }
+      q += 1 + q[0];
+    }
+  }
+  if (has_range) {
+    split_pos = re_class_set_alternative_start(s, &remaining);
+    if (is_backward_dir) re_emit_op(s, REOP_prev);
+    if (re_emit_range(s, &set.cr)) goto fail;
+    if (is_backward_dir) re_emit_op(s, REOP_prev);
+    re_class_set_alternative_end(s, split_pos, &last_goto);
+  }
+  /* the empty string, when present, is the last alternative and emits
+     nothing */
+  while (last_goto >= 0) {
+    pos = get_u32(s->byte_code.buf + last_goto);
+    put_u32(s->byte_code.buf + last_goto, s->byte_code.size - (last_goto + 4));
+    last_goto = pos;
+  }
+  re_class_set_free(&set);
+  return 0;
+fail:
+  re_class_set_free(&set);
+  return -1;
+}
+
 /* Return:
    1 if the opcodes in bc_buf[] always advance the character pointer.
    0 if the character pointer may not be advanced.
@@ -1380,6 +1778,10 @@ static int re_parse_term(REParseState *s, BOOL is_backward_dir) {
     case '[':
       last_atom_start = s->byte_code.size;
       last_capture_count = s->capture_count;
+      if (s->unicode_sets) {
+        if (re_parse_class_set_term(s, &p, is_backward_dir)) return -1;
+        break;
+      }
       if (is_backward_dir) re_emit_op(s, REOP_prev);
       if (re_parse_char_class(s, &p)) return -1;
       if (is_backward_dir) re_emit_op(s, REOP_prev);
@@ -1714,8 +2116,11 @@ uint8_t *lre_compile(int *plen, char *error_msg, int error_msg_size,
   s->buf_ptr = (const uint8_t *)buf;
   s->buf_end = s->buf_ptr + buf_len;
   s->buf_start = s->buf_ptr;
+  /* unicode sets mode is unicode mode with another class syntax */
+  if (re_flags & LRE_FLAG_UNICODE_SETS) re_flags |= LRE_FLAG_UTF16;
   s->re_flags = re_flags;
   s->is_utf16 = ((re_flags & LRE_FLAG_UTF16) != 0);
+  s->unicode_sets = ((re_flags & LRE_FLAG_UNICODE_SETS) != 0);
   is_sticky = ((re_flags & LRE_FLAG_STICKY) != 0);
   s->ignore_case = ((re_flags & LRE_FLAG_IGNORECASE) != 0);
   s->dotall = ((re_flags & LRE_FLAG_DOTALL) != 0);

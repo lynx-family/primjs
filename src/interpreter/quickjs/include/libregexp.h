@@ -41,6 +41,7 @@
 #define LRE_FLAG_DOTALL (1 << 3)
 #define LRE_FLAG_UTF16 (1 << 4)
 #define LRE_FLAG_STICKY (1 << 5)
+#define LRE_FLAG_UNICODE_SETS (1 << 6) /* implies LRE_FLAG_UTF16 */
 
 #define LRE_FLAG_NAMED_GROUPS \
   (1 << 7) /* named groups are present in the regexp */
