@@ -1855,8 +1855,13 @@ void js_string_free_cache(LEPUSRuntime *rt, JSString *str) {
 QJS_STATIC JSString *js_alloc_string_rt(LEPUSRuntime *rt, int max_len,
                                         int is_wide_char) {
   JSString *str;
+  /* JSString::len has 30 bits. This range also keeps the byte size below from
+     overflowing, including on 32-bit targets. */
+  if (unlikely(max_len < 0 || max_len > JS_STRING_LEN_MAX)) return NULL;
   str = static_cast<JSString *>(lepus_malloc_rt(
-      rt, sizeof(JSString) + (max_len << is_wide_char) + 1 - is_wide_char,
+      rt,
+      sizeof(JSString) + (static_cast<size_t>(max_len) << is_wide_char) + 1 -
+          is_wide_char,
       ALLOC_TAG_JSString));
   if (unlikely(!str)) return NULL;
   str->header.ref_count = 1;
@@ -4757,10 +4762,8 @@ QJS_STATIC LEPUSValue JS_ConcatSeparableString(LEPUSContext *ctx,
 
   /* Enforce the same length limit as the eager path (JS_ConcatString1).
      Without this check the rope's logical length can be driven up to the
-     31-bit bitfield maximum, and flattening a wide rope later computes
-     `max_len << is_wide_char` on an `int` in js_alloc_string_rt, which
-     overflows and under-allocates the backing JSString, leading to a heap
-     buffer overflow write. */
+     31-bit bitfield maximum, and a rope that long could never be flattened
+     because js_alloc_string_rt rejects it. */
   if (len > JS_STRING_LEN_MAX) {
     LEPUS_FreeValue(ctx, op1);
     LEPUS_FreeValue(ctx, op2);
@@ -33020,15 +33023,15 @@ QJS_STATIC JSString *JS_ReadString(BCReaderState *s) {
   if (bc_get_leb128(s, &len)) return NULL;
   is_wide_char = len & 1;
   len >>= 1;
+  size = (size_t)len << is_wide_char;
+  /* The length comes straight from the input: validate it before allocating. */
+  if (static_cast<size_t>(s->buf_end - s->ptr) < size) {
+    bc_read_error_end(s);
+    return NULL;
+  }
   p = js_alloc_string(s->ctx, len, is_wide_char);
   if (!p) {
     s->error_state = -1;
-    return NULL;
-  }
-  size = (size_t)len << is_wide_char;
-  if ((s->buf_end - s->ptr) < size) {
-    bc_read_error_end(s);
-    if (!s->ctx->gc_enable) js_free_string(s->ctx->rt, p);
     return NULL;
   }
   memcpy(p->u.str8, s->ptr, size);

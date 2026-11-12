@@ -1223,6 +1223,42 @@ TEST(HeapMemorySlotTest, GCHeaderSupports31BitPayloadAndEightBitSlot) {
   EXPECT_EQ(get_memory_slot(payload), UINT8_MAX);
 }
 
+TEST(HeapMemorySlotTest, GCAllocationRejectsPayloadOverHeaderLimit) {
+  constexpr uint64_t kMarker = 0x0123456789ABCDEF;
+  int32_t current_slot = LEPUS_MEMORY_CATEGORY_UNKNOWN;
+  LEPUSRuntime *rt = JS_NewRuntime_GC(0, &current_slot);
+  ASSERT_NE(rt, nullptr);
+  ASSERT_TRUE(rt->gc_enable);
+
+  void *object = lepus_malloc_rt(rt, sizeof(kMarker), ALLOC_TAG_WITHOUT_PTR);
+  ASSERT_NE(object, nullptr);
+  *static_cast<uint64_t *>(object) = kMarker;
+
+  // Sizes close to SIZE_MAX would wrap around when the header is added.
+  const size_t oversized_requests[] = {
+      static_cast<size_t>(ROS_GC::kPayloadSizeMask) + 1,
+      SIZE_MAX / 2,
+      SIZE_MAX - 16,
+      SIZE_MAX - 8,
+      SIZE_MAX - 1,
+      SIZE_MAX,
+  };
+  for (size_t size : oversized_requests) {
+    EXPECT_EQ(lepus_malloc_rt(rt, size, ALLOC_TAG_WITHOUT_PTR), nullptr)
+        << size;
+    EXPECT_EQ(lepus_realloc_rt(rt, nullptr, size, ALLOC_TAG_WITHOUT_PTR),
+              nullptr)
+        << size;
+    EXPECT_EQ(lepus_realloc_rt(rt, object, size, ALLOC_TAG_WITHOUT_PTR),
+              nullptr)
+        << size;
+  }
+
+  // A rejected reallocation leaves the original object intact.
+  EXPECT_EQ(*static_cast<uint64_t *>(object), kMarker);
+  LEPUS_FreeRuntime(rt);
+}
+
 TEST(HeapMemorySlotTest, GCArrayBufferExceedsPreviousPayloadLimit) {
   int32_t current_slot = LEPUS_MEMORY_CATEGORY_UNKNOWN;
   LEPUSRuntime *rt = JS_NewRuntime_GC(0, &current_slot);

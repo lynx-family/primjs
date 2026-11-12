@@ -1337,6 +1337,9 @@ address_t RosAllocImpl::AllocHugeInternal(size_t reqSize) {
 template <bool TrackMemory>
 address_t RosAllocImpl::AllocateObjInternal(LEPUSRuntime *rt, size_t size,
                                             int alloc_tag) {
+  // The header cannot record a larger payload. Near SIZE_MAX the rounding below
+  // would also wrap around while memset still uses the original size.
+  if (UNLIKELY(size > kPayloadSizeMask)) return 0;
   // The template removes accounting branches after Runtime creation. Both
   // variants use the same 8-byte metadata header.
   auto ros = rt->ros_;
@@ -1428,6 +1431,8 @@ address_t RosAllocImpl::ReallocateObjInternal(LEPUSRuntime *rt, void *ptr,
   // A reallocated object keeps its original slot even if the caller has since
   // selected another page instance.
   if (size == 0) return 0;
+  // See AllocateObjInternal.
+  if (UNLIKELY(size > kPayloadSizeMask)) return 0;
   auto ros = rt->ros_;
 #ifdef ROS_FORCE_GC
   static int cc = 0;
