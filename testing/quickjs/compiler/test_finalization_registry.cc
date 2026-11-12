@@ -857,4 +857,104 @@ TEST_F(DeletePropertyCleanupTest, AccessorCleanupPreservesReaddedProperty) {
   )");
 }
 
+class ReentrantCleanupTest : public DefinePropertyCleanupTest {};
+
+TEST_F(ReentrantCleanupTest, ProxyRevokeDetachesBeforeCleanup) {
+  if (LEPUS_IsGCMode(ctx_)) GTEST_SKIP();
+  Check(R"(
+    (function() {
+      var revoke, calls = 0;
+      var reg = new FinalizationRegistry(function() { calls++; revoke(); });
+      var r = Proxy.revocable({}, {});
+      revoke = r.revoke;
+      reg.register(r.proxy, 0);
+      r = null;
+      revoke();
+      return calls === 1;
+    })()
+  )");
+}
+
+TEST_F(ReentrantCleanupTest, ThenUnlinksRejectionEntryBeforeCleanup) {
+  if (LEPUS_IsGCMode(ctx_)) GTEST_SKIP();
+  Check(R"(
+    (function() {
+      // The rejection error inherits from Promise.prototype.prototype, so
+      // releasing it in then() runs this cleanup, which re-enters then().
+      var calls = 0, promise;
+      var registry = new FinalizationRegistry(function() {
+        calls++;
+        promise.then(function() {});
+      });
+      var target = {};
+      registry.register(target, 0);
+      Promise.prototype.prototype = target;
+      promise = Promise.reject(42);
+      delete Promise.prototype.prototype;
+      target = null;
+      promise.then(function() {});
+      return calls === 1;
+    })()
+  )");
+}
+
+TEST_F(ReentrantCleanupTest, GeneratorCompletesBeforeReleasingFrame) {
+  if (LEPUS_IsGCMode(ctx_)) GTEST_SKIP();
+  Check(R"(
+    (function() {
+      var gen, result;
+      var reg = new FinalizationRegistry(function() { result = gen.next(); });
+      function* g(held) { yield held; }
+      gen = (function(target) {
+        reg.register(target, 0);
+        return g(target);
+      })({});
+      gen.return(7);
+      return result.done && result.value === undefined;
+    })()
+  )");
+}
+
+TEST_F(ReentrantCleanupTest, CleanupErrorsStayIsolatedFromPropagation) {
+  if (LEPUS_IsGCMode(ctx_)) GTEST_SKIP();
+  Check(R"(
+    (function() {
+      var released = 0, kept = 0;
+      var watcher = new FinalizationRegistry(function() { released++; });
+      var registry = new FinalizationRegistry(function(uncaught) {
+        var error = new Error('cleanup');
+        watcher.register(error, 0);
+        try { throw error; } catch (e) { if (uncaught) throw e; }
+      });
+      function fail(uncaught) {
+        var target = {};
+        registry.register(target, uncaught);
+        throw new Error('original');
+      }
+      [false, true].forEach(function(uncaught) {
+        try { fail(uncaught); } catch (e) { kept += e.message === 'original'; }
+      });
+      return kept === 2 && released === 2;
+    })()
+  )");
+}
+
+TEST_F(ReentrantCleanupTest, PendingExceptionSurvivesCleanup) {
+  const char* first = R"(
+    var registry = new FinalizationRegistry(function() { throw 1; });
+    (function() {
+      var stale = new Error('stale');
+      registry.register(stale, 0);
+      registry.register({}, 0);
+      throw stale;
+    })();
+  )";
+  const char* second = "throw new Error('next');";
+  LEPUS_Eval(ctx_, first, strlen(first), "test.js", LEPUS_EVAL_TYPE_GLOBAL);
+  LEPUS_RunGC(rt_);
+  EXPECT_TRUE(LEPUS_IsError(ctx_, rt_->current_exception));
+  LEPUS_Eval(ctx_, second, strlen(second), "test.js", LEPUS_EVAL_TYPE_GLOBAL);
+  EXPECT_NE(js_get_exception_string(ctx_).find("next"), std::string::npos);
+}
+
 }  // namespace finalization_registry_test
