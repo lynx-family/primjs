@@ -16422,8 +16422,7 @@ exception:
 }
 
 static LEPUSValue js_array_find(LEPUSContext *ctx, LEPUSValueConst this_val,
-                                int argc, LEPUSValueConst *argv,
-                                int findIndex) {
+                                int argc, LEPUSValueConst *argv, int mode) {
   LEPUSValueConst func = LEPUS_UNDEFINED, this_arg = LEPUS_UNDEFINED;
   HandleScope func_scope(ctx, &func, HANDLE_TYPE_LEPUS_VALUE);
   func_scope.PushHandle(&this_arg, HANDLE_TYPE_LEPUS_VALUE);
@@ -16431,7 +16430,8 @@ static LEPUSValue js_array_find(LEPUSContext *ctx, LEPUSValueConst this_val,
   func_scope.PushLEPUSValueArrayHandle(args, 3);
   LEPUSValue obj, val, index_val, res = LEPUS_UNDEFINED;
   func_scope.PushHandle(&res, HANDLE_TYPE_LEPUS_VALUE);
-  int64_t len, k;
+  int64_t len, k, end, dir;
+  bool findIndex = mode == ArrayFindIndex || mode == ArrayFindLastIndex;
 
   index_val = LEPUS_UNDEFINED;
   val = LEPUS_UNDEFINED;
@@ -16447,7 +16447,16 @@ static LEPUSValue js_array_find(LEPUSContext *ctx, LEPUSValueConst this_val,
   this_arg = LEPUS_UNDEFINED;
   if (argc > 1) this_arg = argv[1];
 
-  for (k = 0; k < len; k++) {
+  k = 0;
+  dir = 1;
+  end = len;
+  if (mode == ArrayFindLast || mode == ArrayFindLastIndex) {
+    k = len - 1;
+    dir = -1;
+    end = -1;
+  }
+
+  for (; k != end; k += dir) {
     index_val = JS_NewInt64_GC(ctx, k);
     if (LEPUS_IsException(index_val)) goto exception;
     val = JS_GetPropertyValue_GC(ctx, obj, index_val);
@@ -17341,8 +17350,11 @@ static const LEPUSCFunctionListEntry js_array_proto_funcs[] = {
     LEPUS_CFUNC_MAGIC_DEF("reduceRight", 1, js_array_reduce_gc,
                           special_reduceRight),
     LEPUS_CFUNC_DEF("fill", 1, js_array_fill),
-    LEPUS_CFUNC_MAGIC_DEF("find", 1, js_array_find, 0),
-    LEPUS_CFUNC_MAGIC_DEF("findIndex", 1, js_array_find, 1),
+    LEPUS_CFUNC_MAGIC_DEF("find", 1, js_array_find, ArrayFind),
+    LEPUS_CFUNC_MAGIC_DEF("findIndex", 1, js_array_find, ArrayFindIndex),
+    LEPUS_CFUNC_MAGIC_DEF("findLast", 1, js_array_find, ArrayFindLast),
+    LEPUS_CFUNC_MAGIC_DEF("findLastIndex", 1, js_array_find,
+                          ArrayFindLastIndex),
     LEPUS_CFUNC_DEF("indexOf", 1, js_array_indexOf),
     LEPUS_CFUNC_DEF("lastIndexOf", 1, js_array_lastIndexOf),
     LEPUS_CFUNC_DEF("includes", 1, js_array_includes),

@@ -3228,8 +3228,8 @@ TEST_F(CommonQjsTest, NotAFunctionException) {
     std::string src;
     std::string expected;
   } cases[] = {{"results(arr)", "results is not a function"},
-               {"arr.findLast(function (kvalue) {results.push(kvalue)})",
-                "arr.findLast is not a function"},
+               {"arr.findFirst(function (kvalue) {results.push(kvalue)})",
+                "arr.findFirst is not a function"},
                {"arr.length(results)", "arr.length is not a function"},
                {"arr[2](results)", "arr[2] is not a function"},
                {"const Car = 1; new Car()", "Car is not a function"},
