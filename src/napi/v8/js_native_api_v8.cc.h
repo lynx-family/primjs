@@ -422,8 +422,8 @@ class Reference : public RefBase {
       // nothing
       return;
     }
-    _persistent.SetWeak(_secondPassParameter, FinalizeCallback,
-                        v8::WeakCallbackType::kParameter);
+    _persistent.SetWeak(static_cast<void*>(_secondPassParameter),
+                        FinalizeCallback, v8::WeakCallbackType::kParameter);
     *_secondPassParameter = this;
   }
   // The N-API finalizer callback may make calls into the engine. V8's heap is
@@ -433,9 +433,9 @@ class Reference : public RefBase {
   // attach such a second-pass finalizer from the first pass finalizer. Thus,
   // we do that here to ensure that the N-API finalizer callback is free to call
   // into the engine.
-  static void FinalizeCallback(
-      const v8::WeakCallbackInfo<SecondPassCallParameterRef>& data) {
-    SecondPassCallParameterRef* parameter = data.GetParameter();
+  static void FinalizeCallback(const v8::WeakCallbackInfo<void>& data) {
+    auto* parameter =
+        static_cast<SecondPassCallParameterRef*>(data.GetParameter());
     Reference* reference = *parameter;
     if (reference == nullptr) {
       return;
@@ -450,9 +450,9 @@ class Reference : public RefBase {
     data.SetSecondPassCallback(SecondPassCallback);
   }
 
-  static void SecondPassCallback(
-      const v8::WeakCallbackInfo<SecondPassCallParameterRef>& data) {
-    SecondPassCallParameterRef* parameter = data.GetParameter();
+  static void SecondPassCallback(const v8::WeakCallbackInfo<void>& data) {
+    auto* parameter =
+        static_cast<SecondPassCallParameterRef*>(data.GetParameter());
     Reference* reference = *parameter;
     delete parameter;
     if (reference == nullptr) {
