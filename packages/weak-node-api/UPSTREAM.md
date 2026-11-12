@@ -31,6 +31,6 @@ Lynx integrates Node-API based native add-ons into runtimes. To reduce friction 
 ## Links
 
 - Upstream repository: https://github.com/callstackincubator/react-native-node-api
-- Node-Addon-API: https://github.com/node-addon-api/node-addon-api
+- Node-Addon-API: https://github.com/nodejs/node-addon-api
 - Node-API C headers (node-api-headers): https://github.com/nodejs/node-api-headers
 - Node-API (N-API): https://nodejs.org/api/n-api.html
