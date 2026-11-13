@@ -23,6 +23,7 @@
 #include <vector>
 
 #include "basic/log/logging.h"
+#include "napi_env.h"
 #include "napi_env_quickjs.h"
 #include "quickjs/include/quickjs-inner.h"
 #ifdef USE_PRIMJS_NAPI
@@ -2731,6 +2732,7 @@ void napi_attach_quickjs(napi_env env, LEPUSContext* context) {
 }
 
 void napi_detach_quickjs(napi_env env) {
+  if (!napi_run_adapter_cleanup_hooks(env) || env->ctx == nullptr) return;
   LEPUSContext* ctx = env->ctx->ctx;
   delete env->ctx;
   env->ctx = nullptr;

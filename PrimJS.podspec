@@ -117,7 +117,7 @@ Pod::Spec.new do |s|
     sp.subspec "quickjs" do |ssp|
       ssp.source_files = "src/napi/quickjs/*.{h,cc}"
       ssp.public_header_files = "src/napi/quickjs/napi_env_quickjs.h"
-      ssp.dependency "PrimJS/napi/core"
+      ssp.dependency "PrimJS/napi/env"
       ssp.dependency "PrimJS/quickjs"
     end
     sp.subspec "jsc" do |ssp|
@@ -126,7 +126,7 @@ Pod::Spec.new do |s|
       ssp.pod_target_xcconfig = { "GCC_PREPROCESSOR_DEFINITIONS" => "JSC_OBJC_API_ENABLED=0" }
       ssp.source_files = "src/napi/jsc/*.{h,cc}"
       ssp.public_header_files = "src/napi/jsc/napi_env_jsc.h"
-      ssp.dependency "PrimJS/napi/core"
+      ssp.dependency "PrimJS/napi/env"
       ssp.dependency "PrimJS/log"
       ssp.dependency "PrimJS/quickjs"
       ssp.frameworks = "JavaScriptCore"

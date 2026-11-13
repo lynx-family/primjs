@@ -19,5 +19,6 @@ napi_source_set("jsc") {
   sources = [ "js_native_api_JavaScriptCore.cc" ]
   public = [ "js_native_api_JavaScriptCore.h" ]
   public_configs = [ ":jsc_config" ]
+  deps = [ "../env:env" ]
   frameworks = [ "JavaScriptCore.framework" ]
 }

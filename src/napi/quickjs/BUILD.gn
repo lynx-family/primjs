@@ -12,4 +12,5 @@ napi_source_set("native_quickjs") {
   public = [ "./napi_env_quickjs.h" ]
   public_configs = [ ":config" ]
   public_deps = [ "../..:quickjs_lib" ]
+  deps = [ "../env:env" ]
 }

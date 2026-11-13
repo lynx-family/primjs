@@ -82,6 +82,12 @@ The harness triggers collection on each backend and checks callback counts
 before destroying its runtime. Receiver mutation, integer conversion boundaries
 and JSC reference/finalizer ordering assertions remain in the suite.
 
+Native `AdapterCleanup*` cases additionally destroy the environment and check
+that C adapter hooks can unref/delete owned references before InstanceData
+finalization, legacy hooks remain later, and reverse registration order survives
+hook removal. These lifecycle assertions run after teardown because JavaScript
+cannot inspect a destroyed environment.
+
 ## Known JSC failures
 
 The existing JSC adapter does not pass the full imported suite. These findings

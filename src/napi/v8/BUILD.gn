@@ -13,6 +13,7 @@ if (target_os == "mac") {
     public = [ "napi_env_v8.h" ]
     sources = [ "//${napi_src_dir}/v8/js_native_api_v8.cc" ]
     public_configs = [ ":v8_config" ]
+    deps = [ "../env:env" ]
     libs = [
       "//third_party/v8/darwin/lib/libcppgc_base.a",
       "//third_party/v8/darwin/lib/libfuzzer_support.a",
@@ -44,6 +45,7 @@ if (target_os == "mac") {
     public = [ "napi_env_v8.h" ]
     sources = [ "//${napi_src_dir}/v8/js_native_api_v8.cc" ]
     public_configs = [ ":v8_config" ]
+    deps = [ "../env:env" ]
     libs = [ "//third_party/v8/linux/lib/libv8_monolith.a" ]
   }
 } else {

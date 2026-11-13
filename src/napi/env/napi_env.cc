@@ -27,15 +27,25 @@
 #include "primjs_napi_defines.h"
 #endif
 struct napi_env_data__ {
-  void AddCleanupHook(void (*fun)(void* arg), void* arg) {
-    cleanup_hooks.insert(CleanupHook{fun, arg, cleanup_hooks.size()});
+  void AddCleanupHook(void (*fun)(void* arg), void* arg,
+                      bool is_adapter = false) {
+    CleanupHook hook{fun, arg, 0};
+    // Keep cross-API identity: a duplicate retains its first registration.
+    if (adapter_cleanup_hooks.count(hook) || legacy_cleanup_hooks.count(hook)) {
+      return;
+    }
+    auto& hooks = is_adapter ? adapter_cleanup_hooks : legacy_cleanup_hooks;
+    // Adapter registrations must not affect legacy's size-based numbering.
+    hook.insertion_order_counter =
+        is_adapter ? adapter_cleanup_hook_counter++ : hooks.size();
+    hooks.insert(hook);
   }
 
   void RemoveCleanupHook(void (*fun)(void* arg), void* arg) {
-    cleanup_hooks.erase(CleanupHook{fun, arg, 0});
+    CleanupHook hook{fun, arg, 0};
+    adapter_cleanup_hooks.erase(hook);
+    legacy_cleanup_hooks.erase(hook);
   }
-
-  ~napi_env_data__() { RunCleanup(); }
 
   struct CleanupHook {
     void (*fun)(void*);
@@ -59,12 +69,31 @@ struct napi_env_data__ {
     };
   };
 
-  void RunCleanup() {
-    while (!cleanup_hooks.empty()) {
+  using CleanupHooks =
+      std::unordered_set<CleanupHook, CleanupHook::Hash, CleanupHook::Equal>;
+
+  bool HasAdapterCleanupHooks() const { return !adapter_cleanup_hooks.empty(); }
+
+  bool RunCleanup(bool adapter_only) {
+    if (running_cleanup) return false;
+    running_cleanup = true;
+    // Native fallback drains the queues in separate phases. Hooks registered
+    // across queues during cleanup are handled before free-env completes.
+    do {
+      DrainCleanupHooks(adapter_cleanup_hooks);
+      if (!adapter_only) DrainCleanupHooks(legacy_cleanup_hooks);
+    } while (!adapter_cleanup_hooks.empty() ||
+             (!adapter_only && !legacy_cleanup_hooks.empty()));
+    running_cleanup = false;
+    return true;
+  }
+
+  void DrainCleanupHooks(CleanupHooks& hooks) {
+    for (;;) {
       // Copy into a vector, since we can't sort an unordered_set in-place.
-      std::vector<CleanupHook> callbacks(cleanup_hooks.begin(),
-                                         cleanup_hooks.end());
-      // We can't erase the copied elements from `cleanup_hooks_` yet, because
+      std::vector<CleanupHook> callbacks(hooks.begin(), hooks.end());
+      if (callbacks.empty()) break;
+      // We can't erase the copied elements from `hooks` yet, because
       // we need to be able to check whether they were un-scheduled by another
       // hook.
 
@@ -76,20 +105,24 @@ struct napi_env_data__ {
                 });
 
       for (const auto& cb : callbacks) {
-        if (cleanup_hooks.count(cb) == 0) {
-          // This hook was removed from the `cleanup_hooks_` set during another
-          // hook that was run earlier. Nothing to do here.
+        if (hooks.find(cb) == hooks.end()) {
+          // Removed or moved to the other queue by an earlier hook. A legacy
+          // registration must not run during the adapter-only detach phase.
           continue;
         }
 
         cb.fun(cb.arg);
-        cleanup_hooks.erase(cb);
+        // Preserve consumption by callback/argument even if the running hook
+        // removes and re-registers its own key through the other API.
+        RemoveCleanupHook(cb.fun, cb.arg);
       }
     }
   }
 
-  std::unordered_set<CleanupHook, CleanupHook::Hash, CleanupHook::Equal>
-      cleanup_hooks;
+  uint64_t adapter_cleanup_hook_counter = 0;
+  bool running_cleanup = false;
+  CleanupHooks adapter_cleanup_hooks;
+  CleanupHooks legacy_cleanup_hooks;
 };
 
 namespace {
@@ -150,6 +183,12 @@ napi_status napi_get_version(napi_env env, uint32_t* version) {
 napi_status napi_add_env_cleanup_hook(napi_env env, void (*fun)(void* arg),
                                       void* arg) {
   env->state->env_data->AddCleanupHook(fun, arg);
+  return napi_clear_last_error(env);
+}
+
+napi_status napi_add_adapter_cleanup_hook(napi_env env, void (*fun)(void* arg),
+                                          void* arg) {
+  env->state->env_data->AddCleanupHook(fun, arg, true);
   return napi_clear_last_error(env);
 }
 
@@ -240,7 +279,28 @@ napi_env napi_new_env() {
   return env;
 }
 
+bool napi_run_adapter_cleanup_hooks(napi_env env) {
+  if (env == nullptr) return false;
+  // A repeated detach must not run hooks registered after the context was
+  // destroyed. They are handled by the native-only free-env fallback.
+  auto* env_data = env->state->env_data;
+  if (env_data->running_cleanup) return false;
+  if (env->ctx == nullptr || !env_data->HasAdapterCleanupHooks()) return true;
+
+  // Engine detach may have no caller-owned scope. Adapter hooks can create
+  // handles while the context is still attached; legacy-only cleanup must not
+  // introduce scope API calls or change the existing free-env behavior.
+  napi_handle_scope scope = nullptr;
+  if (env->napi_open_handle_scope(env, &scope) != napi_ok) return false;
+  bool completed = env_data->RunCleanup(true);
+  napi_status status = env->napi_close_handle_scope(env, scope);
+  return completed && status == napi_ok;
+}
+
 void napi_free_env(napi_env env) {
+  // Also handles environments that were never attached to an engine. Do not
+  // destroy the environment recursively while one of its hooks is running.
+  if (env == nullptr || !env->state->env_data->RunCleanup(false)) return;
   delete env->state->env_data;
   delete env->state;
   delete env;

@@ -388,7 +388,7 @@ if(ENABLE_BUILD_AAR)
     endif()
   endif()
   target_include_directories(napi_v8 PRIVATE ${JS_V8_HEADERS})
-  target_link_libraries(napi_v8 PUBLIC ${JS_V8_LIBRARY})
+  target_link_libraries(napi_v8 PUBLIC napi ${JS_V8_LIBRARY})
   target_link_libraries(napi_adapter napi)
 endif()
 

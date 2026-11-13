@@ -14,6 +14,7 @@
 #include "harmony/napi_env_harmony.h"
 #include "js_native_api.h"
 #include "js_native_api_types.h"
+#include "napi_env.h"
 #include "napi_state.h"
 
 #ifdef USE_PRIMJS_NAPI
@@ -1612,7 +1613,7 @@ void napi_attach_harmony(napi_env env, JSVM_Env js_env) {
 }
 
 void napi_detach_harmony(napi_env env) {
-  if (!env) {
+  if (!napi_run_adapter_cleanup_hooks(env) || env->ctx == nullptr) {
     return;
   }
   delete env->ctx;

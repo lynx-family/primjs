@@ -14,6 +14,7 @@
 #include <thread>
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
 
 #include "napi/napi.h"
 
@@ -244,6 +245,99 @@ constexpr const char* kTestSuites[] = {
     "test_threadsafe_function",
     "test_typedarray",
 };
+
+TEST_P(NAPITest, AdapterCleanupKeepsReferencesValidAndLegacyHooksLate) {
+  struct State {
+    napi_env env = nullptr;
+    napi_ref reference = nullptr;
+    int finalizers = 0;
+    std::vector<int> events;
+  } state;
+  state.env = env_;
+  // Keep callback state alive even if an assertion exits before teardown.
+  auto runtime = std::move(runtime_);
+  {
+    Napi::HandleScope scope{Napi::Env(env_)};
+    napi_value object;
+    ASSERT_EQ(napi_create_object_primjs(env_, &object), napi_ok);
+    ASSERT_EQ(napi_create_reference_primjs(env_, object, 1, &state.reference),
+              napi_ok);
+    ASSERT_EQ(napi_set_instance_data_primjs(
+                  env_, &state,
+                  [](napi_env, void* data, void*) {
+                    auto* state = static_cast<State*>(data);
+                    ++state->finalizers;
+                    state->events.push_back(2);
+                  },
+                  nullptr),
+              napi_ok);
+    ASSERT_EQ(napi_add_env_cleanup_hook_primjs(
+                  env_,
+                  [](void* data) {
+                    auto* state = static_cast<State*>(data);
+                    state->events.push_back(1);
+                    EXPECT_EQ(state->finalizers, 0);
+                    // The old order has already destroyed this reference.
+                    // Report that order without dereferencing a stale handle.
+                    if (state->finalizers != 0) return;
+                    uint32_t count = 1;
+                    EXPECT_EQ(napi_reference_unref_primjs(
+                                  state->env, state->reference, &count),
+                              napi_ok);
+                    EXPECT_EQ(count, 0u);
+                    EXPECT_EQ(napi_delete_reference_primjs(state->env,
+                                                           state->reference),
+                              napi_ok);
+                    state->reference = nullptr;
+                  },
+                  &state),
+              napi_ok);
+    ASSERT_EQ(env_->napi_add_env_cleanup_hook(
+                  env_,
+                  [](void* data) {
+                    auto* state = static_cast<State*>(data);
+                    EXPECT_EQ(state->finalizers, 1);
+                    state->events.push_back(3);
+                  },
+                  &state),
+              napi_ok);
+  }
+  runtime.reset();
+  env_ = nullptr;
+  EXPECT_EQ(state.events, std::vector<int>({1, 2, 3}));
+  EXPECT_EQ(state.finalizers, 1);
+  EXPECT_EQ(state.reference, nullptr);
+}
+
+TEST_P(NAPITest, AdapterCleanupKeepsReverseOrderAfterRemoval) {
+  struct Entry {
+    std::vector<int>* order;
+    int id;
+  };
+  std::vector<int> order;
+  Entry entries[] = {{&order, 1}, {&order, 2}, {&order, 3},
+                     {&order, 4}, {&order, 5}, {&order, 6}};
+  auto runtime = std::move(runtime_);
+  auto callback = [](void* data) {
+    auto* entry = static_cast<Entry*>(data);
+    entry->order->push_back(entry->id);
+  };
+  for (int i = 0; i < 4; ++i) {
+    ASSERT_EQ(napi_add_env_cleanup_hook_primjs(env_, callback, &entries[i]),
+              napi_ok);
+  }
+  for (int i = 0; i < 2; ++i) {
+    ASSERT_EQ(napi_remove_env_cleanup_hook_primjs(env_, callback, &entries[i]),
+              napi_ok);
+  }
+  for (int i = 4; i < 6; ++i) {
+    ASSERT_EQ(napi_add_env_cleanup_hook_primjs(env_, callback, &entries[i]),
+              napi_ok);
+  }
+  runtime.reset();
+  env_ = nullptr;
+  EXPECT_EQ(order, std::vector<int>({6, 5, 4, 3}));
+}
 
 TEST_P(NAPITest, NapiJS) {
   for (const char* suite : kTestSuites) {

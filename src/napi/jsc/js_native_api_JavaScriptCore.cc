@@ -20,6 +20,7 @@
 #include <vector>
 
 #include "basic/log/logging.h"
+#include "napi_env.h"
 #include "napi_env_jsc.h"
 
 #ifdef USE_PRIMJS_NAPI
@@ -3052,6 +3053,7 @@ void napi_attach_jsc(napi_env env, JSGlobalContextRef global_ctx) {
 }
 
 void napi_detach_jsc(napi_env env) {
+  if (!napi_run_adapter_cleanup_hooks(env) || env->ctx == nullptr) return;
   delete env->ctx;
   env->ctx = nullptr;
 }

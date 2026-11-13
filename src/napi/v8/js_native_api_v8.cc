@@ -7,7 +7,10 @@
 // Copyright 2024 The Lynx Authors. All rights reserved.
 // Licensed under the Apache License Version 2.0 that can be found in the
 // LICENSE file in the root directory of this source tree.
+#define NAPI_COMPILE_UNIT v8
+
 #include "js_native_api_v8.cc.h"
+#include "napi_env.h"
 
 #ifdef USE_PRIMJS_NAPI
 #include "primjs_napi_defines.h"
@@ -287,6 +290,7 @@ void napi_attach_v8(napi_env env, v8::Local<v8::Context> ctx) {
 }
 
 void napi_detach_v8(napi_env env) {
+  if (!napi_run_adapter_cleanup_hooks(env) || env->ctx == nullptr) return;
   delete env->ctx;
   env->ctx = nullptr;
 }

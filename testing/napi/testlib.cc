@@ -7,6 +7,7 @@
 #include <thread>
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
 
 #include "napi/adapter/js_native_api_adapter.h"
 
@@ -973,6 +974,609 @@ TEST_P(NAPITest, InstanceData) {
   int a = 33;
   env.AddCleanupHook<int>(func, &a);
   env.RemoveCleanupHook<int>(func, &a);
+}
+
+TEST_P(NAPITest, CleanupHooksReleaseReferencesBeforeFinalizers) {
+  auto runtime = GetParam().second();
+  napi_env raw_env = runtime->Env();
+  struct State {
+    napi_env env;
+    napi_ref reference = nullptr;
+    std::vector<int> events;
+  } state{raw_env};
+
+  {
+    HandleScope scope(raw_env);
+    napi_value object = Object::New(raw_env);
+    ASSERT_EQ(
+        napi_create_reference_primjs(raw_env, object, 1, &state.reference),
+        napi_ok);
+    ASSERT_EQ(napi_set_instance_data_primjs(
+                  raw_env, &state,
+                  [](napi_env, void* data, void*) {
+                    auto* state = static_cast<State*>(data);
+                    EXPECT_EQ(state->reference, nullptr);
+                    EXPECT_EQ(state->events, std::vector<int>({1}));
+                    state->events.push_back(2);
+                  },
+                  nullptr),
+              napi_ok);
+    ASSERT_EQ(napi_add_env_cleanup_hook_primjs(
+                  raw_env,
+                  [](void* data) {
+                    auto* state = static_cast<State*>(data);
+                    ASSERT_NE(state->env->ctx, nullptr);
+                    EXPECT_TRUE(state->events.empty());
+                    uint32_t count = 1;
+                    EXPECT_EQ(napi_reference_unref_primjs(
+                                  state->env, state->reference, &count),
+                              napi_ok);
+                    EXPECT_EQ(count, 0u);
+                    EXPECT_EQ(napi_delete_reference_primjs(state->env,
+                                                           state->reference),
+                              napi_ok);
+                    state->reference = nullptr;
+                    state->events.push_back(1);
+                  },
+                  &state),
+              napi_ok);
+  }
+
+  runtime.reset();
+  EXPECT_EQ(state.events, std::vector<int>({1, 2}));
+}
+
+TEST_P(NAPITest, DetachingRuntimeDoesNotRunEnvCleanupHooks) {
+  auto runtime = GetParam().second();
+  napi_env raw_env = runtime->Env();
+  int calls[2] = {0, 0};
+  Env(raw_env).AddCleanupHook<int>([](int* calls) { ++*calls; }, &calls[0]);
+  ASSERT_EQ(
+      napi_add_env_cleanup_hook_primjs(
+          raw_env, [](void* data) { ++*static_cast<int*>(data); }, &calls[1]),
+      napi_ok);
+  napi_detach_runtime(raw_env);
+  EXPECT_EQ(calls[0], 0);
+  EXPECT_EQ(calls[1], 0);
+
+  napi_runtime_configuration configuration =
+      napi_create_runtime_configuration();
+  napi_attach_runtime_with_configuration(raw_env, configuration);
+  napi_delete_runtime_configuration(configuration);
+  EXPECT_EQ(calls[0], 0);
+  EXPECT_EQ(calls[1], 0);
+  runtime.reset();
+  EXPECT_EQ(calls[0], 1);
+  EXPECT_EQ(calls[1], 1);
+}
+
+TEST(NAPIEnvCleanup, ReverseOrderAfterRemovalAndInsertion) {
+  napi_env raw_env = napi_new_env();
+  std::vector<int> calls;
+  struct Hook {
+    std::vector<int>* calls;
+    int value;
+  } hooks[] = {{&calls, 1}, {&calls, 2}, {&calls, 3}, {&calls, 4}};
+  auto callback = +[](void* data) {
+    auto* hook = static_cast<Hook*>(data);
+    hook->calls->push_back(hook->value);
+  };
+  ASSERT_EQ(napi_add_env_cleanup_hook_primjs(raw_env, callback, &hooks[0]),
+            napi_ok);
+  ASSERT_EQ(napi_add_env_cleanup_hook_primjs(raw_env, callback, &hooks[1]),
+            napi_ok);
+  ASSERT_EQ(napi_add_env_cleanup_hook_primjs(raw_env, callback, &hooks[2]),
+            napi_ok);
+  ASSERT_EQ(napi_remove_env_cleanup_hook_primjs(raw_env, callback, &hooks[1]),
+            napi_ok);
+  ASSERT_EQ(napi_add_env_cleanup_hook_primjs(raw_env, callback, &hooks[3]),
+            napi_ok);
+  napi_free_env(raw_env);
+  EXPECT_EQ(calls, std::vector<int>({4, 3, 1}));
+}
+
+TEST(NAPIEnvCleanup, HookCanRemoveAnotherHookAndAddANewHook) {
+  napi_env raw_env = napi_new_env();
+  std::vector<int> calls;
+  struct State {
+    napi_env env;
+    std::vector<int>* calls;
+  } state{raw_env, &calls};
+  auto removed =
+      +[](void* data) { static_cast<State*>(data)->calls->push_back(1); };
+  struct Mutation {
+    State* state;
+    void (*removed)(void*);
+  } mutation{&state, removed};
+  ASSERT_EQ(napi_add_env_cleanup_hook_primjs(raw_env, removed, &state),
+            napi_ok);
+  ASSERT_EQ(napi_add_env_cleanup_hook_primjs(
+                raw_env,
+                [](void* data) {
+                  auto* mutation = static_cast<Mutation*>(data);
+                  auto* state = mutation->state;
+                  state->calls->push_back(2);
+                  EXPECT_EQ(napi_remove_env_cleanup_hook_primjs(
+                                state->env, mutation->removed, state),
+                            napi_ok);
+                  EXPECT_EQ(
+                      napi_add_env_cleanup_hook_primjs(
+                          state->env,
+                          [](void* data) {
+                            static_cast<State*>(data)->calls->push_back(3);
+                          },
+                          state),
+                      napi_ok);
+                },
+                &mutation),
+            napi_ok);
+  napi_free_env(raw_env);
+  EXPECT_EQ(calls, std::vector<int>({2, 3}));
+}
+
+TEST(NAPIEnvCleanup, RecursiveFreeDoesNotDestroyEnvDuringHook) {
+  for (bool adapter : {false, true}) {
+    napi_env raw_env = napi_new_env();
+    struct State {
+      napi_env env;
+      int calls = 0;
+    } state{raw_env};
+    auto callback = +[](void* data) {
+      auto* state = static_cast<State*>(data);
+      napi_free_env(state->env);
+      ASSERT_NE(state->env->state, nullptr);
+      ++state->calls;
+    };
+    if (adapter) {
+      ASSERT_EQ(napi_add_env_cleanup_hook_primjs(raw_env, callback, &state),
+                napi_ok);
+    } else {
+      Env(raw_env).AddCleanupHook(callback, &state);
+    }
+    napi_free_env(raw_env);
+    EXPECT_EQ(state.calls, 1);
+  }
+}
+
+TEST_P(NAPITest, LegacyCleanupHooksKeepLateLifecycle) {
+  auto runtime = GetParam().second();
+  napi_env raw_env = runtime->Env();
+  struct State {
+    napi_env env;
+    std::vector<int> events;
+  } state{raw_env};
+  ASSERT_EQ(napi_set_instance_data_primjs(
+                raw_env, &state,
+                [](napi_env, void* data, void*) {
+                  auto* state = static_cast<State*>(data);
+                  EXPECT_TRUE(state->events.empty());
+                  state->events.push_back(1);
+                },
+                nullptr),
+            napi_ok);
+  Env(raw_env).AddCleanupHook(
+      [](void* data) {
+        auto* state = static_cast<State*>(data);
+        EXPECT_EQ(state->env->ctx, nullptr);
+        EXPECT_EQ(state->events, std::vector<int>({1}));
+        state->events.push_back(2);
+      },
+      &state);
+  runtime.reset();
+  EXPECT_EQ(state.events, std::vector<int>({1, 2}));
+}
+
+TEST_P(NAPITest, MixedCleanupHooksKeepEachLifecycle) {
+  for (bool adapter_first : {false, true}) {
+    auto runtime = GetParam().second();
+    napi_env raw_env = runtime->Env();
+    struct State {
+      napi_env env;
+      std::vector<int> events;
+    } state{raw_env};
+    ASSERT_EQ(napi_set_instance_data_primjs(
+                  raw_env, &state,
+                  [](napi_env, void* data, void*) {
+                    auto* state = static_cast<State*>(data);
+                    EXPECT_EQ(state->events, std::vector<int>({1}));
+                    state->events.push_back(2);
+                  },
+                  nullptr),
+              napi_ok);
+    auto adapter = +[](void* data) {
+      auto* state = static_cast<State*>(data);
+      EXPECT_NE(state->env->ctx, nullptr);
+      EXPECT_TRUE(state->events.empty());
+      state->events.push_back(1);
+    };
+    auto legacy = +[](void* data) {
+      auto* state = static_cast<State*>(data);
+      EXPECT_EQ(state->env->ctx, nullptr);
+      EXPECT_EQ(state->events, std::vector<int>({1, 2}));
+      state->events.push_back(3);
+    };
+    if (adapter_first) {
+      ASSERT_EQ(napi_add_env_cleanup_hook_primjs(raw_env, adapter, &state),
+                napi_ok);
+    }
+    Env(raw_env).AddCleanupHook(legacy, &state);
+    if (!adapter_first) {
+      ASSERT_EQ(napi_add_env_cleanup_hook_primjs(raw_env, adapter, &state),
+                napi_ok);
+    }
+    runtime.reset();
+    EXPECT_EQ(state.events, std::vector<int>({1, 2, 3}));
+  }
+}
+
+TEST_P(NAPITest, DuplicateCleanupRegistrationKeepsOriginalSource) {
+  for (bool adapter_first : {false, true}) {
+    auto runtime = GetParam().second();
+    napi_env raw_env = runtime->Env();
+    struct State {
+      napi_env env;
+      bool adapter_first;
+      bool finalized = false;
+      int calls = 0;
+    } state{raw_env, adapter_first};
+    ASSERT_EQ(napi_set_instance_data_primjs(
+                  raw_env, &state,
+                  [](napi_env, void* data, void*) {
+                    auto* state = static_cast<State*>(data);
+                    EXPECT_EQ(state->calls, state->adapter_first ? 1 : 0);
+                    state->finalized = true;
+                  },
+                  nullptr),
+              napi_ok);
+    auto callback = +[](void* data) {
+      auto* state = static_cast<State*>(data);
+      EXPECT_EQ(state->env->ctx != nullptr, state->adapter_first);
+      EXPECT_EQ(state->finalized, !state->adapter_first);
+      ++state->calls;
+    };
+    if (adapter_first) {
+      ASSERT_EQ(napi_add_env_cleanup_hook_primjs(raw_env, callback, &state),
+                napi_ok);
+    }
+    Env(raw_env).AddCleanupHook(callback, &state);
+    if (!adapter_first) {
+      ASSERT_EQ(napi_add_env_cleanup_hook_primjs(raw_env, callback, &state),
+                napi_ok);
+    }
+    runtime.reset();
+    EXPECT_EQ(state.calls, 1);
+  }
+}
+
+TEST_P(NAPITest, CleanupHooksCanBeRemovedThroughEitherAPI) {
+  for (bool registered_as_adapter : {false, true}) {
+    auto runtime = GetParam().second();
+    napi_env raw_env = runtime->Env();
+    int calls = 0;
+    auto callback = +[](void* data) { ++*static_cast<int*>(data); };
+    if (registered_as_adapter) {
+      ASSERT_EQ(napi_add_env_cleanup_hook_primjs(raw_env, callback, &calls),
+                napi_ok);
+      Env(raw_env).RemoveCleanupHook(callback, &calls);
+    } else {
+      Env(raw_env).AddCleanupHook(callback, &calls);
+      ASSERT_EQ(napi_remove_env_cleanup_hook_primjs(raw_env, callback, &calls),
+                napi_ok);
+    }
+    runtime.reset();
+    EXPECT_EQ(calls, 0);
+  }
+}
+
+TEST_P(NAPITest, HookMovedToLegacyDuringCleanupStaysLate) {
+  auto runtime = GetParam().second();
+  napi_env raw_env = runtime->Env();
+  struct State {
+    napi_env env;
+    void (*target)(void*) = nullptr;
+    std::vector<int> events;
+  } state{raw_env};
+  state.target = +[](void* data) {
+    auto* state = static_cast<State*>(data);
+    EXPECT_EQ(state->env->ctx, nullptr);
+    EXPECT_EQ(state->events, std::vector<int>({1, 2}));
+    state->events.push_back(3);
+  };
+  ASSERT_EQ(napi_set_instance_data_primjs(
+                raw_env, &state,
+                [](napi_env, void* data, void*) {
+                  auto* state = static_cast<State*>(data);
+                  EXPECT_EQ(state->events, std::vector<int>({1}));
+                  state->events.push_back(2);
+                },
+                nullptr),
+            napi_ok);
+  ASSERT_EQ(napi_add_env_cleanup_hook_primjs(raw_env, state.target, &state),
+            napi_ok);
+  ASSERT_EQ(napi_add_env_cleanup_hook_primjs(
+                raw_env,
+                [](void* data) {
+                  auto* state = static_cast<State*>(data);
+                  EXPECT_NE(state->env->ctx, nullptr);
+                  EXPECT_EQ(napi_remove_env_cleanup_hook_primjs(
+                                state->env, state->target, state),
+                            napi_ok);
+                  Env(state->env).AddCleanupHook(state->target, state);
+                  state->events.push_back(1);
+                },
+                &state),
+            napi_ok);
+  runtime.reset();
+  EXPECT_EQ(state.events, std::vector<int>({1, 2, 3}));
+}
+
+TEST_P(NAPITest, AdapterCleanupCannotRecursivelyFreeOrDrainEnv) {
+  auto runtime = GetParam().second();
+  napi_env raw_env = runtime->Env();
+  struct State {
+    napi_env env;
+    int calls = 0;
+  } state{raw_env};
+  ASSERT_EQ(napi_add_env_cleanup_hook_primjs(
+                raw_env,
+                [](void* data) {
+                  auto* state = static_cast<State*>(data);
+                  auto* context = state->env->ctx;
+                  EXPECT_NE(context, nullptr);
+                  napi_free_env(state->env);
+                  EXPECT_EQ(state->env->ctx, context);
+                  EXPECT_FALSE(napi_run_adapter_cleanup_hooks(state->env));
+                  EXPECT_EQ(state->env->ctx, context);
+                  ++state->calls;
+                },
+                &state),
+            napi_ok);
+  runtime.reset();
+  EXPECT_EQ(state.calls, 1);
+}
+
+TEST(NAPIEnvCleanup, LegacyHooksKeepExistingReverseOrder) {
+  napi_env raw_env = napi_new_env();
+  std::vector<int> calls;
+  struct Hook {
+    std::vector<int>* calls;
+    int value;
+  } hooks[] = {{&calls, 1}, {&calls, 2}, {&calls, 3}};
+  auto callback = +[](Hook* hook) { hook->calls->push_back(hook->value); };
+  for (auto& hook : hooks) Env(raw_env).AddCleanupHook(callback, &hook);
+  napi_free_env(raw_env);
+  EXPECT_EQ(calls, std::vector<int>({3, 2, 1}));
+}
+
+TEST(NAPIEnvCleanup, LegacyRemovalKeepsExistingQueueSizeOrder) {
+  napi_env raw_env = napi_new_env();
+  std::vector<int> calls;
+  struct Hook {
+    std::vector<int>* calls;
+    int value;
+  } hooks[] = {{&calls, 1}, {&calls, 2}, {&calls, 3}, {&calls, 4}};
+  auto callback = +[](Hook* hook) { hook->calls->push_back(hook->value); };
+  for (int i = 0; i < 3; ++i) Env(raw_env).AddCleanupHook(callback, &hooks[i]);
+  Env(raw_env).RemoveCleanupHook(callback, &hooks[0]);
+  Env(raw_env).RemoveCleanupHook(callback, &hooks[1]);
+  Env(raw_env).AddCleanupHook(callback, &hooks[3]);
+  napi_free_env(raw_env);
+  // Preserve the legacy size-based order rather than adapter registration
+  // order.
+  EXPECT_EQ(calls, std::vector<int>({3, 4}));
+}
+
+TEST(NAPIEnvCleanup, SeparateQueuesRunAdapterBeforeLegacyWithoutContext) {
+  napi_env raw_env = napi_new_env();
+  std::vector<int> calls;
+  struct Hook {
+    std::vector<int>* calls;
+    int value;
+  } hooks[] = {{&calls, 1}, {&calls, 2}, {&calls, 3}, {&calls, 4}};
+  auto callback = +[](void* data) {
+    auto* hook = static_cast<Hook*>(data);
+    hook->calls->push_back(hook->value);
+  };
+  for (int i = 0; i < 4; ++i) {
+    if (i % 2 == 0) {
+      ASSERT_EQ(
+          raw_env->napi_add_env_cleanup_hook(raw_env, callback, &hooks[i]),
+          napi_ok);
+    } else {
+      ASSERT_EQ(napi_add_env_cleanup_hook_primjs(raw_env, callback, &hooks[i]),
+                napi_ok);
+    }
+  }
+  napi_free_env(raw_env);
+  // Each queue has its own order; equal numbers across queues are never sorted
+  // together. The native fallback runs the adapter phase before the legacy one.
+  EXPECT_EQ(calls, std::vector<int>({4, 2, 3, 1}));
+}
+
+TEST(NAPIEnvCleanup, AdapterRegistrationsDoNotChangeLegacyNumbering) {
+  napi_env raw_env = napi_new_env();
+  std::vector<int> calls;
+  struct Hook {
+    std::vector<int>* calls;
+    int value;
+  } hooks[] = {{&calls, 1}, {&calls, 2}, {&calls, 3}, {&calls, 4}};
+  auto callback = +[](void* data) {
+    auto* hook = static_cast<Hook*>(data);
+    hook->calls->push_back(hook->value);
+  };
+  for (int i = 0; i < 3; ++i) {
+    ASSERT_EQ(raw_env->napi_add_env_cleanup_hook(raw_env, callback, &hooks[i]),
+              napi_ok);
+  }
+  for (int i = 0; i < 2; ++i) {
+    ASSERT_EQ(
+        raw_env->napi_remove_env_cleanup_hook(raw_env, callback, &hooks[i]),
+        napi_ok);
+  }
+  int adapter_calls[2] = {0, 0};
+  for (int& count : adapter_calls) {
+    ASSERT_EQ(
+        napi_add_env_cleanup_hook_primjs(
+            raw_env, [](void* data) { ++*static_cast<int*>(data); }, &count),
+        napi_ok);
+  }
+  ASSERT_EQ(raw_env->napi_add_env_cleanup_hook(raw_env, callback, &hooks[3]),
+            napi_ok);
+  napi_free_env(raw_env);
+  EXPECT_EQ(calls, std::vector<int>({3, 4}));
+  EXPECT_EQ(adapter_calls[0], 1);
+  EXPECT_EQ(adapter_calls[1], 1);
+}
+
+TEST(NAPIEnvCleanup, NativeFallbackDrainsHooksAddedAcrossBothQueues) {
+  napi_env raw_env = napi_new_env();
+  struct State {
+    napi_env env;
+    std::vector<int> calls;
+  } state{raw_env};
+  ASSERT_EQ(
+      napi_add_env_cleanup_hook_primjs(
+          raw_env,
+          [](void* data) {
+            auto* state = static_cast<State*>(data);
+            state->calls.push_back(1);
+            EXPECT_EQ(
+                state->env->napi_add_env_cleanup_hook(
+                    state->env,
+                    [](void* data) {
+                      auto* state = static_cast<State*>(data);
+                      state->calls.push_back(2);
+                      EXPECT_EQ(
+                          napi_add_env_cleanup_hook_primjs(
+                              state->env,
+                              [](void* data) {
+                                auto* state = static_cast<State*>(data);
+                                state->calls.push_back(4);
+                                napi_free_env(state->env);
+                                EXPECT_EQ(state->env->ctx, nullptr);
+                                EXPECT_FALSE(
+                                    napi_run_adapter_cleanup_hooks(state->env));
+                              },
+                              state),
+                          napi_ok);
+                    },
+                    state),
+                napi_ok);
+          },
+          &state),
+      napi_ok);
+  ASSERT_EQ(raw_env->napi_add_env_cleanup_hook(
+                raw_env,
+                [](void* data) {
+                  auto* state = static_cast<State*>(data);
+                  state->calls.push_back(3);
+                },
+                &state),
+            napi_ok);
+  napi_free_env(raw_env);
+  EXPECT_EQ(state.calls, std::vector<int>({1, 2, 3, 4}));
+}
+
+TEST(NAPIEnvCleanup, RunningHookMovedAcrossQueuesIsConsumedOnce) {
+  for (bool adapter_first : {false, true}) {
+    napi_env raw_env = napi_new_env();
+    struct State {
+      napi_env env;
+      bool adapter_first;
+      void (*callback)(void*) = nullptr;
+      int calls = 0;
+    } state{raw_env, adapter_first};
+    state.callback = +[](void* data) {
+      auto* state = static_cast<State*>(data);
+      if (++state->calls != 1) return;
+      ASSERT_EQ(state->env->napi_remove_env_cleanup_hook(
+                    state->env, state->callback, state),
+                napi_ok);
+      if (state->adapter_first) {
+        ASSERT_EQ(state->env->napi_add_env_cleanup_hook(state->env,
+                                                        state->callback, state),
+                  napi_ok);
+      } else {
+        ASSERT_EQ(napi_add_env_cleanup_hook_primjs(state->env, state->callback,
+                                                   state),
+                  napi_ok);
+      }
+    };
+    if (adapter_first) {
+      ASSERT_EQ(
+          napi_add_env_cleanup_hook_primjs(raw_env, state.callback, &state),
+          napi_ok);
+    } else {
+      ASSERT_EQ(
+          raw_env->napi_add_env_cleanup_hook(raw_env, state.callback, &state),
+          napi_ok);
+    }
+    napi_free_env(raw_env);
+    EXPECT_EQ(state.calls, 1);
+  }
+}
+
+TEST(NAPIEnvCleanup, LegacyOnlyDetachDoesNotCallScopeAPIs) {
+  napi_env raw_env = napi_new_env();
+  int calls = 0;
+  Env(raw_env).AddCleanupHook(
+      +[](int* count) { ++*count; }, &calls);
+  raw_env->napi_open_handle_scope = [](napi_env, napi_handle_scope*) {
+    ADD_FAILURE() << "Legacy-only detach must not open a handle scope";
+    return napi_generic_failure;
+  };
+  raw_env->napi_close_handle_scope = [](napi_env, napi_handle_scope) {
+    ADD_FAILURE() << "Legacy-only detach must not close a handle scope";
+    return napi_generic_failure;
+  };
+  // A non-null sentinel exercises the attached-context branch without an
+  // engine.
+  raw_env->ctx = reinterpret_cast<napi_context>(&calls);
+  EXPECT_TRUE(napi_run_adapter_cleanup_hooks(raw_env));
+  EXPECT_EQ(calls, 0);
+  raw_env->ctx = nullptr;
+  napi_free_env(raw_env);
+  EXPECT_EQ(calls, 1);
+}
+
+TEST(NAPIEnvCleanup, HooksWithoutAContextWaitForFreeEnv) {
+  napi_env raw_env = napi_new_env();
+  int calls[2] = {0, 0};
+  auto callback = +[](void* data) { ++*static_cast<int*>(data); };
+  ASSERT_EQ(napi_add_env_cleanup_hook_primjs(raw_env, callback, &calls[0]),
+            napi_ok);
+  Env(raw_env).AddCleanupHook(callback, &calls[1]);
+  EXPECT_TRUE(napi_run_adapter_cleanup_hooks(raw_env));
+  EXPECT_EQ(calls[0], 0);
+  EXPECT_EQ(calls[1], 0);
+  napi_free_env(raw_env);
+  EXPECT_EQ(calls[0], 1);
+  EXPECT_EQ(calls[1], 1);
+}
+
+TEST(NAPIEnvCleanup, LegacyFallbackCanRegisterNativeAdapterHook) {
+  napi_env raw_env = napi_new_env();
+  struct State {
+    napi_env env;
+    std::vector<int> events;
+  } state{raw_env};
+  Env(raw_env).AddCleanupHook(
+      [](void* data) {
+        auto* state = static_cast<State*>(data);
+        state->events.push_back(1);
+        EXPECT_EQ(napi_add_env_cleanup_hook_primjs(
+                      state->env,
+                      [](void* data) {
+                        auto* state = static_cast<State*>(data);
+                        EXPECT_EQ(state->env->ctx, nullptr);
+                        state->events.push_back(2);
+                      },
+                      state),
+                  napi_ok);
+      },
+      &state);
+  napi_free_env(raw_env);
+  EXPECT_EQ(state.events, std::vector<int>({1, 2}));
 }
 
 TEST_P(NAPITest, TypeChecking) {

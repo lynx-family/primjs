@@ -18,6 +18,7 @@
 #include <cstdlib>
 #include <string>
 
+#include "napi_env.h"
 #include "napi_runtime.h"
 #include "napi_state.h"
 
@@ -976,7 +977,7 @@ napi_status napi_add_env_cleanup_hook_primjs(napi_env env,
                                              void* arg) {
   CHECK_ENV(env);
   CHECK_ARG(env, fun);
-  return env->napi_add_env_cleanup_hook(env, fun, arg);
+  return napi_add_adapter_cleanup_hook(env, fun, arg);
 }
 
 napi_status napi_remove_env_cleanup_hook_primjs(napi_env env,
