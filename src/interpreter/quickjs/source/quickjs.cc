@@ -27968,6 +27968,8 @@ QJS_STATIC int resolve_scope_private_field(LEPUSContext *ctx, JSFunctionDef *s,
           /* obj func value */
           dbuf_putc(bc, OP_call_method);
           dbuf_put_u16(bc, 1);
+          /* the setter result is not used: obj value -> */
+          dbuf_putc(bc, OP_drop);
         } break;
         default:
           abort();

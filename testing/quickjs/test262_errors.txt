@@ -762,18 +762,6 @@ test/language/expressions/compound-assignment/compound-assignment-operator-calls
 test/language/expressions/compound-assignment/compound-assignment-operator-calls-putvalue-lref--v--20.js:19: Test262Error: Expected a ReferenceError to be thrown but no exception was thrown at all
 test/language/expressions/compound-assignment/compound-assignment-operator-calls-putvalue-lref--v--9.js:19: Test262Error: Expected a ReferenceError to be thrown but no exception was thrown at all
 test/language/expressions/compound-assignment/compound-assignment-operator-calls-putvalue-lref--v-.js:19: Test262Error: Expected a ReferenceError to be thrown but no exception was thrown at all
-test/language/expressions/compound-assignment/left-hand-side-private-reference-accessor-property-add.js:59: Test262Error: The expression should evaluate to the result Expected SameValue(«undefined», «3») to be true
-test/language/expressions/compound-assignment/left-hand-side-private-reference-accessor-property-bitand.js:59: Test262Error: The expression should evaluate to the result Expected SameValue(«undefined», «0») to be true
-test/language/expressions/compound-assignment/left-hand-side-private-reference-accessor-property-bitor.js:59: Test262Error: The expression should evaluate to the result Expected SameValue(«undefined», «15») to be true
-test/language/expressions/compound-assignment/left-hand-side-private-reference-accessor-property-bitxor.js:59: Test262Error: The expression should evaluate to the result Expected SameValue(«undefined», «257») to be true
-test/language/expressions/compound-assignment/left-hand-side-private-reference-accessor-property-div.js:59: Test262Error: The expression should evaluate to the result Expected SameValue(«undefined», «0.5») to be true
-test/language/expressions/compound-assignment/left-hand-side-private-reference-accessor-property-exp.js:59: Test262Error: The expression should evaluate to the result Expected SameValue(«undefined», «1000») to be true
-test/language/expressions/compound-assignment/left-hand-side-private-reference-accessor-property-lshift.js:59: Test262Error: The expression should evaluate to the result Expected SameValue(«undefined», «96») to be true
-test/language/expressions/compound-assignment/left-hand-side-private-reference-accessor-property-mod.js:59: Test262Error: The expression should evaluate to the result Expected SameValue(«undefined», «1») to be true
-test/language/expressions/compound-assignment/left-hand-side-private-reference-accessor-property-mult.js:59: Test262Error: The expression should evaluate to the result Expected SameValue(«undefined», «6») to be true
-test/language/expressions/compound-assignment/left-hand-side-private-reference-accessor-property-rshift.js:59: Test262Error: The expression should evaluate to the result Expected SameValue(«undefined», «3») to be true
-test/language/expressions/compound-assignment/left-hand-side-private-reference-accessor-property-srshift.js:59: Test262Error: The expression should evaluate to the result Expected SameValue(«undefined», «3») to be true
-test/language/expressions/compound-assignment/left-hand-side-private-reference-accessor-property-sub.js:59: Test262Error: The expression should evaluate to the result Expected SameValue(«undefined», «1») to be true
 test/language/expressions/conditional/tco-cond.js:17: strict mode: InternalError: stack overflow
 test/language/expressions/conditional/tco-pos.js:17: strict mode: InternalError: stack overflow
 test/language/expressions/delete/super-property-null-base.js:26: Test262Error: Expected a ReferenceError but got a TypeError
