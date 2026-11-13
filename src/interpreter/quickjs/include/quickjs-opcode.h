@@ -300,7 +300,7 @@ def(scope_get_ref, 7, 0, 2, atom_u16) /* emitted in phase 1, removed in phase 2 
 def(scope_put_var_init, 7, 0, 2, atom_u16) /* emitted in phase 1, removed in phase 2 */
 def(scope_get_private_field, 7, 1, 1, atom_u16) /* obj -> value, emitted in phase 1, removed in phase 2 */
 def(scope_get_private_field2, 7, 1, 2, atom_u16) /* obj -> obj value, emitted in phase 1, removed in phase 2 */
-def(scope_put_private_field, 7, 1, 1, atom_u16) /* obj value ->, emitted in phase 1, removed in phase 2 */
+def(scope_put_private_field, 7, 2, 0, atom_u16) /* obj value ->, emitted in phase 1, removed in phase 2 */
 
 // <Primjs begin>
 def(line_num, 9, 0, 0, u64) /* emitted in phase 1, removed in phase 3 */
