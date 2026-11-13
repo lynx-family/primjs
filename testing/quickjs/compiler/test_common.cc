@@ -1097,6 +1097,135 @@ TEST_F(CommonQjsTest, YieldInForHeadUnderTryDoesNotUnderflowStack) {
   if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
 }
 
+TEST_F(CommonQjsTest, PrivateSetterAssignmentKeepsStackBalanced) {
+  std::string src = R"(
+    class A {
+      #v = 0;
+      static #sv = 0;
+      set #x(value) { this.#v = value; return "setter result"; }
+      get #y() { return this.#v; }
+      set #y(value) { this.#v = value; }
+      static set #s(value) { A.#sv = value; return "setter result"; }
+
+      // In statement position the setter result must not stay on the stack.
+      inLoop(n) {
+        for (let i = 0; i < n; i++) this.#x = i;
+        return this.#v;
+      }
+      inFinally(v) {
+        try {
+        } finally {
+          this.#x = v;
+          this.#x = v + 1;
+        }
+        return this.#v;
+      }
+      inFinallyAfterReturn(v) {
+        try {
+          return "try";
+        } finally {
+          this.#x = v;
+        }
+      }
+      inFinallyAfterThrow(v) {
+        try {
+          throw "thrown";
+        } finally {
+          this.#x = v;
+        }
+      }
+      inFinallyOfLoop(n) {
+        let count = 0;
+        for (let i = 0; i < n; i++) {
+          try {
+            if (i & 1) continue;
+          } finally {
+            this.#x = i;
+            count++;
+          }
+        }
+        return count;
+      }
+      *inGeneratorFinally(v) {
+        try {
+          yield 1;
+          yield 2;
+        } finally {
+          this.#x = v;
+        }
+      }
+
+      // The assignment expression yields the assigned value.
+      value(v) { return (this.#x = v); }
+      chained(v) { return (this.#x = this.#y = v); }
+      compound() {
+        this.#y = 1;
+        const a = (this.#y += 2);
+        const b = this.#y++;
+        const c = ++this.#y;
+        return [a, b, c, this.#v].join();
+      }
+      destructured() {
+        [this.#x] = [7];
+        const first = this.#v;
+        ({ k: this.#x } = { k: 8 });
+        return first + "," + this.#v;
+      }
+      get v() { return this.#v; }
+
+      static inFinally(v) {
+        try {
+        } finally {
+          A.#s = v;
+        }
+        return A.#sv;
+      }
+      static value(v) { return (A.#s = v); }
+    }
+
+    const a = new A();
+    Assert(a.inLoop(1000) === 999);
+    Assert(a.inFinally(3) === 4);
+    Assert(a.inFinallyAfterReturn(5) === "try");
+    Assert(a.v === 5);
+    let caught;
+    try {
+      a.inFinallyAfterThrow(6);
+    } catch (e) {
+      caught = e;
+    }
+    Assert(caught === "thrown");
+    Assert(a.v === 6);
+    Assert(a.inFinallyOfLoop(10) === 10);
+    Assert(a.v === 9);
+
+    const iter = a.inGeneratorFinally(11);
+    Assert(iter.next().value === 1);
+    const result = iter.return(12);
+    Assert(result.done === true);
+    Assert(result.value === 12);
+    Assert(a.v === 11);
+    let seen = 0;
+    for (const x of a.inGeneratorFinally(13)) seen += x;
+    Assert(seen === 3);
+    Assert(a.v === 13);
+
+    Assert(a.value(14) === 14);
+    Assert(a.chained(15) === 15);
+    Assert(a.v === 15);
+    Assert(a.compound() === "3,3,5,5");
+    Assert(a.destructured() === "7,8");
+
+    Assert(A.inFinally(16) === 16);
+    Assert(A.value(17) === 17);
+  )";
+
+  auto ret = LEPUS_Eval(ctx_, src.c_str(), src.length(), "test.js",
+                        LEPUS_EVAL_TYPE_GLOBAL);
+  ASSERT_TRUE(!LEPUS_IsException(ret));
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+}
+
 TEST_F(CommonQjsTest, FinallyLoopReachedAtDifferentStackDepths) {
   std::string src = R"(
     const log = [];
