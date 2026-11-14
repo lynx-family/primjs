@@ -404,6 +404,9 @@ class AccessBuilder {
   static constexpr int stack_state_pos_offset() {
     return offsetof(LEPUSStackState, stack_pos);
   }
+  static constexpr int interrupt_counter_offset() {
+    return offsetof(LEPUSContext, interrupt_counter);
+  }
   static constexpr int con_mark_state_offset() {
     return offsetof(LEPUSContext, con_mark_state);
   }

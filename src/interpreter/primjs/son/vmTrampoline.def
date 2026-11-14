@@ -158,6 +158,7 @@ DEF_CALL_R_DESC_4(js_instantiate_prototype_gc, kInt64, kRawType, kRawType,
 DEF_CALL_R_DESC_2(prim_js_not_slow_gc, kInt64, kRawType, kInt64)
 
 DEF_CALL_R_DESC_2(JS_IsUncatchableError_GC, kInt32, kRawType, kInt64)
+DEF_CALL_R_DESC_1(js_poll_interrupts_slow_gc, kInt32, kRawType)
 DEF_CALL_R_DESC_7(build_backtrace, kNone, kRawType, kInt64, kRawType,
     kInt64, kRawType, kInt32, kInt8)
 DEF_CALL_R_DESC_2(prim_close_var_refs_gc, kNone, kRawType, kRawType)

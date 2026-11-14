@@ -8985,23 +8985,25 @@ QJS_STATIC LEPUSValue js_call_bound_function(LEPUSContext *ctx,
   // <Primjs end>
 }
 
-static no_inline __exception int __js_poll_interrupts(LEPUSContext *ctx) {
+// Also the slow path of the poll that the PrimJS handlers inline at loop back
+// edges and function entry.
+no_inline __exception int js_poll_interrupts_slow_gc(LEPUSContext *ctx) {
   LEPUSRuntime *rt = ctx->rt;
   ctx->interrupt_counter = JS_INTERRUPT_COUNTER_INIT;
-  if (rt->interrupt_handler) {
-    if (rt->interrupt_handler(rt, rt->interrupt_opaque)) {
-      /* XXX: should set a specific flag to avoid catching */
-      LEPUS_ThrowInternalError(ctx, "interrupted");
-      JS_SetUncatchableError(ctx, ctx->rt->current_exception, TRUE);
-      return -1;
-    }
+  if (js_is_terminate_requested(rt) ||
+      (rt->interrupt_handler &&
+       rt->interrupt_handler(rt, rt->interrupt_opaque))) {
+    /* XXX: should set a specific flag to avoid catching */
+    LEPUS_ThrowInternalError(ctx, "interrupted");
+    JS_SetUncatchableError(ctx, ctx->rt->current_exception, TRUE);
+    return -1;
   }
   return 0;
 }
 
 QJS_STATIC inline __exception int js_poll_interrupts(LEPUSContext *ctx) {
   if (unlikely(--ctx->interrupt_counter <= 0)) {
-    return __js_poll_interrupts(ctx);
+    return js_poll_interrupts_slow_gc(ctx);
   } else {
     return 0;
   }

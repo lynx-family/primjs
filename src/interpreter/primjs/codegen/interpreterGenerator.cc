@@ -1586,7 +1586,7 @@ DEFINE_BYTECODE_HANDLER(goto) {
   // pc += (int32_t)get_u32(pc);
   auto imm = Fetch_S32(0);
   auto offset = SExtInt32ToIntPtr(imm);
-  DispatchJmp(offset);
+  DispatchLoopJmp(offset);
 }
 
 DEFINE_BYTECODE_HANDLER(catch) {
@@ -2810,14 +2810,14 @@ DEFINE_BYTECODE_HANDLER(goto8) {
   // pc += (int8_t)pc[0];
   auto imm = Fetch_S8(0);
   auto offset = SExtInt32ToIntPtr(imm);
-  DispatchJmp(offset);
+  DispatchLoopJmp(offset);
 }
 
 DEFINE_BYTECODE_HANDLER(goto16) {
   // pc += (int16_t)get_u16(pc);
   auto imm = Fetch_S16(0);
   auto offset = SExtInt32ToIntPtr(imm);
-  DispatchJmp(offset);
+  DispatchLoopJmp(offset);
 }
 
 DEFINE_BYTECODE_HANDLER(is_undefined) {
@@ -3738,6 +3738,24 @@ DEFINE_BYTECODE_HANDLER(ThrowStackOverflow_Return) {
   SetVar(HandlerVarIndex::kLr, scratch);
   SaveRetVal(ret_val);
   Return();
+}
+
+DEFINE_BYTECODE_HANDLER(PollInterrupts) {
+  // if (js_poll_interrupts_slow_gc(ctx)) goto exception;
+  auto desc = son::node::CallDescriptors::js_poll_interrupts_slow_gc();
+  CallIntRetRuntime(desc, GetCtx());
+  DispatchPrevPc();
+}
+
+DEFINE_BYTECODE_HANDLER(PollInterrupts_spill_top0) {
+  PushSpImpl(GetTop0());
+  DispatchWithId(CallBcIndex::kPollInterrupts);
+}
+
+DEFINE_BYTECODE_HANDLER(PollInterrupts_spill_top0_top1) {
+  PushSpImpl(GetTop0());
+  PushSpImpl(GetTop1());
+  DispatchWithId(CallBcIndex::kPollInterrupts);
 }
 
 void InterpreterGenerator::GenerateBcHandler(son::node::NodeGraph* graph,

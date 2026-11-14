@@ -1735,6 +1735,20 @@ void LEPUS_SetInterruptHandler(LEPUSRuntime *rt, LEPUSInterruptHandler *cb,
   rt->interrupt_opaque = opaque;
 }
 
+void LEPUS_TerminateExecution(LEPUSRuntime *rt) {
+  std::atomic_store_explicit(to_std_atomic32(&rt->terminate_requested), 1u,
+                             std::memory_order_relaxed);
+}
+
+void LEPUS_CancelTerminateExecution(LEPUSRuntime *rt) {
+  std::atomic_store_explicit(to_std_atomic32(&rt->terminate_requested), 0u,
+                             std::memory_order_relaxed);
+}
+
+LEPUS_BOOL LEPUS_IsExecutionTerminating(LEPUSRuntime *rt) {
+  return js_is_terminate_requested(rt);
+}
+
 void LEPUS_SetCanBlock(LEPUSRuntime *rt, BOOL can_block) {
   rt->can_block = can_block;
 }
@@ -14949,13 +14963,13 @@ QJS_STATIC LEPUSValue js_call_bound_function(LEPUSContext *ctx,
 QJS_STATIC no_inline __exception int __js_poll_interrupts(LEPUSContext *ctx) {
   LEPUSRuntime *rt = ctx->rt;
   ctx->interrupt_counter = JS_INTERRUPT_COUNTER_INIT;
-  if (rt->interrupt_handler) {
-    if (rt->interrupt_handler(rt, rt->interrupt_opaque)) {
-      /* XXX: should set a specific flag to avoid catching */
-      LEPUS_ThrowInternalError(ctx, "interrupted");
-      JS_SetUncatchableError(ctx, ctx->rt->current_exception, TRUE);
-      return -1;
-    }
+  if (js_is_terminate_requested(rt) ||
+      (rt->interrupt_handler &&
+       rt->interrupt_handler(rt, rt->interrupt_opaque))) {
+    /* XXX: should set a specific flag to avoid catching */
+    LEPUS_ThrowInternalError(ctx, "interrupted");
+    JS_SetUncatchableError(ctx, ctx->rt->current_exception, TRUE);
+    return -1;
   }
   return 0;
 }

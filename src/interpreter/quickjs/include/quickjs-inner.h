@@ -553,6 +553,9 @@ struct LEPUSRuntime {
 #endif
   JSStrCacheOrphan *str_cache_orphans;
   bool uswap_in_progress;
+  /* Set by LEPUS_TerminateExecution(), possibly from another thread; read
+     with atomic accesses at the interrupt poll. */
+  uint32_t terminate_requested;
 };
 
 // Temporarily attributes allocations to the Runtime-wide common memory slot.
@@ -979,6 +982,12 @@ QJS_STATIC inline const JSVarRefGC *js_var_ref_gc(const JSVarRef *var_ref) {
 /* must be large enough to have a negligible runtime cost and small
    enough to call the interrupt callback often. */
 #define JS_INTERRUPT_COUNTER_INIT 10000
+
+inline bool js_is_terminate_requested(LEPUSRuntime *rt) {
+  return std::atomic_load_explicit(to_std_atomic32(&rt->terminate_requested),
+                                   std::memory_order_relaxed) != 0;
+}
+
 // <Primjs begin>
 #define DEFAULT_VIRTUAL_STACK_SIZE 1024 * 1024 * 4
 #define FALLBACK_VIRTUAL_STACK_SIZE 1024 * 1024 * 1
@@ -2491,6 +2500,7 @@ QJS_HIDE int add_fast_array_element_gc(LEPUSContext *ctx, LEPUSObject *p,
                                        LEPUSValue val, int flags);
 
 QJS_HIDE BOOL JS_IsUncatchableError_GC(LEPUSContext *ctx, LEPUSValueConst val);
+QJS_HIDE int js_poll_interrupts_slow_gc(LEPUSContext *ctx);
 QJS_HIDE JSAtom js_value_to_atom_gc(LEPUSContext *ctx, LEPUSValueConst val);
 QJS_HIDE JSAtom prim_get_interned_non_index_atom(LEPUSRuntime *rt,
                                                  JSString *str);

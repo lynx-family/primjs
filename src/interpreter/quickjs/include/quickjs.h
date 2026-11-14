@@ -1509,6 +1509,15 @@ LEPUSValue LEPUS_NewPromiseCapability(LEPUSContext *ctx,
 typedef int LEPUSInterruptHandler(LEPUSRuntime *rt, void *opaque);
 void LEPUS_SetInterruptHandler(LEPUSRuntime *rt, LEPUSInterruptHandler *cb,
                                void *opaque);
+/* Requests that the script running in 'rt' is interrupted. It may be called
+   from any thread while 'rt' is alive. The script stops at the next interrupt
+   poll (loop back edge, function entry) with an "interrupted" InternalError
+   that script 'catch' and 'finally' blocks do not intercept. The request stays
+   active, so that code reached while the error unwinds is interrupted too,
+   until LEPUS_CancelTerminateExecution() is called. */
+void LEPUS_TerminateExecution(LEPUSRuntime *rt);
+void LEPUS_CancelTerminateExecution(LEPUSRuntime *rt);
+LEPUS_BOOL LEPUS_IsExecutionTerminating(LEPUSRuntime *rt);
 /* if can_block is TRUE, Atomics.wait() can be used */
 void LEPUS_SetCanBlock(LEPUSRuntime *rt, LEPUS_BOOL can_block);
 

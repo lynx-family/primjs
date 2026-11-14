@@ -515,6 +515,16 @@ class CodeAssembler : public son::node::GraphBuilder {
     return StoreByteOffset(son::node::MachineType::kInt64, obj, offset, val);
   }
 
+  son::node::Node* LoadInterruptCounter(son::node::Node* ctx) {
+    auto offset = AccessBuilder::interrupt_counter_offset();
+    return LoadByteOffset(son::node::MachineType::kInt32, ctx, offset);
+  }
+
+  void StoreInterruptCounter(son::node::Node* ctx, son::node::Node* val) {
+    auto offset = AccessBuilder::interrupt_counter_offset();
+    return StoreByteOffset(son::node::MachineType::kInt32, ctx, offset, val);
+  }
+
   son::node::Node* LoadConMarkState(son::node::Node* ctx) {
     auto offset = AccessBuilder::con_mark_state_offset();
     return LoadByteOffset(son::node::MachineType::kInt8, ctx, offset);
