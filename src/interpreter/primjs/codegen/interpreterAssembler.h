@@ -763,6 +763,12 @@ class InterpreterAssembler : public CodeAssembler {
 
   void Dispatch(PrimjsOpcode opcode);
   void DispatchJmp(son::node::Node* offset);
+  // The interrupt poll (see js_poll_interrupts): loop back edges and function
+  // entry count down ctx->interrupt_counter and call the runtime when it
+  // expires, so that the embedder can stop a script that does not return.
+  void DispatchLoopJmp(son::node::Node* offset);
+  void DispatchWithInterruptCheck(son::node::Node* new_pc);
+  void DispatchInterruptPoll(son::node::Node* new_pc);
   void DispatchNext();
   void DispatchWithPc(son::node::Node* new_pc);
   void DispatchWithId(CallBcIndex index);

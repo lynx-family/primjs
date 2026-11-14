@@ -1144,7 +1144,7 @@ void HandlerImpl::GenIfBranch(PrimjsOpcode opcode) {
       imm = Fetch_S32(0);
     }
     auto offset = SExtInt32ToIntPtr(imm);
-    DispatchJmp(offset);
+    DispatchLoopJmp(offset);
   }
   if (branch_condition) {
     Bind(&if_false);
@@ -3757,7 +3757,7 @@ void HandlerImpl::GenCommonCallInternal(son::node::Node* b,
   SetNewPc(pc);
 
   DebuggerCallEachFunc();
-  DispatchWithPc(pc);
+  DispatchWithInterruptCheck(pc);
 }
 
 void HandlerImpl::GenInsert(PrimjsOpcode opcode) {

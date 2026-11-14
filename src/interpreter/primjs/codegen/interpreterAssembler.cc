@@ -186,6 +186,64 @@ void InterpreterAssembler::DispatchJmp(son::node::Node* offset) {
   DispatchImpl(pc);
 }
 
+void InterpreterAssembler::DispatchLoopJmp(son::node::Node* offset) {
+  son::node::Label backward(this);
+  son::node::Label forward(this);
+
+  auto new_pc = IntPtrAdd(GetPc(), offset);
+  // Every loop has a backward jump, so forward jumps do not need to count;
+  // they are the more frequent ones and fall through.
+  Branch(LessThan(offset, IntPtrValue(0)), &backward, &forward,
+         son::node::BranchHint::kFalse);
+  Bind(&backward);
+  { DispatchWithInterruptCheck(new_pc); }
+  Bind(&forward);
+  DispatchImpl(new_pc);
+}
+
+void InterpreterAssembler::DispatchWithInterruptCheck(son::node::Node* new_pc) {
+  son::node::Label poll(this);
+  son::node::Label no_poll(this);
+
+  auto ctx = GetCtx();
+  auto counter = Int32Sub(LoadInterruptCounter(ctx), IntValue(1));
+  StoreInterruptCounter(ctx, counter);
+  // Testing the sign needs no compare.
+  Branch(LessThan(counter, IntValue(0)), &poll, &no_poll,
+         son::node::BranchHint::kFalse);
+  Bind(&poll);
+  { DispatchInterruptPoll(new_pc); }
+  Bind(&no_poll);
+  DispatchImpl(new_pc);
+}
+
+void InterpreterAssembler::DispatchInterruptPoll(son::node::Node* new_pc) {
+  DispatchStateScope scope(_dispatch_table);
+  // Finish this handler as a dispatch to new_pc would, then let the poll
+  // handler for the resulting state spill the cached stack top.
+  auto index = CallBcIndex::kPollInterrupts;
+  switch (_dispatch_table->DoTransition()) {
+    case DispatchState::U0_U1:
+      break;
+    case DispatchState::C0_U1:
+      index = CallBcIndex::kPollInterrupts_spill_top0;
+      break;
+    case DispatchState::C0_C1:
+      index = CallBcIndex::kPollInterrupts_spill_top0_top1;
+      break;
+    default:
+      unreachable();
+  }
+  auto desc =
+      son::node::CallDescriptors::ExtCallBcHandler(static_cast<int>(index));
+  auto target = FunctionPointer(desc);
+  // As for any handler, pc is past the opcode: PollInterrupts resumes with
+  // DispatchPrevPc(), and an error it throws is reported at new_pc.
+  auto pc = CastIntPtrToRaw(IntPtrAdd(new_pc, IntPtrValue(1)));
+  TailCall(desc, target, pc, GetSp());
+  Return();
+}
+
 void InterpreterAssembler::DispatchWithPc(son::node::Node* new_pc) {
   DispatchImpl(new_pc);
 }

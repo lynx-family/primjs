@@ -388,9 +388,9 @@ LBB3_32:                                ; %B3
                                         ; -- End function
 	.p2align	2                               ; -- Begin function common_call_from_entry_asm_h
 l_common_call_from_entry_asm_h:         ; @common_call_from_entry_asm_h
-; %bb.0:                                ; %B48
+; %bb.0:                                ; %B54
 	tbz	w19, #2, LBB4_3
-; %bb.1:                                ; %B39
+; %bb.1:                                ; %B45
 	ldr	x9, [x24, #296]
 	mov	x8, x30
 	and	x10, x22, #0xfffffffffffc
@@ -407,20 +407,18 @@ l_common_call_from_entry_asm_h:         ; @common_call_from_entry_asm_h
 	ldr	x20, [x10, #64]
 	ldr	x28, [x10, #32]
 	ldr	x26, [x10, #120]
-	cbnz	w8, LBB4_13
-LBB4_2:                                 ; %B28
-	ldrb	w8, [x19], #1
-	ldr	x1, [x25, x8, lsl #3]
-	br	x1
-LBB4_3:                                 ; %B42
+	cbz	w8, LBB4_14
+; %bb.2:                                ; %B46
+	b	l_exception_asm_h
+LBB4_3:                                 ; %B48
 	mov	x8, #2                          ; =0x2
 	movk	x8, #65535, lsl #48
 	tst	x22, x8
-	b.ne	LBB4_14
-; %bb.4:                                ; %B44
+	b.ne	LBB4_15
+; %bb.4:                                ; %B50
 	ldrh	w8, [x22, #6]
 	cmp	w8, #13
-	b.ne	LBB4_15
+	b.ne	LBB4_16
 ; %bb.5:                                ; %B1
 	ldr	x11, [x22, #32]
 	ldr	x9, [x24, #296]
@@ -433,15 +431,15 @@ LBB4_3:                                 ; %B42
 	ldr	x14, [x14]
 	cmp	w0, w10
 	add	w9, w8, w15
-	b.lt	LBB4_16
-; %bb.6:                                ; %B36
+	b.lt	LBB4_17
+; %bb.6:                                ; %B42
 	add	w9, w9, w0
 	lsl	w9, w9, #3
 	add	w9, w9, #160
 	sub	x9, x13, x9
 	cmp	x9, x14
-	b.ls	LBB4_23
-; %bb.7:                                ; %B38
+	b.ls	LBB4_28
+; %bb.7:                                ; %B44
 	ldr	x14, [x24, #296]
 	mov	x10, x30
 	mov	x23, x9
@@ -464,13 +462,13 @@ LBB4_3:                                 ; %B42
 	mov	x12, x11
 	cmp	x11, x10
 	b.ge	LBB4_9
-LBB4_8:                                 ; %B33
+LBB4_8:                                 ; %B39
                                         ; =>This Inner Loop Header: Depth=1
 	ldr	x13, [x20], #8
 	str	x13, [x12], #8
 	cmp	x12, x10
 	b.lt	LBB4_8
-LBB4_9:                                 ; %B35
+LBB4_9:                                 ; %B41
 	add	w12, w0, w8
 	str	w0, [x9, #40]
 	add	x20, x10, x8, lsl #3
@@ -484,36 +482,40 @@ LBB4_9:                                 ; %B35
 	str	x9, [x12, #256]
 	cmp	x10, x20
 	b.ge	LBB4_11
-LBB4_10:                                ; %B25
+LBB4_10:                                ; %B28
                                         ; =>This Inner Loop Header: Depth=1
 	str	x8, [x10], #8
 	cmp	x10, x20
 	b.lt	LBB4_10
-LBB4_11:                                ; %B26
+LBB4_11:                                ; %B29
 	ldr	w8, [x24, #328]
-	cbz	w8, LBB4_2
-; %bb.12:                               ; %B27
+	cbz	w8, LBB4_13
+; %bb.12:                               ; %B30
 	add	x1, x19, #1
 	mov	x0, x24
 	str	x20, [x9, #48]
 	bl	_DebuggerCallEachFunc
+LBB4_13:                                ; %B32
+	ldr	w8, [x24, #232]
+	subs	w8, w8, #1
+	str	w8, [x24, #232]
+	b.mi	LBB4_27
+LBB4_14:                                ; %B34
 	ldrb	w8, [x19], #1
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB4_13:                                ; %B40
-	b	l_exception_asm_h
-LBB4_14:                                ; %B47
+LBB4_15:                                ; %B53
 	b	l_ThrowTypeErrorNotFunction_Return_asm_h
-LBB4_15:                                ; %B45
+LBB4_16:                                ; %B51
 	b	l_call_native_entry_asm_h
-LBB4_16:                                ; %B20
+LBB4_17:                                ; %B23
 	add	w9, w9, w10
 	lsl	w9, w9, #3
 	add	w9, w9, #160
 	sub	x9, x13, x9
 	cmp	x9, x14
-	b.ls	LBB4_23
-; %bb.17:                               ; %B22
+	b.ls	LBB4_28
+; %bb.18:                               ; %B25
 	ldr	x15, [x24, #296]
 	mov	x14, x30
 	mov	x23, x9
@@ -537,8 +539,8 @@ LBB4_16:                                ; %B20
 	csel	w13, w0, w10, lt
 	add	x13, x11, w13, uxtw #3
 	cmp	x11, x13
-	b.ge	LBB4_19
-LBB4_18:                                ; %B6
+	b.ge	LBB4_20
+LBB4_19:                                ; %B9
                                         ; =>This Inner Loop Header: Depth=1
 	ldr	x13, [x20], #8
 	str	x13, [x12], #8
@@ -546,18 +548,18 @@ LBB4_18:                                ; %B6
 	csel	w13, w0, w10, lt
 	add	x13, x11, w13, uxtw #3
 	cmp	x12, x13
-	b.lt	LBB4_18
-LBB4_19:                                ; %B10.preheader
+	b.lt	LBB4_19
+LBB4_20:                                ; %B13.preheader
 	add	x12, x11, x10, lsl #3
 	mov	w14, #18                        ; =0x12
 	cmp	x13, x12
-	b.ge	LBB4_21
-LBB4_20:                                ; %B11
+	b.ge	LBB4_22
+LBB4_21:                                ; %B14
                                         ; =>This Inner Loop Header: Depth=1
 	str	x14, [x13], #8
 	cmp	x13, x12
-	b.lt	LBB4_20
-LBB4_21:                                ; %B12
+	b.lt	LBB4_21
+LBB4_22:                                ; %B15
 	str	w10, [x9, #40]
 	add	w10, w10, w8
 	add	x20, x12, x8, lsl #3
@@ -570,15 +572,44 @@ LBB4_21:                                ; %B12
 	ldr	x10, [x24, #8]
 	str	x9, [x10, #256]
 	cmp	x12, x20
-	b.ge	LBB4_11
-LBB4_22:                                ; %B18
+	b.ge	LBB4_24
+LBB4_23:                                ; %B21
                                         ; =>This Inner Loop Header: Depth=1
 	str	x8, [x12], #8
 	cmp	x12, x20
-	b.lt	LBB4_22
-	b	LBB4_11
-LBB4_23:                                ; %B21
+	b.lt	LBB4_23
+LBB4_24:                                ; %B17
+	ldr	w8, [x24, #328]
+	cbz	w8, LBB4_26
+; %bb.25:                               ; %B18
+	add	x1, x19, #1
+	mov	x0, x24
+	str	x20, [x9, #48]
+	bl	_DebuggerCallEachFunc
+LBB4_26:                                ; %B5
+	ldr	w8, [x24, #232]
+	subs	w8, w8, #1
+	str	w8, [x24, #232]
+	b.pl	LBB4_14
+LBB4_27:                                ; %B6
+	add	x19, x19, #1
+	b	l_PollInterrupts_asm_h
+LBB4_28:                                ; %B43
 	b	l_ThrowStackOverflow_Return_asm_h
+                                        ; -- End function
+	.p2align	2                               ; -- Begin function PollInterrupts_asm_h
+l_PollInterrupts_asm_h:                 ; @PollInterrupts_asm_h
+; %bb.0:                                ; %B1
+	mov	x0, x24
+	str	x20, [x23, #48]
+	bl	_js_poll_interrupts_slow_gc
+	tbnz	w0, #31, LBB5_2
+; %bb.1:                                ; %B3
+	ldurb	w8, [x19, #-1]
+	ldr	x1, [x25, x8, lsl #3]
+	br	x1
+LBB5_2:                                 ; %B2
+	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function exception_asm_h
 l_exception_asm_h:                      ; @exception_asm_h
@@ -588,7 +619,7 @@ l_exception_asm_h:                      ; @exception_asm_h
 	ldr	w8, [x9, #248]
 	stp	x9, x20, [sp, #8]               ; 16-byte Folded Spill
 	ldr	x20, [x9, #240]
-	cbz	w8, LBB5_2
+	cbz	w8, LBB6_2
 ; %bb.1:                                ; %B18
 	mov	x0, x24
 	mov	x1, x20
@@ -598,17 +629,17 @@ l_exception_asm_h:                      ; @exception_asm_h
 	mov	w5, wzr
 	mov	w6, wzr
 	bl	_build_backtrace
-LBB5_2:                                 ; %B2
+LBB6_2:                                 ; %B2
 	mov	x0, x24
 	mov	x1, x20
 	bl	_JS_IsUncatchableError_GC
-	cbz	w0, LBB5_4
-LBB5_3:                                 ; %B4
+	cbz	w0, LBB6_4
+LBB6_3:                                 ; %B4
 	ldr	x20, [sp, #16]                  ; 8-byte Folded Reload
 	mov	w0, #130                        ; =0x82
 	add	sp, sp, #32
 	b	l_common_return_asm_h
-LBB5_4:                                 ; %B6
+LBB6_4:                                 ; %B6
 	ldr	x8, [x23, #8]
 	str	x19, [sp, #24]                  ; 8-byte Folded Spill
 	ldr	x8, [x8, #32]
@@ -616,27 +647,27 @@ LBB5_4:                                 ; %B6
 	ldrh	w8, [x8, #42]
 	add	x20, x27, x8, lsl #3
 	ldr	x8, [sp, #16]                   ; 8-byte Folded Reload
-LBB5_5:                                 ; %B7
+LBB6_5:                                 ; %B7
                                         ; =>This Inner Loop Header: Depth=1
 	cmp	x8, x20
-	b.le	LBB5_3
+	b.le	LBB6_3
 ; %bb.6:                                ; %B12
-                                        ;   in Loop: Header=BB5_5 Depth=1
+                                        ;   in Loop: Header=BB6_5 Depth=1
 	ldr	x9, [x8, #-8]!
 	tst	x9, #0xffff000000000000
-	b.ne	LBB5_5
+	b.ne	LBB6_5
 ; %bb.7:                                ; %B12
-                                        ;   in Loop: Header=BB5_5 Depth=1
+                                        ;   in Loop: Header=BB6_5 Depth=1
 	mov	w10, #247                       ; =0xf7
 	and	x10, x9, x10
 	cmp	x10, #66
-	b.ne	LBB5_5
+	b.ne	LBB6_5
 ; %bb.8:                                ; %B9
-                                        ;   in Loop: Header=BB5_5 Depth=1
+                                        ;   in Loop: Header=BB6_5 Depth=1
 	lsr	x9, x9, #16
-	cbnz	w9, LBB5_10
+	cbnz	w9, LBB6_10
 ; %bb.9:                                ; %B10
-                                        ;   in Loop: Header=BB5_5 Depth=1
+                                        ;   in Loop: Header=BB6_5 Depth=1
 	ldur	x1, [x8, #-16]
 	mov	x0, x24
 	mov	w2, #1                          ; =0x1
@@ -644,8 +675,8 @@ LBB5_5:                                 ; %B7
 	bl	_JS_IteratorClose
 	mov	x8, x19
 	ldr	x19, [sp, #24]                  ; 8-byte Folded Reload
-	b	LBB5_5
-LBB5_10:                                ; %B11
+	b	LBB6_5
+LBB6_10:                                ; %B11
 	ldr	x11, [sp, #8]                   ; 8-byte Folded Reload
 	ldr	x10, [x11, #240]
 	str	x10, [x8], #8
@@ -662,16 +693,16 @@ LBB5_10:                                ; %B11
                                         ; -- End function
 	.p2align	2                               ; -- Begin function common_call_asm_h
 l_common_call_asm_h:                    ; @common_call_asm_h
-; %bb.0:                                ; %B38
+; %bb.0:                                ; %B44
 	mov	x9, #2                          ; =0x2
 	mov	x8, x20
 	movk	x9, #65535, lsl #48
 	tst	x22, x9
-	b.ne	LBB6_9
-; %bb.1:                                ; %B35
+	b.ne	LBB7_10
+; %bb.1:                                ; %B41
 	ldrh	w9, [x22, #6]
 	cmp	w9, #13
-	b.ne	LBB6_10
+	b.ne	LBB7_11
 ; %bb.2:                                ; %B1
 	ldr	x12, [x22, #32]
 	ldr	x10, [x24, #296]
@@ -684,14 +715,14 @@ l_common_call_asm_h:                    ; @common_call_asm_h
 	ldr	x15, [x15]
 	cmp	w0, w11
 	add	w10, w9, w16
-	b.lt	LBB6_11
-; %bb.3:                                ; %B32
+	b.lt	LBB7_12
+; %bb.3:                                ; %B38
 	lsl	w10, w10, #3
 	add	w10, w10, #160
 	sub	x10, x14, x10
 	cmp	x10, x15
-	b.ls	LBB6_18
-; %bb.4:                                ; %B34
+	b.ls	LBB7_23
+; %bb.4:                                ; %B40
 	ldr	x15, [x24, #296]
 	mov	x11, x30
 	mov	x23, x10
@@ -722,38 +753,43 @@ l_common_call_asm_h:                    ; @common_call_asm_h
 	ldr	x12, [x24, #8]
 	str	x10, [x12, #256]
 	cmp	x11, x20
-	b.ge	LBB6_6
-LBB6_5:                                 ; %B26
+	b.ge	LBB7_6
+LBB7_5:                                 ; %B32
                                         ; =>This Inner Loop Header: Depth=1
 	str	x9, [x11], #8
 	cmp	x11, x20
-	b.lt	LBB6_5
-LBB6_6:                                 ; %B27
+	b.lt	LBB7_5
+LBB7_6:                                 ; %B33
 	ldr	w8, [x24, #328]
-	cbz	w8, LBB6_8
-; %bb.7:                                ; %B28
+	cbz	w8, LBB7_8
+; %bb.7:                                ; %B34
 	add	x1, x19, #1
 	mov	x0, x24
 	str	x20, [x10, #48]
 	bl	_DebuggerCallEachFunc
-LBB6_8:                                 ; %B24
+LBB7_8:                                 ; %B28
+	ldr	w8, [x24, #232]
+	subs	w8, w8, #1
+	str	w8, [x24, #232]
+	b.mi	LBB7_22
+LBB7_9:                                 ; %B30
 	ldrb	w8, [x19], #1
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB6_9:                                 ; %B40
+LBB7_10:                                ; %B46
 	mov	x20, x8
 	b	l_ThrowTypeErrorNotFunction_Return_asm_h
-LBB6_10:                                ; %B36
+LBB7_11:                                ; %B42
 	mov	x20, x8
 	b	l_call_native_asm_h
-LBB6_11:                                ; %B20
+LBB7_12:                                ; %B23
 	add	w10, w10, w11
 	lsl	w10, w10, #3
 	add	w10, w10, #160
 	sub	x10, x14, x10
 	cmp	x10, x15
-	b.ls	LBB6_18
-; %bb.12:                               ; %B22
+	b.ls	LBB7_23
+; %bb.13:                               ; %B25
 	ldr	x16, [x24, #296]
 	mov	x15, x30
 	mov	x23, x10
@@ -777,8 +813,8 @@ LBB6_11:                                ; %B20
 	csel	w14, w0, w11, lt
 	add	x14, x12, w14, uxtw #3
 	cmp	x12, x14
-	b.ge	LBB6_14
-LBB6_13:                                ; %B6
+	b.ge	LBB7_15
+LBB7_14:                                ; %B9
                                         ; =>This Inner Loop Header: Depth=1
 	ldr	x14, [x8], #8
 	str	x14, [x13], #8
@@ -786,18 +822,18 @@ LBB6_13:                                ; %B6
 	csel	w14, w0, w11, lt
 	add	x14, x12, w14, uxtw #3
 	cmp	x13, x14
-	b.lt	LBB6_13
-LBB6_14:                                ; %B10.preheader
+	b.lt	LBB7_14
+LBB7_15:                                ; %B13.preheader
 	add	x8, x12, x11, lsl #3
 	mov	w13, #18                        ; =0x12
 	cmp	x14, x8
-	b.ge	LBB6_16
-LBB6_15:                                ; %B11
+	b.ge	LBB7_17
+LBB7_16:                                ; %B14
                                         ; =>This Inner Loop Header: Depth=1
 	str	x13, [x14], #8
 	cmp	x14, x8
-	b.lt	LBB6_15
-LBB6_16:                                ; %B12
+	b.lt	LBB7_16
+LBB7_17:                                ; %B15
 	str	w11, [x10, #40]
 	add	w11, w11, w9
 	add	x20, x8, x9, lsl #3
@@ -810,14 +846,29 @@ LBB6_16:                                ; %B12
 	ldr	x11, [x24, #8]
 	str	x10, [x11, #256]
 	cmp	x8, x20
-	b.ge	LBB6_6
-LBB6_17:                                ; %B18
+	b.ge	LBB7_19
+LBB7_18:                                ; %B21
                                         ; =>This Inner Loop Header: Depth=1
 	str	x9, [x8], #8
 	cmp	x8, x20
-	b.lt	LBB6_17
-	b	LBB6_6
-LBB6_18:                                ; %B21
+	b.lt	LBB7_18
+LBB7_19:                                ; %B17
+	ldr	w8, [x24, #328]
+	cbz	w8, LBB7_21
+; %bb.20:                               ; %B18
+	add	x1, x19, #1
+	mov	x0, x24
+	str	x20, [x10, #48]
+	bl	_DebuggerCallEachFunc
+LBB7_21:                                ; %B5
+	ldr	w8, [x24, #232]
+	subs	w8, w8, #1
+	str	w8, [x24, #232]
+	b.pl	LBB7_9
+LBB7_22:                                ; %B6
+	add	x19, x19, #1
+	b	l_PollInterrupts_asm_h
+LBB7_23:                                ; %B39
 	mov	x20, x8
 	b	l_ThrowStackOverflow_Return_asm_h
                                         ; -- End function
@@ -840,7 +891,7 @@ l_common_return_direct_asm_h:           ; @common_return_direct_asm_h
 _common_call_debugger0_asm_h:           ; @common_call_debugger0_asm_h
 ; %bb.0:                                ; %B3
 	ldr	w8, [x24, #328]
-	cbz	w8, LBB8_2
+	cbz	w8, LBB9_2
 ; %bb.1:                                ; %B4
 	ldr	x8, [x23, #8]
 	mov	x0, x24
@@ -848,7 +899,7 @@ _common_call_debugger0_asm_h:           ; @common_call_debugger0_asm_h
 	ldr	x2, [x8, #32]
 	str	x20, [x23, #48]
 	bl	_DebuggerCallEachOp
-LBB8_2:                                 ; %B1
+LBB9_2:                                 ; %B1
 	ldurb	w8, [x19, #-1]
 	sub	w8, w8, #729
 	ldr	x1, [x25, w8, sxtw #3]
@@ -860,7 +911,7 @@ LBB8_2:                                 ; %B1
 _common_call_debugger1_asm_h:           ; @common_call_debugger1_asm_h
 ; %bb.0:                                ; %B3
 	ldr	w8, [x24, #328]
-	cbz	w8, LBB9_2
+	cbz	w8, LBB10_2
 ; %bb.1:                                ; %B4
 	ldr	x8, [x23, #8]
 	mov	x0, x24
@@ -868,7 +919,7 @@ _common_call_debugger1_asm_h:           ; @common_call_debugger1_asm_h
 	ldr	x2, [x8, #32]
 	str	x20, [x23, #48]
 	bl	_DebuggerCallEachOp
-LBB9_2:                                 ; %B1
+LBB10_2:                                ; %B1
 	ldurb	w8, [x19, #-1]
 	sub	w8, w8, #486
 	ldr	x1, [x25, w8, sxtw #3]
@@ -880,7 +931,7 @@ LBB9_2:                                 ; %B1
 _common_call_debugger2_asm_h:           ; @common_call_debugger2_asm_h
 ; %bb.0:                                ; %B3
 	ldr	w8, [x24, #328]
-	cbz	w8, LBB10_2
+	cbz	w8, LBB11_2
 ; %bb.1:                                ; %B4
 	ldr	x8, [x23, #8]
 	mov	x0, x24
@@ -888,7 +939,7 @@ _common_call_debugger2_asm_h:           ; @common_call_debugger2_asm_h
 	ldr	x2, [x8, #32]
 	str	x20, [x23, #48]
 	bl	_DebuggerCallEachOp
-LBB10_2:                                ; %B1
+LBB11_2:                                ; %B1
 	ldurb	w8, [x19, #-1]
 	sub	w8, w8, #243
 	ldr	x1, [x25, w8, sxtw #3]
@@ -908,15 +959,15 @@ l_SlowCloseVarRefs_asm_h:               ; @SlowCloseVarRefs_asm_h
 l_common_return_asm_h:                  ; @common_return_asm_h
 ; %bb.0:                                ; %B6
 	ldr	x8, [x23, #72]
-	cbnz	x8, LBB12_3
+	cbnz	x8, LBB13_3
 ; %bb.1:                                ; %B1
 	ldrb	w8, [x24, #384]
-	cbz	w8, LBB12_4
+	cbz	w8, LBB13_4
 ; %bb.2:                                ; %B1
-	cbz	x26, LBB12_4
-LBB12_3:                                ; %B3
+	cbz	x26, LBB13_4
+LBB13_3:                                ; %B3
 	b	l_SlowCloseVarRefs_asm_h
-LBB12_4:                                ; %B5
+LBB13_4:                                ; %B5
 	b	l_common_return_direct_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function exception_spill_top0_asm_h
@@ -962,7 +1013,7 @@ l_SlowToBoolean_asm_h:                  ; @SlowToBoolean_asm_h
 	mov	x0, x24
 	str	x20, [x23, #48]
 	bl	_JS_ToBoolFree_GC
-	tbnz	w0, #31, LBB18_2
+	tbnz	w0, #31, LBB19_2
 ; %bb.1:                                ; %B3
 	cmp	w0, #0
 	mov	w8, #6                          ; =0x6
@@ -971,7 +1022,7 @@ l_SlowToBoolean_asm_h:                  ; @SlowToBoolean_asm_h
 	ldurb	w8, [x19, #-1]
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB18_2:                                ; %B2
+LBB19_2:                                ; %B2
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function SlowJSPostInc_asm_h
@@ -982,13 +1033,13 @@ l_SlowJSPostInc_asm_h:                  ; @SlowJSPostInc_asm_h
 	mov	x1, x20
 	str	x20, [x23, #48]
 	bl	_js_post_inc_slow_gc
-	tbnz	w0, #31, LBB19_2
+	tbnz	w0, #31, LBB20_2
 ; %bb.1:                                ; %B3
 	ldrb	w8, [x19], #1
 	add	x20, x20, #8
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB19_2:                                ; %B2
+LBB20_2:                                ; %B2
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function SlowJSNot_asm_h
@@ -999,13 +1050,13 @@ l_SlowJSNot_asm_h:                      ; @SlowJSNot_asm_h
 	str	x20, [x23, #48]
 	bl	_prim_js_not_slow_gc
 	cmp	x0, #130
-	b.eq	LBB20_2
+	b.eq	LBB21_2
 ; %bb.1:                                ; %B3
 	stur	x0, [x20, #-8]
 	ldrb	w8, [x19], #1
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB20_2:                                ; %B2
+LBB21_2:                                ; %B2
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function FastJSConcatString_asm_h
@@ -1014,10 +1065,10 @@ l_FastJSConcatString_asm_h:             ; @FastJSConcatString_asm_h
 	sub	sp, sp, #48
 	mov	x22, x0
 	str	x19, [sp, #40]                  ; 8-byte Folded Spill
-	cbnz	x22, LBB21_13
+	cbnz	x22, LBB22_13
 ; %bb.1:                                ; %B40
 	ldur	x1, [x20, #-16]
-LBB21_2:                                ; %B14
+LBB22_2:                                ; %B14
 	ldur	x2, [x20, #-8]
 	and	x9, x1, #0xfffffffffffc
 	str	x20, [sp, #32]                  ; 8-byte Folded Spill
@@ -1028,19 +1079,19 @@ LBB21_2:                                ; %B14
 	and	w11, w13, #0x3fffffff
 	add	w11, w10, w11
 	lsr	w10, w11, #30
-	cbnz	w10, LBB21_10
+	cbnz	w10, LBB22_10
 ; %bb.3:                                ; %B18
 	mov	x10, #-281474976710653          ; =0xffff000000000003
 	bics	xzr, x10, x1
-	b.eq	LBB21_14
+	b.eq	LBB22_14
 ; %bb.4:
 	mov	w14, #1                         ; =0x1
 	bics	xzr, x10, x2
 	stp	x1, x2, [sp, #16]               ; 16-byte Folded Spill
 	stp	w12, w11, [sp, #8]              ; 8-byte Folded Spill
 	str	w13, [sp, #4]                   ; 4-byte Folded Spill
-	b.eq	LBB21_15
-LBB21_5:                                ; %B28
+	b.eq	LBB22_15
+LBB22_5:                                ; %B28
 	mov	x0, x24
 	mov	w1, #32                         ; =0x20
 	mov	w2, #20                         ; =0x14
@@ -1052,7 +1103,7 @@ LBB21_5:                                ; %B28
 	ldp	w8, w10, [sp, #8]               ; 8-byte Folded Reload
 	ldr	x1, [sp, #16]                   ; 8-byte Folded Reload
 	ldr	w9, [sp, #4]                    ; 4-byte Folded Reload
-	cbz	x19, LBB21_10
+	cbz	x19, LBB22_10
 ; %bb.6:                                ; %B20
 	and	w8, w8, #0xbfffffff
 	and	w9, w9, #0xbfffffff
@@ -1065,15 +1116,15 @@ LBB21_5:                                ; %B28
 	orr	w8, w10, w8
 	stp	w8, w11, [x19, #4]
 	ldrb	w8, [x24, #384]
-	cbnz	w8, LBB21_16
+	cbnz	w8, LBB22_16
 ; %bb.7:                                ; %B24
 	str	x2, [x19, #24]
 	ldrb	w8, [x24, #384]
-	cbnz	w8, LBB21_17
-LBB21_8:                                ; %B1
+	cbnz	w8, LBB22_17
+LBB22_8:                                ; %B1
 	orr	x8, x19, #0xffff000000000003
-	cbz	x22, LBB21_18
-LBB21_9:                                ; %B2
+	cbz	x22, LBB22_18
+LBB22_9:                                ; %B2
 	ldr	x10, [sp, #40]                  ; 8-byte Folded Reload
 	sub	x20, x20, #8
 	ldrb	w9, [x10]
@@ -1083,14 +1134,14 @@ LBB21_9:                                ; %B2
 	ldr	x1, [x25, x8, lsl #3]
 	add	sp, sp, #48
 	br	x1
-LBB21_10:                               ; %B5
+LBB22_10:                               ; %B5
 	mov	x0, x24
 	str	x20, [x23, #48]
 	bl	_JS_ConcatString_GC
 	cmp	x0, #130
-	cbnz	x22, LBB21_19
+	cbnz	x22, LBB22_19
 ; %bb.11:                               ; %B11
-	b.eq	LBB21_21
+	b.eq	LBB22_21
 ; %bb.12:                               ; %B13
 	ldp	x9, x19, [sp, #32]              ; 16-byte Folded Reload
 	stur	x0, [x9, #-16]
@@ -1099,25 +1150,25 @@ LBB21_10:                               ; %B5
 	ldr	x1, [x25, x8, lsl #3]
 	add	sp, sp, #48
 	br	x1
-LBB21_13:                               ; %B38
+LBB22_13:                               ; %B38
 	ldrb	w8, [x19]
 	ldr	x1, [x27, x8, lsl #3]
-	b	LBB21_2
-LBB21_14:                               ; %B19
+	b	LBB22_2
+LBB22_14:                               ; %B19
 	ldr	w9, [x9, #8]
 	add	w14, w9, #1
 	bics	xzr, x10, x2
 	stp	x1, x2, [sp, #16]               ; 16-byte Folded Spill
 	stp	w12, w11, [sp, #8]              ; 8-byte Folded Spill
 	str	w13, [sp, #4]                   ; 4-byte Folded Spill
-	b.ne	LBB21_5
-LBB21_15:                               ; %B33
+	b.ne	LBB22_5
+LBB22_15:                               ; %B33
 	ldr	w8, [x8, #8]
 	add	w9, w8, #1
 	cmp	w14, w9
 	csinc	w14, w14, w8, gt
-	b	LBB21_5
-LBB21_16:                               ; %B27
+	b	LBB22_5
+LBB22_16:                               ; %B27
 	mov	x0, x1
 	mov	x1, x24
 	mov	x20, x2
@@ -1126,15 +1177,15 @@ LBB21_16:                               ; %B27
 	ldr	x20, [sp, #32]                  ; 8-byte Folded Reload
 	str	x2, [x19, #24]
 	ldrb	w8, [x24, #384]
-	cbz	w8, LBB21_8
-LBB21_17:                               ; %B26
+	cbz	w8, LBB22_8
+LBB22_17:                               ; %B26
 	mov	x0, x2
 	mov	x1, x24
 	bl	_prim_WriteBarrierNoStore
 	ldr	x20, [sp, #32]                  ; 8-byte Folded Reload
 	orr	x8, x19, #0xffff000000000003
-	cbnz	x22, LBB21_9
-LBB21_18:                               ; %B4
+	cbnz	x22, LBB22_9
+LBB22_18:                               ; %B4
 	ldr	x19, [sp, #40]                  ; 8-byte Folded Reload
 	stur	x8, [x20, #-16]
 	sub	x20, x20, #8
@@ -1142,8 +1193,8 @@ LBB21_18:                               ; %B4
 	ldr	x1, [x25, x8, lsl #3]
 	add	sp, sp, #48
 	br	x1
-LBB21_19:                               ; %B7
-	b.eq	LBB21_21
+LBB22_19:                               ; %B7
+	b.eq	LBB22_21
 ; %bb.20:                               ; %B9
 	ldr	x9, [sp, #40]                   ; 8-byte Folded Reload
 	ldrb	w8, [x9]
@@ -1155,7 +1206,7 @@ LBB21_19:                               ; %B7
 	sub	x20, x8, #8
 	add	sp, sp, #48
 	br	x1
-LBB21_21:                               ; %B12
+LBB22_21:                               ; %B12
 	ldp	x20, x19, [sp, #32]             ; 16-byte Folded Reload
 	add	sp, sp, #48
 	b	l_exception_asm_h
@@ -1171,45 +1222,45 @@ l_FastStringEqual_asm_h:                ; @FastStringEqual_asm_h
 	and	w8, w8, #0x3fffffff
 	and	w9, w9, #0x3fffffff
 	cmp	w8, w9
-	b.eq	LBB22_3
-LBB22_1:                                ; %B15
+	b.eq	LBB23_3
+LBB23_1:                                ; %B15
 	mov	w8, #6                          ; =0x6
 	bfxil	x8, x0, #0, #1
-LBB22_2:                                ; %B16
+LBB23_2:                                ; %B16
 	stur	x8, [x20, #-16]
 	sub	x20, x20, #8
 	ldrb	w8, [x19], #1
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB22_3:                                ; %B1
+LBB23_3:                                ; %B1
 	mov	x8, #-281474976710653           ; =0xffff000000000003
 	bics	xzr, x8, x1
-	b.eq	LBB22_15
+	b.eq	LBB23_15
 ; %bb.4:                                ; %B69
 	bics	xzr, x8, x2
-	b.eq	LBB22_17
-LBB22_5:                                ; %B54
+	b.eq	LBB23_17
+LBB23_5:                                ; %B54
 	and	x8, x1, #0xfffffffffffc
 	and	x9, x2, #0xfffffffffffc
 	cmp	x8, x9
-	b.eq	LBB22_19
-LBB22_6:                                ; %B57
+	b.eq	LBB23_19
+LBB23_6:                                ; %B57
 	ldrb	w10, [x8, #7]
-	tbnz	w10, #6, LBB22_20
+	tbnz	w10, #6, LBB23_20
 ; %bb.7:                                ; %B60
 	ldr	w10, [x8, #8]
 	ldrb	w11, [x9, #7]
-	tbnz	w11, #6, LBB22_21
-LBB22_8:                                ; %B53
+	tbnz	w11, #6, LBB23_21
+LBB23_8:                                ; %B53
 	ldr	w11, [x9, #8]
 	asr	w10, w10, #30
 	cmp	w10, #1
-	b.ne	LBB22_10
-LBB22_9:                                ; %B49
+	b.ne	LBB23_10
+LBB23_9:                                ; %B49
 	asr	w10, w11, #30
 	cmp	w10, #1
-	b.eq	LBB22_1
-LBB22_10:                               ; %B8
+	b.eq	LBB23_1
+LBB23_10:                               ; %B8
 	ldr	w10, [x8, #4]
 	ldr	w11, [x9, #4]
 	add	x8, x8, #16
@@ -1217,46 +1268,46 @@ LBB22_10:                               ; %B8
 	tst	w10, #0xbfffffff
 	and	w10, w10, #0x3fffffff
 	and	w11, w11, #0xbfffffff
-	b.lt	LBB22_22
+	b.lt	LBB23_22
 ; %bb.11:                               ; %B32
-	tbnz	w11, #31, LBB22_26
+	tbnz	w11, #31, LBB23_26
 ; %bb.12:                               ; %B46.preheader
 	mov	w11, wzr
 	cmp	w10, wzr
-	b.eq	LBB22_19
-LBB22_13:                               ; %B43
+	b.eq	LBB23_19
+LBB23_13:                               ; %B43
                                         ; =>This Inner Loop Header: Depth=1
 	ldrb	w12, [x8, w11, sxtw]
 	ldrb	w13, [x9, w11, sxtw]
 	cmp	w12, w13
-	b.ne	LBB22_1
+	b.ne	LBB23_1
 ; %bb.14:                               ; %B45
-                                        ;   in Loop: Header=BB22_13 Depth=1
+                                        ;   in Loop: Header=BB23_13 Depth=1
 	add	w11, w11, #1
 	cmp	w10, w11
-	b.ne	LBB22_13
-	b	LBB22_19
-LBB22_15:                               ; %B66
+	b.ne	LBB23_13
+	b	LBB23_19
+LBB23_15:                               ; %B66
 	and	x9, x1, #0xfffffffffffc
 	ldr	x10, [x9, #24]
 	cmp	x10, #2
-	b.ne	LBB22_29
+	b.ne	LBB23_29
 ; %bb.16:                               ; %B67
 	ldr	x1, [x9, #16]
 	bics	xzr, x8, x2
-	b.ne	LBB22_5
-LBB22_17:                               ; %B3
+	b.ne	LBB23_5
+LBB23_17:                               ; %B3
 	and	x8, x2, #0xfffffffffffc
 	ldr	x9, [x8, #24]
 	cmp	x9, #2
-	b.ne	LBB22_29
+	b.ne	LBB23_29
 ; %bb.18:                               ; %B4
 	ldr	x2, [x8, #16]
 	and	x8, x1, #0xfffffffffffc
 	and	x9, x2, #0xfffffffffffc
 	cmp	x8, x9
-	b.ne	LBB22_6
-LBB22_19:                               ; %B21
+	b.ne	LBB23_6
+LBB23_19:                               ; %B21
 	mvn	w9, w0
 	mov	w8, #6                          ; =0x6
 	bfxil	x8, x9, #0, #1
@@ -1265,78 +1316,78 @@ LBB22_19:                               ; %B21
 	ldrb	w8, [x19], #1
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB22_20:                               ; %B58
+LBB23_20:                               ; %B58
 	ldr	x10, [x8, #8]
 	ldr	w10, [x10]
 	ldrb	w11, [x9, #7]
-	tbz	w11, #6, LBB22_8
-LBB22_21:                               ; %B7
+	tbz	w11, #6, LBB23_8
+LBB23_21:                               ; %B7
 	ldr	x11, [x9, #8]
 	ldr	w11, [x11]
 	asr	w10, w10, #30
 	cmp	w10, #1
-	b.eq	LBB22_9
-	b	LBB22_10
-LBB22_22:                               ; %B10
-	tbnz	w11, #31, LBB22_31
+	b.eq	LBB23_9
+	b	LBB23_10
+LBB23_22:                               ; %B10
+	tbnz	w11, #31, LBB23_31
 ; %bb.23:                               ; %B28.preheader
 	mov	w11, wzr
 	cmp	w10, wzr
-	b.eq	LBB22_19
-LBB22_24:                               ; %B25
+	b.eq	LBB23_19
+LBB23_24:                               ; %B25
                                         ; =>This Inner Loop Header: Depth=1
 	ldrh	w12, [x8, w11, sxtw #1]
 	ldrb	w13, [x9, w11, sxtw]
 	cmp	w12, w13
-	b.ne	LBB22_1
+	b.ne	LBB23_1
 ; %bb.25:                               ; %B27
-                                        ;   in Loop: Header=BB22_24 Depth=1
+                                        ;   in Loop: Header=BB23_24 Depth=1
 	add	w11, w11, #1
 	cmp	w10, w11
-	b.ne	LBB22_24
-	b	LBB22_19
-LBB22_26:                               ; %B38.preheader
+	b.ne	LBB23_24
+	b	LBB23_19
+LBB23_26:                               ; %B38.preheader
 	mov	w11, wzr
 	cmp	w10, wzr
-	b.eq	LBB22_19
-LBB22_27:                               ; %B35
+	b.eq	LBB23_19
+LBB23_27:                               ; %B35
                                         ; =>This Inner Loop Header: Depth=1
 	ldrb	w12, [x8, w11, sxtw]
 	ldrh	w13, [x9, w11, sxtw #1]
 	cmp	w12, w13
-	b.ne	LBB22_1
+	b.ne	LBB23_1
 ; %bb.28:                               ; %B37
-                                        ;   in Loop: Header=BB22_27 Depth=1
+                                        ;   in Loop: Header=BB23_27 Depth=1
 	add	w11, w11, #1
 	cmp	w10, w11
-	b.ne	LBB22_27
-	b	LBB22_19
-LBB22_29:                               ; %B63
+	b.ne	LBB23_27
+	b	LBB23_19
+LBB23_29:                               ; %B63
 	mov	w3, w0
 	mov	x0, x24
 	str	x20, [x23, #48]
 	bl	_prim_js_strict_eq_slow_gc
 	cmp	x0, #130
 	mov	x8, x0
-	b.ne	LBB22_2
+	b.ne	LBB23_2
 ; %bb.30:                               ; %B64
 	b	l_exception_asm_h
-LBB22_31:                               ; %B19.preheader
+LBB23_31:                               ; %B19.preheader
 	mov	w11, wzr
 	cmp	w10, wzr
-	b.eq	LBB22_19
-LBB22_32:                               ; %B13
+	b.eq	LBB23_19
+LBB23_32:                               ; %B13
                                         ; =>This Inner Loop Header: Depth=1
 	ldrh	w12, [x8, w11, sxtw #1]
 	ldrh	w13, [x9, w11, sxtw #1]
 	cmp	w12, w13
-	b.ne	LBB22_1
+	b.ne	LBB23_1
 ; %bb.33:                               ; %B18
-                                        ;   in Loop: Header=BB22_32 Depth=1
+                                        ;   in Loop: Header=BB23_32 Depth=1
 	add	w11, w11, #1
 	cmp	w10, w11
-	b.ne	LBB22_32
-	b	LBB22_19
+	b.ne	LBB23_32
+	b	LBB23_19
                                         ; -- End function
 	.p2align	2                               ; -- Begin function ThrowReferenceErrorUninitialized_asm_h
 l_ThrowReferenceErrorUninitialized_asm_h: ; @ThrowReferenceErrorUninitialized_asm_h
@@ -1360,6 +1411,20 @@ Lloh1:
 	b	l_exception_asm_h
 	.loh AdrpAdd	Lloh0, Lloh1
                                         ; -- End function
+	.p2align	2                               ; -- Begin function PollInterrupts_spill_top0_asm_h
+l_PollInterrupts_spill_top0_asm_h:      ; @PollInterrupts_spill_top0_asm_h
+; %bb.0:                                ; %B0
+	str	x22, [x20], #8
+	b	l_PollInterrupts_asm_h
+                                        ; -- End function
+	.p2align	2                               ; -- Begin function PollInterrupts_spill_top0_top1_asm_h
+l_PollInterrupts_spill_top0_top1_asm_h: ; @PollInterrupts_spill_top0_top1_asm_h
+; %bb.0:                                ; %B0
+	mov	x8, x20
+	add	x20, x20, #16
+	stp	x22, x21, [x8]
+	b	l_PollInterrupts_asm_h
+                                        ; -- End function
 	.p2align	2                               ; -- Begin function FastBuildArguments_asm_h
 l_FastBuildArguments_asm_h:             ; @FastBuildArguments_asm_h
 ; %bb.0:                                ; %B51
@@ -1368,14 +1433,14 @@ l_FastBuildArguments_asm_h:             ; @FastBuildArguments_asm_h
 	ldrb	w8, [x24, #363]
 	ldr	w20, [x23, #120]
 	str	x19, [sp, #24]                  ; 8-byte Folded Spill
-	cbnz	w8, LBB25_19
+	cbnz	w8, LBB28_19
 ; %bb.1:                                ; %B48
 	ldr	x8, [x24, #408]
-	cbz	x8, LBB25_19
+	cbz	x8, LBB28_19
 ; %bb.2:                                ; %B45
 	str	x8, [sp, #16]                   ; 8-byte Folded Spill
 	str	x20, [sp, #32]                  ; 8-byte Folded Spill
-	cbz	w20, LBB25_8
+	cbz	w20, LBB28_8
 ; %bb.3:                                ; %B6
 	lsl	x1, x20, #3
 	ldr	x8, [sp, #40]                   ; 8-byte Folded Reload
@@ -1383,7 +1448,7 @@ l_FastBuildArguments_asm_h:             ; @FastBuildArguments_asm_h
 	mov	w2, #42                         ; =0x2a
 	str	x8, [x23, #48]
 	bl	_prim_try_malloc_gc
-	cbz	x0, LBB25_19
+	cbz	x0, LBB28_19
 ; %bb.4:                                ; %B9.preheader
 	mov	x8, x0
 	add	x10, x0, x20, lsl #3
@@ -1391,31 +1456,31 @@ l_FastBuildArguments_asm_h:             ; @FastBuildArguments_asm_h
 	mov	x20, x8
 	str	x8, [sp, #8]                    ; 8-byte Folded Spill
 	cmp	x8, x10
-	b.ge	LBB25_9
-LBB25_5:                                ; %B12
+	b.ge	LBB28_9
+LBB28_5:                                ; %B12
                                         ; =>This Inner Loop Header: Depth=1
 	ldr	x8, [x19]
 	str	x8, [x20]
 	ldrb	w9, [x24, #384]
-	cbnz	w9, LBB25_7
-LBB25_6:                                ; %B11
-                                        ;   in Loop: Header=BB25_5 Depth=1
+	cbnz	w9, LBB28_7
+LBB28_6:                                ; %B11
+                                        ;   in Loop: Header=BB28_5 Depth=1
 	add	x20, x20, #8
 	add	x19, x19, #8
 	cmp	x20, x10
-	b.lt	LBB25_5
-	b	LBB25_9
-LBB25_7:                                ; %B14
-                                        ;   in Loop: Header=BB25_5 Depth=1
+	b.lt	LBB28_5
+	b	LBB28_9
+LBB28_7:                                ; %B14
+                                        ;   in Loop: Header=BB28_5 Depth=1
 	mov	x0, x8
 	mov	x1, x24
 	str	x10, [sp]                       ; 8-byte Folded Spill
 	bl	_prim_WriteBarrierNoStore
 	ldr	x10, [sp]                       ; 8-byte Folded Reload
-	b	LBB25_6
-LBB25_8:
+	b	LBB28_6
+LBB28_8:
 	str	xzr, [sp, #8]                   ; 8-byte Folded Spill
-LBB25_9:                                ; %B17
+LBB28_9:                                ; %B17
 	ldr	x8, [sp, #40]                   ; 8-byte Folded Reload
 	mov	x0, x24
 	mov	w1, #16                         ; =0x10
@@ -1424,18 +1489,18 @@ LBB25_9:                                ; %B17
 	bl	_prim_try_malloc_gc
 	ldr	x20, [sp, #32]                  ; 8-byte Folded Reload
 	mov	x9, x0
-	cbz	x9, LBB25_19
+	cbz	x9, LBB28_19
 ; %bb.10:                               ; %B40
 	ldr	x20, [x24, #192]
 	str	x20, [x9]
 	ldrb	w8, [x24, #384]
-	cbnz	w8, LBB25_17
+	cbnz	w8, LBB28_17
 ; %bb.11:                               ; %B37
 	str	x20, [x9, #8]
 	ldrb	w8, [x24, #384]
 	str	x9, [sp]                        ; 8-byte Folded Spill
-	cbnz	w8, LBB25_18
-LBB25_12:                               ; %B21
+	cbnz	w8, LBB28_18
+LBB28_12:                               ; %B21
 	ldr	x8, [sp, #40]                   ; 8-byte Folded Reload
 	mov	x0, x24
 	mov	w1, #88                         ; =0x58
@@ -1446,7 +1511,7 @@ LBB25_12:                               ; %B21
 	ldr	x9, [sp, #16]                   ; 8-byte Folded Reload
 	mov	x19, x0
 	ldr	x10, [sp]                       ; 8-byte Folded Reload
-	cbz	x19, LBB25_19
+	cbz	x19, LBB28_19
 ; %bb.13:                               ; %B32
 	ldr	w8, [x9]
 	add	w8, w8, #1
@@ -1460,8 +1525,8 @@ LBB25_12:                               ; %B21
 	add	x8, x19, #8
 	stlr	x9, [x8]
 	ldrb	w8, [x24, #384]
-	cbnz	w8, LBB25_21
-LBB25_14:                               ; %B29
+	cbnz	w8, LBB28_21
+LBB28_14:                               ; %B29
 	orr	x8, x20, #0xfffe000000000000
 	mov	x9, x19
 	str	x8, [x9, #56]!
@@ -1472,12 +1537,12 @@ LBB25_14:                               ; %B29
 	ldr	x8, [x24, #184]
 	str	x8, [x9, #8]
 	ldrb	w9, [x24, #384]
-	cbnz	w9, LBB25_22
+	cbnz	w9, LBB28_22
 ; %bb.15:                               ; %B26
 	str	x10, [x19, #72]
 	ldrb	w8, [x24, #384]
-	cbnz	w8, LBB25_23
-LBB25_16:                               ; %B4
+	cbnz	w8, LBB28_23
+LBB28_16:                               ; %B4
 	ldr	x20, [sp, #40]                  ; 8-byte Folded Reload
 	ldr	x9, [sp, #24]                   ; 8-byte Folded Reload
 	str	x19, [x20], #8
@@ -1486,7 +1551,7 @@ LBB25_16:                               ; %B4
 	ldr	x1, [x25, x8, lsl #3]
 	add	sp, sp, #48
 	br	x1
-LBB25_17:                               ; %B42
+LBB28_17:                               ; %B42
 	mov	x0, x20
 	mov	x1, x24
 	mov	x19, x9
@@ -1494,13 +1559,13 @@ LBB25_17:                               ; %B42
 	str	x20, [x19, #8]
 	ldrb	w8, [x24, #384]
 	str	x19, [sp]                       ; 8-byte Folded Spill
-	cbz	w8, LBB25_12
-LBB25_18:                               ; %B39
+	cbz	w8, LBB28_12
+LBB28_18:                               ; %B39
 	mov	x0, x20
 	mov	x1, x24
 	bl	_prim_WriteBarrierNoStore
-	b	LBB25_12
-LBB25_19:                               ; %B1
+	b	LBB28_12
+LBB28_19:                               ; %B1
 	ldr	x8, [sp, #40]                   ; 8-byte Folded Reload
 	mov	x0, x24
 	mov	w1, w20
@@ -1509,32 +1574,32 @@ LBB25_19:                               ; %B1
 	bl	_js_build_arguments_gc
 	cmp	x0, #130
 	mov	x19, x0
-	b.ne	LBB25_16
+	b.ne	LBB28_16
 ; %bb.20:                               ; %B2
 	ldr	x19, [sp, #24]                  ; 8-byte Folded Reload
 	ldr	x20, [sp, #40]                  ; 8-byte Folded Reload
 	add	sp, sp, #48
 	b	l_exception_asm_h
-LBB25_21:                               ; %B34
+LBB28_21:                               ; %B34
 	mov	x8, #-844424930131968           ; =0xfffd000000000000
 	mov	x1, x24
 	orr	x0, x9, x8
 	bl	_prim_WriteBarrierNoStore
 	ldr	x10, [sp]                       ; 8-byte Folded Reload
-	b	LBB25_14
-LBB25_22:                               ; %B31
+	b	LBB28_14
+LBB28_22:                               ; %B31
 	mov	x0, x8
 	mov	x1, x24
 	bl	_prim_WriteBarrierNoStore
 	ldr	x10, [sp]                       ; 8-byte Folded Reload
 	str	x10, [x19, #72]
 	ldrb	w8, [x24, #384]
-	cbz	w8, LBB25_16
-LBB25_23:                               ; %B28
+	cbz	w8, LBB28_16
+LBB28_23:                               ; %B28
 	mov	x0, x10
 	mov	x1, x24
 	bl	_prim_WriteBarrierNoStore
-	b	LBB25_16
+	b	LBB28_16
                                         ; -- End function
 	.p2align	2                               ; -- Begin function FastFclosure_asm_h
 l_FastFclosure_asm_h:                   ; @FastFclosure_asm_h
@@ -1548,44 +1613,44 @@ l_FastFclosure_asm_h:                   ; @FastFclosure_asm_h
 	str	x20, [sp, #120]                 ; 8-byte Folded Spill
 	tst	w8, #0x30
 	str	w8, [sp, #76]                   ; 4-byte Folded Spill
-	b.ne	LBB26_38
+	b.ne	LBB29_38
 ; %bb.1:                                ; %B91
 	ldrb	w8, [x24, #363]
-	cbnz	w8, LBB26_38
+	cbnz	w8, LBB29_38
 ; %bb.2:                                ; %B94
 	ldrb	w8, [x24, #384]
-	cbnz	w8, LBB26_38
+	cbnz	w8, LBB29_38
 ; %bb.3:                                ; %B97
 	ldr	w8, [sp, #76]                   ; 4-byte Folded Reload
 	tst	w8, #0x1
 	mov	w8, #6                          ; =0x6
 	cinc	w8, w8, eq
 	ldr	x10, [x24, w8, uxtw #3]
-	cbz	x10, LBB26_38
+	cbz	x10, LBB29_38
 ; %bb.4:                                ; %B9
 	ldr	x8, [sp, #80]                   ; 8-byte Folded Reload
 	mov	w9, #47                         ; =0x2f
 	ldr	w8, [x8, #20]
 	cmp	w8, #0
 	csel	w8, w9, w8, eq
-	tbnz	w8, #31, LBB26_38
+	tbnz	w8, #31, LBB29_38
 ; %bb.5:                                ; %B86
 	ldr	x9, [x24, #8]
 	ldr	x9, [x9, #64]
 	ldr	x9, [x9, w8, sxtw #3]
 	ldrb	w8, [x9, #7]
-	tbnz	w8, #6, LBB26_23
+	tbnz	w8, #6, LBB29_23
 ; %bb.6:                                ; %B89
 	ldr	w8, [x9, #8]
 	asr	w8, w8, #30
 	str	x9, [sp, #24]                   ; 8-byte Folded Spill
 	cmp	w8, #1
-	b.ne	LBB26_38
-LBB26_7:                                ; %B19
+	b.ne	LBB29_38
+LBB29_7:                                ; %B19
 	ldr	x8, [sp, #80]                   ; 8-byte Folded Reload
 	str	x10, [sp, #16]                  ; 8-byte Folded Spill
 	ldr	w9, [x8, #60]
-	cbz	w9, LBB26_24
+	cbz	w9, LBB29_24
 ; %bb.8:                                ; %B82
 	ldr	x8, [x8, #32]
 	lsl	x1, x9, #3
@@ -1598,7 +1663,7 @@ LBB26_7:                                ; %B19
 	bl	_prim_try_malloc_gc
 	ldp	x11, x10, [sp, #56]             ; 16-byte Folded Reload
 	ldr	x14, [sp, #120]                 ; 8-byte Folded Reload
-	cbz	x0, LBB26_38
+	cbz	x0, LBB29_38
 ; %bb.9:                                ; %B83
 	mov	w12, w19
 	mov	w13, wzr
@@ -1606,42 +1671,42 @@ LBB26_7:                                ; %B19
 	mov	w19, wzr
 	str	x0, [sp, #8]                    ; 8-byte Folded Spill
 	str	w12, [sp, #44]                  ; 4-byte Folded Spill
-	b	LBB26_11
-LBB26_10:                               ; %B74
-                                        ;   in Loop: Header=BB26_11 Depth=1
+	b	LBB29_11
+LBB29_10:                               ; %B74
+                                        ;   in Loop: Header=BB29_11 Depth=1
 	add	w19, w19, #1
 	add	w13, w13, #8
 	cmp	w19, w10
 	str	x8, [x15], #8
-	b.hs	LBB26_25
-LBB26_11:                               ; %B25
+	b.hs	LBB29_25
+LBB29_11:                               ; %B25
                                         ; =>This Inner Loop Header: Depth=1
 	add	x8, x11, w13, uxtw
 	ldrb	w9, [x8]
-	tbz	w9, #0, LBB26_14
+	tbz	w9, #0, LBB29_14
 ; %bb.12:                               ; %B27
-                                        ;   in Loop: Header=BB26_11 Depth=1
+                                        ;   in Loop: Header=BB29_11 Depth=1
 	ldrh	w16, [x8, #2]
 	tst	w9, #0x2
 	csel	x17, x27, x28, eq
 	add	w8, w12, w16
 	csel	w9, w8, w16, eq
-	cbz	x20, LBB26_16
+	cbz	x20, LBB29_16
 ; %bb.13:                               ; %B43
-                                        ;   in Loop: Header=BB26_11 Depth=1
+                                        ;   in Loop: Header=BB29_11 Depth=1
 	ldr	x8, [x20, w9, uxtw #3]
-	cbnz	x8, LBB26_10
-	b	LBB26_18
-LBB26_14:                               ; %B21
-                                        ;   in Loop: Header=BB26_11 Depth=1
-	cbz	x26, LBB26_38
+	cbnz	x8, LBB29_10
+	b	LBB29_18
+LBB29_14:                               ; %B21
+                                        ;   in Loop: Header=BB29_11 Depth=1
+	cbz	x26, LBB29_38
 ; %bb.15:                               ; %B23
-                                        ;   in Loop: Header=BB26_11 Depth=1
+                                        ;   in Loop: Header=BB29_11 Depth=1
 	ldrh	w8, [x8, #2]
 	ldr	x8, [x26, x8, lsl #3]
-	b	LBB26_10
-LBB26_16:                               ; %B29
-                                        ;   in Loop: Header=BB26_11 Depth=1
+	b	LBB29_10
+LBB29_16:                               ; %B29
+                                        ;   in Loop: Header=BB29_11 Depth=1
 	ldr	w8, [x23, #80]
 	mov	x0, x24
 	mov	w2, #48                         ; =0x30
@@ -1653,17 +1718,17 @@ LBB26_16:                               ; %B29
 	str	x14, [x23, #48]
 	bl	_prim_try_malloc_gc
 	ldp	x15, x14, [sp, #112]            ; 16-byte Folded Reload
-	cbz	x0, LBB26_38
+	cbz	x0, LBB29_38
 ; %bb.17:                               ; %B30
-                                        ;   in Loop: Header=BB26_11 Depth=1
+                                        ;   in Loop: Header=BB29_11 Depth=1
 	ldr	x16, [sp, #104]                 ; 8-byte Folded Reload
 	ldr	w9, [sp, #100]                  ; 4-byte Folded Reload
 	mov	w13, w20
 	ldr	x17, [sp, #88]                  ; 8-byte Folded Reload
 	mov	x20, x0
 	str	x0, [x23, #72]
-LBB26_18:                               ; %B39
-                                        ;   in Loop: Header=BB26_11 Depth=1
+LBB29_18:                               ; %B39
+                                        ;   in Loop: Header=BB29_11 Depth=1
 	ldr	w8, [x23, #44]
 	str	x20, [sp, #48]                  ; 8-byte Folded Spill
 	mov	w20, w13
@@ -1673,20 +1738,20 @@ LBB26_18:                               ; %B39
 	str	w9, [sp, #100]                  ; 4-byte Folded Spill
 	stp	x16, x15, [sp, #104]            ; 16-byte Folded Spill
 	str	x14, [x23, #48]
-	tbnz	w8, #4, LBB26_22
+	tbnz	w8, #4, LBB29_22
 ; %bb.19:                               ; %B32
-                                        ;   in Loop: Header=BB26_11 Depth=1
+                                        ;   in Loop: Header=BB29_11 Depth=1
 	mov	w2, #16                         ; =0x10
-LBB26_20:                               ; %B32
-                                        ;   in Loop: Header=BB26_11 Depth=1
+LBB29_20:                               ; %B32
+                                        ;   in Loop: Header=BB29_11 Depth=1
 	bl	_prim_try_malloc_gc
 	ldp	x15, x14, [sp, #112]            ; 16-byte Folded Reload
 	mov	w13, w20
 	ldp	x11, x10, [sp, #56]             ; 16-byte Folded Reload
 	ldr	w12, [sp, #44]                  ; 4-byte Folded Reload
 	ldr	x20, [sp, #48]                  ; 8-byte Folded Reload
-	cbz	x0, LBB26_38
-; %bb.21:                               ;   in Loop: Header=BB26_11 Depth=1
+	cbz	x0, LBB29_38
+; %bb.21:                               ;   in Loop: Header=BB29_11 Depth=1
 	ldr	x9, [sp, #104]                  ; 8-byte Folded Reload
 	ldr	x16, [sp, #88]                  ; 8-byte Folded Reload
 	mov	x8, x0
@@ -1696,24 +1761,24 @@ LBB26_20:                               ; %B32
 	str	x9, [x8, #8]
 	ldr	w9, [sp, #100]                  ; 4-byte Folded Reload
 	str	x8, [x20, w9, uxtw #3]
-	b	LBB26_10
-LBB26_22:                               ; %B36
-                                        ;   in Loop: Header=BB26_11 Depth=1
+	b	LBB29_10
+LBB29_22:                               ; %B36
+                                        ;   in Loop: Header=BB29_11 Depth=1
 	mov	w2, #57                         ; =0x39
-	b	LBB26_20
-LBB26_23:                               ; %B87
+	b	LBB29_20
+LBB29_23:                               ; %B87
 	ldr	x8, [x9, #8]
 	ldr	w8, [x8]
 	asr	w8, w8, #30
 	str	x9, [sp, #24]                   ; 8-byte Folded Spill
 	cmp	w8, #1
-	b.eq	LBB26_7
-	b	LBB26_38
-LBB26_24:
+	b.eq	LBB29_7
+	b	LBB29_38
+LBB29_24:
 	str	xzr, [sp, #8]                   ; 8-byte Folded Spill
-LBB26_25:                               ; %B79
+LBB29_25:                               ; %B79
 	ldr	w8, [sp, #76]                   ; 4-byte Folded Reload
-	tbnz	w8, #0, LBB26_32
+	tbnz	w8, #0, LBB29_32
 ; %bb.26:                               ; %B67
 	mov	x0, x24
 	mov	w1, #88                         ; =0x58
@@ -1722,7 +1787,7 @@ LBB26_25:                               ; %B79
 	bl	_prim_try_malloc_gc
 	ldr	x14, [sp, #120]                 ; 8-byte Folded Reload
 	ldr	x11, [sp, #16]                  ; 8-byte Folded Reload
-	cbz	x0, LBB26_38
+	cbz	x0, LBB29_38
 ; %bb.27:                               ; %B70
 	ldr	w9, [x11]
 	mov	w10, #1                         ; =0x1
@@ -1739,8 +1804,8 @@ LBB26_25:                               ; %B79
 	mov	x9, xzr
 	stlr	x11, [x10]
 	ldrb	w10, [x24, #384]
-	cbnz	w10, LBB26_35
-LBB26_28:                               ; %B58
+	cbnz	w10, LBB29_35
+LBB29_28:                               ; %B58
 	ldr	x11, [sp, #80]                  ; 8-byte Folded Reload
 	ldr	x12, [sp, #8]                   ; 8-byte Folded Reload
 	add	x10, x8, #56
@@ -1754,14 +1819,14 @@ LBB26_28:                               ; %B58
 	orr	x11, x11, #0xfffe000000000000
 	stp	x11, x12, [x8, #56]
 	ldr	w11, [sp, #76]                  ; 4-byte Folded Reload
-	tbnz	w11, #0, LBB26_36
-LBB26_29:                               ; %B61
+	tbnz	w11, #0, LBB29_36
+LBB29_29:                               ; %B61
 	ldr	x19, [sp, #32]                  ; 8-byte Folded Reload
-LBB26_30:                               ; %B6
+LBB29_30:                               ; %B6
 	str	x8, [x14], #8
 	ldurb	w8, [x19, #-1]
 	cmp	w8, #189
-	b.ne	LBB26_37
+	b.ne	LBB29_37
 ; %bb.31:                               ; %B7
 	ldrb	w8, [x19, #1]
 	add	x19, x19, #2
@@ -1769,9 +1834,9 @@ LBB26_30:                               ; %B6
 	mov	x20, x14
 	add	sp, sp, #128
 	br	x1
-LBB26_32:                               ; %B52
+LBB29_32:                               ; %B52
 	ldr	x20, [x24, #424]
-	cbz	x20, LBB26_38
+	cbz	x20, LBB29_38
 ; %bb.33:                               ; %B55
 	mov	x0, x24
 	mov	w1, #88                         ; =0x58
@@ -1780,7 +1845,7 @@ LBB26_32:                               ; %B52
 	bl	_prim_try_malloc_gc
 	ldr	x11, [sp, #16]                  ; 8-byte Folded Reload
 	ldr	x14, [sp, #120]                 ; 8-byte Folded Reload
-	cbz	x0, LBB26_38
+	cbz	x0, LBB29_38
 ; %bb.34:                               ; %B63
 	ldr	w9, [x11]
 	mov	w10, #1                         ; =0x1
@@ -1797,8 +1862,8 @@ LBB26_32:                               ; %B52
 	stlr	x11, [x9]
 	mov	x9, x20
 	ldrb	w10, [x24, #384]
-	cbz	w10, LBB26_28
-LBB26_35:                               ; %B58.sink.split
+	cbz	w10, LBB29_28
+LBB29_35:                               ; %B58.sink.split
 	mov	x8, #-844424930131968           ; =0xfffd000000000000
 	mov	x1, x24
 	orr	x0, x11, x8
@@ -1806,18 +1871,18 @@ LBB26_35:                               ; %B58.sink.split
 	ldr	x14, [sp, #120]                 ; 8-byte Folded Reload
 	mov	x8, x19
 	mov	x9, x20
-	b	LBB26_28
-LBB26_36:                               ; %B60
+	b	LBB29_28
+LBB29_36:                               ; %B60
 	str	x9, [x10, #16]
-	b	LBB26_29
-LBB26_37:                               ; %B8
+	b	LBB29_29
+LBB29_37:                               ; %B8
 	ldrb	w8, [x19, #4]
 	add	x19, x19, #5
 	ldr	x1, [x25, x8, lsl #3]
 	mov	x20, x14
 	add	sp, sp, #128
 	br	x1
-LBB26_38:                               ; %B1
+LBB29_38:                               ; %B1
 	ldr	x1, [sp, #80]                   ; 8-byte Folded Reload
 	mov	x0, x24
 	mov	x2, x26
@@ -1828,7 +1893,7 @@ LBB26_38:                               ; %B1
 	ldr	x19, [sp, #32]                  ; 8-byte Folded Reload
 	cmp	x0, #130
 	mov	x8, x0
-	b.ne	LBB26_30
+	b.ne	LBB29_30
 ; %bb.39:                               ; %B2
 	mov	x20, x14
 	add	sp, sp, #128
@@ -1848,7 +1913,7 @@ l_FastCallConstructor_asm_h:            ; @FastCallConstructor_asm_h
 	mov	x20, x8
 	bl	_js_create_ordinary_constructor_this_GC
 	cmp	x0, #130
-	b.eq	LBB27_5
+	b.eq	LBB30_5
 ; %bb.1:                                ; %B6
 	ldr	x9, [sp, #8]                    ; 8-byte Folded Reload
 	stur	x0, [x20, #-8]
@@ -1867,17 +1932,17 @@ l_FastCallConstructor_asm_h:            ; @FastCallConstructor_asm_h
 	ldr	x20, [x23, #48]
 	ldr	x28, [x23, #16]
 	ldr	x26, [x23, #104]
-	b.eq	LBB27_6
+	b.eq	LBB30_6
 ; %bb.2:                                ; %B1
 	mov	x9, #2                          ; =0x2
 	ldurh	w8, [x19, #-2]
 	movk	x9, #65535, lsl #48
 	tst	x0, x9
-	b.eq	LBB27_7
+	b.eq	LBB30_7
 ; %bb.3:                                ; %B5
 	sub	x9, x20, x8, lsl #3
 	ldur	x9, [x9, #-8]
-LBB27_4:                                ; %B3
+LBB30_4:                                ; %B3
 	sub	x8, x20, x8, lsl #3
 	stur	x9, [x8, #-16]
 	sub	x20, x8, #8
@@ -1885,14 +1950,14 @@ LBB27_4:                                ; %B3
 	ldr	x1, [x25, x9, lsl #3]
 	add	sp, sp, #16
 	br	x1
-LBB27_5:                                ; %B10
+LBB30_5:                                ; %B10
 	ldr	x20, [sp, #8]                   ; 8-byte Folded Reload
-LBB27_6:                                ; %B7
+LBB30_6:                                ; %B7
 	add	sp, sp, #16
 	b	l_exception_asm_h
-LBB27_7:
+LBB30_7:
 	mov	x9, x0
-	b	LBB27_4
+	b	LBB30_4
                                         ; -- End function
 	.p2align	2                               ; -- Begin function FastCallDerivedConstructor_asm_h
 l_FastCallDerivedConstructor_asm_h:     ; @FastCallDerivedConstructor_asm_h
@@ -1914,7 +1979,7 @@ l_FastCallDerivedConstructor_asm_h:     ; @FastCallDerivedConstructor_asm_h
 	ldr	x20, [x23, #48]
 	ldr	x28, [x23, #16]
 	ldr	x26, [x23, #104]
-	b.eq	LBB28_2
+	b.eq	LBB31_2
 ; %bb.1:                                ; %B4
 	ldurh	w8, [x19, #-2]
 	sub	x8, x20, x8, lsl #3
@@ -1923,7 +1988,7 @@ l_FastCallDerivedConstructor_asm_h:     ; @FastCallDerivedConstructor_asm_h
 	ldrb	w9, [x19], #1
 	ldr	x1, [x25, x9, lsl #3]
 	br	x1
-LBB28_2:                                ; %B3
+LBB31_2:                                ; %B3
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function FastTypedArrayGet_asm_h
@@ -1934,19 +1999,19 @@ l_FastTypedArrayGet_asm_h:              ; @FastTypedArrayGet_asm_h
 	mov	x10, x0
 	ldr	w8, [x1, #48]
 	cmp	w2, w8
-	b.hs	LBB29_4
+	b.hs	LBB32_4
 ; %bb.1:                                ; %B21
 	ldrh	w9, [x1, #6]
 	ldr	x8, [x1, #40]
 	cmp	w9, #23
-	b.ge	LBB29_6
+	b.ge	LBB32_6
 ; %bb.2:                                ; %B21
 	cmp	w9, #21
-	b.eq	LBB29_7
+	b.eq	LBB32_7
 ; %bb.3:                                ; %B21
 	cmp	w9, #22
-	b.eq	LBB29_21
-LBB29_4:                                ; %B18
+	b.eq	LBB32_21
+LBB32_4:                                ; %B18
 	mov	x0, x24
 	str	x20, [x23, #48]
 	str	x10, [sp, #8]                   ; 8-byte Folded Spill
@@ -1954,77 +2019,77 @@ LBB29_4:                                ; %B18
 	ldr	x10, [sp, #8]                   ; 8-byte Folded Reload
 	cmp	x0, #130
 	mov	x8, x0
-	b.ne	LBB29_9
+	b.ne	LBB32_9
 ; %bb.5:                                ; %B19
 	add	sp, sp, #16
 	b	l_exception_asm_h
-LBB29_6:                                ; %B21
-	b.gt	LBB29_11
-LBB29_7:                                ; %B25
+LBB32_6:                                ; %B21
+	b.gt	LBB32_11
+LBB32_7:                                ; %B25
 	ldrb	w8, [x8, w2, sxtw]
-LBB29_8:                                ; %B1
+LBB32_8:                                ; %B1
 	orr	x8, x8, #0xfffe000000000000
-LBB29_9:                                ; %B1
-	tbnz	w10, #0, LBB29_20
-LBB29_10:                               ; %B4
+LBB32_9:                                ; %B1
+	tbnz	w10, #0, LBB32_20
+LBB32_10:                               ; %B4
 	stur	x8, [x20, #-16]
 	sub	x20, x20, #8
 	ldrb	w8, [x19], #1
 	ldr	x1, [x25, x8, lsl #3]
 	add	sp, sp, #16
 	br	x1
-LBB29_11:                               ; %B21
+LBB32_11:                               ; %B21
 	cmp	w9, #25
-	b.gt	LBB29_15
+	b.gt	LBB32_15
 ; %bb.12:                               ; %B21
 	cmp	w9, #24
-	b.eq	LBB29_22
+	b.eq	LBB32_22
 ; %bb.13:                               ; %B21
 	cmp	w9, #25
-	b.ne	LBB29_4
+	b.ne	LBB32_4
 ; %bb.14:                               ; %B31
 	ldrh	w8, [x8, w2, sxtw #1]
-	b	LBB29_8
-LBB29_15:                               ; %B21
+	b	LBB32_8
+LBB32_15:                               ; %B21
 	cmp	w9, #26
-	b.eq	LBB29_23
+	b.eq	LBB32_23
 ; %bb.16:                               ; %B21
 	cmp	w9, #27
-	b.eq	LBB29_24
+	b.eq	LBB32_24
 ; %bb.17:                               ; %B21
 	cmp	w9, #29
-	b.ne	LBB29_4
+	b.ne	LBB32_4
 ; %bb.18:                               ; %B14
 	ldr	d0, [x8, w2, sxtw #3]
-LBB29_19:                               ; %B1
+LBB32_19:                               ; %B1
 	fmov	x8, d0
 	fcmp	d0, d0
 	mov	x9, #562949953421312            ; =0x2000000000000
 	add	x8, x8, x9
 	mov	x9, #9221683186994511872        ; =0x7ffa000000000000
 	csel	x8, x8, x9, vc
-	tbz	w10, #0, LBB29_10
-LBB29_20:                               ; %B2
+	tbz	w10, #0, LBB32_10
+LBB32_20:                               ; %B2
 	stur	x8, [x20, #-8]
 	ldrb	w8, [x19], #1
 	ldr	x1, [x25, x8, lsl #3]
 	add	sp, sp, #16
 	br	x1
-LBB29_21:                               ; %B22
+LBB32_21:                               ; %B22
 	ldrsb	w8, [x8, w2, sxtw]
-	b	LBB29_8
-LBB29_22:                               ; %B28
+	b	LBB32_8
+LBB32_22:                               ; %B28
 	ldrsh	w8, [x8, w2, sxtw #1]
-	b	LBB29_8
-LBB29_23:                               ; %B34
+	b	LBB32_8
+LBB32_23:                               ; %B34
 	ldr	w8, [x8, w2, sxtw #2]
-	b	LBB29_8
-LBB29_24:                               ; %B5
+	b	LBB32_8
+LBB32_24:                               ; %B5
 	ldr	w8, [x8, w2, sxtw #2]
-	tbz	w8, #31, LBB29_8
+	tbz	w8, #31, LBB32_8
 ; %bb.25:                               ; %B10
 	ucvtf	d0, w8
-	b	LBB29_19
+	b	LBB32_19
                                         ; -- End function
 	.p2align	2                               ; -- Begin function FastTypedArraySet_asm_h
 l_FastTypedArraySet_asm_h:              ; @FastTypedArraySet_asm_h
@@ -2033,66 +2098,66 @@ l_FastTypedArraySet_asm_h:              ; @FastTypedArraySet_asm_h
 	mov	w8, #65534                      ; =0xfffe
 	ldur	x3, [x20, #-8]
 	cmp	x8, x2, lsr #48
-	b.ne	LBB30_17
+	b.ne	LBB33_17
 ; %bb.1:                                ; %B1
 	ldr	w8, [x1, #48]
 	cmp	w2, w8
-	b.hs	LBB30_17
+	b.hs	LBB33_17
 ; %bb.2:                                ; %B3
 	ldrh	w9, [x1, #6]
 	ldr	x8, [x1, #40]
 	sub	w10, w9, #22
 	cmp	w10, #2
-	b.hs	LBB30_6
+	b.hs	LBB33_6
 ; %bb.3:                                ; %B14
 	mov	w9, #65534                      ; =0xfffe
 	cmp	x9, x3, lsr #48
-	b.ne	LBB30_17
+	b.ne	LBB33_17
 ; %bb.4:                                ; %B15
 	strb	w3, [x8, w2, sxtw]
-LBB30_5:                                ; %B8
+LBB33_5:                                ; %B8
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #24
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB30_6:                                ; %B3
+LBB33_6:                                ; %B3
 	cmp	w9, #25
-	b.gt	LBB30_10
+	b.gt	LBB33_10
 ; %bb.7:                                ; %B3
 	sub	w10, w9, #24
 	cmp	w10, #2
-	b.hs	LBB30_16
+	b.hs	LBB33_16
 ; %bb.8:                                ; %B20
 	mov	w9, #65534                      ; =0xfffe
 	cmp	x9, x3, lsr #48
-	b.ne	LBB30_17
+	b.ne	LBB33_17
 ; %bb.9:                                ; %B21
 	strh	w3, [x8, w2, sxtw #1]
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #24
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB30_10:                               ; %B3
+LBB33_10:                               ; %B3
 	sub	w10, w9, #26
 	cmp	w10, #2
-	b.hs	LBB30_13
+	b.hs	LBB33_13
 ; %bb.11:                               ; %B26
 	mov	w9, #65534                      ; =0xfffe
 	cmp	x9, x3, lsr #48
-	b.ne	LBB30_17
+	b.ne	LBB33_17
 ; %bb.12:                               ; %B27
 	str	w3, [x8, w2, sxtw #2]
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #24
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB30_13:                               ; %B3
+LBB33_13:                               ; %B3
 	cmp	w9, #29
-	b.ne	LBB30_17
+	b.ne	LBB33_17
 ; %bb.14:                               ; %B32
 	mov	w9, #65534                      ; =0xfffe
 	cmp	x9, x3, lsr #48
-	b.ne	LBB30_21
+	b.ne	LBB33_21
 ; %bb.15:                               ; %B33
 	scvtf	d0, w3
 	str	d0, [x8, w2, sxtw #3]
@@ -2100,21 +2165,21 @@ LBB30_13:                               ; %B3
 	sub	x20, x20, #24
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB30_16:                               ; %B3
+LBB33_16:                               ; %B3
 	cmp	w9, #21
-	b.eq	LBB30_19
-LBB30_17:                               ; %B40
+	b.eq	LBB33_19
+LBB33_17:                               ; %B40
 	mov	x0, x24
 	mov	w4, wzr
 	str	x20, [x23, #48]
 	bl	_JS_SetPropertyValue_GC
-	tbz	w0, #31, LBB30_5
+	tbz	w0, #31, LBB33_5
 ; %bb.18:                               ; %B41
 	b	l_exception_asm_h
-LBB30_19:                               ; %B5
+LBB33_19:                               ; %B5
 	mov	w9, #65534                      ; =0xfffe
 	cmp	x9, x3, lsr #48
-	b.ne	LBB30_17
+	b.ne	LBB33_17
 ; %bb.20:                               ; %B6
 	cmp	w3, #255
 	mov	w9, #255                        ; =0xff
@@ -2125,13 +2190,13 @@ LBB30_19:                               ; %B5
 	sub	x20, x20, #24
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB30_21:                               ; %B35
+LBB33_21:                               ; %B35
 	and	x9, x3, #0xfffe000000000000
 	mov	x10, #-562949953421312          ; =0xfffe000000000000
 	cmp	x9, x10
-	b.eq	LBB30_17
+	b.eq	LBB33_17
 ; %bb.22:                               ; %B35
-	cbz	x9, LBB30_17
+	cbz	x9, LBB33_17
 ; %bb.23:                               ; %B36
 	mov	x9, #-562949953421312           ; =0xfffe000000000000
 	add	x9, x3, x9
@@ -2149,20 +2214,20 @@ l_FastAddNamedProperty_asm_h:           ; @FastAddNamedProperty_asm_h
 	mov	x12, x19
 	mov	x2, x0
 	cmp	w13, #76
-	b.eq	LBB31_2
+	b.eq	LBB34_2
 ; %bb.1:                                ; %B52
 	cmp	w13, #67
-	b.ne	LBB31_12
-LBB31_2:                                ; %B53
+	b.ne	LBB34_12
+LBB34_2:                                ; %B53
 	ldur	x1, [x20, #-16]
 	cmp	x1, #18
-	b.eq	LBB31_13
-LBB31_3:                                ; %B42
+	b.eq	LBB34_13
+LBB34_3:                                ; %B42
 	ldr	x15, [x1, #8]
 	ldur	x14, [x20, #-8]
 	ldr	x19, [x15, #40]
-	cbz	x19, LBB31_14
-LBB31_4:                                ; %B45
+	cbz	x19, LBB34_14
+LBB34_4:                                ; %B45
 	ldr	x8, [x1, #16]
 	ldr	w9, [x19, #16]
 	add	x10, x1, #32
@@ -2171,18 +2236,18 @@ LBB31_4:                                ; %B45
 	ccmp	w9, #5, #0, eq
 	cset	w8, lt
 	cmp	w11, w9
-	b.eq	LBB31_6
+	b.eq	LBB34_6
 ; %bb.5:                                ; %B45
-	cbz	w8, LBB31_18
-LBB31_6:                                ; %B1
+	cbz	w8, LBB34_18
+LBB34_6:                                ; %B1
 	ldr	w8, [x15, #48]
 	cmp	w8, w2
-	b.ne	LBB31_14
+	b.ne	LBB34_14
 ; %bb.7:                                ; %B1
 	ldrb	w8, [x15, #52]
 	cmp	w8, #7
-	b.ne	LBB31_14
-LBB31_8:                                ; %B17
+	b.ne	LBB34_14
+LBB34_8:                                ; %B17
 	ldr	w8, [x19]
 	add	x9, x1, #8
 	add	w8, w8, #1
@@ -2192,17 +2257,17 @@ LBB31_8:                                ; %B17
 	str	w8, [x15]
 	stlr	x19, [x9]
 	ldrb	w8, [x24, #384]
-	cbnz	w8, LBB31_23
+	cbnz	w8, LBB34_23
 ; %bb.9:                                ; %B14
 	ldr	w8, [x19, #20]
 	ldr	x9, [x1, #16]
 	sub	w8, w8, #1
 	str	x14, [x9, w8, sxtw #3]
 	ldrb	w8, [x24, #384]
-	cbnz	w8, LBB31_24
-LBB31_10:                               ; %B8
+	cbnz	w8, LBB34_24
+LBB34_10:                               ; %B8
 	cmp	w13, #67
-	b.ne	LBB31_21
+	b.ne	LBB34_21
 ; %bb.11:                               ; %B9
 	ldrb	w8, [x12, #4]
 	sub	x20, x20, #16
@@ -2210,17 +2275,17 @@ LBB31_10:                               ; %B8
 	add	x19, x12, #5
 	add	sp, sp, #64
 	br	x1
-LBB31_12:
+LBB34_12:
 	ldur	x1, [x20, #-24]
 	cmp	x1, #18
-	b.ne	LBB31_3
-LBB31_13:                               ; %B49
+	b.ne	LBB34_3
+LBB34_13:                               ; %B49
 	ldr	x1, [x24, #208]
 	ldr	x15, [x1, #8]
 	ldur	x14, [x20, #-8]
 	ldr	x19, [x15, #40]
-	cbnz	x19, LBB31_4
-LBB31_14:                               ; %B22
+	cbnz	x19, LBB34_4
+LBB34_14:                               ; %B22
 	ldr	x0, [x24, #8]
 	stp	x2, x1, [sp, #32]               ; 16-byte Folded Spill
 	mov	x1, x15
@@ -2235,7 +2300,7 @@ LBB31_14:                               ; %B22
 	ldr	w13, [sp, #60]                  ; 4-byte Folded Reload
 	ldp	x2, x1, [sp, #32]               ; 16-byte Folded Reload
 	ldr	x12, [sp, #48]                  ; 8-byte Folded Reload
-	cbz	x0, LBB31_18
+	cbz	x0, LBB34_18
 ; %bb.15:                               ; %B26
 	ldr	x8, [x1, #16]
 	ldr	w9, [x0, #16]
@@ -2246,20 +2311,20 @@ LBB31_14:                               ; %B22
 	ccmp	w9, #5, #0, eq
 	cset	w8, lt
 	cmp	w11, w9
-	b.ne	LBB31_17
+	b.ne	LBB34_17
 ; %bb.16:
 	ldp	x1, x12, [sp, #40]              ; 16-byte Folded Reload
 	ldr	w13, [sp, #60]                  ; 4-byte Folded Reload
 	ldp	x15, x20, [sp, #16]             ; 16-byte Folded Reload
 	ldr	x14, [sp, #8]                   ; 8-byte Folded Reload
-	b	LBB31_8
-LBB31_17:                               ; %B26
+	b	LBB34_8
+LBB34_17:                               ; %B26
 	ldp	x1, x12, [sp, #40]              ; 16-byte Folded Reload
 	ldr	w13, [sp, #60]                  ; 4-byte Folded Reload
 	ldp	x20, x2, [sp, #24]              ; 16-byte Folded Reload
 	ldp	x14, x15, [sp, #8]              ; 16-byte Folded Reload
-	cbnz	w8, LBB31_8
-LBB31_18:                               ; %B29
+	cbnz	w8, LBB34_8
+LBB34_18:                               ; %B29
 	mov	x0, x24
 	mov	w3, #7                          ; =0x7
 	mov	w19, w13
@@ -2268,7 +2333,7 @@ LBB31_18:                               ; %B29
 	str	x20, [sp, #24]                  ; 8-byte Folded Spill
 	str	x20, [x23, #48]
 	bl	_add_property_gc
-	cbz	x0, LBB31_25
+	cbz	x0, LBB34_25
 ; %bb.19:                               ; %B39
 	ldr	x20, [sp, #24]                  ; 8-byte Folded Reload
 	ldr	x12, [sp, #48]                  ; 8-byte Folded Reload
@@ -2276,7 +2341,7 @@ LBB31_18:                               ; %B29
 	ldur	x8, [x20, #-8]
 	str	x8, [x0]
 	ldrb	w9, [x24, #384]
-	cbz	w9, LBB31_10
+	cbz	w9, LBB34_10
 ; %bb.20:                               ; %B41
 	mov	x0, x8
 	mov	x1, x24
@@ -2284,10 +2349,10 @@ LBB31_18:                               ; %B29
 	ldr	x20, [sp, #24]                  ; 8-byte Folded Reload
 	ldr	x12, [sp, #48]                  ; 8-byte Folded Reload
 	mov	w13, w19
-	b	LBB31_10
-LBB31_21:                               ; %B11
+	b	LBB34_10
+LBB34_21:                               ; %B11
 	cmp	w13, #76
-	b.ne	LBB31_27
+	b.ne	LBB34_27
 ; %bb.22:                               ; %B12
 	ldrb	w8, [x12, #4]
 	sub	x20, x20, #8
@@ -2295,7 +2360,7 @@ LBB31_21:                               ; %B11
 	add	x19, x12, #5
 	add	sp, sp, #64
 	br	x1
-LBB31_23:                               ; %B19
+LBB34_23:                               ; %B19
 	mov	x8, #-844424930131968           ; =0xfffd000000000000
 	stp	x1, x12, [sp, #40]              ; 16-byte Folded Spill
 	mov	x1, x24
@@ -2311,8 +2376,8 @@ LBB31_23:                               ; %B19
 	sub	w8, w8, #1
 	str	x14, [x9, w8, sxtw #3]
 	ldrb	w8, [x24, #384]
-	cbz	w8, LBB31_10
-LBB31_24:                               ; %B16
+	cbz	w8, LBB34_10
+LBB34_24:                               ; %B16
 	mov	x0, x14
 	mov	x1, x24
 	mov	x19, x12
@@ -2320,32 +2385,32 @@ LBB31_24:                               ; %B16
 	bl	_prim_WriteBarrierNoStore
 	ldr	w13, [sp, #60]                  ; 4-byte Folded Reload
 	mov	x12, x19
-	b	LBB31_10
-LBB31_25:                               ; %B31
+	b	LBB34_10
+LBB34_25:                               ; %B31
 	cmp	w19, #67
-	b.ne	LBB31_28
+	b.ne	LBB34_28
 ; %bb.26:                               ; %B32
 	ldr	x8, [sp, #24]                   ; 8-byte Folded Reload
 	sub	x20, x8, #16
 	ldr	x19, [sp, #48]                  ; 8-byte Folded Reload
 	add	sp, sp, #64
 	b	l_exception_asm_h
-LBB31_27:                               ; %B13
+LBB34_27:                               ; %B13
 	ldrb	w8, [x12], #1
 	sub	x20, x20, #24
 	mov	x19, x12
 	ldr	x1, [x25, x8, lsl #3]
 	add	sp, sp, #64
 	br	x1
-LBB31_28:                               ; %B34
+LBB34_28:                               ; %B34
 	cmp	w19, #76
-	b.ne	LBB31_30
+	b.ne	LBB34_30
 ; %bb.29:                               ; %B35
 	ldr	x19, [sp, #48]                  ; 8-byte Folded Reload
 	ldr	x20, [sp, #24]                  ; 8-byte Folded Reload
 	add	sp, sp, #64
 	b	l_exception_asm_h
-LBB31_30:                               ; %B36
+LBB34_30:                               ; %B36
 	ldr	x8, [sp, #24]                   ; 8-byte Folded Reload
 	sub	x20, x8, #24
 	ldr	x19, [sp, #48]                  ; 8-byte Folded Reload
@@ -2390,7 +2455,7 @@ l_push_const_0_asm_h:                   ; @push_const_0_asm_h
 	ldrsw	x9, [x19]
 	ldr	w10, [x24, #328]
 	ldr	x1, [x8, x9, lsl #3]
-	cbz	w10, LBB34_2
+	cbz	w10, LBB37_2
 ; %bb.1:                                ; %B4
 	mov	x0, x24
 	mov	x2, x19
@@ -2398,7 +2463,7 @@ l_push_const_0_asm_h:                   ; @push_const_0_asm_h
 	str	x1, [sp, #8]                    ; 8-byte Folded Spill
 	bl	_DebuggerPause
 	ldr	x1, [sp, #8]                    ; 8-byte Folded Reload
-LBB34_2:                                ; %B1
+LBB37_2:                                ; %B1
 	ldrb	w8, [x19, #4]
 	add	x19, x19, #5
 	mov	x22, x1
@@ -2419,19 +2484,19 @@ l_fclosure_0_asm_h:                     ; @fclosure_0_asm_h
 l_push_atom_value_0_asm_h:              ; @push_atom_value_0_asm_h
 ; %bb.0:                                ; %B13
 	ldr	w1, [x19]
-	tbnz	w1, #31, LBB36_5
+	tbnz	w1, #31, LBB39_5
 ; %bb.1:                                ; %B1
 	ldr	x8, [x24, #8]
 	ldr	x8, [x8, #64]
 	ldr	x8, [x8, w1, sxtw #3]
 	ldrb	w9, [x8, #7]
-	tbnz	w9, #6, LBB36_4
+	tbnz	w9, #6, LBB39_4
 ; %bb.2:                                ; %B9
 	ldr	w9, [x8, #8]
 	asr	w9, w9, #30
 	cmp	w9, #1
-	b.ne	LBB36_5
-LBB36_3:                                ; %B7
+	b.ne	LBB39_5
+LBB39_3:                                ; %B7
 	ldrb	w9, [x19, #4]
 	add	x19, x19, #5
 	add	w9, w9, #243
@@ -2440,19 +2505,19 @@ LBB36_3:                                ; %B7
 	movk	x9, #1, lsl #48
 	orr	x22, x8, x9
 	br	x1
-LBB36_4:                                ; %B2
+LBB39_4:                                ; %B2
 	ldr	x9, [x8, #8]
 	ldr	w9, [x9]
 	asr	w9, w9, #30
 	cmp	w9, #1
-	b.eq	LBB36_3
-LBB36_5:                                ; %B10
+	b.eq	LBB39_3
+LBB39_5:                                ; %B10
 	mov	x0, x24
 	mov	w2, wzr
 	str	x20, [x23, #48]
 	bl	___JS_AtomToValue_GC
 	cmp	x0, #130
-	b.eq	LBB36_7
+	b.eq	LBB39_7
 ; %bb.6:                                ; %B12
 	ldrb	w8, [x19, #4]
 	add	x19, x19, #5
@@ -2460,7 +2525,7 @@ LBB36_5:                                ; %B10
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB36_7:                                ; %B11
+LBB39_7:                                ; %B11
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function private_symbol_0_asm_h
@@ -2472,7 +2537,7 @@ l_private_symbol_0_asm_h:               ; @private_symbol_0_asm_h
 	str	x20, [x23, #48]
 	bl	_JS_NewSymbolFromAtom_GC
 	cmp	x0, #130
-	b.eq	LBB37_2
+	b.eq	LBB40_2
 ; %bb.1:                                ; %B3
 	ldrb	w8, [x19, #4]
 	add	x19, x19, #5
@@ -2480,7 +2545,7 @@ l_private_symbol_0_asm_h:               ; @private_symbol_0_asm_h
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB37_2:                                ; %B2
+LBB40_2:                                ; %B2
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function undefined_0_asm_h
@@ -2506,41 +2571,41 @@ l_push_this_0_asm_h:                    ; @push_this_0_asm_h
 ; %bb.0:                                ; %B12
 	ldr	w8, [x23, #44]
 	ldr	x1, [x23, #88]
-	tbnz	w8, #0, LBB40_2
+	tbnz	w8, #0, LBB43_2
 ; %bb.1:                                ; %B12
 	ldr	x8, [x23, #88]
 	and	x9, x8, #0xfffffffffffffffe
 	and	x9, x9, #0xffff000000000003
-	cbnz	x9, LBB40_3
-LBB40_2:                                ; %B3
+	cbnz	x9, LBB43_3
+LBB43_2:                                ; %B3
 	ldrb	w8, [x19], #1
 	mov	x22, x1
 	add	w8, w8, #243
 	ldr	x2, [x25, w8, uxtw #3]
 	br	x2
-LBB40_3:                                ; %B6
+LBB43_3:                                ; %B6
 	orr	x8, x8, #0x10
 	cmp	x8, #18
-	b.ne	LBB40_5
+	b.ne	LBB43_5
 ; %bb.4:                                ; %B7
 	ldrb	w8, [x19], #1
 	ldr	x22, [x24, #208]
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB40_5:                                ; %B9
+LBB43_5:                                ; %B9
 	mov	x0, x24
 	str	x20, [x23, #48]
 	bl	_JS_ToObject_GC
 	cmp	x0, #130
-	b.eq	LBB40_7
+	b.eq	LBB43_7
 ; %bb.6:                                ; %B11
 	ldrb	w8, [x19], #1
 	mov	x22, x0
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB40_7:                                ; %B10
+LBB43_7:                                ; %B10
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function push_false_0_asm_h
@@ -2566,10 +2631,10 @@ l_object_0_asm_h:                       ; @object_0_asm_h
 ; %bb.0:                                ; %B16
 	ldrb	w8, [x24, #363]
 	stp	x19, x20, [sp, #-16]!           ; 16-byte Folded Spill
-	cbnz	w8, LBB43_5
+	cbnz	w8, LBB46_5
 ; %bb.1:                                ; %B1
 	ldr	x19, [x24, #400]
-	cbz	x19, LBB43_5
+	cbz	x19, LBB46_5
 ; %bb.2:                                ; %B5
 	mov	x0, x24
 	mov	w1, #64                         ; =0x40
@@ -2578,7 +2643,7 @@ l_object_0_asm_h:                       ; @object_0_asm_h
 	bl	_prim_try_malloc_gc
 	ldr	x20, [sp, #8]                   ; 8-byte Folded Reload
 	mov	x9, x0
-	cbz	x9, LBB43_5
+	cbz	x9, LBB46_5
 ; %bb.3:                                ; %B7
 	ldr	w8, [x19]
 	add	w8, w8, #1
@@ -2590,8 +2655,8 @@ l_object_0_asm_h:                       ; @object_0_asm_h
 	add	x8, x9, #8
 	stlr	x19, [x8]
 	ldrb	w8, [x24, #384]
-	cbnz	w8, LBB43_7
-LBB43_4:                                ; %B9
+	cbnz	w8, LBB46_7
+LBB46_4:                                ; %B9
 	add	x8, x9, #32
 	ldr	x19, [sp]                       ; 8-byte Folded Reload
 	mov	x22, x9
@@ -2601,12 +2666,12 @@ LBB43_4:                                ; %B9
 	ldr	x1, [x25, w8, uxtw #3]
 	add	sp, sp, #16
 	br	x1
-LBB43_5:                                ; %B13
+LBB46_5:                                ; %B13
 	mov	x0, x24
 	str	x20, [x23, #48]
 	bl	_PRIM_JS_NewObject_GC
 	cmp	x0, #130
-	b.eq	LBB43_8
+	b.eq	LBB46_8
 ; %bb.6:                                ; %B15
 	ldp	x19, x20, [sp]                  ; 16-byte Folded Reload
 	mov	x22, x0
@@ -2615,7 +2680,7 @@ LBB43_5:                                ; %B13
 	ldr	x1, [x25, w8, uxtw #3]
 	add	sp, sp, #16
 	br	x1
-LBB43_7:                                ; %B11
+LBB46_7:                                ; %B11
 	mov	x8, #-844424930131968           ; =0xfffd000000000000
 	mov	x1, x24
 	orr	x0, x19, x8
@@ -2623,8 +2688,8 @@ LBB43_7:                                ; %B11
 	bl	_prim_WriteBarrierNoStore
 	ldr	x20, [sp, #8]                   ; 8-byte Folded Reload
 	mov	x9, x19
-	b	LBB43_4
-LBB43_8:                                ; %B14
+	b	LBB46_4
+LBB46_8:                                ; %B14
 	ldp	x19, x20, [sp], #16             ; 16-byte Folded Reload
 	b	l_exception_asm_h
                                         ; -- End function
@@ -2633,12 +2698,12 @@ l_special_object_0_asm_h:               ; @special_object_0_asm_h
 ; %bb.0:                                ; %B12
 	ldrb	w8, [x19]
 	cmp	w8, #2
-	b.gt	LBB44_5
+	b.gt	LBB47_5
 ; %bb.1:                                ; %B12
-	cbz	w8, LBB44_8
+	cbz	w8, LBB47_8
 ; %bb.2:                                ; %B12
 	cmp	w8, #1
-	b.ne	LBB44_10
+	b.ne	LBB47_10
 ; %bb.3:                                ; %B2
 	ldr	x8, [x23, #8]
 	ldr	w1, [x23, #120]
@@ -2652,8 +2717,8 @@ l_special_object_0_asm_h:               ; @special_object_0_asm_h
 	csel	w4, w8, w1, lt
 	bl	_js_build_mapped_arguments_gc
 	cmp	x0, #130
-	b.eq	LBB44_12
-LBB44_4:
+	b.eq	LBB47_12
+LBB47_4:
 	mov	x8, x0
 	ldrb	w9, [x19, #1]
 	add	x19, x19, #2
@@ -2661,12 +2726,12 @@ LBB44_4:
 	add	w9, w9, #243
 	ldr	x1, [x25, w9, uxtw #3]
 	br	x1
-LBB44_5:                                ; %B12
+LBB47_5:                                ; %B12
 	cmp	w8, #3
-	b.eq	LBB44_9
+	b.eq	LBB47_9
 ; %bb.6:                                ; %B12
 	cmp	w8, #4
-	b.ne	LBB44_11
+	b.ne	LBB47_11
 ; %bb.7:                                ; %B6
 	ldr	x8, [x23, #8]
 	mov	w9, #18                         ; =0x12
@@ -2679,9 +2744,9 @@ LBB44_5:                                ; %B12
 	add	w9, w9, #243
 	ldr	x1, [x25, w9, uxtw #3]
 	br	x1
-LBB44_8:                                ; %B13
+LBB47_8:                                ; %B13
 	b	l_FastBuildArguments_asm_h
-LBB44_9:                                ; %B16
+LBB47_9:                                ; %B16
 	ldr	x8, [x23, #96]
 	ldrb	w9, [x19, #1]
 	add	x19, x19, #2
@@ -2689,7 +2754,7 @@ LBB44_9:                                ; %B16
 	add	w9, w9, #243
 	ldr	x1, [x25, w9, uxtw #3]
 	br	x1
-LBB44_10:                               ; %B15
+LBB47_10:                               ; %B15
 	ldr	x8, [x23, #8]
 	ldrb	w9, [x19, #1]
 	add	x19, x19, #2
@@ -2697,14 +2762,14 @@ LBB44_10:                               ; %B15
 	add	w9, w9, #243
 	ldr	x1, [x25, w9, uxtw #3]
 	br	x1
-LBB44_11:                               ; %B9
+LBB47_11:                               ; %B9
 	mov	x0, x24
 	mov	w1, #2                          ; =0x2
 	str	x20, [x23, #48]
 	bl	_JS_NewObjectProto_GC
 	cmp	x0, #130
-	b.ne	LBB44_4
-LBB44_12:                               ; %B10
+	b.ne	LBB47_4
+LBB47_12:                               ; %B10
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function rest_0_asm_h
@@ -2717,7 +2782,7 @@ l_rest_0_asm_h:                         ; @rest_0_asm_h
 	str	x20, [x23, #48]
 	bl	_js_build_rest_gc
 	cmp	x0, #130
-	b.eq	LBB45_2
+	b.eq	LBB48_2
 ; %bb.1:                                ; %B3
 	ldrb	w8, [x19, #2]
 	add	x19, x19, #3
@@ -2725,7 +2790,7 @@ l_rest_0_asm_h:                         ; @rest_0_asm_h
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB45_2:                                ; %B2
+LBB48_2:                                ; %B2
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function drop_0_asm_h
@@ -2974,22 +3039,22 @@ l_call_constructor_0_asm_h:             ; @call_constructor_0_asm_h
 	cmp	x1, x2
 	and	x8, x8, #0xffff000000000003
 	ccmp	x8, #0, #0, eq
-	b.ne	LBB65_5
+	b.ne	LBB68_5
 ; %bb.1:                                ; %B14
 	ldrh	w8, [x1, #6]
 	cmp	w8, #13
-	b.ne	LBB65_5
+	b.ne	LBB68_5
 ; %bb.2:                                ; %B7
 	ldrb	w8, [x1, #5]
-	tbz	w8, #4, LBB65_5
+	tbz	w8, #4, LBB68_5
 ; %bb.3:                                ; %B9
 	ldr	x8, [x1, #32]
 	mov	x0, x3
 	ldrb	w8, [x8, #6]
-	tbnz	w8, #2, LBB65_7
+	tbnz	w8, #2, LBB68_7
 ; %bb.4:                                ; %B10
 	b	l_FastCallConstructor_asm_h
-LBB65_5:                                ; %B2
+LBB68_5:                                ; %B2
 	add	x8, x19, #2
 	mov	x0, x24
 	mov	w5, wzr
@@ -2998,7 +3063,7 @@ LBB65_5:                                ; %B2
 	str	x20, [x23, #48]
 	bl	_JS_CallConstructorInternal_GC
 	cmp	x0, #130
-	b.eq	LBB65_8
+	b.eq	LBB68_8
 ; %bb.6:                                ; %B4
 	ldrh	w8, [x19]
 	sub	x8, x20, x8, lsl #3
@@ -3008,9 +3073,9 @@ LBB65_5:                                ; %B2
 	add	x19, x19, #3
 	ldr	x1, [x25, x9, lsl #3]
 	br	x1
-LBB65_7:                                ; %B11
+LBB68_7:                                ; %B11
 	b	l_FastCallDerivedConstructor_asm_h
-LBB65_8:                                ; %B3
+LBB68_8:                                ; %B3
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function call_0_asm_h
@@ -3030,7 +3095,7 @@ l_call_0_asm_h:                         ; @call_0_asm_h
 	ldr	x20, [x23, #48]
 	ldr	x28, [x23, #16]
 	ldr	x26, [x23, #104]
-	b.eq	LBB66_2
+	b.eq	LBB69_2
 ; %bb.1:                                ; %B4
 	ldurh	w8, [x19, #-2]
 	add	w8, w8, #1
@@ -3039,7 +3104,7 @@ l_call_0_asm_h:                         ; @call_0_asm_h
 	ldrb	w8, [x19], #1
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB66_2:                                ; %B3
+LBB69_2:                                ; %B3
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function tail_call_0_asm_h
@@ -3055,13 +3120,13 @@ l_tail_call_0_asm_h:                    ; @tail_call_0_asm_h
 	ldur	x22, [x20, #-8]
 	bl	l_common_call_asm_h
 	cmp	x0, #130
-	b.eq	LBB67_2
+	b.eq	LBB70_2
 ; %bb.1:                                ; %B4
 	ldr	x26, [x23, #104]
 	mov	x19, xzr
 	mov	x20, xzr
 	b	l_common_return_asm_h
-LBB67_2:                                ; %B3
+LBB70_2:                                ; %B3
 	mov	x19, xzr
 	mov	x20, xzr
 	b	l_exception_asm_h
@@ -3082,7 +3147,7 @@ l_call_method_0_asm_h:                  ; @call_method_0_asm_h
 	ldr	x20, [x23, #48]
 	ldr	x28, [x23, #16]
 	ldr	x26, [x23, #104]
-	b.eq	LBB68_2
+	b.eq	LBB71_2
 ; %bb.1:                                ; %B4
 	ldurh	w8, [x19, #-2]
 	add	w8, w8, #2
@@ -3091,7 +3156,7 @@ l_call_method_0_asm_h:                  ; @call_method_0_asm_h
 	ldrb	w8, [x19], #1
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB68_2:                                ; %B3
+LBB71_2:                                ; %B3
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function tail_call_method_0_asm_h
@@ -3106,13 +3171,13 @@ l_tail_call_method_0_asm_h:             ; @tail_call_method_0_asm_h
 	ldp	x21, x22, [x20, #-16]
 	bl	l_common_call_asm_h
 	cmp	x0, #130
-	b.eq	LBB69_2
+	b.eq	LBB72_2
 ; %bb.1:                                ; %B4
 	ldr	x26, [x23, #104]
 	mov	x19, xzr
 	mov	x20, xzr
 	b	l_common_return_asm_h
-LBB69_2:                                ; %B3
+LBB72_2:                                ; %B3
 	mov	x19, xzr
 	mov	x20, xzr
 	b	l_exception_asm_h
@@ -3127,14 +3192,14 @@ l_array_from_0_asm_h:                   ; @array_from_0_asm_h
 	str	x20, [sp, #56]                  ; 8-byte Folded Spill
 	sub	x9, x20, w1, uxtw #3
 	str	x9, [sp, #24]                   ; 8-byte Folded Spill
-	cbnz	w8, LBB70_13
+	cbnz	w8, LBB73_13
 ; %bb.1:                                ; %B1
 	ldr	x8, [x24, #40]
 	str	x8, [sp, #32]                   ; 8-byte Folded Spill
-	cbz	x8, LBB70_13
+	cbz	x8, LBB73_13
 ; %bb.2:                                ; %B5
 	str	x1, [sp, #48]                   ; 8-byte Folded Spill
-	cbz	w1, LBB70_8
+	cbz	w1, LBB73_8
 ; %bb.3:                                ; %B10
 	ldp	x9, x8, [sp, #48]               ; 16-byte Folded Reload
 	mov	x0, x24
@@ -3143,38 +3208,38 @@ l_array_from_0_asm_h:                   ; @array_from_0_asm_h
 	str	x8, [x23, #48]
 	bl	_prim_try_malloc_gc
 	ldr	x1, [sp, #48]                   ; 8-byte Folded Reload
-	cbz	x0, LBB70_13
+	cbz	x0, LBB73_13
 ; %bb.4:                                ; %B13.preheader
 	add	x10, x0, x1, lsl #3
 	ldr	x19, [sp, #24]                  ; 8-byte Folded Reload
 	mov	x20, x0
 	str	x20, [sp, #16]                  ; 8-byte Folded Spill
 	cmp	x20, x10
-	b.ge	LBB70_9
-LBB70_5:                                ; %B15
+	b.ge	LBB73_9
+LBB73_5:                                ; %B15
                                         ; =>This Inner Loop Header: Depth=1
 	ldr	x8, [x19]
 	str	x8, [x20]
 	ldrb	w9, [x24, #384]
-	cbnz	w9, LBB70_7
-LBB70_6:                                ; %B17
-                                        ;   in Loop: Header=BB70_5 Depth=1
+	cbnz	w9, LBB73_7
+LBB73_6:                                ; %B17
+                                        ;   in Loop: Header=BB73_5 Depth=1
 	add	x20, x20, #8
 	add	x19, x19, #8
 	cmp	x20, x10
-	b.lt	LBB70_5
-	b	LBB70_9
-LBB70_7:                                ; %B18
-                                        ;   in Loop: Header=BB70_5 Depth=1
+	b.lt	LBB73_5
+	b	LBB73_9
+LBB73_7:                                ; %B18
+                                        ;   in Loop: Header=BB73_5 Depth=1
 	mov	x0, x8
 	mov	x1, x24
 	str	x10, [sp, #8]                   ; 8-byte Folded Spill
 	bl	_prim_WriteBarrierNoStore
 	ldr	x10, [sp, #8]                   ; 8-byte Folded Reload
-	b	LBB70_6
-LBB70_8:
+	b	LBB73_6
+LBB73_8:
 	str	xzr, [sp, #16]                  ; 8-byte Folded Spill
-LBB70_9:                                ; %B21
+LBB73_9:                                ; %B21
 	ldr	x8, [sp, #56]                   ; 8-byte Folded Reload
 	mov	x0, x24
 	mov	w1, #88                         ; =0x58
@@ -3184,7 +3249,7 @@ LBB70_9:                                ; %B21
 	bl	_prim_try_malloc_gc
 	ldr	x1, [sp, #48]                   ; 8-byte Folded Reload
 	mov	x19, x0
-	cbz	x19, LBB70_13
+	cbz	x19, LBB73_13
 ; %bb.10:                               ; %B23
 	ldr	x9, [sp, #32]                   ; 8-byte Folded Reload
 	ldr	w8, [x9]
@@ -3198,8 +3263,8 @@ LBB70_9:                                ; %B21
 	strh	w20, [x19, #6]
 	stlr	x9, [x8]
 	ldrb	w8, [x24, #384]
-	cbnz	w8, LBB70_15
-LBB70_11:                               ; %B25
+	cbnz	w8, LBB73_15
+LBB73_11:                               ; %B25
 	orr	x8, x1, #0xfffe000000000000
 	mov	x9, x19
 	str	x8, [x9, #56]!
@@ -3208,7 +3273,7 @@ LBB70_11:                               ; %B25
 	str	x8, [x19, #40]
 	str	w1, [x19, #32]
 	str	w1, [x19, #48]
-LBB70_12:                               ; %B26
+LBB73_12:                               ; %B26
 	ldr	x9, [sp, #40]                   ; 8-byte Folded Reload
 	ldr	x10, [sp, #56]                  ; 8-byte Folded Reload
 	ldrh	w8, [x9]
@@ -3219,7 +3284,7 @@ LBB70_12:                               ; %B26
 	ldr	x1, [x25, x8, lsl #3]
 	add	sp, sp, #64
 	br	x1
-LBB70_13:                               ; %B29
+LBB73_13:                               ; %B29
 	ldr	x8, [sp, #56]                   ; 8-byte Folded Reload
 	ldr	x2, [sp, #24]                   ; 8-byte Folded Reload
 	mov	x0, x24
@@ -3228,19 +3293,19 @@ LBB70_13:                               ; %B29
 	bl	_JS_NewArrayWithArgs_GC
 	cmp	x0, #130
 	mov	x19, x0
-	b.ne	LBB70_12
+	b.ne	LBB73_12
 ; %bb.14:                               ; %B30
 	ldr	x19, [sp, #40]                  ; 8-byte Folded Reload
 	ldr	x20, [sp, #56]                  ; 8-byte Folded Reload
 	add	sp, sp, #64
 	b	l_exception_asm_h
-LBB70_15:                               ; %B27
+LBB73_15:                               ; %B27
 	mov	x8, #-844424930131968           ; =0xfffd000000000000
 	mov	x1, x24
 	orr	x0, x9, x8
 	bl	_prim_WriteBarrierNoStore
 	ldr	x1, [sp, #48]                   ; 8-byte Folded Reload
-	b	LBB70_11
+	b	LBB73_11
                                         ; -- End function
 	.p2align	2                               ; -- Begin function apply_0_asm_h
 l_apply_0_asm_h:                        ; @apply_0_asm_h
@@ -3255,7 +3320,7 @@ l_apply_0_asm_h:                        ; @apply_0_asm_h
 	str	x3, [sp, #8]                    ; 8-byte Folded Spill
 	bl	_js_function_apply_gc
 	cmp	x0, #130
-	b.eq	LBB71_2
+	b.eq	LBB74_2
 ; %bb.1:                                ; %B3
 	stur	x0, [x20, #-24]
 	ldr	x20, [sp, #8]                   ; 8-byte Folded Reload
@@ -3264,7 +3329,7 @@ l_apply_0_asm_h:                        ; @apply_0_asm_h
 	ldr	x1, [x25, x8, lsl #3]
 	add	sp, sp, #16
 	br	x1
-LBB71_2:                                ; %B2
+LBB74_2:                                ; %B2
 	add	sp, sp, #16
 	b	l_exception_asm_h
                                         ; -- End function
@@ -3288,10 +3353,10 @@ l_check_ctor_return_0_asm_h:            ; @check_ctor_return_0_asm_h
 	mov	x8, #2                          ; =0x2
 	movk	x8, #65535, lsl #48
 	tst	x22, x8
-	b.eq	LBB74_3
+	b.eq	LBB77_3
 ; %bb.1:                                ; %B2
 	cmp	x22, #18
-	b.eq	LBB74_4
+	b.eq	LBB77_4
 ; %bb.2:                                ; %B3
 Lloh4:
 	adrp	x1, l___unnamed_3@PAGE
@@ -3301,14 +3366,14 @@ Lloh5:
 	str	x20, [x23, #48]
 	bl	_LEPUS_ThrowTypeError
 	b	l_exception_asm_h
-LBB74_3:                                ; %B6
+LBB77_3:                                ; %B6
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #8
 	mov	w21, #6                         ; =0x6
 	add	w8, w8, #486
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB74_4:                                ; %B4
+LBB77_4:                                ; %B4
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #8
 	mov	w21, #7                         ; =0x7
@@ -3322,7 +3387,7 @@ l_check_ctor_0_asm_h:                   ; @check_ctor_0_asm_h
 ; %bb.0:                                ; %B2
 	ldr	x8, [x23, #96]
 	cmp	x8, #18
-	b.ne	LBB75_2
+	b.ne	LBB78_2
 ; %bb.1:                                ; %B3
 Lloh6:
 	adrp	x1, l___unnamed_4@PAGE
@@ -3332,7 +3397,7 @@ Lloh7:
 	str	x20, [x23, #48]
 	bl	_LEPUS_ThrowTypeError
 	b	l_exception_asm_h
-LBB75_2:                                ; %B4
+LBB78_2:                                ; %B4
 	ldrb	w8, [x19], #1
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
@@ -3347,14 +3412,14 @@ l_check_brand_0_asm_h:                  ; @check_brand_0_asm_h
 	mov	x1, x22
 	mov	x2, x21
 	bl	_JS_CheckBrand_GC
-	tbnz	w0, #31, LBB76_2
+	tbnz	w0, #31, LBB79_2
 ; %bb.1:                                ; %B3
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #16
 	add	w8, w8, #486
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB76_2:                                ; %B2
+LBB79_2:                                ; %B2
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function add_brand_0_asm_h
@@ -3366,13 +3431,13 @@ l_add_brand_0_asm_h:                    ; @add_brand_0_asm_h
 	mov	x1, x22
 	mov	x2, x21
 	bl	_JS_AddBrand_GC
-	tbnz	w0, #31, LBB77_2
+	tbnz	w0, #31, LBB80_2
 ; %bb.1:                                ; %B3
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #16
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB77_2:                                ; %B2
+LBB80_2:                                ; %B2
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function return_async_0_asm_h
@@ -3400,16 +3465,16 @@ l_throw_var_0_asm_h:                    ; @throw_var_0_asm_h
 	ldr	w2, [x19]
 	str	x20, [x23, #48]
 	cmp	w8, #1
-	b.le	LBB80_5
+	b.le	LBB83_5
 ; %bb.1:                                ; %B3
 	cmp	w8, #2
-	b.eq	LBB80_8
+	b.eq	LBB83_8
 ; %bb.2:                                ; %B3
 	cmp	w8, #3
-	b.eq	LBB80_9
+	b.eq	LBB83_9
 ; %bb.3:                                ; %B3
 	cmp	w8, #4
-	b.ne	LBB80_11
+	b.ne	LBB83_11
 ; %bb.4:                                ; %B8
 Lloh8:
 	adrp	x1, l___unnamed_5@PAGE
@@ -3419,24 +3484,24 @@ Lloh9:
 	bl	_LEPUS_ThrowTypeError
 	add	sp, sp, #16
 	b	l_exception_asm_h
-LBB80_5:                                ; %B3
-	cbz	w8, LBB80_10
+LBB83_5:                                ; %B3
+	cbz	w8, LBB83_10
 ; %bb.6:                                ; %B3
 	cmp	w8, #1
-	b.ne	LBB80_11
+	b.ne	LBB83_11
 ; %bb.7:                                ; %B5
 	mov	x0, x24
 	mov	w1, w2
 	bl	_JS_ThrowSyntaxErrorVarRedeclaration_GC
 	add	sp, sp, #16
 	b	l_exception_asm_h
-LBB80_8:                                ; %B6
+LBB83_8:                                ; %B6
 	mov	x0, x24
 	mov	w1, w2
 	bl	_JS_ThrowReferenceErrorUninitialized_GC
 	add	sp, sp, #16
 	b	l_exception_asm_h
-LBB80_9:                                ; %B7
+LBB83_9:                                ; %B7
 Lloh10:
 	adrp	x1, l___unnamed_6@PAGE
 Lloh11:
@@ -3445,14 +3510,14 @@ Lloh11:
 	bl	_LEPUS_ThrowReferenceError
 	add	sp, sp, #16
 	b	l_exception_asm_h
-LBB80_10:                               ; %B4
+LBB83_10:                               ; %B4
 	mov	x0, x24
 	mov	w1, #16384                      ; =0x4000
                                         ; kill: def $w2 killed $w2 killed $x2
 	bl	_JS_ThrowTypeErrorReadOnly
 	add	sp, sp, #16
 	b	l_exception_asm_h
-LBB80_11:                               ; %B9
+LBB83_11:                               ; %B9
 Lloh12:
 	adrp	x1, l___unnamed_7@PAGE
 Lloh13:
@@ -3476,14 +3541,14 @@ l_eval_0_asm_h:                         ; @eval_0_asm_h
 	sub	w1, w8, #1
 	bl	_prim_js_op_eval_gc
 	cmp	x0, #130
-	b.eq	LBB81_2
+	b.eq	LBB84_2
 ; %bb.1:                                ; %B3
 	stur	x0, [x20, #-8]
 	ldrb	w8, [x19, #2]
 	add	x19, x19, #3
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB81_2:                                ; %B2
+LBB84_2:                                ; %B2
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function regexp_0_asm_h
@@ -3497,7 +3562,7 @@ l_regexp_0_asm_h:                       ; @regexp_0_asm_h
 	mov	x3, x21
 	bl	_js_regexp_constructor_internal_gc
 	cmp	x0, #130
-	b.eq	LBB82_2
+	b.eq	LBB85_2
 ; %bb.1:                                ; %B3
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #16
@@ -3505,7 +3570,7 @@ l_regexp_0_asm_h:                       ; @regexp_0_asm_h
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB82_2:                                ; %B2
+LBB85_2:                                ; %B2
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function get_super_ctor_0_asm_h
@@ -3517,7 +3582,7 @@ l_get_super_ctor_0_asm_h:               ; @get_super_ctor_0_asm_h
 	mov	x1, x22
 	bl	_primjs_get_super_ctor_gc
 	cmp	x0, #130
-	b.eq	LBB83_2
+	b.eq	LBB86_2
 ; %bb.1:                                ; %B3
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #8
@@ -3525,7 +3590,7 @@ l_get_super_ctor_0_asm_h:               ; @get_super_ctor_0_asm_h
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB83_2:                                ; %B2
+LBB86_2:                                ; %B2
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function get_super_0_asm_h
@@ -3537,7 +3602,7 @@ l_get_super_0_asm_h:                    ; @get_super_0_asm_h
 	mov	x1, x22
 	bl	_JS_GetPrototype_GC
 	cmp	x0, #130
-	b.eq	LBB84_2
+	b.eq	LBB87_2
 ; %bb.1:                                ; %B3
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #8
@@ -3545,7 +3610,7 @@ l_get_super_0_asm_h:                    ; @get_super_0_asm_h
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB84_2:                                ; %B2
+LBB87_2:                                ; %B2
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function import_0_asm_h
@@ -3557,7 +3622,7 @@ l_import_0_asm_h:                       ; @import_0_asm_h
 	mov	x1, x22
 	bl	_js_dynamic_import
 	cmp	x0, #130
-	b.eq	LBB85_2
+	b.eq	LBB88_2
 ; %bb.1:                                ; %B3
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #8
@@ -3565,7 +3630,7 @@ l_import_0_asm_h:                       ; @import_0_asm_h
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB85_2:                                ; %B2
+LBB88_2:                                ; %B2
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function check_var_0_asm_h
@@ -3575,7 +3640,7 @@ l_check_var_0_asm_h:                    ; @check_var_0_asm_h
 	mov	x0, x24
 	str	x20, [x23, #48]
 	bl	_JS_CheckGlobalVar_GC
-	tbnz	w0, #31, LBB86_2
+	tbnz	w0, #31, LBB89_2
 ; %bb.1:                                ; %B3
 	ldrb	w8, [x19, #4]
 	cmp	w0, #0
@@ -3585,7 +3650,7 @@ l_check_var_0_asm_h:                    ; @check_var_0_asm_h
 	mov	w8, #6                          ; =0x6
 	cinc	x22, x8, ne
 	br	x1
-LBB86_2:                                ; %B2
+LBB89_2:                                ; %B2
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function get_var_undef_0_asm_h
@@ -3601,26 +3666,26 @@ l_get_var_undef_0_asm_h:                ; @get_var_undef_0_asm_h
 	ldr	w11, [x10, w11, sxtw #2]
 	add	w12, w12, #4
 	add	x10, x10, x12
-	cbz	w11, LBB87_3
-LBB87_1:                                ; %B5
+	cbz	w11, LBB90_3
+LBB90_1:                                ; %B5
                                         ; =>This Inner Loop Header: Depth=1
 	lsl	w12, w11, #3
 	sub	w12, w12, #8
 	add	x12, x10, x12
 	ldr	w13, [x12, #4]
 	cmp	w13, w9
-	b.eq	LBB87_10
+	b.eq	LBB90_10
 ; %bb.2:                                ; %B8
-                                        ;   in Loop: Header=BB87_1 Depth=1
+                                        ;   in Loop: Header=BB90_1 Depth=1
 	ldr	w11, [x12]
 	and	w11, w11, #0x3ffffff
-	cbnz	w11, LBB87_1
-LBB87_3:                                ; %B11
+	cbnz	w11, LBB90_1
+LBB90_3:                                ; %B11
 	ldr	x8, [x24, #208]
 	mov	w10, #18                        ; =0x12
-LBB87_4:                                ; %B33
+LBB90_4:                                ; %B33
                                         ; =>This Loop Header: Depth=1
-                                        ;     Child Loop BB87_5 Depth 2
+                                        ;     Child Loop BB90_5 Depth 2
 	ldr	x11, [x8, #8]
 	ldr	w12, [x11, #12]
 	add	x14, x11, #64
@@ -3629,43 +3694,43 @@ LBB87_4:                                ; %B33
 	ldr	w11, [x14, w11, sxtw #2]
 	add	w12, w13, #4
 	add	x12, x14, x12
-	cbz	w11, LBB87_7
-LBB87_5:                                ; %B22
-                                        ;   Parent Loop BB87_4 Depth=1
+	cbz	w11, LBB90_7
+LBB90_5:                                ; %B22
+                                        ;   Parent Loop BB90_4 Depth=1
                                         ; =>  This Inner Loop Header: Depth=2
 	lsl	w13, w11, #3
 	sub	w13, w13, #8
 	add	x13, x12, x13
 	ldp	w13, w14, [x13]
 	cmp	w14, w9
-	b.eq	LBB87_9
+	b.eq	LBB90_9
 ; %bb.6:                                ; %B24
-                                        ;   in Loop: Header=BB87_5 Depth=2
+                                        ;   in Loop: Header=BB90_5 Depth=2
 	and	w11, w13, #0x3ffffff
-	cbnz	w11, LBB87_5
-LBB87_7:                                ; %B27
-                                        ;   in Loop: Header=BB87_4 Depth=1
+	cbnz	w11, LBB90_5
+LBB90_7:                                ; %B27
+                                        ;   in Loop: Header=BB90_4 Depth=1
 	ldr	w11, [x8, #4]
 	ubfx	w11, w11, #10, #1
 	cmp	w11, #1
-	b.eq	LBB87_13
+	b.eq	LBB90_13
 ; %bb.8:                                ; %B30
-                                        ;   in Loop: Header=BB87_4 Depth=1
+                                        ;   in Loop: Header=BB90_4 Depth=1
 	ldr	x8, [x8, #8]
 	ldr	x8, [x8, #32]
-	cbnz	x8, LBB87_4
-	b	LBB87_11
-LBB87_9:                                ; %B12
+	cbnz	x8, LBB90_4
+	b	LBB90_11
+LBB90_9:                                ; %B12
 	lsr	w9, w13, #26
 	tst	w9, #0x30
-	b.ne	LBB87_13
-LBB87_10:                               ; %B7.sink.split
+	b.ne	LBB90_13
+LBB90_10:                               ; %B7.sink.split
 	ldr	x8, [x8, #16]
 	sub	w9, w11, #1
 	ldr	x10, [x8, w9, sxtw #3]
-LBB87_11:                               ; %B7
+LBB90_11:                               ; %B7
 	cmp	x10, #34
-	b.eq	LBB87_15
+	b.eq	LBB90_15
 ; %bb.12:                               ; %B4
 	ldrb	w8, [x19, #4]
 	add	x19, x19, #5
@@ -3673,14 +3738,14 @@ LBB87_11:                               ; %B7
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB87_13:                               ; %B17
+LBB90_13:                               ; %B17
 	ldr	w1, [x19]
 	mov	x0, x24
 	mov	w2, wzr
 	str	x20, [x23, #48]
 	bl	_JS_GetGlobalVarImpl_GC
 	cmp	x0, #130
-	b.eq	LBB87_16
+	b.eq	LBB90_16
 ; %bb.14:                               ; %B19
 	ldrb	w8, [x19, #4]
 	add	x19, x19, #5
@@ -3688,9 +3753,9 @@ LBB87_13:                               ; %B17
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB87_15:                               ; %B3
+LBB90_15:                               ; %B3
 	b	l_ThrowReferenceErrorUninitialized_asm_h
-LBB87_16:                               ; %B18
+LBB90_16:                               ; %B18
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function get_var_0_asm_h
@@ -3706,25 +3771,25 @@ l_get_var_0_asm_h:                      ; @get_var_0_asm_h
 	ldr	w10, [x13, w10, sxtw #2]
 	add	w11, w12, #4
 	add	x11, x13, x11
-	cbz	w10, LBB88_3
-LBB88_1:                                ; %B5
+	cbz	w10, LBB91_3
+LBB91_1:                                ; %B5
                                         ; =>This Inner Loop Header: Depth=1
 	lsl	w12, w10, #3
 	sub	w12, w12, #8
 	add	x12, x11, x12
 	ldr	w13, [x12, #4]
 	cmp	w13, w9
-	b.eq	LBB88_10
+	b.eq	LBB91_10
 ; %bb.2:                                ; %B8
-                                        ;   in Loop: Header=BB88_1 Depth=1
+                                        ;   in Loop: Header=BB91_1 Depth=1
 	ldr	w10, [x12]
 	and	w10, w10, #0x3ffffff
-	cbnz	w10, LBB88_1
-LBB88_3:                                ; %B11
+	cbnz	w10, LBB91_1
+LBB91_3:                                ; %B11
 	ldr	x8, [x24, #208]
-LBB88_4:                                ; %B32
+LBB91_4:                                ; %B32
                                         ; =>This Loop Header: Depth=1
-                                        ;     Child Loop BB88_5 Depth 2
+                                        ;     Child Loop BB91_5 Depth 2
 	ldr	x10, [x8, #8]
 	ldr	w11, [x10, #12]
 	add	x13, x10, #64
@@ -3733,42 +3798,42 @@ LBB88_4:                                ; %B32
 	ldr	w10, [x13, w10, sxtw #2]
 	add	w11, w12, #4
 	add	x11, x13, x11
-	cbz	w10, LBB88_7
-LBB88_5:                                ; %B21
-                                        ;   Parent Loop BB88_4 Depth=1
+	cbz	w10, LBB91_7
+LBB91_5:                                ; %B21
+                                        ;   Parent Loop BB91_4 Depth=1
                                         ; =>  This Inner Loop Header: Depth=2
 	lsl	w12, w10, #3
 	sub	w12, w12, #8
 	add	x12, x11, x12
 	ldp	w12, w13, [x12]
 	cmp	w13, w9
-	b.eq	LBB88_9
+	b.eq	LBB91_9
 ; %bb.6:                                ; %B23
-                                        ;   in Loop: Header=BB88_5 Depth=2
+                                        ;   in Loop: Header=BB91_5 Depth=2
 	and	w10, w12, #0x3ffffff
-	cbnz	w10, LBB88_5
-LBB88_7:                                ; %B26
-                                        ;   in Loop: Header=BB88_4 Depth=1
+	cbnz	w10, LBB91_5
+LBB91_7:                                ; %B26
+                                        ;   in Loop: Header=BB91_4 Depth=1
 	ldr	w10, [x8, #4]
 	ubfx	w10, w10, #10, #1
 	cmp	w10, #1
-	b.eq	LBB88_12
+	b.eq	LBB91_12
 ; %bb.8:                                ; %B29
-                                        ;   in Loop: Header=BB88_4 Depth=1
+                                        ;   in Loop: Header=BB91_4 Depth=1
 	ldr	x8, [x8, #8]
 	ldr	x8, [x8, #32]
-	cbnz	x8, LBB88_4
-	b	LBB88_12
-LBB88_9:                                ; %B12
+	cbnz	x8, LBB91_4
+	b	LBB91_12
+LBB91_9:                                ; %B12
 	lsr	w9, w12, #26
 	tst	w9, #0x30
-	b.ne	LBB88_12
-LBB88_10:                               ; %B7
+	b.ne	LBB91_12
+LBB91_10:                               ; %B7
 	ldr	x8, [x8, #16]
 	sub	w9, w10, #1
 	ldr	x8, [x8, w9, sxtw #3]
 	cmp	x8, #34
-	b.eq	LBB88_14
+	b.eq	LBB91_14
 ; %bb.11:                               ; %B4
 	ldrb	w9, [x19, #4]
 	add	x19, x19, #5
@@ -3776,14 +3841,14 @@ LBB88_10:                               ; %B7
 	add	w9, w9, #243
 	ldr	x1, [x25, w9, uxtw #3]
 	br	x1
-LBB88_12:                               ; %B16
+LBB91_12:                               ; %B16
 	ldr	w1, [x19]
 	mov	x0, x24
 	mov	w2, #1                          ; =0x1
 	str	x20, [x23, #48]
 	bl	_JS_GetGlobalVarImpl_GC
 	cmp	x0, #130
-	b.eq	LBB88_15
+	b.eq	LBB91_15
 ; %bb.13:                               ; %B18
 	ldrb	w8, [x19, #4]
 	add	x19, x19, #5
@@ -3791,9 +3856,9 @@ LBB88_12:                               ; %B16
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB88_14:                               ; %B3
+LBB91_14:                               ; %B3
 	b	l_ThrowReferenceErrorUninitialized_asm_h
-LBB88_15:                               ; %B17
+LBB91_15:                               ; %B17
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function put_var_0_asm_h
@@ -3810,20 +3875,20 @@ l_put_var_0_asm_h:                      ; @put_var_0_asm_h
 	ldr	w9, [x12, w9, sxtw #2]
 	add	w10, w11, #4
 	add	x10, x12, x10
-	cbz	w9, LBB89_3
-LBB89_1:                                ; %B1
+	cbz	w9, LBB92_3
+LBB92_1:                                ; %B1
                                         ; =>This Inner Loop Header: Depth=1
 	lsl	w11, w9, #3
 	sub	w11, w11, #8
 	add	x11, x10, x11
 	ldp	w11, w12, [x11]
 	cmp	w12, w1
-	b.eq	LBB89_6
+	b.eq	LBB92_6
 ; %bb.2:                                ; %B16
-                                        ;   in Loop: Header=BB89_1 Depth=1
+                                        ;   in Loop: Header=BB92_1 Depth=1
 	and	w9, w11, #0x3ffffff
-	cbnz	w9, LBB89_1
-LBB89_3:                                ; %B19
+	cbnz	w9, LBB92_1
+LBB92_3:                                ; %B19
 	ldr	x8, [x24, #208]
 	ldr	x9, [x8, #8]
 	ldr	w10, [x9, #12]
@@ -3833,53 +3898,53 @@ LBB89_3:                                ; %B19
 	ldr	w9, [x12, w9, sxtw #2]
 	add	w10, w11, #4
 	add	x10, x12, x10
-	cbz	w9, LBB89_13
-LBB89_4:                                ; %B26
+	cbz	w9, LBB92_13
+LBB92_4:                                ; %B26
                                         ; =>This Inner Loop Header: Depth=1
 	lsl	w11, w9, #3
 	sub	w11, w11, #8
 	add	x11, x10, x11
 	ldp	w11, w12, [x11]
 	cmp	w12, w1
-	b.eq	LBB89_10
+	b.eq	LBB92_10
 ; %bb.5:                                ; %B31
-                                        ;   in Loop: Header=BB89_4 Depth=1
+                                        ;   in Loop: Header=BB92_4 Depth=1
 	and	w9, w11, #0x3ffffff
-	cbnz	w9, LBB89_4
-	b	LBB89_13
-LBB89_6:                                ; %B13
+	cbnz	w9, LBB92_4
+	b	LBB92_13
+LBB92_6:                                ; %B13
 	mov	w10, #58                        ; =0x3a
 	and	w10, w10, w11, lsr #26
 	cmp	w10, #2
-	b.ne	LBB89_13
+	b.ne	LBB92_13
 ; %bb.7:                                ; %B3
 	ldr	x8, [x8, #16]
 	sub	w9, w9, #1
 	ldr	x10, [x8, w9, sxtw #3]
 	cmp	x10, #34
-	b.eq	LBB89_13
+	b.eq	LBB92_13
 ; %bb.8:                                ; %B20
 	str	x22, [x8, w9, sxtw #3]
 	ldrb	w8, [x24, #384]
-	cbnz	w8, LBB89_12
-LBB89_9:                                ; %B8
+	cbnz	w8, LBB92_12
+LBB92_9:                                ; %B8
 	ldrb	w8, [x19, #4]
 	sub	x20, x20, #8
 	add	x19, x19, #5
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB89_10:                               ; %B28
+LBB92_10:                               ; %B28
 	mov	w10, #58                        ; =0x3a
 	and	w10, w10, w11, lsr #26
 	cmp	w10, #2
-	b.ne	LBB89_13
+	b.ne	LBB92_13
 ; %bb.11:                               ; %B20
 	ldr	x8, [x8, #16]
 	sub	w9, w9, #1
 	str	x22, [x8, w9, sxtw #3]
 	ldrb	w8, [x24, #384]
-	cbz	w8, LBB89_9
-LBB89_12:
+	cbz	w8, LBB92_9
+LBB92_12:
 	mov	x1, x24
 	mov	x0, x22
 	bl	_prim_WriteBarrierNoStore
@@ -3888,13 +3953,13 @@ LBB89_12:
 	add	x19, x19, #5
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB89_13:                               ; %B34
+LBB92_13:                               ; %B34
 	mov	x0, x24
 	mov	x2, x22
 	mov	w3, wzr
 	str	x20, [x23, #48]
 	bl	_JS_SetGlobalVar_GC
-	tbz	w0, #31, LBB89_9
+	tbz	w0, #31, LBB92_9
 ; %bb.14:                               ; %B35
 	b	l_exception_asm_h
                                         ; -- End function
@@ -3908,14 +3973,14 @@ l_put_var_init_0_asm_h:                 ; @put_var_init_0_asm_h
 	str	x20, [x23, #48]
 	mov	x2, x22
 	bl	_JS_SetGlobalVar_GC
-	tbnz	w0, #31, LBB90_2
+	tbnz	w0, #31, LBB93_2
 ; %bb.1:                                ; %B3
 	ldrb	w8, [x19, #4]
 	sub	x20, x20, #8
 	add	x19, x19, #5
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB90_2:                                ; %B2
+LBB93_2:                                ; %B2
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function put_var_strict_0_asm_h
@@ -3923,7 +3988,7 @@ l_put_var_strict_0_asm_h:               ; @put_var_strict_0_asm_h
 ; %bb.0:                                ; %B38
 	ldp	x22, x21, [x20, #-16]
 	cmp	x22, #7
-	b.ne	LBB91_16
+	b.ne	LBB94_16
 ; %bb.1:                                ; %B40
 	ldr	x8, [x24, #216]
 	ldr	w1, [x19]
@@ -3935,20 +4000,20 @@ l_put_var_strict_0_asm_h:               ; @put_var_strict_0_asm_h
 	ldr	w9, [x12, w9, sxtw #2]
 	add	w10, w11, #4
 	add	x10, x12, x10
-	cbz	w9, LBB91_4
-LBB91_2:                                ; %B30
+	cbz	w9, LBB94_4
+LBB94_2:                                ; %B30
                                         ; =>This Inner Loop Header: Depth=1
 	lsl	w11, w9, #3
 	sub	w11, w11, #8
 	add	x11, x10, x11
 	ldp	w11, w12, [x11]
 	cmp	w12, w1
-	b.eq	LBB91_7
+	b.eq	LBB94_7
 ; %bb.3:                                ; %B32
-                                        ;   in Loop: Header=BB91_2 Depth=1
+                                        ;   in Loop: Header=BB94_2 Depth=1
 	and	w9, w11, #0x3ffffff
-	cbnz	w9, LBB91_2
-LBB91_4:                                ; %B34
+	cbnz	w9, LBB94_2
+LBB94_4:                                ; %B34
 	ldr	x8, [x24, #208]
 	ldr	x9, [x8, #8]
 	ldr	w10, [x9, #12]
@@ -3958,53 +4023,53 @@ LBB91_4:                                ; %B34
 	ldr	w9, [x12, w9, sxtw #2]
 	add	w10, w11, #4
 	add	x10, x12, x10
-	cbz	w9, LBB91_14
-LBB91_5:                                ; %B23
+	cbz	w9, LBB94_14
+LBB94_5:                                ; %B23
                                         ; =>This Inner Loop Header: Depth=1
 	lsl	w11, w9, #3
 	sub	w11, w11, #8
 	add	x11, x10, x11
 	ldp	w11, w12, [x11]
 	cmp	w12, w1
-	b.eq	LBB91_11
+	b.eq	LBB94_11
 ; %bb.6:                                ; %B25
-                                        ;   in Loop: Header=BB91_5 Depth=1
+                                        ;   in Loop: Header=BB94_5 Depth=1
 	and	w9, w11, #0x3ffffff
-	cbnz	w9, LBB91_5
-	b	LBB91_14
-LBB91_7:                                ; %B1
+	cbnz	w9, LBB94_5
+	b	LBB94_14
+LBB94_7:                                ; %B1
 	mov	w10, #58                        ; =0x3a
 	and	w10, w10, w11, lsr #26
 	cmp	w10, #2
-	b.ne	LBB91_14
+	b.ne	LBB94_14
 ; %bb.8:                                ; %B9
 	ldr	x8, [x8, #16]
 	sub	w9, w9, #1
 	ldr	x10, [x8, w9, sxtw #3]
 	cmp	x10, #34
-	b.eq	LBB91_14
+	b.eq	LBB94_14
 ; %bb.9:                                ; %B14
 	str	x21, [x8, w9, sxtw #3]
 	ldrb	w8, [x24, #384]
-	cbnz	w8, LBB91_13
-LBB91_10:                               ; %B6
+	cbnz	w8, LBB94_13
+LBB94_10:                               ; %B6
 	ldrb	w8, [x19, #4]
 	sub	x20, x20, #16
 	add	x19, x19, #5
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB91_11:                               ; %B18
+LBB94_11:                               ; %B18
 	mov	w10, #58                        ; =0x3a
 	and	w10, w10, w11, lsr #26
 	cmp	w10, #2
-	b.ne	LBB91_14
+	b.ne	LBB94_14
 ; %bb.12:                               ; %B14
 	ldr	x8, [x8, #16]
 	sub	w9, w9, #1
 	str	x21, [x8, w9, sxtw #3]
 	ldrb	w8, [x24, #384]
-	cbz	w8, LBB91_10
-LBB91_13:
+	cbz	w8, LBB94_10
+LBB94_13:
 	mov	x1, x24
 	mov	x0, x21
 	bl	_prim_WriteBarrierNoStore
@@ -4013,16 +4078,16 @@ LBB91_13:
 	add	x19, x19, #5
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB91_14:                               ; %B35
+LBB94_14:                               ; %B35
 	mov	x0, x24
 	mov	x2, x21
 	mov	w3, #2                          ; =0x2
 	str	x20, [x23, #48]
 	bl	_JS_SetGlobalVar_GC
-	tbz	w0, #31, LBB91_10
+	tbz	w0, #31, LBB94_10
 ; %bb.15:                               ; %B36
 	b	l_exception_asm_h
-LBB91_16:                               ; %B39
+LBB94_16:                               ; %B39
 	ldr	w1, [x19]
 	mov	x0, x24
 	str	x20, [x23, #48]
@@ -4034,35 +4099,35 @@ l_get_ref_value_0_asm_h:                ; @get_ref_value_0_asm_h
 ; %bb.0:                                ; %B49
 	ldp	x22, x21, [x20, #-16]
 	cmp	x22, #18
-	b.eq	LBB92_7
+	b.eq	LBB95_7
 ; %bb.1:                                ; %B1
 	mov	x8, #2                          ; =0x2
 	movk	x8, #65535, lsl #48
 	tst	x22, x8
-	b.ne	LBB92_5
+	b.ne	LBB95_5
 ; %bb.2:                                ; %B39
 	ldrh	w8, [x22, #6]
 	cmp	w8, #1
-	b.ne	LBB92_5
+	b.ne	LBB95_5
 ; %bb.3:                                ; %B3
 	ldr	w8, [x22, #4]
 	ubfx	w8, w8, #10, #1
 	cmp	w8, #1
-	b.eq	LBB92_5
+	b.eq	LBB95_5
 ; %bb.4:                                ; %B3
 	mov	x9, #2                          ; =0x2
 	and	x8, x21, #0xffff000000000003
 	movk	x9, #1, lsl #48
 	cmp	x8, x9
-	b.eq	LBB92_10
-LBB92_5:                                ; %B43
+	b.eq	LBB95_10
+LBB95_5:                                ; %B43
 	mov	x0, x24
 	mov	x1, x22
 	mov	x2, x21
 	str	x20, [x23, #48]
 	bl	_JS_GetPropertyValue_GC
 	cmp	x0, #130
-	b.eq	LBB92_9
+	b.eq	LBB95_9
 ; %bb.6:                                ; %B45
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #8
@@ -4071,38 +4136,38 @@ LBB92_5:                                ; %B43
 	add	w8, w8, #486
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB92_7:                                ; %B46
+LBB95_7:                                ; %B46
 	mov	x0, x24
 	mov	x1, x21
 	str	x20, [x23, #48]
 	bl	_js_value_to_atom_gc
-	cbz	w0, LBB92_9
+	cbz	w0, LBB95_9
 ; %bb.8:                                ; %B48
 	mov	w1, w0
 	mov	x0, x24
 	str	x20, [x23, #48]
 	bl	_JS_ThrowReferenceErrorNotDefined_GC
-LBB92_9:                                ; %B47
+LBB95_9:                                ; %B47
 	b	l_exception_asm_h
-LBB92_10:                               ; %B9
+LBB95_10:                               ; %B9
 	and	x1, x21, #0xfffffffffffc
 	ldrb	w8, [x1, #7]
-	tbnz	w8, #6, LBB92_22
+	tbnz	w8, #6, LBB95_22
 ; %bb.11:                               ; %B37
 	ldr	w8, [x1, #8]
 	asr	w8, w8, #30
 	cmp	w8, #1
-	b.ne	LBB92_5
-LBB92_12:                               ; %B11
+	b.ne	LBB95_5
+LBB95_12:                               ; %B11
 	ldr	x0, [x24, #8]
 	bl	_prim_get_interned_non_index_atom
-	cbz	w0, LBB92_5
+	cbz	w0, LBB95_5
 ; %bb.13:                               ; %B14.preheader
 	mov	x9, x22
 	mov	w8, #18                         ; =0x12
-LBB92_14:                               ; %B14
+LBB95_14:                               ; %B14
                                         ; =>This Loop Header: Depth=1
-                                        ;     Child Loop BB92_15 Depth 2
+                                        ;     Child Loop BB95_15 Depth 2
 	ldr	x10, [x9, #8]
 	ldr	w11, [x10, #12]
 	add	x13, x10, #64
@@ -4111,41 +4176,41 @@ LBB92_14:                               ; %B14
 	ldr	w10, [x13, w10, sxtw #2]
 	add	w11, w12, #4
 	add	x11, x13, x11
-	cbz	w10, LBB92_17
-LBB92_15:                               ; %B25
-                                        ;   Parent Loop BB92_14 Depth=1
+	cbz	w10, LBB95_17
+LBB95_15:                               ; %B25
+                                        ;   Parent Loop BB95_14 Depth=1
                                         ; =>  This Inner Loop Header: Depth=2
 	lsl	w12, w10, #3
 	sub	w12, w12, #8
 	add	x12, x11, x12
 	ldp	w12, w13, [x12]
 	cmp	w13, w0
-	b.eq	LBB92_19
+	b.eq	LBB95_19
 ; %bb.16:                               ; %B30
-                                        ;   in Loop: Header=BB92_15 Depth=2
+                                        ;   in Loop: Header=BB95_15 Depth=2
 	and	w10, w12, #0x3ffffff
-	cbnz	w10, LBB92_15
-LBB92_17:                               ; %B16
-                                        ;   in Loop: Header=BB92_14 Depth=1
+	cbnz	w10, LBB95_15
+LBB95_17:                               ; %B16
+                                        ;   in Loop: Header=BB95_14 Depth=1
 	ldr	w10, [x9, #4]
 	ubfx	w10, w10, #10, #1
 	cmp	w10, #1
-	b.eq	LBB92_5
+	b.eq	LBB95_5
 ; %bb.18:                               ; %B19
-                                        ;   in Loop: Header=BB92_14 Depth=1
+                                        ;   in Loop: Header=BB95_14 Depth=1
 	ldr	x9, [x9, #8]
 	ldr	x9, [x9, #32]
-	cbnz	x9, LBB92_14
-	b	LBB92_21
-LBB92_19:                               ; %B27
+	cbnz	x9, LBB95_14
+	b	LBB95_21
+LBB95_19:                               ; %B27
 	lsr	w8, w12, #26
 	tst	w8, #0x30
-	b.ne	LBB92_5
+	b.ne	LBB95_5
 ; %bb.20:                               ; %B28
 	ldr	x8, [x9, #16]
 	sub	w9, w10, #1
 	ldr	x8, [x8, w9, sxtw #3]
-LBB92_21:                               ; %B22
+LBB95_21:                               ; %B22
 	ldrb	w9, [x19], #1
 	sub	x20, x20, #8
 	mov	x22, x21
@@ -4153,13 +4218,13 @@ LBB92_21:                               ; %B22
 	add	w9, w9, #486
 	ldr	x1, [x25, w9, uxtw #3]
 	br	x1
-LBB92_22:                               ; %B10
+LBB95_22:                               ; %B10
 	ldr	x8, [x1, #8]
 	ldr	w8, [x8]
 	asr	w8, w8, #30
 	cmp	w8, #1
-	b.eq	LBB92_12
-	b	LBB92_5
+	b.eq	LBB95_12
+	b	LBB95_5
                                         ; -- End function
 	.p2align	2                               ; -- Begin function put_ref_value_0_asm_h
 l_put_ref_value_0_asm_h:                ; @put_ref_value_0_asm_h
@@ -4168,28 +4233,28 @@ l_put_ref_value_0_asm_h:                ; @put_ref_value_0_asm_h
 	ldp	x10, x22, [x20, #-24]
 	ldur	x21, [x20, #-8]
 	cmp	x10, #18
-	b.eq	LBB93_7
+	b.eq	LBB96_7
 ; %bb.1:                                ; %B1
 	mov	x8, #2                          ; =0x2
 	movk	x8, #65535, lsl #48
 	tst	x10, x8
-	b.ne	LBB93_5
-LBB93_2:                                ; %B56
+	b.ne	LBB96_5
+LBB96_2:                                ; %B56
 	ldrh	w8, [x10, #6]
 	cmp	w8, #1
-	b.ne	LBB93_5
+	b.ne	LBB96_5
 ; %bb.3:                                ; %B3
 	ldr	w8, [x10, #4]
 	ubfx	w8, w8, #10, #1
 	cmp	w8, #1
-	b.eq	LBB93_5
+	b.eq	LBB96_5
 ; %bb.4:                                ; %B3
 	mov	x9, #2                          ; =0x2
 	and	x8, x22, #0xffff000000000003
 	movk	x9, #1, lsl #48
 	cmp	x8, x9
-	b.eq	LBB93_9
-LBB93_5:                                ; %B60
+	b.eq	LBB96_9
+LBB96_5:                                ; %B60
 	mov	x0, x24
 	mov	x1, x10
 	mov	x2, x22
@@ -4197,39 +4262,39 @@ LBB93_5:                                ; %B60
 	mov	w4, #32768                      ; =0x8000
 	str	x20, [x23, #48]
 	bl	_JS_SetPropertyValue_GC
-	tbnz	w0, #31, LBB93_29
+	tbnz	w0, #31, LBB96_29
 ; %bb.6:                                ; %B62
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #24
 	ldr	x1, [x25, x8, lsl #3]
 	add	sp, sp, #16
 	br	x1
-LBB93_7:                                ; %B66
+LBB96_7:                                ; %B66
 	ldr	w8, [x23, #44]
-	tbnz	w8, #0, LBB93_27
+	tbnz	w8, #0, LBB96_27
 ; %bb.8:                                ; %B67
 	ldr	x10, [x24, #208]
 	mov	x8, #2                          ; =0x2
 	movk	x8, #65535, lsl #48
 	tst	x10, x8
-	b.eq	LBB93_2
-	b	LBB93_5
-LBB93_9:                                ; %B9
+	b.eq	LBB96_2
+	b	LBB96_5
+LBB96_9:                                ; %B9
 	and	x1, x22, #0xfffffffffffc
 	stp	x10, x20, [sp]                  ; 16-byte Folded Spill
 	ldrb	w8, [x1, #7]
-	tbnz	w8, #6, LBB93_30
+	tbnz	w8, #6, LBB96_30
 ; %bb.10:                               ; %B54
 	ldr	w8, [x1, #8]
 	asr	w8, w8, #30
 	ldp	x10, x20, [sp]                  ; 16-byte Folded Reload
 	cmp	w8, #1
-	b.ne	LBB93_5
-LBB93_11:                               ; %B11
+	b.ne	LBB96_5
+LBB96_11:                               ; %B11
 	ldr	x0, [x24, #8]
 	bl	_prim_get_interned_non_index_atom
 	ldp	x10, x20, [sp]                  ; 16-byte Folded Reload
-	cbz	w0, LBB93_5
+	cbz	w0, LBB96_5
 ; %bb.12:                               ; %B13
 	ldr	x8, [x10, #8]
 	ldr	w9, [x8, #12]
@@ -4239,24 +4304,24 @@ LBB93_11:                               ; %B11
 	ldr	w8, [x11, w8, sxtw #2]
 	add	w9, w10, #4
 	add	x9, x11, x9
-	cbz	w8, LBB93_15
-LBB93_13:                               ; %B16
+	cbz	w8, LBB96_15
+LBB96_13:                               ; %B16
                                         ; =>This Inner Loop Header: Depth=1
 	lsl	w10, w8, #3
 	sub	w10, w10, #8
 	add	x10, x9, x10
 	ldp	w10, w11, [x10]
 	cmp	w11, w0
-	b.eq	LBB93_21
+	b.eq	LBB96_21
 ; %bb.14:                               ; %B26
-                                        ;   in Loop: Header=BB93_13 Depth=1
+                                        ;   in Loop: Header=BB96_13 Depth=1
 	and	w8, w10, #0x3ffffff
-	cbnz	w8, LBB93_13
-LBB93_15:                               ; %B28.preheader
+	cbnz	w8, LBB96_13
+LBB96_15:                               ; %B28.preheader
 	ldp	x8, x20, [sp]                   ; 16-byte Folded Reload
-LBB93_16:                               ; %B28
+LBB96_16:                               ; %B28
                                         ; =>This Loop Header: Depth=1
-                                        ;     Child Loop BB93_17 Depth 2
+                                        ;     Child Loop BB96_17 Depth 2
 	ldr	x9, [x8, #8]
 	ldr	w10, [x9, #12]
 	add	x9, x9, #64
@@ -4265,45 +4330,45 @@ LBB93_16:                               ; %B28
 	ldr	w10, [x9, w10, sxtw #2]
 	add	w11, w11, #4
 	add	x9, x9, x11
-	cbz	w10, LBB93_19
-LBB93_17:                               ; %B41
-                                        ;   Parent Loop BB93_16 Depth=1
+	cbz	w10, LBB96_19
+LBB96_17:                               ; %B41
+                                        ;   Parent Loop BB96_16 Depth=1
                                         ; =>  This Inner Loop Header: Depth=2
 	lsl	w10, w10, #3
 	sub	w10, w10, #8
 	add	x10, x9, x10
 	ldp	w10, w11, [x10]
 	cmp	w11, w0
-	b.eq	LBB93_24
+	b.eq	LBB96_24
 ; %bb.18:                               ; %B46
-                                        ;   in Loop: Header=BB93_17 Depth=2
+                                        ;   in Loop: Header=BB96_17 Depth=2
 	and	w10, w10, #0x3ffffff
-	cbnz	w10, LBB93_17
-LBB93_19:                               ; %B29
-                                        ;   in Loop: Header=BB93_16 Depth=1
+	cbnz	w10, LBB96_17
+LBB96_19:                               ; %B29
+                                        ;   in Loop: Header=BB96_16 Depth=1
 	ldr	w9, [x8, #4]
 	ldr	x10, [sp]                       ; 8-byte Folded Reload
 	ubfx	w9, w9, #10, #1
 	cmp	w9, #1
-	b.eq	LBB93_5
+	b.eq	LBB96_5
 ; %bb.20:                               ; %B35
-                                        ;   in Loop: Header=BB93_16 Depth=1
+                                        ;   in Loop: Header=BB96_16 Depth=1
 	ldr	x8, [x8, #8]
 	ldr	x8, [x8, #32]
-	cbnz	x8, LBB93_16
-	b	LBB93_25
-LBB93_21:                               ; %B18
+	cbnz	x8, LBB96_16
+	b	LBB96_25
+LBB96_21:                               ; %B18
 	mov	w9, #58                         ; =0x3a
 	and	w9, w9, w10, lsr #26
 	ldp	x10, x20, [sp]                  ; 16-byte Folded Reload
 	cmp	w9, #2
-	b.ne	LBB93_5
+	b.ne	LBB96_5
 ; %bb.22:                               ; %B22
 	ldr	x9, [x10, #16]
 	sub	w8, w8, #1
 	str	x21, [x9, w8, sxtw #3]
 	ldrb	w8, [x24, #384]
-	cbnz	w8, LBB93_31
+	cbnz	w8, LBB96_31
 ; %bb.23:                               ; %B20
 	ldrb	w8, [x19], #1
 	ldr	x1, [x25, x8, lsl #3]
@@ -4311,44 +4376,44 @@ LBB93_21:                               ; %B18
 	sub	x20, x8, #24
 	add	sp, sp, #16
 	br	x1
-LBB93_24:                               ; %B43
+LBB96_24:                               ; %B43
 	mov	w8, #58                         ; =0x3a
 	and	w8, w8, w10, lsr #26
 	ldp	x10, x20, [sp]                  ; 16-byte Folded Reload
 	cmp	w8, #2
-	b.ne	LBB93_5
-LBB93_25:                               ; %B32
+	b.ne	LBB96_5
+LBB96_25:                               ; %B32
 	ldr	w8, [x10, #4]
 	ubfx	w8, w8, #8, #1
 	cmp	w8, #1
-	b.ne	LBB93_5
+	b.ne	LBB96_5
 ; %bb.26:                               ; %B33
 	mov	w0, w0
 	add	sp, sp, #16
 	b	l_FastAddNamedProperty_asm_h
-LBB93_27:                               ; %B63
+LBB96_27:                               ; %B63
 	mov	x0, x24
 	mov	x1, x22
 	str	x20, [x23, #48]
 	bl	_js_value_to_atom_gc
-	cbz	w0, LBB93_29
+	cbz	w0, LBB96_29
 ; %bb.28:                               ; %B65
 	mov	w1, w0
 	mov	x0, x24
 	str	x20, [x23, #48]
 	bl	_JS_ThrowReferenceErrorNotDefined_GC
-LBB93_29:                               ; %B61
+LBB96_29:                               ; %B61
 	add	sp, sp, #16
 	b	l_exception_asm_h
-LBB93_30:                               ; %B10
+LBB96_30:                               ; %B10
 	ldr	x8, [x1, #8]
 	ldr	w8, [x8]
 	asr	w8, w8, #30
 	ldp	x10, x20, [sp]                  ; 16-byte Folded Reload
 	cmp	w8, #1
-	b.eq	LBB93_11
-	b	LBB93_5
-LBB93_31:                               ; %B24
+	b.eq	LBB96_11
+	b	LBB96_5
+LBB96_31:                               ; %B24
 	mov	x0, x21
 	mov	x1, x24
 	bl	_prim_WriteBarrierNoStore
@@ -4367,13 +4432,13 @@ l_define_var_0_asm_h:                   ; @define_var_0_asm_h
 	mov	x0, x24
 	str	x20, [x23, #48]
 	bl	_JS_DefineGlobalVar_GC
-	tbnz	w0, #31, LBB94_2
+	tbnz	w0, #31, LBB97_2
 ; %bb.1:                                ; %B3
 	ldrb	w8, [x19, #5]
 	add	x19, x19, #6
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB94_2:                                ; %B2
+LBB97_2:                                ; %B2
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function check_define_var_0_asm_h
@@ -4384,13 +4449,13 @@ l_check_define_var_0_asm_h:             ; @check_define_var_0_asm_h
 	mov	x0, x24
 	str	x20, [x23, #48]
 	bl	_JS_CheckDefineGlobalVar_GC
-	tbnz	w0, #31, LBB95_2
+	tbnz	w0, #31, LBB98_2
 ; %bb.1:                                ; %B3
 	ldrb	w8, [x19, #5]
 	add	x19, x19, #6
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB95_2:                                ; %B2
+LBB98_2:                                ; %B2
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function define_func_0_asm_h
@@ -4403,14 +4468,14 @@ l_define_func_0_asm_h:                  ; @define_func_0_asm_h
 	str	x20, [x23, #48]
 	mov	x2, x22
 	bl	_JS_DefineGlobalFunction_GC
-	tbnz	w0, #31, LBB96_2
+	tbnz	w0, #31, LBB99_2
 ; %bb.1:                                ; %B3
 	ldrb	w8, [x19, #5]
 	sub	x20, x20, #8
 	add	x19, x19, #6
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB96_2:                                ; %B2
+LBB99_2:                                ; %B2
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function get_field_0_asm_h
@@ -4421,13 +4486,13 @@ l_get_field_0_asm_h:                    ; @get_field_0_asm_h
 	ldr	w2, [x19]
 	movk	x8, #65535, lsl #48
 	tst	x22, x8
-	b.ne	LBB97_10
+	b.ne	LBB100_10
 ; %bb.1:                                ; %B25
 	mov	x9, x22
 	mov	w8, #18                         ; =0x12
-LBB97_2:                                ; %B19
+LBB100_2:                               ; %B19
                                         ; =>This Loop Header: Depth=1
-                                        ;     Child Loop BB97_3 Depth 2
+                                        ;     Child Loop BB100_3 Depth 2
 	ldr	x10, [x9, #8]
 	ldr	w11, [x10, #12]
 	add	x13, x10, #64
@@ -4436,41 +4501,41 @@ LBB97_2:                                ; %B19
 	ldr	w10, [x13, w10, sxtw #2]
 	add	w11, w12, #4
 	add	x11, x13, x11
-	cbz	w10, LBB97_5
-LBB97_3:                                ; %B1
-                                        ;   Parent Loop BB97_2 Depth=1
+	cbz	w10, LBB100_5
+LBB100_3:                               ; %B1
+                                        ;   Parent Loop BB100_2 Depth=1
                                         ; =>  This Inner Loop Header: Depth=2
 	lsl	w12, w10, #3
 	sub	w12, w12, #8
 	add	x12, x11, x12
 	ldp	w12, w13, [x12]
 	cmp	w13, w2
-	b.eq	LBB97_7
+	b.eq	LBB100_7
 ; %bb.4:                                ; %B9
-                                        ;   in Loop: Header=BB97_3 Depth=2
+                                        ;   in Loop: Header=BB100_3 Depth=2
 	and	w10, w12, #0x3ffffff
-	cbnz	w10, LBB97_3
-LBB97_5:                                ; %B14
-                                        ;   in Loop: Header=BB97_2 Depth=1
+	cbnz	w10, LBB100_3
+LBB100_5:                               ; %B14
+                                        ;   in Loop: Header=BB100_2 Depth=1
 	ldr	w10, [x9, #4]
 	ubfx	w10, w10, #10, #1
 	cmp	w10, #1
-	b.eq	LBB97_10
+	b.eq	LBB100_10
 ; %bb.6:                                ; %B17
-                                        ;   in Loop: Header=BB97_2 Depth=1
+                                        ;   in Loop: Header=BB100_2 Depth=1
 	ldr	x9, [x9, #8]
 	ldr	x9, [x9, #32]
-	cbnz	x9, LBB97_2
-	b	LBB97_9
-LBB97_7:                                ; %B3
+	cbnz	x9, LBB100_2
+	b	LBB100_9
+LBB100_7:                               ; %B3
 	lsr	w8, w12, #26
 	tst	w8, #0x30
-	b.ne	LBB97_10
+	b.ne	LBB100_10
 ; %bb.8:                                ; %B4
 	ldr	x8, [x9, #16]
 	sub	w9, w10, #1
 	ldr	x8, [x8, w9, sxtw #3]
-LBB97_9:                                ; %B6
+LBB100_9:                               ; %B6
 	ldrb	w9, [x19, #4]
 	sub	x20, x20, #8
 	add	x19, x19, #5
@@ -4478,7 +4543,7 @@ LBB97_9:                                ; %B6
 	add	w9, w9, #243
 	ldr	x1, [x25, w9, uxtw #3]
 	br	x1
-LBB97_10:                               ; %B21
+LBB100_10:                              ; %B21
 	mov	x0, x24
 	mov	x1, x22
 	mov	x3, x22
@@ -4486,7 +4551,7 @@ LBB97_10:                               ; %B21
 	str	x20, [x23, #48]
 	bl	_JS_GetPropertyInternalImpl_GC
 	cmp	x0, #130
-	b.eq	LBB97_12
+	b.eq	LBB100_12
 ; %bb.11:                               ; %B23
 	ldrb	w8, [x19, #4]
 	sub	x20, x20, #8
@@ -4495,7 +4560,7 @@ LBB97_10:                               ; %B21
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB97_12:                               ; %B22
+LBB100_12:                              ; %B22
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function get_field2_0_asm_h
@@ -4506,13 +4571,13 @@ l_get_field2_0_asm_h:                   ; @get_field2_0_asm_h
 	ldr	w2, [x19]
 	movk	x8, #65535, lsl #48
 	tst	x22, x8
-	b.ne	LBB98_10
+	b.ne	LBB101_10
 ; %bb.1:                                ; %B25
 	mov	x9, x22
 	mov	w8, #18                         ; =0x12
-LBB98_2:                                ; %B19
+LBB101_2:                               ; %B19
                                         ; =>This Loop Header: Depth=1
-                                        ;     Child Loop BB98_3 Depth 2
+                                        ;     Child Loop BB101_3 Depth 2
 	ldr	x10, [x9, #8]
 	ldr	w11, [x10, #12]
 	add	x13, x10, #64
@@ -4521,41 +4586,41 @@ LBB98_2:                                ; %B19
 	ldr	w10, [x13, w10, sxtw #2]
 	add	w11, w12, #4
 	add	x11, x13, x11
-	cbz	w10, LBB98_5
-LBB98_3:                                ; %B1
-                                        ;   Parent Loop BB98_2 Depth=1
+	cbz	w10, LBB101_5
+LBB101_3:                               ; %B1
+                                        ;   Parent Loop BB101_2 Depth=1
                                         ; =>  This Inner Loop Header: Depth=2
 	lsl	w12, w10, #3
 	sub	w12, w12, #8
 	add	x12, x11, x12
 	ldp	w12, w13, [x12]
 	cmp	w13, w2
-	b.eq	LBB98_7
+	b.eq	LBB101_7
 ; %bb.4:                                ; %B9
-                                        ;   in Loop: Header=BB98_3 Depth=2
+                                        ;   in Loop: Header=BB101_3 Depth=2
 	and	w10, w12, #0x3ffffff
-	cbnz	w10, LBB98_3
-LBB98_5:                                ; %B14
-                                        ;   in Loop: Header=BB98_2 Depth=1
+	cbnz	w10, LBB101_3
+LBB101_5:                               ; %B14
+                                        ;   in Loop: Header=BB101_2 Depth=1
 	ldr	w10, [x9, #4]
 	ubfx	w10, w10, #10, #1
 	cmp	w10, #1
-	b.eq	LBB98_10
+	b.eq	LBB101_10
 ; %bb.6:                                ; %B17
-                                        ;   in Loop: Header=BB98_2 Depth=1
+                                        ;   in Loop: Header=BB101_2 Depth=1
 	ldr	x9, [x9, #8]
 	ldr	x9, [x9, #32]
-	cbnz	x9, LBB98_2
-	b	LBB98_9
-LBB98_7:                                ; %B3
+	cbnz	x9, LBB101_2
+	b	LBB101_9
+LBB101_7:                               ; %B3
 	lsr	w8, w12, #26
 	tst	w8, #0x30
-	b.ne	LBB98_10
+	b.ne	LBB101_10
 ; %bb.8:                                ; %B4
 	ldr	x8, [x9, #16]
 	sub	w9, w10, #1
 	ldr	x8, [x8, w9, sxtw #3]
-LBB98_9:                                ; %B6
+LBB101_9:                               ; %B6
 	ldrb	w9, [x19, #4]
 	sub	x20, x20, #8
 	add	x19, x19, #5
@@ -4563,7 +4628,7 @@ LBB98_9:                                ; %B6
 	add	w9, w9, #486
 	ldr	x1, [x25, w9, uxtw #3]
 	br	x1
-LBB98_10:                               ; %B21
+LBB101_10:                              ; %B21
 	mov	x0, x24
 	mov	x1, x22
 	mov	x3, x22
@@ -4571,7 +4636,7 @@ LBB98_10:                               ; %B21
 	str	x20, [x23, #48]
 	bl	_JS_GetPropertyInternalImpl_GC
 	cmp	x0, #130
-	b.eq	LBB98_12
+	b.eq	LBB101_12
 ; %bb.11:                               ; %B23
 	ldrb	w8, [x19, #4]
 	sub	x20, x20, #8
@@ -4580,7 +4645,7 @@ LBB98_10:                               ; %B21
 	add	w8, w8, #486
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB98_12:                               ; %B22
+LBB101_12:                              ; %B22
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function put_field_0_asm_h
@@ -4591,7 +4656,7 @@ l_put_field_0_asm_h:                    ; @put_field_0_asm_h
 	movk	x8, #65535, lsl #48
 	ldr	w2, [x19]
 	tst	x22, x8
-	b.ne	LBB99_18
+	b.ne	LBB102_18
 ; %bb.1:                                ; %B56
 	ldr	x8, [x22, #8]
 	ldr	w9, [x8, #12]
@@ -4601,24 +4666,24 @@ l_put_field_0_asm_h:                    ; @put_field_0_asm_h
 	ldr	w8, [x11, w8, sxtw #2]
 	add	w9, w10, #4
 	add	x9, x11, x9
-	cbz	w8, LBB99_4
-LBB99_2:                                ; %B1
+	cbz	w8, LBB102_4
+LBB102_2:                               ; %B1
                                         ; =>This Inner Loop Header: Depth=1
 	lsl	w10, w8, #3
 	sub	w10, w10, #8
 	add	x10, x9, x10
 	ldp	w10, w11, [x10]
 	cmp	w11, w2
-	b.eq	LBB99_10
+	b.eq	LBB102_10
 ; %bb.3:                                ; %B12
-                                        ;   in Loop: Header=BB99_2 Depth=1
+                                        ;   in Loop: Header=BB102_2 Depth=1
 	and	w8, w10, #0x3ffffff
-	cbnz	w8, LBB99_2
-LBB99_4:                                ; %B17.preheader
+	cbnz	w8, LBB102_2
+LBB102_4:                               ; %B17.preheader
 	mov	x8, x22
-LBB99_5:                                ; %B17
+LBB102_5:                               ; %B17
                                         ; =>This Loop Header: Depth=1
-                                        ;     Child Loop BB99_6 Depth 2
+                                        ;     Child Loop BB102_6 Depth 2
 	ldr	x9, [x8, #8]
 	ldr	w10, [x9, #12]
 	add	x9, x9, #64
@@ -4627,69 +4692,69 @@ LBB99_5:                                ; %B17
 	ldr	w10, [x9, w10, sxtw #2]
 	add	w11, w11, #4
 	add	x9, x9, x11
-	cbz	w10, LBB99_8
-LBB99_6:                                ; %B18
-                                        ;   Parent Loop BB99_5 Depth=1
+	cbz	w10, LBB102_8
+LBB102_6:                               ; %B18
+                                        ;   Parent Loop BB102_5 Depth=1
                                         ; =>  This Inner Loop Header: Depth=2
 	lsl	w10, w10, #3
 	sub	w10, w10, #8
 	add	x10, x9, x10
 	ldp	w10, w11, [x10]
 	cmp	w11, w2
-	b.eq	LBB99_13
+	b.eq	LBB102_13
 ; %bb.7:                                ; %B34
-                                        ;   in Loop: Header=BB99_6 Depth=2
+                                        ;   in Loop: Header=BB102_6 Depth=2
 	and	w10, w10, #0x3ffffff
-	cbnz	w10, LBB99_6
-LBB99_8:                                ; %B41
-                                        ;   in Loop: Header=BB99_5 Depth=1
+	cbnz	w10, LBB102_6
+LBB102_8:                               ; %B41
+                                        ;   in Loop: Header=BB102_5 Depth=1
 	ldr	w9, [x8, #4]
 	ubfx	w9, w9, #10, #1
 	cmp	w9, #1
-	b.eq	LBB99_18
+	b.eq	LBB102_18
 ; %bb.9:                                ; %B38
-                                        ;   in Loop: Header=BB99_5 Depth=1
+                                        ;   in Loop: Header=BB102_5 Depth=1
 	ldr	x8, [x8, #8]
 	ldr	x8, [x8, #32]
-	cbnz	x8, LBB99_5
-	b	LBB99_14
-LBB99_10:                               ; %B3
+	cbnz	x8, LBB102_5
+	b	LBB102_14
+LBB102_10:                              ; %B3
 	mov	w9, #58                         ; =0x3a
 	and	w9, w9, w10, lsr #26
 	cmp	w9, #2
-	b.ne	LBB99_18
+	b.ne	LBB102_18
 ; %bb.11:                               ; %B7
 	ldr	x9, [x22, #16]
 	sub	w8, w8, #1
 	str	x21, [x9, w8, sxtw #3]
 	ldrb	w8, [x24, #384]
-	cbnz	w8, LBB99_22
-LBB99_12:                               ; %B48
+	cbnz	w8, LBB102_22
+LBB102_12:                              ; %B48
 	ldrb	w8, [x19, #4]
 	sub	x20, x20, #16
 	add	x19, x19, #5
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB99_13:                               ; %B20
+LBB102_13:                              ; %B20
 	mov	w8, #58                         ; =0x3a
 	and	w8, w8, w10, lsr #26
 	cmp	w8, #2
-	b.ne	LBB99_18
-LBB99_14:                               ; %B23
+	b.ne	LBB102_18
+LBB102_14:                              ; %B23
 	ldr	w8, [x22, #4]
 	ubfx	w8, w8, #8, #1
 	cmp	w8, #1
-	b.ne	LBB99_18
+	b.ne	LBB102_18
 ; %bb.15:                               ; %B25
 	ldrh	w8, [x22, #6]
 	cmp	w8, #1
-	b.ne	LBB99_20
+	b.ne	LBB102_20
 ; %bb.16:                               ; %B25
-	tbnz	w2, #31, LBB99_20
+	tbnz	w2, #31, LBB102_20
 ; %bb.17:                               ; %B31
 	mov	x0, x2
 	b	l_FastAddNamedProperty_asm_h
-LBB99_18:                               ; %B52
+LBB102_18:                              ; %B52
 	mov	x0, x24
 	mov	x1, x22
 	mov	x3, x21
@@ -4697,22 +4762,22 @@ LBB99_18:                               ; %B52
 	str	x20, [x23, #48]
                                         ; kill: def $w2 killed $w2 killed $x2
 	bl	_JS_SetPropertyInternalImpl_GC
-	tbz	w0, #31, LBB99_12
+	tbz	w0, #31, LBB102_12
 ; %bb.19:                               ; %B53
 	b	l_exception_asm_h
-LBB99_20:                               ; %B45
+LBB102_20:                              ; %B45
 	mov	x0, x24
 	mov	x1, x22
 	mov	w3, #7                          ; =0x7
 	str	x20, [x23, #48]
                                         ; kill: def $w2 killed $w2 killed $x2
 	bl	_add_property_gc
-	cbz	x0, LBB99_23
+	cbz	x0, LBB102_23
 ; %bb.21:                               ; %B49
 	str	x21, [x0]
 	ldrb	w8, [x24, #384]
-	cbz	w8, LBB99_12
-LBB99_22:                               ; %B51
+	cbz	w8, LBB102_12
+LBB102_22:                              ; %B51
 	mov	x0, x21
 	mov	x1, x24
 	bl	_prim_WriteBarrierNoStore
@@ -4721,7 +4786,7 @@ LBB99_22:                               ; %B51
 	add	x19, x19, #5
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB99_23:                               ; %B46
+LBB102_23:                              ; %B46
 	sub	x20, x20, #16
 	b	l_exception_asm_h
                                         ; -- End function
@@ -4735,7 +4800,7 @@ l_get_private_field_0_asm_h:            ; @get_private_field_0_asm_h
 	mov	x2, x21
 	bl	_JS_GetPrivateField_GC
 	cmp	x0, #130
-	b.eq	LBB100_2
+	b.eq	LBB103_2
 ; %bb.1:                                ; %B3
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #16
@@ -4743,7 +4808,7 @@ l_get_private_field_0_asm_h:            ; @get_private_field_0_asm_h
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB100_2:                               ; %B2
+LBB103_2:                               ; %B2
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function put_private_field_0_asm_h
@@ -4756,13 +4821,13 @@ l_put_private_field_0_asm_h:            ; @put_private_field_0_asm_h
 	mov	x2, x21
 	mov	x3, x22
 	bl	_JS_SetPrivateField_GC
-	tbnz	w0, #31, LBB101_2
+	tbnz	w0, #31, LBB104_2
 ; %bb.1:                                ; %B3
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #24
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB101_2:                               ; %B2
+LBB104_2:                               ; %B2
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function define_private_field_0_asm_h
@@ -4775,13 +4840,13 @@ l_define_private_field_0_asm_h:         ; @define_private_field_0_asm_h
 	mov	x2, x22
 	mov	x3, x21
 	bl	_JS_DefinePrivateField_GC
-	tbnz	w0, #31, LBB102_2
+	tbnz	w0, #31, LBB105_2
 ; %bb.1:                                ; %B3
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #16
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB102_2:                               ; %B2
+LBB105_2:                               ; %B2
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function get_array_el_0_asm_h
@@ -4791,19 +4856,19 @@ l_get_array_el_0_asm_h:                 ; @get_array_el_0_asm_h
 	mov	x8, #2                          ; =0x2
 	movk	x8, #65535, lsl #48
 	tst	x22, x8
-	b.ne	LBB103_12
+	b.ne	LBB106_12
 ; %bb.1:                                ; %B73
 	mov	w9, #65534                      ; =0xfffe
 	ldrh	w8, [x22, #6]
 	cmp	x9, x21, lsr #48
-	b.ne	LBB103_5
+	b.ne	LBB106_5
 ; %bb.2:                                ; %B1
 	cmp	w8, #2
-	b.ne	LBB103_10
+	b.ne	LBB106_10
 ; %bb.3:                                ; %B3
 	ldr	w8, [x22, #48]
 	cmp	w21, w8
-	b.hs	LBB103_14
+	b.hs	LBB106_14
 ; %bb.4:                                ; %B4
 	ldrb	w8, [x19], #1
 	ldr	x9, [x22, #40]
@@ -4812,42 +4877,42 @@ l_get_array_el_0_asm_h:                 ; @get_array_el_0_asm_h
 	ldr	x22, [x9, w21, sxtw #3]
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB103_5:                               ; %B33
+LBB106_5:                               ; %B33
 	cmp	w8, #1
-	b.ne	LBB103_12
+	b.ne	LBB106_12
 ; %bb.6:                                ; %B36
 	ldr	w8, [x22, #4]
 	ubfx	w8, w8, #10, #1
 	cmp	w8, #1
-	b.eq	LBB103_12
+	b.eq	LBB106_12
 ; %bb.7:                                ; %B36
 	mov	x9, #2                          ; =0x2
 	and	x8, x21, #0xffff000000000003
 	movk	x9, #1, lsl #48
 	cmp	x8, x9
-	b.ne	LBB103_12
+	b.ne	LBB106_12
 ; %bb.8:                                ; %B65
 	and	x1, x21, #0xfffffffffffc
 	ldrb	w8, [x1, #7]
-	tbnz	w8, #6, LBB103_24
+	tbnz	w8, #6, LBB106_24
 ; %bb.9:                                ; %B68
 	ldr	w8, [x1, #8]
-	b	LBB103_25
-LBB103_10:                              ; %B30
+	b	LBB106_25
+LBB106_10:                              ; %B30
 	sxth	w8, w8
 	cmp	w8, #21
-	b.lt	LBB103_12
+	b.lt	LBB106_12
 ; %bb.11:                               ; %B30
 	cmp	w8, #29
-	b.le	LBB103_33
-LBB103_12:                              ; %B70
+	b.le	LBB106_33
+LBB106_12:                              ; %B70
 	mov	x0, x24
 	mov	x1, x22
 	mov	x2, x21
 	str	x20, [x23, #48]
 	bl	_JS_GetPropertyValue_GC
 	cmp	x0, #130
-	b.eq	LBB103_34
+	b.eq	LBB106_34
 ; %bb.13:                               ; %B72
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #16
@@ -4855,14 +4920,14 @@ LBB103_12:                              ; %B70
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB103_14:                              ; %B7
-	tbnz	w21, #31, LBB103_12
+LBB106_14:                              ; %B7
+	tbnz	w21, #31, LBB106_12
 ; %bb.15:                               ; %B9.preheader
 	mov	x9, x22
 	mov	w8, #18                         ; =0x12
-LBB103_16:                              ; %B9
+LBB106_16:                              ; %B9
                                         ; =>This Loop Header: Depth=1
-                                        ;     Child Loop BB103_17 Depth 2
+                                        ;     Child Loop BB106_17 Depth 2
 	ldr	x11, [x9, #8]
 	orr	w10, w21, #0x80000000
 	ldr	w12, [x11, #12]
@@ -4872,64 +4937,64 @@ LBB103_16:                              ; %B9
 	ldr	w11, [x14, w11, sxtw #2]
 	add	w12, w13, #4
 	add	x12, x14, x12
-	cbz	w11, LBB103_19
-LBB103_17:                              ; %B10
-                                        ;   Parent Loop BB103_16 Depth=1
+	cbz	w11, LBB106_19
+LBB106_17:                              ; %B10
+                                        ;   Parent Loop BB106_16 Depth=1
                                         ; =>  This Inner Loop Header: Depth=2
 	lsl	w13, w11, #3
 	sub	w13, w13, #8
 	add	x13, x12, x13
 	ldp	w13, w14, [x13]
 	cmp	w14, w10
-	b.eq	LBB103_21
+	b.eq	LBB106_21
 ; %bb.18:                               ; %B17
-                                        ;   in Loop: Header=BB103_17 Depth=2
+                                        ;   in Loop: Header=BB106_17 Depth=2
 	and	w11, w13, #0x3ffffff
-	cbnz	w11, LBB103_17
-LBB103_19:                              ; %B24
-                                        ;   in Loop: Header=BB103_16 Depth=1
+	cbnz	w11, LBB106_17
+LBB106_19:                              ; %B24
+                                        ;   in Loop: Header=BB106_16 Depth=1
 	ldr	w10, [x9, #4]
 	ubfx	w10, w10, #10, #1
 	cmp	w10, #1
-	b.eq	LBB103_12
+	b.eq	LBB106_12
 ; %bb.20:                               ; %B21
-                                        ;   in Loop: Header=BB103_16 Depth=1
+                                        ;   in Loop: Header=BB106_16 Depth=1
 	ldr	x9, [x9, #8]
 	ldr	x9, [x9, #32]
-	cbnz	x9, LBB103_16
-	b	LBB103_23
-LBB103_21:                              ; %B12
+	cbnz	x9, LBB106_16
+	b	LBB106_23
+LBB106_21:                              ; %B12
 	lsr	w8, w13, #26
 	tst	w8, #0x30
-	b.ne	LBB103_12
+	b.ne	LBB106_12
 ; %bb.22:                               ; %B13
 	ldr	x8, [x9, #16]
 	sub	w9, w11, #1
 	ldr	x8, [x8, w9, sxtw #3]
-LBB103_23:                              ; %B51
+LBB106_23:                              ; %B51
 	ldrb	w9, [x19], #1
 	sub	x20, x20, #16
 	mov	x22, x8
 	add	w9, w9, #243
 	ldr	x1, [x25, w9, uxtw #3]
 	br	x1
-LBB103_24:                              ; %B66
+LBB106_24:                              ; %B66
 	ldr	x8, [x1, #8]
 	ldr	w8, [x8]
-LBB103_25:                              ; %B62
+LBB106_25:                              ; %B62
 	asr	w8, w8, #30
 	cmp	w8, #1
-	b.ne	LBB103_12
+	b.ne	LBB106_12
 ; %bb.26:                               ; %B41
 	ldr	x0, [x24, #8]
 	bl	_prim_get_interned_non_index_atom
-	cbz	w0, LBB103_12
+	cbz	w0, LBB106_12
 ; %bb.27:                               ; %B44.preheader
 	mov	x9, x22
 	mov	w8, #18                         ; =0x12
-LBB103_28:                              ; %B44
+LBB106_28:                              ; %B44
                                         ; =>This Loop Header: Depth=1
-                                        ;     Child Loop BB103_29 Depth 2
+                                        ;     Child Loop BB106_29 Depth 2
 	ldr	x10, [x9, #8]
 	ldr	w11, [x10, #12]
 	add	x13, x10, #64
@@ -4938,41 +5003,41 @@ LBB103_28:                              ; %B44
 	ldr	w10, [x13, w10, sxtw #2]
 	add	w11, w12, #4
 	add	x11, x13, x11
-	cbz	w10, LBB103_31
-LBB103_29:                              ; %B47
-                                        ;   Parent Loop BB103_28 Depth=1
+	cbz	w10, LBB106_31
+LBB106_29:                              ; %B47
+                                        ;   Parent Loop BB106_28 Depth=1
                                         ; =>  This Inner Loop Header: Depth=2
 	lsl	w12, w10, #3
 	sub	w12, w12, #8
 	add	x12, x11, x12
 	ldp	w12, w13, [x12]
 	cmp	w13, w0
-	b.eq	LBB103_35
+	b.eq	LBB106_35
 ; %bb.30:                               ; %B53
-                                        ;   in Loop: Header=BB103_29 Depth=2
+                                        ;   in Loop: Header=BB106_29 Depth=2
 	and	w10, w12, #0x3ffffff
-	cbnz	w10, LBB103_29
-LBB103_31:                              ; %B58
-                                        ;   in Loop: Header=BB103_28 Depth=1
+	cbnz	w10, LBB106_29
+LBB106_31:                              ; %B58
+                                        ;   in Loop: Header=BB106_28 Depth=1
 	ldr	w10, [x9, #4]
 	ubfx	w10, w10, #10, #1
 	cmp	w10, #1
-	b.eq	LBB103_12
+	b.eq	LBB106_12
 ; %bb.32:                               ; %B55
-                                        ;   in Loop: Header=BB103_28 Depth=1
+                                        ;   in Loop: Header=BB106_28 Depth=1
 	ldr	x9, [x9, #8]
 	ldr	x9, [x9, #32]
-	cbnz	x9, LBB103_28
-	b	LBB103_23
-LBB103_33:                              ; %B31
+	cbnz	x9, LBB106_28
+	b	LBB106_23
+LBB106_33:                              ; %B31
 	mov	x0, xzr
 	b	l_FastTypedArrayGet_asm_h
-LBB103_34:                              ; %B71
+LBB106_34:                              ; %B71
 	b	l_exception_asm_h
-LBB103_35:                              ; %B49
+LBB106_35:                              ; %B49
 	lsr	w8, w12, #26
 	tst	w8, #0x30
-	b.ne	LBB103_12
+	b.ne	LBB106_12
 ; %bb.36:                               ; %B50
 	ldr	x8, [x9, #16]
 	sub	w9, w10, #1
@@ -4991,19 +5056,19 @@ l_get_array_el2_0_asm_h:                ; @get_array_el2_0_asm_h
 	mov	x8, #2                          ; =0x2
 	movk	x8, #65535, lsl #48
 	tst	x22, x8
-	b.ne	LBB104_12
+	b.ne	LBB107_12
 ; %bb.1:                                ; %B73
 	mov	w9, #65534                      ; =0xfffe
 	ldrh	w8, [x22, #6]
 	cmp	x9, x21, lsr #48
-	b.ne	LBB104_5
+	b.ne	LBB107_5
 ; %bb.2:                                ; %B1
 	cmp	w8, #2
-	b.ne	LBB104_10
+	b.ne	LBB107_10
 ; %bb.3:                                ; %B3
 	ldr	w8, [x22, #48]
 	cmp	w21, w8
-	b.hs	LBB104_14
+	b.hs	LBB107_14
 ; %bb.4:                                ; %B4
 	ldrb	w8, [x19], #1
 	ldr	x9, [x22, #40]
@@ -5012,42 +5077,42 @@ l_get_array_el2_0_asm_h:                ; @get_array_el2_0_asm_h
 	ldr	x21, [x9, w21, sxtw #3]
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB104_5:                               ; %B33
+LBB107_5:                               ; %B33
 	cmp	w8, #1
-	b.ne	LBB104_12
+	b.ne	LBB107_12
 ; %bb.6:                                ; %B36
 	ldr	w8, [x22, #4]
 	ubfx	w8, w8, #10, #1
 	cmp	w8, #1
-	b.eq	LBB104_12
+	b.eq	LBB107_12
 ; %bb.7:                                ; %B36
 	mov	x9, #2                          ; =0x2
 	and	x8, x21, #0xffff000000000003
 	movk	x9, #1, lsl #48
 	cmp	x8, x9
-	b.ne	LBB104_12
+	b.ne	LBB107_12
 ; %bb.8:                                ; %B65
 	and	x1, x21, #0xfffffffffffc
 	ldrb	w8, [x1, #7]
-	tbnz	w8, #6, LBB104_24
+	tbnz	w8, #6, LBB107_24
 ; %bb.9:                                ; %B68
 	ldr	w8, [x1, #8]
-	b	LBB104_25
-LBB104_10:                              ; %B30
+	b	LBB107_25
+LBB107_10:                              ; %B30
 	sxth	w8, w8
 	cmp	w8, #21
-	b.lt	LBB104_12
+	b.lt	LBB107_12
 ; %bb.11:                               ; %B30
 	cmp	w8, #29
-	b.le	LBB104_33
-LBB104_12:                              ; %B70
+	b.le	LBB107_33
+LBB107_12:                              ; %B70
 	mov	x0, x24
 	mov	x1, x22
 	mov	x2, x21
 	str	x20, [x23, #48]
 	bl	_JS_GetPropertyValue_GC
 	cmp	x0, #130
-	b.eq	LBB104_34
+	b.eq	LBB107_34
 ; %bb.13:                               ; %B72
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #16
@@ -5055,14 +5120,14 @@ LBB104_12:                              ; %B70
 	add	w8, w8, #486
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB104_14:                              ; %B7
-	tbnz	w21, #31, LBB104_12
+LBB107_14:                              ; %B7
+	tbnz	w21, #31, LBB107_12
 ; %bb.15:                               ; %B9.preheader
 	mov	x9, x22
 	mov	w8, #18                         ; =0x12
-LBB104_16:                              ; %B9
+LBB107_16:                              ; %B9
                                         ; =>This Loop Header: Depth=1
-                                        ;     Child Loop BB104_17 Depth 2
+                                        ;     Child Loop BB107_17 Depth 2
 	ldr	x11, [x9, #8]
 	orr	w10, w21, #0x80000000
 	ldr	w12, [x11, #12]
@@ -5072,64 +5137,64 @@ LBB104_16:                              ; %B9
 	ldr	w11, [x14, w11, sxtw #2]
 	add	w12, w13, #4
 	add	x12, x14, x12
-	cbz	w11, LBB104_19
-LBB104_17:                              ; %B10
-                                        ;   Parent Loop BB104_16 Depth=1
+	cbz	w11, LBB107_19
+LBB107_17:                              ; %B10
+                                        ;   Parent Loop BB107_16 Depth=1
                                         ; =>  This Inner Loop Header: Depth=2
 	lsl	w13, w11, #3
 	sub	w13, w13, #8
 	add	x13, x12, x13
 	ldp	w13, w14, [x13]
 	cmp	w14, w10
-	b.eq	LBB104_21
+	b.eq	LBB107_21
 ; %bb.18:                               ; %B17
-                                        ;   in Loop: Header=BB104_17 Depth=2
+                                        ;   in Loop: Header=BB107_17 Depth=2
 	and	w11, w13, #0x3ffffff
-	cbnz	w11, LBB104_17
-LBB104_19:                              ; %B24
-                                        ;   in Loop: Header=BB104_16 Depth=1
+	cbnz	w11, LBB107_17
+LBB107_19:                              ; %B24
+                                        ;   in Loop: Header=BB107_16 Depth=1
 	ldr	w10, [x9, #4]
 	ubfx	w10, w10, #10, #1
 	cmp	w10, #1
-	b.eq	LBB104_12
+	b.eq	LBB107_12
 ; %bb.20:                               ; %B21
-                                        ;   in Loop: Header=BB104_16 Depth=1
+                                        ;   in Loop: Header=BB107_16 Depth=1
 	ldr	x9, [x9, #8]
 	ldr	x9, [x9, #32]
-	cbnz	x9, LBB104_16
-	b	LBB104_23
-LBB104_21:                              ; %B12
+	cbnz	x9, LBB107_16
+	b	LBB107_23
+LBB107_21:                              ; %B12
 	lsr	w8, w13, #26
 	tst	w8, #0x30
-	b.ne	LBB104_12
+	b.ne	LBB107_12
 ; %bb.22:                               ; %B13
 	ldr	x8, [x9, #16]
 	sub	w9, w11, #1
 	ldr	x8, [x8, w9, sxtw #3]
-LBB104_23:                              ; %B51
+LBB107_23:                              ; %B51
 	ldrb	w9, [x19], #1
 	sub	x20, x20, #16
 	mov	x21, x8
 	add	w9, w9, #486
 	ldr	x1, [x25, w9, uxtw #3]
 	br	x1
-LBB104_24:                              ; %B66
+LBB107_24:                              ; %B66
 	ldr	x8, [x1, #8]
 	ldr	w8, [x8]
-LBB104_25:                              ; %B62
+LBB107_25:                              ; %B62
 	asr	w8, w8, #30
 	cmp	w8, #1
-	b.ne	LBB104_12
+	b.ne	LBB107_12
 ; %bb.26:                               ; %B41
 	ldr	x0, [x24, #8]
 	bl	_prim_get_interned_non_index_atom
-	cbz	w0, LBB104_12
+	cbz	w0, LBB107_12
 ; %bb.27:                               ; %B44.preheader
 	mov	x9, x22
 	mov	w8, #18                         ; =0x12
-LBB104_28:                              ; %B44
+LBB107_28:                              ; %B44
                                         ; =>This Loop Header: Depth=1
-                                        ;     Child Loop BB104_29 Depth 2
+                                        ;     Child Loop BB107_29 Depth 2
 	ldr	x10, [x9, #8]
 	ldr	w11, [x10, #12]
 	add	x13, x10, #64
@@ -5138,41 +5203,41 @@ LBB104_28:                              ; %B44
 	ldr	w10, [x13, w10, sxtw #2]
 	add	w11, w12, #4
 	add	x11, x13, x11
-	cbz	w10, LBB104_31
-LBB104_29:                              ; %B47
-                                        ;   Parent Loop BB104_28 Depth=1
+	cbz	w10, LBB107_31
+LBB107_29:                              ; %B47
+                                        ;   Parent Loop BB107_28 Depth=1
                                         ; =>  This Inner Loop Header: Depth=2
 	lsl	w12, w10, #3
 	sub	w12, w12, #8
 	add	x12, x11, x12
 	ldp	w12, w13, [x12]
 	cmp	w13, w0
-	b.eq	LBB104_35
+	b.eq	LBB107_35
 ; %bb.30:                               ; %B53
-                                        ;   in Loop: Header=BB104_29 Depth=2
+                                        ;   in Loop: Header=BB107_29 Depth=2
 	and	w10, w12, #0x3ffffff
-	cbnz	w10, LBB104_29
-LBB104_31:                              ; %B58
-                                        ;   in Loop: Header=BB104_28 Depth=1
+	cbnz	w10, LBB107_29
+LBB107_31:                              ; %B58
+                                        ;   in Loop: Header=BB107_28 Depth=1
 	ldr	w10, [x9, #4]
 	ubfx	w10, w10, #10, #1
 	cmp	w10, #1
-	b.eq	LBB104_12
+	b.eq	LBB107_12
 ; %bb.32:                               ; %B55
-                                        ;   in Loop: Header=BB104_28 Depth=1
+                                        ;   in Loop: Header=BB107_28 Depth=1
 	ldr	x9, [x9, #8]
 	ldr	x9, [x9, #32]
-	cbnz	x9, LBB104_28
-	b	LBB104_23
-LBB104_33:                              ; %B31
+	cbnz	x9, LBB107_28
+	b	LBB107_23
+LBB107_33:                              ; %B31
 	mov	w0, #1                          ; =0x1
 	b	l_FastTypedArrayGet_asm_h
-LBB104_34:                              ; %B71
+LBB107_34:                              ; %B71
 	b	l_exception_asm_h
-LBB104_35:                              ; %B49
+LBB107_35:                              ; %B49
 	lsr	w8, w12, #26
 	tst	w8, #0x30
-	b.ne	LBB104_12
+	b.ne	LBB107_12
 ; %bb.36:                               ; %B50
 	ldr	x8, [x9, #16]
 	sub	w9, w10, #1
@@ -5193,111 +5258,111 @@ l_put_array_el_0_asm_h:                 ; @put_array_el_0_asm_h
 	movk	x8, #65535, lsl #48
 	ldur	x21, [x20, #-8]
 	tst	x11, x8
-	b.ne	LBB105_45
+	b.ne	LBB108_45
 ; %bb.1:                                ; %B1
 	mov	w9, #65534                      ; =0xfffe
 	ldrh	w8, [x11, #6]
 	cmp	x9, x22, lsr #48
-	b.ne	LBB105_7
+	b.ne	LBB108_7
 ; %bb.2:                                ; %B3
 	cmp	w8, #2
-	b.ne	LBB105_12
+	b.ne	LBB108_12
 ; %bb.3:                                ; %B5
 	mov	w8, #65534                      ; =0xfffe
 	cmp	x8, x22, lsr #48
-	b.ne	LBB105_45
+	b.ne	LBB108_45
 ; %bb.4:                                ; %B50
 	ldr	w8, [x11, #48]
 	cmp	w22, w8
-	b.hs	LBB105_15
+	b.hs	LBB108_15
 ; %bb.5:                                ; %B7
 	ldr	x8, [x11, #40]
 	str	x21, [x8, w22, sxtw #3]
 	ldrb	w8, [x24, #384]
-	cbnz	w8, LBB105_24
+	cbnz	w8, LBB108_24
 ; %bb.6:                                ; %B9
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #24
 	ldr	x1, [x25, x8, lsl #3]
 	add	sp, sp, #16
 	br	x1
-LBB105_7:                               ; %B59
+LBB108_7:                               ; %B59
 	cmp	w8, #1
-	b.ne	LBB105_45
+	b.ne	LBB108_45
 ; %bb.8:                                ; %B107
 	ldr	w8, [x11, #4]
 	ubfx	w8, w8, #10, #1
 	cmp	w8, #1
-	b.eq	LBB105_45
+	b.eq	LBB108_45
 ; %bb.9:                                ; %B107
 	mov	x9, #2                          ; =0x2
 	and	x8, x22, #0xffff000000000003
 	movk	x9, #1, lsl #48
 	cmp	x8, x9
-	b.ne	LBB105_45
+	b.ne	LBB108_45
 ; %bb.10:                               ; %B62
 	and	x1, x22, #0xfffffffffffc
 	stp	x11, x20, [sp]                  ; 16-byte Folded Spill
 	ldrb	w8, [x1, #7]
-	tbnz	w8, #6, LBB105_25
+	tbnz	w8, #6, LBB108_25
 ; %bb.11:                               ; %B106
 	ldr	w8, [x1, #8]
-	b	LBB105_26
-LBB105_12:                              ; %B55
+	b	LBB108_26
+LBB108_12:                              ; %B55
 	sxth	w8, w8
 	cmp	w8, #21
-	b.lt	LBB105_45
+	b.lt	LBB108_45
 ; %bb.13:                               ; %B55
 	cmp	w8, #29
-	b.gt	LBB105_45
+	b.gt	LBB108_45
 ; %bb.14:                               ; %B56
 	add	sp, sp, #16
 	b	l_FastTypedArraySet_asm_h
-LBB105_15:                              ; %B12
+LBB108_15:                              ; %B12
 	mov	x1, x11
 	str	x20, [sp, #8]                   ; 8-byte Folded Spill
-	b.ne	LBB105_37
+	b.ne	LBB108_37
 ; %bb.16:                               ; %B40
 	ldr	w9, [x1, #4]
 	ldr	x20, [sp, #8]                   ; 8-byte Folded Reload
 	mov	x11, x1
 	ubfx	w10, w9, #11, #1
 	cmp	w10, #1
-	b.ne	LBB105_45
+	b.ne	LBB108_45
 ; %bb.17:                               ; %B40
 	ubfx	w9, w9, #8, #1
-	cbz	w9, LBB105_45
+	cbz	w9, LBB108_45
 ; %bb.18:                               ; %B14
 	ldr	x9, [x11, #8]
 	ldr	x9, [x9, #32]
-	cbz	x9, LBB105_20
+	cbz	x9, LBB108_20
 ; %bb.19:                               ; %B36
 	ldr	w9, [x9, #4]
 	ubfx	w9, w9, #13, #1
 	cmp	w9, #1
-	b.ne	LBB105_45
-LBB105_20:                              ; %B32
+	b.ne	LBB108_45
+LBB108_20:                              ; %B32
 	ldr	x9, [x11, #16]
 	ldr	x10, [x9]
 	mov	w9, #65534                      ; =0xfffe
 	cmp	x9, x10, lsr #48
 	add	w9, w8, #1
-	b.ne	LBB105_22
+	b.ne	LBB108_22
 ; %bb.21:                               ; %B32
 	cmp	w9, w10
-	b.hi	LBB105_39
-LBB105_22:                              ; %B29
+	b.hi	LBB108_39
+LBB108_22:                              ; %B29
 	ldr	w10, [x1, #32]
 	cmp	w9, w10
-	b.hi	LBB105_39
+	b.hi	LBB108_39
 ; %bb.23:                               ; %B25
 	ldr	x10, [x1, #40]
 	str	w9, [x1, #48]
 	str	x21, [x10, w8, sxtw #3]
 	ldrb	w8, [x24, #384]
-	cbz	w8, LBB105_46
-	b	LBB105_42
-LBB105_24:                              ; %B11
+	cbz	w8, LBB108_46
+	b	LBB108_42
+LBB108_24:                              ; %B11
 	mov	x0, x21
 	mov	x1, x24
 	bl	_prim_WriteBarrierNoStore
@@ -5306,19 +5371,19 @@ LBB105_24:                              ; %B11
 	ldr	x1, [x25, x8, lsl #3]
 	add	sp, sp, #16
 	br	x1
-LBB105_25:                              ; %B63
+LBB108_25:                              ; %B63
 	ldr	x8, [x1, #8]
 	ldr	w8, [x8]
-LBB105_26:                              ; %B102
+LBB108_26:                              ; %B102
 	asr	w8, w8, #30
 	ldp	x11, x20, [sp]                  ; 16-byte Folded Reload
 	cmp	w8, #1
-	b.ne	LBB105_45
+	b.ne	LBB108_45
 ; %bb.27:                               ; %B64
 	ldr	x0, [x24, #8]
 	bl	_prim_get_interned_non_index_atom
 	ldp	x11, x20, [sp]                  ; 16-byte Folded Reload
-	cbz	w0, LBB105_45
+	cbz	w0, LBB108_45
 ; %bb.28:                               ; %B66
 	ldr	x8, [x11, #8]
 	ldr	w9, [x8, #12]
@@ -5328,24 +5393,24 @@ LBB105_26:                              ; %B102
 	ldr	w8, [x11, w8, sxtw #2]
 	add	w9, w10, #4
 	add	x9, x11, x9
-	cbz	w8, LBB105_31
-LBB105_29:                              ; %B69
+	cbz	w8, LBB108_31
+LBB108_29:                              ; %B69
                                         ; =>This Inner Loop Header: Depth=1
 	lsl	w10, w8, #3
 	sub	w10, w10, #8
 	add	x10, x9, x10
 	ldp	w10, w11, [x10]
 	cmp	w11, w0
-	b.eq	LBB105_40
+	b.eq	LBB108_40
 ; %bb.30:                               ; %B78
-                                        ;   in Loop: Header=BB105_29 Depth=1
+                                        ;   in Loop: Header=BB108_29 Depth=1
 	and	w8, w10, #0x3ffffff
-	cbnz	w8, LBB105_29
-LBB105_31:                              ; %B80.preheader
+	cbnz	w8, LBB108_29
+LBB108_31:                              ; %B80.preheader
 	ldp	x8, x20, [sp]                   ; 16-byte Folded Reload
-LBB105_32:                              ; %B80
+LBB108_32:                              ; %B80
                                         ; =>This Loop Header: Depth=1
-                                        ;     Child Loop BB105_33 Depth 2
+                                        ;     Child Loop BB108_33 Depth 2
 	ldr	x9, [x8, #8]
 	ldr	w10, [x9, #12]
 	add	x9, x9, #64
@@ -5354,37 +5419,37 @@ LBB105_32:                              ; %B80
 	ldr	w10, [x9, w10, sxtw #2]
 	add	w11, w11, #4
 	add	x9, x9, x11
-	cbz	w10, LBB105_35
-LBB105_33:                              ; %B93
-                                        ;   Parent Loop BB105_32 Depth=1
+	cbz	w10, LBB108_35
+LBB108_33:                              ; %B93
+                                        ;   Parent Loop BB108_32 Depth=1
                                         ; =>  This Inner Loop Header: Depth=2
 	lsl	w10, w10, #3
 	sub	w10, w10, #8
 	add	x10, x9, x10
 	ldp	w10, w11, [x10]
 	cmp	w11, w0
-	b.eq	LBB105_43
+	b.eq	LBB108_43
 ; %bb.34:                               ; %B98
-                                        ;   in Loop: Header=BB105_33 Depth=2
+                                        ;   in Loop: Header=BB108_33 Depth=2
 	and	w10, w10, #0x3ffffff
-	cbnz	w10, LBB105_33
-LBB105_35:                              ; %B81
-                                        ;   in Loop: Header=BB105_32 Depth=1
+	cbnz	w10, LBB108_33
+LBB108_35:                              ; %B81
+                                        ;   in Loop: Header=BB108_32 Depth=1
 	ldr	w9, [x8, #4]
 	ldr	x11, [sp]                       ; 8-byte Folded Reload
 	ubfx	w9, w9, #10, #1
 	cmp	w9, #1
-	b.eq	LBB105_45
+	b.eq	LBB108_45
 ; %bb.36:                               ; %B87
-                                        ;   in Loop: Header=BB105_32 Depth=1
+                                        ;   in Loop: Header=BB108_32 Depth=1
 	ldr	x8, [x8, #8]
 	ldr	x8, [x8, #32]
-	cbnz	x8, LBB105_32
-	b	LBB105_44
-LBB105_37:                              ; %B44
+	cbnz	x8, LBB108_32
+	b	LBB108_44
+LBB108_37:                              ; %B44
 	ldr	x20, [sp, #8]                   ; 8-byte Folded Reload
 	mov	x11, x1
-	tbnz	w22, #31, LBB105_45
+	tbnz	w22, #31, LBB108_45
 ; %bb.38:                               ; %B46
 	mov	x0, x24
 	mov	x1, x11
@@ -5393,30 +5458,30 @@ LBB105_37:                              ; %B44
 	mov	w4, #32768                      ; =0x8000
 	str	x20, [x23, #48]
 	bl	_JS_SetArrayIntPropertyValue_GC
-	tbz	w0, #31, LBB105_46
-	b	LBB105_48
-LBB105_39:                              ; %B20
+	tbz	w0, #31, LBB108_46
+	b	LBB108_48
+LBB108_39:                              ; %B20
 	ldr	x8, [sp, #8]                    ; 8-byte Folded Reload
 	mov	x0, x24
 	mov	x2, x21
 	mov	w3, #32768                      ; =0x8000
 	str	x8, [x23, #48]
 	bl	_add_fast_array_element_gc
-	tbz	w0, #31, LBB105_46
-	b	LBB105_48
-LBB105_40:                              ; %B71
+	tbz	w0, #31, LBB108_46
+	b	LBB108_48
+LBB108_40:                              ; %B71
 	mov	w9, #58                         ; =0x3a
 	ldp	x11, x20, [sp]                  ; 16-byte Folded Reload
 	and	w9, w9, w10, lsr #26
 	cmp	w9, #2
-	b.ne	LBB105_45
+	b.ne	LBB108_45
 ; %bb.41:                               ; %B74
 	ldr	x9, [x11, #16]
 	sub	w8, w8, #1
 	str	x21, [x9, w8, sxtw #3]
 	ldrb	w8, [x24, #384]
-	cbz	w8, LBB105_46
-LBB105_42:                              ; %B76
+	cbz	w8, LBB108_46
+LBB108_42:                              ; %B76
 	mov	x0, x21
 	mov	x1, x24
 	bl	_prim_WriteBarrierNoStore
@@ -5426,18 +5491,18 @@ LBB105_42:                              ; %B76
 	sub	x20, x8, #24
 	add	sp, sp, #16
 	br	x1
-LBB105_43:                              ; %B95
+LBB108_43:                              ; %B95
 	mov	w8, #58                         ; =0x3a
 	ldp	x11, x20, [sp]                  ; 16-byte Folded Reload
 	and	w8, w8, w10, lsr #26
 	cmp	w8, #2
-	b.ne	LBB105_45
-LBB105_44:                              ; %B84
+	b.ne	LBB108_45
+LBB108_44:                              ; %B84
 	ldr	w8, [x11, #4]
 	ubfx	w8, w8, #8, #1
 	cmp	w8, #1
-	b.eq	LBB105_47
-LBB105_45:                              ; %B113
+	b.eq	LBB108_47
+LBB108_45:                              ; %B113
 	mov	x0, x24
 	mov	x1, x11
 	mov	x2, x22
@@ -5446,19 +5511,19 @@ LBB105_45:                              ; %B113
 	str	x20, [sp, #8]                   ; 8-byte Folded Spill
 	str	x20, [x23, #48]
 	bl	_JS_SetPropertyValue_GC
-	tbnz	w0, #31, LBB105_48
-LBB105_46:                              ; %B73
+	tbnz	w0, #31, LBB108_48
+LBB108_46:                              ; %B73
 	ldrb	w8, [x19], #1
 	ldr	x1, [x25, x8, lsl #3]
 	ldr	x8, [sp, #8]                    ; 8-byte Folded Reload
 	sub	x20, x8, #24
 	add	sp, sp, #16
 	br	x1
-LBB105_47:                              ; %B85
+LBB108_47:                              ; %B85
 	mov	w0, w0
 	add	sp, sp, #16
 	b	l_FastAddNamedProperty_asm_h
-LBB105_48:                              ; %B47
+LBB108_48:                              ; %B47
 	ldr	x20, [sp, #8]                   ; 8-byte Folded Reload
 	add	sp, sp, #16
 	b	l_exception_asm_h
@@ -5471,7 +5536,7 @@ l_get_super_value_0_asm_h:              ; @get_super_value_0_asm_h
 	str	x20, [x23, #48]
 	mov	x1, x21
 	bl	_js_value_to_atom_gc
-	cbz	w0, LBB106_3
+	cbz	w0, LBB109_3
 ; %bb.1:                                ; %B5
 	ldur	x3, [x20, #-24]
 	mov	w2, w0
@@ -5481,14 +5546,14 @@ l_get_super_value_0_asm_h:              ; @get_super_value_0_asm_h
 	str	x20, [x23, #48]
 	bl	_JS_GetPropertyInternalImpl_GC
 	cmp	x0, #130
-	b.eq	LBB106_3
+	b.eq	LBB109_3
 ; %bb.2:                                ; %B7
 	stur	x0, [x20, #-24]
 	sub	x20, x20, #16
 	ldrb	w8, [x19], #1
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB106_3:                               ; %B6
+LBB109_3:                               ; %B6
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function put_super_value_0_asm_h
@@ -5499,21 +5564,21 @@ l_put_super_value_0_asm_h:              ; @put_super_value_0_asm_h
 	mov	x8, #2                          ; =0x2
 	movk	x8, #65535, lsl #48
 	tst	x9, x8
-	b.eq	LBB107_3
+	b.eq	LBB110_3
 ; %bb.1:                                ; %B10
 	mov	x0, x24
 	str	x20, [x23, #48]
 	bl	_JS_ThrowTypeErrorNotAnObject
-LBB107_2:                               ; %B6
+LBB110_2:                               ; %B6
 	add	sp, sp, #16
 	b	l_exception_asm_h
-LBB107_3:                               ; %B1
+LBB110_3:                               ; %B1
 	ldur	x1, [x20, #-16]
 	mov	x0, x24
 	str	x9, [sp, #8]                    ; 8-byte Folded Spill
 	str	x20, [x23, #48]
 	bl	_js_value_to_atom_gc
-	cbz	w0, LBB107_2
+	cbz	w0, LBB110_2
 ; %bb.4:                                ; %B5
 	ldur	x3, [x20, #-8]
 	ldur	x4, [x20, #-32]
@@ -5523,7 +5588,7 @@ LBB107_3:                               ; %B1
 	mov	w5, #32768                      ; =0x8000
 	str	x20, [x23, #48]
 	bl	_JS_SetPropertyGeneric_GC
-	tbnz	w0, #31, LBB107_2
+	tbnz	w0, #31, LBB110_2
 ; %bb.5:                                ; %B7
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #32
@@ -5539,22 +5604,22 @@ l_define_field_0_asm_h:                 ; @define_field_0_asm_h
 	movk	x8, #65535, lsl #48
 	ldr	w2, [x19]
 	tst	x22, x8
-	b.ne	LBB108_4
+	b.ne	LBB111_4
 ; %bb.1:                                ; %B29
 	ldrh	w8, [x22, #6]
 	cmp	w8, #1
-	b.ne	LBB108_4
+	b.ne	LBB111_4
 ; %bb.2:                                ; %B23
 	ldr	w8, [x22, #4]
 	ubfx	w8, w8, #10, #1
 	cmp	w8, #1
-	b.eq	LBB108_4
+	b.eq	LBB111_4
 ; %bb.3:                                ; %B26
 	ldr	w8, [x22, #4]
 	ubfx	w8, w8, #8, #1
 	cmp	w8, #1
-	b.eq	LBB108_6
-LBB108_4:                               ; %B20
+	b.eq	LBB111_6
+LBB111_4:                               ; %B20
 	mov	x0, x24
 	mov	x1, x22
 	mov	x3, x21
@@ -5562,15 +5627,15 @@ LBB108_4:                               ; %B20
 	str	x20, [x23, #48]
                                         ; kill: def $w2 killed $w2 killed $x2
 	bl	_JS_DefinePropertyValue_GC
-	tbnz	w0, #31, LBB108_11
-LBB108_5:                               ; %B3
+	tbnz	w0, #31, LBB111_11
+LBB111_5:                               ; %B3
 	ldrb	w8, [x19, #4]
 	sub	x20, x20, #16
 	add	x19, x19, #5
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB108_6:                               ; %B27
+LBB111_6:                               ; %B27
 	ldr	x8, [x22, #8]
 	ldr	w9, [x8, #12]
 	add	x11, x8, #64
@@ -5579,37 +5644,37 @@ LBB108_6:                               ; %B27
 	ldr	w8, [x11, w8, sxtw #2]
 	add	w9, w10, #4
 	add	x9, x11, x9
-	cbz	w8, LBB108_9
-LBB108_7:                               ; %B12
+	cbz	w8, LBB111_9
+LBB111_7:                               ; %B12
                                         ; =>This Inner Loop Header: Depth=1
 	lsl	w10, w8, #3
 	sub	w10, w10, #8
 	add	x10, x9, x10
 	ldp	w10, w11, [x10]
 	cmp	w11, w2
-	b.eq	LBB108_12
+	b.eq	LBB111_12
 ; %bb.8:                                ; %B14
-                                        ;   in Loop: Header=BB108_7 Depth=1
+                                        ;   in Loop: Header=BB111_7 Depth=1
 	and	w8, w10, #0x3ffffff
-	cbnz	w8, LBB108_7
-LBB108_9:                               ; %B17
-	tbnz	w2, #31, LBB108_4
+	cbnz	w8, LBB111_7
+LBB111_9:                               ; %B17
+	tbnz	w2, #31, LBB111_4
 ; %bb.10:                               ; %B19
 	mov	x0, x2
 	b	l_FastAddNamedProperty_asm_h
-LBB108_11:                              ; %B21
+LBB111_11:                              ; %B21
 	b	l_exception_asm_h
-LBB108_12:                              ; %B1
+LBB111_12:                              ; %B1
 	lsr	w9, w10, #26
 	and	w9, w9, #0xfffffff7
 	cmp	w9, #7
-	b.ne	LBB108_4
+	b.ne	LBB111_4
 ; %bb.13:                               ; %B5
 	ldr	x9, [x22, #16]
 	sub	w8, w8, #1
 	str	x21, [x9, w8, sxtw #3]
 	ldrb	w8, [x24, #384]
-	cbz	w8, LBB108_5
+	cbz	w8, LBB111_5
 ; %bb.14:                               ; %B7
 	mov	x0, x21
 	mov	x1, x24
@@ -5631,7 +5696,7 @@ l_set_name_0_asm_h:                     ; @set_name_0_asm_h
 	str	x20, [x23, #48]
 	mov	x1, x22
 	bl	_JS_DefineObjectName
-	tbnz	w0, #31, LBB109_2
+	tbnz	w0, #31, LBB112_2
 ; %bb.1:                                ; %B3
 	ldrb	w8, [x19, #4]
 	sub	x20, x20, #8
@@ -5639,7 +5704,7 @@ l_set_name_0_asm_h:                     ; @set_name_0_asm_h
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB109_2:                               ; %B2
+LBB112_2:                               ; %B2
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function set_name_computed_0_asm_h
@@ -5652,14 +5717,14 @@ l_set_name_computed_0_asm_h:            ; @set_name_computed_0_asm_h
 	mov	x1, x21
 	mov	x2, x22
 	bl	_JS_DefineObjectNameComputed_GC
-	tbnz	w0, #31, LBB110_2
+	tbnz	w0, #31, LBB113_2
 ; %bb.1:                                ; %B3
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #16
 	add	w8, w8, #486
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB110_2:                               ; %B2
+LBB113_2:                               ; %B2
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function set_proto_0_asm_h
@@ -5669,24 +5734,24 @@ l_set_proto_0_asm_h:                    ; @set_proto_0_asm_h
 	mov	x8, #2                          ; =0x2
 	movk	x8, #65535, lsl #48
 	tst	x21, x8
-	b.eq	LBB111_3
+	b.eq	LBB114_3
 ; %bb.1:                                ; %B6
 	cmp	x21, #2
-	b.eq	LBB111_3
-LBB111_2:                               ; %B4
+	b.eq	LBB114_3
+LBB114_2:                               ; %B4
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #16
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB111_3:                               ; %B1
+LBB114_3:                               ; %B1
 	mov	x0, x24
 	mov	x1, x22
 	mov	x2, x21
 	mov	w3, #1                          ; =0x1
 	str	x20, [x23, #48]
 	bl	_JS_SetPrototypeInternal_GC
-	tbz	w0, #31, LBB111_2
+	tbz	w0, #31, LBB114_2
 ; %bb.4:                                ; %B2
 	b	l_exception_asm_h
                                         ; -- End function
@@ -5721,14 +5786,14 @@ l_define_array_el_0_asm_h:              ; @define_array_el_0_asm_h
 	mov	x2, x22
 	mov	x3, x21
 	bl	_JS_DefinePropertyValueValue_GC
-	tbnz	w0, #31, LBB113_2
+	tbnz	w0, #31, LBB116_2
 ; %bb.1:                                ; %B3
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #16
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB113_2:                               ; %B2
+LBB116_2:                               ; %B2
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function append_0_asm_h
@@ -5738,13 +5803,13 @@ l_append_0_asm_h:                       ; @append_0_asm_h
 	mov	x1, x20
 	str	x20, [x23, #48]
 	bl	_js_append_enumerate_gc
-	tbnz	w0, #31, LBB114_2
+	tbnz	w0, #31, LBB117_2
 ; %bb.1:                                ; %B3
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #8
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB114_2:                               ; %B2
+LBB117_2:                               ; %B2
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function copy_data_properties_0_asm_h
@@ -5755,13 +5820,13 @@ l_copy_data_properties_0_asm_h:         ; @copy_data_properties_0_asm_h
 	mov	x1, x20
 	str	x20, [x23, #48]
 	bl	_prim_js_copy_data_properties_gc
-	tbnz	w0, #31, LBB115_2
+	tbnz	w0, #31, LBB118_2
 ; %bb.1:                                ; %B3
 	ldrb	w8, [x19, #1]
 	add	x19, x19, #2
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB115_2:                               ; %B2
+LBB118_2:                               ; %B2
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function define_method_0_asm_h
@@ -5778,31 +5843,31 @@ l_define_method_0_asm_h:                ; @define_method_0_asm_h
 	csel	w10, w10, w9, ne
 	ldp	x9, x12, [x20, #-16]
 	ands	w8, w8, #0x3
-	b.eq	LBB116_3
+	b.eq	LBB119_3
 ; %bb.1:                                ; %B15
 	cmp	w8, #1
-	b.ne	LBB116_4
+	b.ne	LBB119_4
 ; %bb.2:                                ; %B13
 	mov	w8, #18                         ; =0x12
 	mov	w11, #2048                      ; =0x800
 	stp	x12, x8, [sp, #16]              ; 16-byte Folded Spill
-	b	LBB116_5
-LBB116_3:
+	b	LBB119_5
+LBB119_3:
 	mov	w8, #18                         ; =0x12
 	str	x12, [sp, #40]                  ; 8-byte Folded Spill
 	mov	w11, #8706                      ; =0x2202
 	str	x8, [sp, #24]                   ; 8-byte Folded Spill
 	mov	w8, #18                         ; =0x12
 	str	x8, [sp, #16]                   ; 8-byte Folded Spill
-	b	LBB116_6
-LBB116_4:                               ; %B14
+	b	LBB119_6
+LBB119_4:                               ; %B14
 	mov	w11, #4096                      ; =0x1000
 	mov	w8, #18                         ; =0x12
 	stp	x8, x12, [sp, #16]              ; 16-byte Folded Spill
-LBB116_5:                               ; %B10
+LBB119_5:                               ; %B10
 	mov	w8, #18                         ; =0x12
 	str	x8, [sp, #40]                   ; 8-byte Folded Spill
-LBB116_6:                               ; %B10
+LBB119_6:                               ; %B10
 	ldur	x1, [x20, #-8]
 	orr	w3, w10, w11
 	mov	x0, x24
@@ -5815,7 +5880,7 @@ LBB116_6:                               ; %B10
 	mov	x19, x9
 	str	w10, [sp, #12]                  ; 4-byte Folded Spill
 	bl	_js_method_set_properties_gc
-	tbnz	w0, #31, LBB116_9
+	tbnz	w0, #31, LBB119_9
 ; %bb.7:                                ; %B5
 	ldr	x8, [sp, #56]                   ; 8-byte Folded Reload
 	ldr	w9, [sp, #12]                   ; 4-byte Folded Reload
@@ -5828,7 +5893,7 @@ LBB116_6:                               ; %B10
 	ldr	x3, [sp, #40]                   ; 8-byte Folded Reload
 	orr	w6, w9, w8
 	bl	_JS_DefineProperty_GC
-	tbnz	w0, #31, LBB116_9
+	tbnz	w0, #31, LBB119_9
 ; %bb.8:                                ; %B7
 	ldr	x9, [sp, #48]                   ; 8-byte Folded Reload
 	ldrb	w8, [x9, #5]
@@ -5838,7 +5903,7 @@ LBB116_6:                               ; %B10
 	sub	x20, x8, #8
 	add	sp, sp, #64
 	br	x1
-LBB116_9:                               ; %B2
+LBB119_9:                               ; %B2
 	ldp	x19, x20, [sp, #48]             ; 16-byte Folded Reload
 	add	sp, sp, #64
 	b	l_exception_asm_h
@@ -5852,7 +5917,7 @@ l_define_method_computed_0_asm_h:       ; @define_method_computed_0_asm_h
 	str	x20, [x23, #48]
 	bl	_js_value_to_atom_gc
 	mov	w11, w0
-	cbz	w11, LBB117_11
+	cbz	w11, LBB120_11
 ; %bb.1:                                ; %B11
 	ldrb	w8, [x19]
 	mov	w9, #17665                      ; =0x4501
@@ -5863,31 +5928,31 @@ l_define_method_computed_0_asm_h:       ; @define_method_computed_0_asm_h
 	csel	w9, w10, w9, ne
 	ldur	x10, [x20, #-8]
 	ands	w8, w8, #0x3
-	b.eq	LBB117_4
+	b.eq	LBB120_4
 ; %bb.2:                                ; %B11
 	cmp	w8, #1
-	b.ne	LBB117_5
+	b.ne	LBB120_5
 ; %bb.3:                                ; %B19
 	mov	w8, #18                         ; =0x12
 	mov	w13, #2048                      ; =0x800
 	stp	x10, x8, [sp, #16]              ; 16-byte Folded Spill
-	b	LBB117_6
-LBB117_4:
+	b	LBB120_6
+LBB120_4:
 	mov	w8, #18                         ; =0x12
 	str	x10, [sp, #40]                  ; 8-byte Folded Spill
 	mov	w13, #8706                      ; =0x2202
 	str	x8, [sp, #24]                   ; 8-byte Folded Spill
 	mov	w8, #18                         ; =0x12
 	str	x8, [sp, #16]                   ; 8-byte Folded Spill
-	b	LBB117_7
-LBB117_5:                               ; %B20
+	b	LBB120_7
+LBB120_5:                               ; %B20
 	mov	w13, #4096                      ; =0x1000
 	mov	w8, #18                         ; =0x12
 	stp	x8, x10, [sp, #16]              ; 16-byte Folded Spill
-LBB117_6:                               ; %B16
+LBB120_6:                               ; %B16
 	mov	w8, #18                         ; =0x12
 	str	x8, [sp, #40]                   ; 8-byte Folded Spill
-LBB117_7:                               ; %B16
+LBB120_7:                               ; %B16
 	ldur	x1, [x20, #-8]
 	orr	w3, w9, w13
 	mov	x0, x24
@@ -5900,7 +5965,7 @@ LBB117_7:                               ; %B16
 	mov	w20, w11
 	str	w9, [sp, #12]                   ; 4-byte Folded Spill
 	bl	_js_method_set_properties_gc
-	tbnz	w0, #31, LBB117_10
+	tbnz	w0, #31, LBB120_10
 ; %bb.8:                                ; %B5
 	ldr	x8, [sp, #56]                   ; 8-byte Folded Reload
 	ldr	w9, [sp, #12]                   ; 4-byte Folded Reload
@@ -5913,7 +5978,7 @@ LBB117_7:                               ; %B16
 	ldr	x3, [sp, #40]                   ; 8-byte Folded Reload
 	orr	w6, w9, w8
 	bl	_JS_DefineProperty_GC
-	tbnz	w0, #31, LBB117_10
+	tbnz	w0, #31, LBB120_10
 ; %bb.9:                                ; %B7
 	ldr	x9, [sp, #48]                   ; 8-byte Folded Reload
 	ldrb	w8, [x9, #1]
@@ -5923,9 +5988,9 @@ LBB117_7:                               ; %B16
 	sub	x20, x8, #16
 	add	sp, sp, #64
 	br	x1
-LBB117_10:                              ; %B2
+LBB120_10:                              ; %B2
 	ldp	x19, x20, [sp, #48]             ; 16-byte Folded Reload
-LBB117_11:                              ; %B9
+LBB120_11:                              ; %B9
 	add	sp, sp, #64
 	b	l_exception_asm_h
                                         ; -- End function
@@ -5940,13 +6005,13 @@ l_define_class_0_asm_h:                 ; @define_class_0_asm_h
 	mov	x5, x23
 	str	x20, [x23, #48]
 	bl	_js_op_define_class
-	tbnz	w0, #31, LBB118_2
+	tbnz	w0, #31, LBB121_2
 ; %bb.1:                                ; %B3
 	ldrb	w8, [x19, #5]
 	add	x19, x19, #6
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB118_2:                               ; %B2
+LBB121_2:                               ; %B2
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function get_loc_0_asm_h
@@ -6072,61 +6137,6 @@ l_get_loc_check_0_asm_h:                ; @get_loc_check_0_asm_h
 	ldrh	w8, [x19]
 	ldr	x8, [x27, x8, lsl #3]
 	cmp	x8, #34
-	b.eq	LBB129_2
-; %bb.1:                                ; %B4
-	ldrb	w9, [x19, #2]
-	add	x19, x19, #3
-	mov	x22, x8
-	add	w9, w9, #243
-	ldr	x1, [x25, w9, uxtw #3]
-	br	x1
-LBB129_2:                               ; %B3
-	b	l_ThrowReferenceErrorUninitialized_asm_h
-                                        ; -- End function
-	.p2align	2                               ; -- Begin function put_loc_check_0_asm_h
-l_put_loc_check_0_asm_h:                ; @put_loc_check_0_asm_h
-; %bb.0:                                ; %B2
-	ldrh	w8, [x19]
-	ldur	x22, [x20, #-8]
-	ldr	x9, [x27, x8, lsl #3]
-	cmp	x9, #34
-	b.eq	LBB130_2
-; %bb.1:                                ; %B4
-	str	x22, [x27, w8, uxtw #3]
-	sub	x20, x20, #8
-	ldrb	w8, [x19, #2]
-	add	x19, x19, #3
-	ldr	x1, [x25, x8, lsl #3]
-	br	x1
-LBB130_2:                               ; %B3
-	b	l_ThrowReferenceErrorUninitialized_asm_h
-                                        ; -- End function
-	.p2align	2                               ; -- Begin function put_loc_check_init_0_asm_h
-l_put_loc_check_init_0_asm_h:           ; @put_loc_check_init_0_asm_h
-; %bb.0:                                ; %B2
-	ldrh	w8, [x19]
-	ldur	x22, [x20, #-8]
-	ldr	x9, [x27, x8, lsl #3]
-	cmp	x9, #34
-	b.ne	LBB131_2
-; %bb.1:                                ; %B4
-	str	x22, [x27, w8, uxtw #3]
-	sub	x20, x20, #8
-	ldrb	w8, [x19, #2]
-	add	x19, x19, #3
-	ldr	x1, [x25, x8, lsl #3]
-	br	x1
-LBB131_2:                               ; %B3
-	b	l_ThrowThisReferenceError_asm_h
-                                        ; -- End function
-	.p2align	2                               ; -- Begin function get_var_ref_check_0_asm_h
-l_get_var_ref_check_0_asm_h:            ; @get_var_ref_check_0_asm_h
-; %bb.0:                                ; %B2
-	ldrh	w8, [x19]
-	ldr	x8, [x26, x8, lsl #3]
-	ldr	x8, [x8]
-	ldr	x8, [x8]
-	cmp	x8, #34
 	b.eq	LBB132_2
 ; %bb.1:                                ; %B4
 	ldrb	w9, [x19, #2]
@@ -6138,6 +6148,61 @@ l_get_var_ref_check_0_asm_h:            ; @get_var_ref_check_0_asm_h
 LBB132_2:                               ; %B3
 	b	l_ThrowReferenceErrorUninitialized_asm_h
                                         ; -- End function
+	.p2align	2                               ; -- Begin function put_loc_check_0_asm_h
+l_put_loc_check_0_asm_h:                ; @put_loc_check_0_asm_h
+; %bb.0:                                ; %B2
+	ldrh	w8, [x19]
+	ldur	x22, [x20, #-8]
+	ldr	x9, [x27, x8, lsl #3]
+	cmp	x9, #34
+	b.eq	LBB133_2
+; %bb.1:                                ; %B4
+	str	x22, [x27, w8, uxtw #3]
+	sub	x20, x20, #8
+	ldrb	w8, [x19, #2]
+	add	x19, x19, #3
+	ldr	x1, [x25, x8, lsl #3]
+	br	x1
+LBB133_2:                               ; %B3
+	b	l_ThrowReferenceErrorUninitialized_asm_h
+                                        ; -- End function
+	.p2align	2                               ; -- Begin function put_loc_check_init_0_asm_h
+l_put_loc_check_init_0_asm_h:           ; @put_loc_check_init_0_asm_h
+; %bb.0:                                ; %B2
+	ldrh	w8, [x19]
+	ldur	x22, [x20, #-8]
+	ldr	x9, [x27, x8, lsl #3]
+	cmp	x9, #34
+	b.ne	LBB134_2
+; %bb.1:                                ; %B4
+	str	x22, [x27, w8, uxtw #3]
+	sub	x20, x20, #8
+	ldrb	w8, [x19, #2]
+	add	x19, x19, #3
+	ldr	x1, [x25, x8, lsl #3]
+	br	x1
+LBB134_2:                               ; %B3
+	b	l_ThrowThisReferenceError_asm_h
+                                        ; -- End function
+	.p2align	2                               ; -- Begin function get_var_ref_check_0_asm_h
+l_get_var_ref_check_0_asm_h:            ; @get_var_ref_check_0_asm_h
+; %bb.0:                                ; %B2
+	ldrh	w8, [x19]
+	ldr	x8, [x26, x8, lsl #3]
+	ldr	x8, [x8]
+	ldr	x8, [x8]
+	cmp	x8, #34
+	b.eq	LBB135_2
+; %bb.1:                                ; %B4
+	ldrb	w9, [x19, #2]
+	add	x19, x19, #3
+	mov	x22, x8
+	add	w9, w9, #243
+	ldr	x1, [x25, w9, uxtw #3]
+	br	x1
+LBB135_2:                               ; %B3
+	b	l_ThrowReferenceErrorUninitialized_asm_h
+                                        ; -- End function
 	.p2align	2                               ; -- Begin function put_var_ref_check_0_asm_h
 l_put_var_ref_check_0_asm_h:            ; @put_var_ref_check_0_asm_h
 ; %bb.0:                                ; %B2
@@ -6147,7 +6212,7 @@ l_put_var_ref_check_0_asm_h:            ; @put_var_ref_check_0_asm_h
 	ldr	x8, [x8]
 	ldr	x9, [x8]
 	cmp	x9, #34
-	b.eq	LBB133_2
+	b.eq	LBB136_2
 ; %bb.1:                                ; %B4
 	str	x22, [x8]
 	sub	x20, x20, #8
@@ -6155,7 +6220,7 @@ l_put_var_ref_check_0_asm_h:            ; @put_var_ref_check_0_asm_h
 	add	x19, x19, #3
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB133_2:                               ; %B3
+LBB136_2:                               ; %B3
 	b	l_ThrowReferenceErrorUninitialized_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function put_var_ref_check_init_0_asm_h
@@ -6167,7 +6232,7 @@ l_put_var_ref_check_init_0_asm_h:       ; @put_var_ref_check_init_0_asm_h
 	ldr	x8, [x8]
 	ldr	x9, [x8]
 	cmp	x9, #34
-	b.ne	LBB134_2
+	b.ne	LBB137_2
 ; %bb.1:                                ; %B4
 	str	x22, [x8]
 	sub	x20, x20, #8
@@ -6175,7 +6240,7 @@ l_put_var_ref_check_init_0_asm_h:       ; @put_var_ref_check_init_0_asm_h
 	add	x19, x19, #3
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB134_2:                               ; %B3
+LBB137_2:                               ; %B3
 	b	l_ThrowReferenceErrorUninitialized_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function close_loc_0_asm_h
@@ -6192,138 +6257,168 @@ l_close_loc_0_asm_h:                    ; @close_loc_0_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function if_false_0_asm_h
 l_if_false_0_asm_h:                     ; @if_false_0_asm_h
-; %bb.0:                                ; %B23
+; %bb.0:                                ; %B29
 	mov	x8, x20
 	ldr	x22, [x20, #-8]!
 	cmp	x22, #5
-	b.le	LBB136_4
-; %bb.1:                                ; %B23
+	b.le	LBB139_4
+; %bb.1:                                ; %B29
 	cmp	x22, #6
-	b.eq	LBB136_6
-; %bb.2:                                ; %B23
+	b.eq	LBB139_6
+; %bb.2:                                ; %B29
 	cmp	x22, #7
-	b.eq	LBB136_9
-; %bb.3:                                ; %B23
+	b.eq	LBB139_10
+; %bb.3:                                ; %B29
 	cmp	x22, #18
-	b.eq	LBB136_6
-	b	LBB136_7
-LBB136_4:                               ; %B23
+	b.eq	LBB139_6
+	b	LBB139_8
+LBB139_4:                               ; %B29
 	mov	x9, #-562949953421312           ; =0xfffe000000000000
 	cmp	x22, x9
-	b.eq	LBB136_6
-; %bb.5:                                ; %B23
+	b.eq	LBB139_6
+; %bb.5:                                ; %B29
 	cmp	x22, #2
-	b.ne	LBB136_7
-LBB136_6:                               ; %B3
+	b.ne	LBB139_8
+LBB139_6:                               ; %B8
 	ldrsw	x8, [x19]
 	add	x19, x19, x8
+	tbnz	x8, #63, LBB139_11
+LBB139_7:                               ; %B10
 	ldrb	w8, [x19], #1
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB136_7:                               ; %B9
+LBB139_8:                               ; %B15
 	mov	x9, #-281474976710656           ; =0xffff000000000000
 	cmp	x22, x9
-	b.hs	LBB136_13
-; %bb.8:                                ; %B11
+	b.hs	LBB139_16
+; %bb.9:                                ; %B17
 	mov	x9, #-562949953421312           ; =0xfffe000000000000
 	cmp	x22, x9
-	b.lo	LBB136_10
-LBB136_9:                               ; %B19
+	b.lo	LBB139_13
+LBB139_10:                              ; %B25
 	ldrb	w8, [x19, #4]
 	add	x19, x19, #5
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB136_10:                              ; %B13
+LBB139_11:                              ; %B5
+	ldr	w8, [x24, #232]
+	subs	w8, w8, #1
+	str	w8, [x24, #232]
+	b.pl	LBB139_7
+; %bb.12:                               ; %B6
+	add	x19, x19, #1
+	b	l_PollInterrupts_asm_h
+LBB139_13:                              ; %B19
 	tst	x22, #0xfffe000000000000
-	b.eq	LBB136_13
-; %bb.11:                               ; %B17
+	b.eq	LBB139_16
+; %bb.14:                               ; %B23
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	add	x8, x22, x8
 	fmov	d0, x8
 	fcmp	d0, d0
 	cset	w8, vc
 	fcmp	d0, #0.0
-	b.eq	LBB136_6
-	b.vs	LBB136_6
-; %bb.12:                               ; %B17
-	tbnz	w8, #0, LBB136_9
-	b	LBB136_6
-LBB136_13:                              ; %B15
+	b.eq	LBB139_6
+	b.vs	LBB139_6
+; %bb.15:                               ; %B23
+	tbnz	w8, #0, LBB139_10
+	b	LBB139_6
+LBB139_16:                              ; %B21
 	mov	x20, x8
 	mov	x0, x22
 	b	l_SlowToBoolean_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function if_true_0_asm_h
 l_if_true_0_asm_h:                      ; @if_true_0_asm_h
-; %bb.0:                                ; %B23
+; %bb.0:                                ; %B29
 	mov	x8, x20
 	ldr	x22, [x20, #-8]!
 	cmp	x22, #5
-	b.le	LBB137_4
-; %bb.1:                                ; %B23
+	b.le	LBB140_4
+; %bb.1:                                ; %B29
 	cmp	x22, #6
-	b.eq	LBB137_6
-; %bb.2:                                ; %B23
+	b.eq	LBB140_6
+; %bb.2:                                ; %B29
 	cmp	x22, #7
-	b.eq	LBB137_9
-; %bb.3:                                ; %B23
+	b.eq	LBB140_9
+; %bb.3:                                ; %B29
 	cmp	x22, #18
-	b.eq	LBB137_6
-	b	LBB137_7
-LBB137_4:                               ; %B23
+	b.eq	LBB140_6
+	b	LBB140_7
+LBB140_4:                               ; %B29
 	mov	x9, #-562949953421312           ; =0xfffe000000000000
 	cmp	x22, x9
-	b.eq	LBB137_6
-; %bb.5:                                ; %B23
+	b.eq	LBB140_6
+; %bb.5:                                ; %B29
 	cmp	x22, #2
-	b.ne	LBB137_7
-LBB137_6:                               ; %B3
+	b.ne	LBB140_7
+LBB140_6:                               ; %B3
 	ldrb	w8, [x19, #4]
 	add	x19, x19, #5
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB137_7:                               ; %B9
+LBB140_7:                               ; %B9
 	mov	x9, #-281474976710656           ; =0xffff000000000000
 	cmp	x22, x9
-	b.hs	LBB137_13
+	b.hs	LBB140_16
 ; %bb.8:                                ; %B11
-	mov	x9, #-562949953421312           ; =0xfffe000000000000
+	mov	x9, #-562949953421313           ; =0xfffdffffffffffff
 	cmp	x22, x9
-	b.lo	LBB137_10
-LBB137_9:                               ; %B19
+	b.ls	LBB140_13
+LBB140_9:                               ; %B23
 	ldrsw	x8, [x19]
 	add	x19, x19, x8
+	tbnz	x8, #63, LBB140_11
+LBB140_10:                              ; %B25
 	ldrb	w8, [x19], #1
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB137_10:                              ; %B13
+LBB140_11:                              ; %B20
+	ldr	w8, [x24, #232]
+	subs	w8, w8, #1
+	str	w8, [x24, #232]
+	b.pl	LBB140_10
+; %bb.12:                               ; %B21
+	add	x19, x19, #1
+	b	l_PollInterrupts_asm_h
+LBB140_13:                              ; %B13
 	tst	x22, #0xfffe000000000000
-	b.eq	LBB137_13
-; %bb.11:                               ; %B17
+	b.eq	LBB140_16
+; %bb.14:                               ; %B17
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	add	x8, x22, x8
 	fmov	d0, x8
 	fcmp	d0, d0
 	cset	w8, vc
 	fcmp	d0, #0.0
-	b.eq	LBB137_6
-	b.vs	LBB137_6
-; %bb.12:                               ; %B17
-	tbnz	w8, #0, LBB137_9
-	b	LBB137_6
-LBB137_13:                              ; %B15
+	b.eq	LBB140_6
+	b.vs	LBB140_6
+; %bb.15:                               ; %B17
+	tbnz	w8, #0, LBB140_9
+	b	LBB140_6
+LBB140_16:                              ; %B15
 	mov	x20, x8
 	mov	x0, x22
 	b	l_SlowToBoolean_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function goto_0_asm_h
 l_goto_0_asm_h:                         ; @goto_0_asm_h
-; %bb.0:                                ; %B0
+; %bb.0:                                ; %B5
 	ldrsw	x8, [x19]
 	add	x19, x19, x8
+	tbnz	x8, #63, LBB141_2
+LBB141_1:                               ; %B7
 	ldrb	w8, [x19], #1
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
+LBB141_2:                               ; %B2
+	ldr	w8, [x24, #232]
+	subs	w8, w8, #1
+	str	w8, [x24, #232]
+	b.pl	LBB141_1
+; %bb.3:                                ; %B3
+	add	x19, x19, #1
+	b	l_PollInterrupts_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function catch_0_asm_h
 l_catch_0_asm_h:                        ; @catch_0_asm_h
@@ -6365,13 +6460,13 @@ l_ret_0_asm_h:                          ; @ret_0_asm_h
 	ldur	x22, [x20, #-8]
 	mov	w8, #65534                      ; =0xfffe
 	cmp	x8, x22, lsr #48
-	b.ne	LBB141_3
+	b.ne	LBB144_3
 ; %bb.1:                                ; %B1
 	ldr	x8, [x23, #8]
 	ldr	x8, [x8, #32]
 	ldr	w9, [x8, #16]
 	cmp	w22, w9
-	b.ge	LBB141_3
+	b.ge	LBB144_3
 ; %bb.2:                                ; %B5
 	ldr	x8, [x8, #8]
 	sub	x20, x20, #8
@@ -6379,7 +6474,7 @@ l_ret_0_asm_h:                          ; @ret_0_asm_h
 	ldrb	w8, [x19], #1
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB141_3:                               ; %B3
+LBB144_3:                               ; %B3
 Lloh14:
 	adrp	x1, l___unnamed_8@PAGE
 Lloh15:
@@ -6397,20 +6492,20 @@ l_to_object_0_asm_h:                    ; @to_object_0_asm_h
 	mov	x8, #2                          ; =0x2
 	movk	x8, #65535, lsl #48
 	tst	x22, x8
-	b.ne	LBB142_2
+	b.ne	LBB145_2
 ; %bb.1:                                ; %B4
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #8
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB142_2:                               ; %B1
+LBB145_2:                               ; %B1
 	mov	x0, x24
 	mov	x1, x22
 	str	x20, [x23, #48]
 	bl	_JS_ToObject_GC
 	cmp	x0, #130
-	b.eq	LBB142_4
+	b.eq	LBB145_4
 ; %bb.3:                                ; %B3
 	mov	x22, x0
 	ldrb	w8, [x19], #1
@@ -6418,7 +6513,7 @@ LBB142_2:                               ; %B1
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB142_4:                               ; %B2
+LBB145_4:                               ; %B2
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function to_propkey_0_asm_h
@@ -6427,34 +6522,34 @@ l_to_propkey_0_asm_h:                   ; @to_propkey_0_asm_h
 	ldur	x22, [x20, #-8]
 	mov	w8, #65534                      ; =0xfffe
 	cmp	x8, x22, lsr #48
-	b.eq	LBB143_4
+	b.eq	LBB146_4
 ; %bb.1:                                ; %B15
 	mov	x9, #1                          ; =0x1
 	and	x8, x22, #0xffff000000000003
 	movk	x9, #1, lsl #48
 	add	x10, x9, #1
 	cmp	x8, x10
-	b.eq	LBB143_4
+	b.eq	LBB146_4
 ; %bb.2:                                ; %B15
 	cmp	x8, x9
-	b.eq	LBB143_4
+	b.eq	LBB146_4
 ; %bb.3:                                ; %B15
 	mov	x9, #-281474976710653           ; =0xffff000000000003
 	cmp	x8, x9
-	b.ne	LBB143_5
-LBB143_4:                               ; %B3
+	b.ne	LBB146_5
+LBB146_4:                               ; %B3
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #8
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB143_5:                               ; %B12
+LBB146_5:                               ; %B12
 	mov	x0, x24
 	mov	x1, x22
 	str	x20, [x23, #48]
 	bl	_JS_ToPropertyKey_GC
 	cmp	x0, #130
-	b.eq	LBB143_7
+	b.eq	LBB146_7
 ; %bb.6:                                ; %B14
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #8
@@ -6462,7 +6557,7 @@ LBB143_5:                               ; %B12
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB143_7:                               ; %B13
+LBB146_7:                               ; %B13
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function to_propkey2_0_asm_h
@@ -6471,7 +6566,7 @@ l_to_propkey2_0_asm_h:                  ; @to_propkey2_0_asm_h
 	ldp	x22, x21, [x20, #-16]
 	orr	x8, x22, #0x10
 	cmp	x8, #18
-	b.ne	LBB144_3
+	b.ne	LBB147_3
 ; %bb.1:                                ; %B19
 Lloh16:
 	adrp	x1, l___unnamed_9@PAGE
@@ -6480,39 +6575,39 @@ Lloh17:
 	mov	x0, x24
 	str	x20, [x23, #48]
 	bl	_LEPUS_ThrowTypeError
-LBB144_2:                               ; %B16
+LBB147_2:                               ; %B16
 	b	l_exception_asm_h
-LBB144_3:                               ; %B2
+LBB147_3:                               ; %B2
 	mov	w8, #65534                      ; =0xfffe
 	cmp	x8, x21, lsr #48
-	b.eq	LBB144_7
+	b.eq	LBB147_7
 ; %bb.4:                                ; %B2
 	mov	x9, #1                          ; =0x1
 	and	x8, x21, #0xffff000000000003
 	movk	x9, #1, lsl #48
 	add	x10, x9, #1
 	cmp	x8, x10
-	b.eq	LBB144_7
+	b.eq	LBB147_7
 ; %bb.5:                                ; %B2
 	cmp	x8, x9
-	b.eq	LBB144_7
+	b.eq	LBB147_7
 ; %bb.6:                                ; %B2
 	mov	x9, #-281474976710653           ; =0xffff000000000003
 	cmp	x8, x9
-	b.ne	LBB144_8
-LBB144_7:                               ; %B4
+	b.ne	LBB147_8
+LBB147_7:                               ; %B4
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #16
 	add	w8, w8, #486
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB144_8:                               ; %B15
+LBB147_8:                               ; %B15
 	mov	x0, x24
 	mov	x1, x21
 	str	x20, [x23, #48]
 	bl	_JS_ToPropertyKey_GC
 	cmp	x0, #130
-	b.eq	LBB144_2
+	b.eq	LBB147_2
 ; %bb.9:                                ; %B17
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #16
@@ -6532,100 +6627,11 @@ l_with_get_var_0_asm_h:                 ; @with_get_var_0_asm_h
 	mov	w4, #113                        ; =0x71
 	str	x20, [x23, #48]
 	bl	_prim_js_with_op_gc
-	tbnz	w0, #31, LBB145_4
-; %bb.1:                                ; %B4
-	cbz	w0, LBB145_3
-; %bb.2:                                ; %B7
-	ldr	w8, [x19, #4]
-	add	w8, w8, #4
-	add	x19, x19, w8, sxtw
-	ldrb	w8, [x19], #1
-	ldr	x1, [x25, x8, lsl #3]
-	br	x1
-LBB145_3:                               ; %B5
-	ldrb	w8, [x19, #9]
-	sub	x20, x20, #8
-	add	x19, x19, #10
-	ldr	x1, [x25, x8, lsl #3]
-	br	x1
-LBB145_4:                               ; %B2
-	b	l_exception_asm_h
-                                        ; -- End function
-	.p2align	2                               ; -- Begin function with_put_var_0_asm_h
-l_with_put_var_0_asm_h:                 ; @with_put_var_0_asm_h
-; %bb.0:                                ; %B1
-	ldr	w2, [x19]
-	ldrb	w3, [x19, #8]
-	mov	x0, x24
-	mov	x1, x20
-	mov	w4, #114                        ; =0x72
-	str	x20, [x23, #48]
-	bl	_prim_js_with_op_gc
-	tbnz	w0, #31, LBB146_4
-; %bb.1:                                ; %B4
-	cbz	w0, LBB146_3
-; %bb.2:                                ; %B7
-	ldr	w8, [x19, #4]
-	sub	x20, x20, #16
-	add	w8, w8, #4
-	add	x19, x19, w8, sxtw
-	ldrb	w8, [x19], #1
-	ldr	x1, [x25, x8, lsl #3]
-	br	x1
-LBB146_3:                               ; %B5
-	ldrb	w8, [x19, #9]
-	sub	x20, x20, #8
-	add	x19, x19, #10
-	ldr	x1, [x25, x8, lsl #3]
-	br	x1
-LBB146_4:                               ; %B2
-	b	l_exception_asm_h
-                                        ; -- End function
-	.p2align	2                               ; -- Begin function with_delete_var_0_asm_h
-l_with_delete_var_0_asm_h:              ; @with_delete_var_0_asm_h
-; %bb.0:                                ; %B1
-	ldr	w2, [x19]
-	ldrb	w3, [x19, #8]
-	mov	x0, x24
-	mov	x1, x20
-	mov	w4, #115                        ; =0x73
-	str	x20, [x23, #48]
-	bl	_prim_js_with_op_gc
-	tbnz	w0, #31, LBB147_4
-; %bb.1:                                ; %B4
-	cbz	w0, LBB147_3
-; %bb.2:                                ; %B7
-	ldr	w8, [x19, #4]
-	add	w8, w8, #4
-	add	x19, x19, w8, sxtw
-	ldrb	w8, [x19], #1
-	ldr	x1, [x25, x8, lsl #3]
-	br	x1
-LBB147_3:                               ; %B5
-	ldrb	w8, [x19, #9]
-	sub	x20, x20, #8
-	add	x19, x19, #10
-	ldr	x1, [x25, x8, lsl #3]
-	br	x1
-LBB147_4:                               ; %B2
-	b	l_exception_asm_h
-                                        ; -- End function
-	.p2align	2                               ; -- Begin function with_make_ref_0_asm_h
-l_with_make_ref_0_asm_h:                ; @with_make_ref_0_asm_h
-; %bb.0:                                ; %B1
-	ldr	w2, [x19]
-	ldrb	w3, [x19, #8]
-	mov	x0, x24
-	mov	x1, x20
-	mov	w4, #116                        ; =0x74
-	str	x20, [x23, #48]
-	bl	_prim_js_with_op_gc
 	tbnz	w0, #31, LBB148_4
 ; %bb.1:                                ; %B4
 	cbz	w0, LBB148_3
 ; %bb.2:                                ; %B7
 	ldr	w8, [x19, #4]
-	add	x20, x20, #8
 	add	w8, w8, #4
 	add	x19, x19, w8, sxtw
 	ldrb	w8, [x19], #1
@@ -6640,14 +6646,14 @@ LBB148_3:                               ; %B5
 LBB148_4:                               ; %B2
 	b	l_exception_asm_h
                                         ; -- End function
-	.p2align	2                               ; -- Begin function with_get_ref_0_asm_h
-l_with_get_ref_0_asm_h:                 ; @with_get_ref_0_asm_h
+	.p2align	2                               ; -- Begin function with_put_var_0_asm_h
+l_with_put_var_0_asm_h:                 ; @with_put_var_0_asm_h
 ; %bb.0:                                ; %B1
 	ldr	w2, [x19]
 	ldrb	w3, [x19, #8]
 	mov	x0, x24
 	mov	x1, x20
-	mov	w4, #117                        ; =0x75
+	mov	w4, #114                        ; =0x72
 	str	x20, [x23, #48]
 	bl	_prim_js_with_op_gc
 	tbnz	w0, #31, LBB149_4
@@ -6655,7 +6661,7 @@ l_with_get_ref_0_asm_h:                 ; @with_get_ref_0_asm_h
 	cbz	w0, LBB149_3
 ; %bb.2:                                ; %B7
 	ldr	w8, [x19, #4]
-	add	x20, x20, #8
+	sub	x20, x20, #16
 	add	w8, w8, #4
 	add	x19, x19, w8, sxtw
 	ldrb	w8, [x19], #1
@@ -6670,14 +6676,14 @@ LBB149_3:                               ; %B5
 LBB149_4:                               ; %B2
 	b	l_exception_asm_h
                                         ; -- End function
-	.p2align	2                               ; -- Begin function with_get_ref_undef_0_asm_h
-l_with_get_ref_undef_0_asm_h:           ; @with_get_ref_undef_0_asm_h
+	.p2align	2                               ; -- Begin function with_delete_var_0_asm_h
+l_with_delete_var_0_asm_h:              ; @with_delete_var_0_asm_h
 ; %bb.0:                                ; %B1
 	ldr	w2, [x19]
 	ldrb	w3, [x19, #8]
 	mov	x0, x24
 	mov	x1, x20
-	mov	w4, #118                        ; =0x76
+	mov	w4, #115                        ; =0x73
 	str	x20, [x23, #48]
 	bl	_prim_js_with_op_gc
 	tbnz	w0, #31, LBB150_4
@@ -6685,7 +6691,6 @@ l_with_get_ref_undef_0_asm_h:           ; @with_get_ref_undef_0_asm_h
 	cbz	w0, LBB150_3
 ; %bb.2:                                ; %B7
 	ldr	w8, [x19, #4]
-	add	x20, x20, #8
 	add	w8, w8, #4
 	add	x19, x19, w8, sxtw
 	ldrb	w8, [x19], #1
@@ -6700,6 +6705,96 @@ LBB150_3:                               ; %B5
 LBB150_4:                               ; %B2
 	b	l_exception_asm_h
                                         ; -- End function
+	.p2align	2                               ; -- Begin function with_make_ref_0_asm_h
+l_with_make_ref_0_asm_h:                ; @with_make_ref_0_asm_h
+; %bb.0:                                ; %B1
+	ldr	w2, [x19]
+	ldrb	w3, [x19, #8]
+	mov	x0, x24
+	mov	x1, x20
+	mov	w4, #116                        ; =0x74
+	str	x20, [x23, #48]
+	bl	_prim_js_with_op_gc
+	tbnz	w0, #31, LBB151_4
+; %bb.1:                                ; %B4
+	cbz	w0, LBB151_3
+; %bb.2:                                ; %B7
+	ldr	w8, [x19, #4]
+	add	x20, x20, #8
+	add	w8, w8, #4
+	add	x19, x19, w8, sxtw
+	ldrb	w8, [x19], #1
+	ldr	x1, [x25, x8, lsl #3]
+	br	x1
+LBB151_3:                               ; %B5
+	ldrb	w8, [x19, #9]
+	sub	x20, x20, #8
+	add	x19, x19, #10
+	ldr	x1, [x25, x8, lsl #3]
+	br	x1
+LBB151_4:                               ; %B2
+	b	l_exception_asm_h
+                                        ; -- End function
+	.p2align	2                               ; -- Begin function with_get_ref_0_asm_h
+l_with_get_ref_0_asm_h:                 ; @with_get_ref_0_asm_h
+; %bb.0:                                ; %B1
+	ldr	w2, [x19]
+	ldrb	w3, [x19, #8]
+	mov	x0, x24
+	mov	x1, x20
+	mov	w4, #117                        ; =0x75
+	str	x20, [x23, #48]
+	bl	_prim_js_with_op_gc
+	tbnz	w0, #31, LBB152_4
+; %bb.1:                                ; %B4
+	cbz	w0, LBB152_3
+; %bb.2:                                ; %B7
+	ldr	w8, [x19, #4]
+	add	x20, x20, #8
+	add	w8, w8, #4
+	add	x19, x19, w8, sxtw
+	ldrb	w8, [x19], #1
+	ldr	x1, [x25, x8, lsl #3]
+	br	x1
+LBB152_3:                               ; %B5
+	ldrb	w8, [x19, #9]
+	sub	x20, x20, #8
+	add	x19, x19, #10
+	ldr	x1, [x25, x8, lsl #3]
+	br	x1
+LBB152_4:                               ; %B2
+	b	l_exception_asm_h
+                                        ; -- End function
+	.p2align	2                               ; -- Begin function with_get_ref_undef_0_asm_h
+l_with_get_ref_undef_0_asm_h:           ; @with_get_ref_undef_0_asm_h
+; %bb.0:                                ; %B1
+	ldr	w2, [x19]
+	ldrb	w3, [x19, #8]
+	mov	x0, x24
+	mov	x1, x20
+	mov	w4, #118                        ; =0x76
+	str	x20, [x23, #48]
+	bl	_prim_js_with_op_gc
+	tbnz	w0, #31, LBB153_4
+; %bb.1:                                ; %B4
+	cbz	w0, LBB153_3
+; %bb.2:                                ; %B7
+	ldr	w8, [x19, #4]
+	add	x20, x20, #8
+	add	w8, w8, #4
+	add	x19, x19, w8, sxtw
+	ldrb	w8, [x19], #1
+	ldr	x1, [x25, x8, lsl #3]
+	br	x1
+LBB153_3:                               ; %B5
+	ldrb	w8, [x19, #9]
+	sub	x20, x20, #8
+	add	x19, x19, #10
+	ldr	x1, [x25, x8, lsl #3]
+	br	x1
+LBB153_4:                               ; %B2
+	b	l_exception_asm_h
+                                        ; -- End function
 	.p2align	2                               ; -- Begin function make_loc_ref_0_asm_h
 l_make_loc_ref_0_asm_h:                 ; @make_loc_ref_0_asm_h
 ; %bb.0:                                ; %B16
@@ -6709,7 +6804,7 @@ l_make_loc_ref_0_asm_h:                 ; @make_loc_ref_0_asm_h
 	str	x20, [x23, #48]
 	bl	_JS_NewObjectProto_GC
 	cmp	x0, #130
-	b.eq	LBB151_6
+	b.eq	LBB154_6
 ; %bb.1:                                ; %B1
 	mov	w8, #18                         ; =0x12
 	mov	x1, x23
@@ -6720,7 +6815,7 @@ l_make_loc_ref_0_asm_h:                 ; @make_loc_ref_0_asm_h
 	str	x20, [x23, #48]
 	bl	_get_var_ref_gc
 	mov	x8, x0
-	cbz	x8, LBB151_6
+	cbz	x8, LBB154_6
 ; %bb.2:                                ; %B6
 	ldur	x1, [x20, #-16]
 	ldr	w2, [x19]
@@ -6730,22 +6825,22 @@ l_make_loc_ref_0_asm_h:                 ; @make_loc_ref_0_asm_h
 	str	x8, [sp, #8]                    ; 8-byte Folded Spill
 	bl	_add_property_gc
 	ldr	x9, [sp, #8]                    ; 8-byte Folded Reload
-	cbz	x0, LBB151_6
+	cbz	x0, LBB154_6
 ; %bb.3:                                ; %B9
 	mov	x8, #2                          ; =0x2
 	movk	x8, #65533, lsl #48
 	orr	x8, x9, x8
 	str	x8, [x0]
 	ldrb	w9, [x24, #384]
-	cbnz	w9, LBB151_7
-LBB151_4:                               ; %B13
+	cbnz	w9, LBB154_7
+LBB154_4:                               ; %B13
 	ldr	w1, [x19]
 	mov	x0, x24
 	mov	w2, wzr
 	str	x20, [x23, #48]
 	bl	___JS_AtomToValue_GC
 	cmp	x0, #130
-	b.eq	LBB151_6
+	b.eq	LBB154_6
 ; %bb.5:                                ; %B15
 	stur	x0, [x20, #-8]
 	ldrb	w8, [x19, #6]
@@ -6753,14 +6848,14 @@ LBB151_4:                               ; %B13
 	ldr	x1, [x25, x8, lsl #3]
 	add	sp, sp, #16
 	br	x1
-LBB151_6:                               ; %B14
+LBB154_6:                               ; %B14
 	add	sp, sp, #16
 	b	l_exception_asm_h
-LBB151_7:                               ; %B12
+LBB154_7:                               ; %B12
 	mov	x0, x8
 	mov	x1, x24
 	bl	_prim_WriteBarrierNoStore
-	b	LBB151_4
+	b	LBB154_4
                                         ; -- End function
 	.p2align	2                               ; -- Begin function make_arg_ref_0_asm_h
 l_make_arg_ref_0_asm_h:                 ; @make_arg_ref_0_asm_h
@@ -6771,7 +6866,7 @@ l_make_arg_ref_0_asm_h:                 ; @make_arg_ref_0_asm_h
 	str	x20, [x23, #48]
 	bl	_JS_NewObjectProto_GC
 	cmp	x0, #130
-	b.eq	LBB152_6
+	b.eq	LBB155_6
 ; %bb.1:                                ; %B1
 	mov	w8, #18                         ; =0x12
 	mov	x1, x23
@@ -6782,7 +6877,7 @@ l_make_arg_ref_0_asm_h:                 ; @make_arg_ref_0_asm_h
 	str	x20, [x23, #48]
 	bl	_get_var_ref_gc
 	mov	x8, x0
-	cbz	x8, LBB152_6
+	cbz	x8, LBB155_6
 ; %bb.2:                                ; %B6
 	ldur	x1, [x20, #-16]
 	ldr	w2, [x19]
@@ -6792,22 +6887,22 @@ l_make_arg_ref_0_asm_h:                 ; @make_arg_ref_0_asm_h
 	str	x8, [sp, #8]                    ; 8-byte Folded Spill
 	bl	_add_property_gc
 	ldr	x9, [sp, #8]                    ; 8-byte Folded Reload
-	cbz	x0, LBB152_6
+	cbz	x0, LBB155_6
 ; %bb.3:                                ; %B9
 	mov	x8, #2                          ; =0x2
 	movk	x8, #65533, lsl #48
 	orr	x8, x9, x8
 	str	x8, [x0]
 	ldrb	w9, [x24, #384]
-	cbnz	w9, LBB152_7
-LBB152_4:                               ; %B13
+	cbnz	w9, LBB155_7
+LBB155_4:                               ; %B13
 	ldr	w1, [x19]
 	mov	x0, x24
 	mov	w2, wzr
 	str	x20, [x23, #48]
 	bl	___JS_AtomToValue_GC
 	cmp	x0, #130
-	b.eq	LBB152_6
+	b.eq	LBB155_6
 ; %bb.5:                                ; %B15
 	stur	x0, [x20, #-8]
 	ldrb	w8, [x19, #6]
@@ -6815,14 +6910,14 @@ LBB152_4:                               ; %B13
 	ldr	x1, [x25, x8, lsl #3]
 	add	sp, sp, #16
 	br	x1
-LBB152_6:                               ; %B14
+LBB155_6:                               ; %B14
 	add	sp, sp, #16
 	b	l_exception_asm_h
-LBB152_7:                               ; %B12
+LBB155_7:                               ; %B12
 	mov	x0, x8
 	mov	x1, x24
 	bl	_prim_WriteBarrierNoStore
-	b	LBB152_4
+	b	LBB155_4
                                         ; -- End function
 	.p2align	2                               ; -- Begin function make_var_ref_ref_0_asm_h
 l_make_var_ref_ref_0_asm_h:             ; @make_var_ref_ref_0_asm_h
@@ -6832,7 +6927,7 @@ l_make_var_ref_ref_0_asm_h:             ; @make_var_ref_ref_0_asm_h
 	str	x20, [x23, #48]
 	bl	_JS_NewObjectProto_GC
 	cmp	x0, #130
-	b.eq	LBB153_5
+	b.eq	LBB156_5
 ; %bb.1:                                ; %B1
 	mov	x1, x0
 	mov	w8, #18                         ; =0x12
@@ -6842,7 +6937,7 @@ l_make_var_ref_ref_0_asm_h:             ; @make_var_ref_ref_0_asm_h
 	ldr	w2, [x19]
 	str	x20, [x23, #48]
 	bl	_add_property_gc
-	cbz	x0, LBB153_5
+	cbz	x0, LBB156_5
 ; %bb.2:                                ; %B4
 	ldrh	w8, [x19, #4]
 	mov	x9, #2                          ; =0x2
@@ -6851,28 +6946,28 @@ l_make_var_ref_ref_0_asm_h:             ; @make_var_ref_ref_0_asm_h
 	orr	x8, x8, x9
 	str	x8, [x0]
 	ldrb	w9, [x24, #384]
-	cbnz	w9, LBB153_6
-LBB153_3:                               ; %B9
+	cbnz	w9, LBB156_6
+LBB156_3:                               ; %B9
 	ldr	w1, [x19]
 	mov	x0, x24
 	mov	w2, wzr
 	str	x20, [x23, #48]
 	bl	___JS_AtomToValue_GC
 	cmp	x0, #130
-	b.eq	LBB153_5
+	b.eq	LBB156_5
 ; %bb.4:                                ; %B11
 	stur	x0, [x20, #-8]
 	ldrb	w8, [x19, #6]
 	add	x19, x19, #7
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB153_5:                               ; %B10
+LBB156_5:                               ; %B10
 	b	l_exception_asm_h
-LBB153_6:                               ; %B7
+LBB156_6:                               ; %B7
 	mov	x0, x8
 	mov	x1, x24
 	bl	_prim_WriteBarrierNoStore
-	b	LBB153_3
+	b	LBB156_3
                                         ; -- End function
 	.p2align	2                               ; -- Begin function make_var_ref_0_asm_h
 l_make_var_ref_0_asm_h:                 ; @make_var_ref_0_asm_h
@@ -6882,14 +6977,14 @@ l_make_var_ref_0_asm_h:                 ; @make_var_ref_0_asm_h
 	mov	x2, x20
 	str	x20, [x23, #48]
 	bl	_JS_GetGlobalVarRef_GC
-	tbnz	w0, #31, LBB154_2
+	tbnz	w0, #31, LBB157_2
 ; %bb.1:                                ; %B3
 	ldrb	w8, [x19, #4]
 	add	x19, x19, #5
 	add	x20, x20, #16
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB154_2:                               ; %B2
+LBB157_2:                               ; %B2
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function for_in_start_0_asm_h
@@ -6901,7 +6996,7 @@ l_for_in_start_0_asm_h:                 ; @for_in_start_0_asm_h
 	mov	x1, x22
 	bl	_prim_js_for_in_start_gc
 	cmp	x0, #130
-	b.eq	LBB155_2
+	b.eq	LBB158_2
 ; %bb.1:                                ; %B3
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #8
@@ -6909,7 +7004,7 @@ l_for_in_start_0_asm_h:                 ; @for_in_start_0_asm_h
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB155_2:                               ; %B2
+LBB158_2:                               ; %B2
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function for_of_start_0_asm_h
@@ -6920,7 +7015,7 @@ l_for_of_start_0_asm_h:                 ; @for_of_start_0_asm_h
 	mov	w2, wzr
 	str	x20, [x23, #48]
 	bl	_js_for_of_start_gc
-	tbnz	w0, #31, LBB156_2
+	tbnz	w0, #31, LBB159_2
 ; %bb.1:                                ; %B3
 	mov	w8, #66                         ; =0x42
 	str	x8, [x20, #8]
@@ -6928,7 +7023,7 @@ l_for_of_start_0_asm_h:                 ; @for_of_start_0_asm_h
 	ldrb	w8, [x19], #1
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB156_2:                               ; %B2
+LBB159_2:                               ; %B2
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function for_await_of_start_0_asm_h
@@ -6939,7 +7034,7 @@ l_for_await_of_start_0_asm_h:           ; @for_await_of_start_0_asm_h
 	mov	w2, #1                          ; =0x1
 	str	x20, [x23, #48]
 	bl	_js_for_of_start_gc
-	tbnz	w0, #31, LBB157_2
+	tbnz	w0, #31, LBB160_2
 ; %bb.1:                                ; %B3
 	mov	w8, #66                         ; =0x42
 	str	x8, [x20, #8]
@@ -6947,7 +7042,7 @@ l_for_await_of_start_0_asm_h:           ; @for_await_of_start_0_asm_h
 	ldrb	w8, [x19], #1
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB157_2:                               ; %B2
+LBB160_2:                               ; %B2
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function for_in_next_0_asm_h
@@ -6957,47 +7052,47 @@ l_for_in_next_0_asm_h:                  ; @for_in_next_0_asm_h
 	mov	x11, #2                         ; =0x2
 	movk	x11, #65535, lsl #48
 	tst	x8, x11
-	b.ne	LBB158_4
+	b.ne	LBB161_4
 ; %bb.1:                                ; %B62
 	ldrh	w9, [x8, #6]
 	cmp	w9, #17
-	b.ne	LBB158_4
+	b.ne	LBB161_4
 ; %bb.2:                                ; %B1
 	ldr	x8, [x8, #32]
-	cbz	x8, LBB158_4
+	cbz	x8, LBB161_4
 ; %bb.3:                                ; %B9
 	ldp	w9, w10, [x8, #8]
 	cmp	w9, w10
-	b.lo	LBB158_6
-LBB158_4:                               ; %B4
+	b.lo	LBB161_6
+LBB161_4:                               ; %B4
 	mov	x0, x24
 	mov	x1, x20
 	str	x20, [x23, #48]
 	bl	_js_for_in_next_gc
-	tbnz	w0, #31, LBB158_27
+	tbnz	w0, #31, LBB161_27
 ; %bb.5:                                ; %B6
 	ldrb	w8, [x19], #1
 	add	x20, x20, #16
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB158_6:                               ; %B11
+LBB161_6:                               ; %B11
 	ldr	x10, [x8]
 	tst	x10, x11
-	b.ne	LBB158_4
+	b.ne	LBB161_4
 ; %bb.7:                                ; %B13
 	ldrb	w11, [x8, #17]
-	cbnz	w11, LBB158_21
+	cbnz	w11, LBB161_21
 ; %bb.8:                                ; %B37
 	ldrb	w11, [x8, #16]
-	cbnz	w11, LBB158_4
+	cbnz	w11, LBB161_4
 ; %bb.9:                                ; %B40
 	ldr	x11, [x8, #24]
-	cbz	x11, LBB158_4
+	cbz	x11, LBB161_4
 ; %bb.10:                               ; %B57
 	lsl	w12, w9, #3
 	add	x11, x11, x12
 	ldr	w12, [x11]
-	cbz	w12, LBB158_15
+	cbz	w12, LBB161_15
 ; %bb.11:                               ; %B59
 	ldr	x12, [x10, #8]
 	ldr	w1, [x11, #4]
@@ -7008,48 +7103,48 @@ LBB158_6:                               ; %B11
 	ldr	w12, [x14, w12, sxtw #2]
 	add	w11, w11, #4
 	add	x11, x14, x11
-	cbz	w12, LBB158_14
-LBB158_12:                              ; %B52
+	cbz	w12, LBB161_14
+LBB161_12:                              ; %B52
                                         ; =>This Inner Loop Header: Depth=1
 	lsl	w12, w12, #3
 	sub	w12, w12, #8
 	add	x12, x11, x12
 	ldp	w12, w13, [x12]
 	cmp	w13, w1
-	b.eq	LBB158_16
+	b.eq	LBB161_16
 ; %bb.13:                               ; %B54
-                                        ;   in Loop: Header=BB158_12 Depth=1
+                                        ;   in Loop: Header=BB161_12 Depth=1
 	and	w12, w12, #0x3ffffff
-	cbnz	w12, LBB158_12
-LBB158_14:                              ; %B46
+	cbnz	w12, LBB161_12
+LBB161_14:                              ; %B46
 	ldr	w10, [x10, #4]
 	ubfx	w10, w10, #10, #1
 	cmp	w10, #1
-	b.eq	LBB158_4
-LBB158_15:                              ; %B49
+	b.eq	LBB161_4
+LBB161_15:                              ; %B49
 	add	w9, w9, #1
 	str	w9, [x8, #8]
-	b	LBB158_4
-LBB158_16:                              ; %B43
+	b	LBB161_4
+LBB161_16:                              ; %B43
 	lsr	w10, w12, #26
 	tst	w10, #0x30
-	b.ne	LBB158_4
+	b.ne	LBB161_4
 ; %bb.17:                               ; %B44
 	add	w9, w9, #1
 	str	w9, [x8, #8]
-	tbnz	w1, #31, LBB158_25
-LBB158_18:                              ; %B18
+	tbnz	w1, #31, LBB161_25
+LBB161_18:                              ; %B18
 	ldr	x8, [x24, #8]
 	ldr	x8, [x8, #64]
 	ldr	x8, [x8, w1, sxtw #3]
 	ldrb	w9, [x8, #7]
-	tbnz	w9, #6, LBB158_24
+	tbnz	w9, #6, LBB161_24
 ; %bb.19:                               ; %B28
 	ldr	w9, [x8, #8]
 	asr	w9, w9, #30
 	cmp	w9, #1
-	b.ne	LBB158_25
-LBB158_20:                              ; %B26
+	b.ne	LBB161_25
+LBB161_20:                              ; %B26
 	mov	x9, #2                          ; =0x2
 	movk	x9, #1, lsl #48
 	orr	x8, x8, x9
@@ -7058,41 +7153,41 @@ LBB158_20:                              ; %B26
 	ldrb	w8, [x19], #1
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB158_21:                              ; %B33
+LBB161_21:                              ; %B33
 	ldr	w11, [x10, #4]
 	ubfx	w11, w11, #11, #1
 	cmp	w11, #1
-	b.ne	LBB158_4
+	b.ne	LBB161_4
 ; %bb.22:                               ; %B15
 	ldr	w10, [x10, #48]
 	cmp	w9, w10
-	b.hs	LBB158_4
+	b.hs	LBB161_4
 ; %bb.23:                               ; %B16
 	add	w10, w9, #1
 	orr	w1, w9, #0x80000000
 	str	w10, [x8, #8]
-	tbz	w1, #31, LBB158_18
-	b	LBB158_25
-LBB158_24:                              ; %B19
+	tbz	w1, #31, LBB161_18
+	b	LBB161_25
+LBB161_24:                              ; %B19
 	ldr	x9, [x8, #8]
 	ldr	w9, [x9]
 	asr	w9, w9, #30
 	cmp	w9, #1
-	b.eq	LBB158_20
-LBB158_25:                              ; %B23
+	b.eq	LBB161_20
+LBB161_25:                              ; %B23
 	mov	x0, x24
 	mov	w2, wzr
 	str	x20, [x23, #48]
 	bl	___JS_AtomToValue_GC
 	cmp	x0, #130
-	b.eq	LBB158_27
+	b.eq	LBB161_27
 ; %bb.26:                               ; %B25
 	mov	w8, #6                          ; =0x6
 	stp	x0, x8, [x20], #16
 	ldrb	w8, [x19], #1
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB158_27:                              ; %B5
+LBB161_27:                              ; %B5
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function for_of_next_0_asm_h
@@ -7105,14 +7200,14 @@ l_for_of_next_0_asm_h:                  ; @for_of_next_0_asm_h
 	str	x20, [x23, #48]
 	sub	w2, w8, w9
 	bl	_js_for_of_next_gc
-	tbnz	w0, #31, LBB159_2
+	tbnz	w0, #31, LBB162_2
 ; %bb.1:                                ; %B3
 	ldrb	w8, [x19, #1]
 	add	x19, x19, #2
 	add	x20, x20, #16
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB159_2:                               ; %B2
+LBB162_2:                               ; %B2
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function for_await_of_next_0_asm_h
@@ -7122,13 +7217,13 @@ l_for_await_of_next_0_asm_h:            ; @for_await_of_next_0_asm_h
 	mov	x1, x20
 	str	x20, [x23, #48]
 	bl	_js_for_await_of_next_gc
-	tbnz	w0, #31, LBB160_2
+	tbnz	w0, #31, LBB163_2
 ; %bb.1:                                ; %B3
 	ldrb	w8, [x19], #1
 	add	x20, x20, #8
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB160_2:                               ; %B2
+LBB163_2:                               ; %B2
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function iterator_get_value_done_0_asm_h
@@ -7138,13 +7233,13 @@ l_iterator_get_value_done_0_asm_h:      ; @iterator_get_value_done_0_asm_h
 	mov	x1, x20
 	str	x20, [x23, #48]
 	bl	_js_iterator_get_value_done_gc
-	tbnz	w0, #31, LBB161_2
+	tbnz	w0, #31, LBB164_2
 ; %bb.1:                                ; %B3
 	ldrb	w8, [x19], #1
 	add	x20, x20, #8
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB161_2:                               ; %B2
+LBB164_2:                               ; %B2
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function iterator_close_0_asm_h
@@ -7153,19 +7248,19 @@ l_iterator_close_0_asm_h:               ; @iterator_close_0_asm_h
 	ldur	x1, [x20, #-24]
 	sub	x20, x20, #16
 	cmp	x1, #18
-	b.eq	LBB162_2
+	b.eq	LBB165_2
 ; %bb.1:                                ; %B1
 	mov	x0, x24
 	mov	w2, wzr
 	str	x20, [x23, #48]
 	bl	_JS_IteratorClose
-	tbnz	w0, #31, LBB162_3
-LBB162_2:                               ; %B4
+	tbnz	w0, #31, LBB165_3
+LBB165_2:                               ; %B4
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #8
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB162_3:                               ; %B2
+LBB165_3:                               ; %B2
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function iterator_close_return_0_asm_h
@@ -7177,29 +7272,29 @@ l_iterator_close_return_0_asm_h:        ; @iterator_close_return_0_asm_h
 	ldr	x9, [x9, #32]
 	ldrh	w9, [x9, #42]
 	add	x9, x27, x9, lsl #3
-	b	LBB163_2
-LBB163_1:                               ; %B10
-                                        ;   in Loop: Header=BB163_2 Depth=1
+	b	LBB166_2
+LBB166_1:                               ; %B10
+                                        ;   in Loop: Header=BB166_2 Depth=1
 	sub	x20, x20, #8
-LBB163_2:                               ; %B2
+LBB166_2:                               ; %B2
                                         ; =>This Inner Loop Header: Depth=1
 	cmp	x20, x9
-	b.le	LBB163_5
+	b.le	LBB166_5
 ; %bb.3:                                ; %B4
-                                        ;   in Loop: Header=BB163_2 Depth=1
+                                        ;   in Loop: Header=BB166_2 Depth=1
 	ldur	x11, [x20, #-8]
 	tst	x11, #0xffff000000000000
-	b.ne	LBB163_1
+	b.ne	LBB166_1
 ; %bb.4:                                ; %B4
-                                        ;   in Loop: Header=BB163_2 Depth=1
+                                        ;   in Loop: Header=BB166_2 Depth=1
 	and	x11, x11, x10
 	cmp	x11, #66
-	b.ne	LBB163_1
-LBB163_5:                               ; %B7
+	b.ne	LBB166_1
+LBB166_5:                               ; %B7
 	add	x9, x9, #24
 	cmp	x20, x9
 	add	x20, x20, #8
-	b.lt	LBB163_7
+	b.lt	LBB166_7
 ; %bb.6:                                ; %B9
 	ldur	x9, [x20, #-16]
 	ldur	q0, [x20, #-32]
@@ -7209,7 +7304,7 @@ LBB163_5:                               ; %B7
 	ldrb	w8, [x19], #1
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB163_7:                               ; %B8
+LBB166_7:                               ; %B8
 Lloh18:
 	adrp	x1, l___unnamed_10@PAGE
 Lloh19:
@@ -7227,13 +7322,13 @@ l_async_iterator_close_0_asm_h:         ; @async_iterator_close_0_asm_h
 	mov	x1, x20
 	str	x20, [x23, #48]
 	bl	_prim_js_async_iterator_close_gc
-	tbnz	w0, #31, LBB164_2
+	tbnz	w0, #31, LBB167_2
 ; %bb.1:                                ; %B3
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #8
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB164_2:                               ; %B2
+LBB167_2:                               ; %B2
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function async_iterator_next_0_asm_h
@@ -7246,13 +7341,13 @@ l_async_iterator_next_0_asm_h:          ; @async_iterator_next_0_asm_h
 	str	x20, [x23, #48]
 	bl	_JS_Call_GC
 	cmp	x0, #130
-	b.eq	LBB165_2
+	b.eq	LBB168_2
 ; %bb.1:                                ; %B3
 	stur	x0, [x20, #-8]
 	ldrb	w8, [x19], #1
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB165_2:                               ; %B2
+LBB168_2:                               ; %B2
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function async_iterator_get_0_asm_h
@@ -7263,14 +7358,14 @@ l_async_iterator_get_0_asm_h:           ; @async_iterator_get_0_asm_h
 	mov	x1, x20
 	str	x20, [x23, #48]
 	bl	_prim_js_async_iterator_get_gc
-	tbnz	w0, #31, LBB166_2
+	tbnz	w0, #31, LBB169_2
 ; %bb.1:                                ; %B3
 	ldrb	w8, [x19, #1]
 	add	x19, x19, #2
 	add	x20, x20, #8
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB166_2:                               ; %B2
+LBB169_2:                               ; %B2
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function initial_yield_0_asm_h
@@ -7321,24 +7416,24 @@ l_neg_0_asm_h:                          ; @neg_0_asm_h
 	ldur	x22, [x20, #-8]
 	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
 	cmp	x22, x8
-	b.hi	LBB172_3
+	b.hi	LBB175_3
 ; %bb.1:                                ; %B1
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x22, x8
-	b.lo	LBB172_6
+	b.lo	LBB175_6
 ; %bb.2:                                ; %B13
 	orr	w8, w22, #0x80000000
 	mov	w9, #-2147483648                ; =0x80000000
 	cmp	w8, w9
-	b.ne	LBB172_5
-LBB172_3:                               ; %B16
+	b.ne	LBB175_5
+LBB175_3:                               ; %B16
 	mov	x0, x24
 	mov	x1, x22
 	mov	w2, #140                        ; =0x8c
 	str	x20, [x23, #48]
 	bl	_prim_js_unary_arith_slow_gc
 	cmp	x0, #130
-	b.eq	LBB172_8
+	b.eq	LBB175_8
 ; %bb.4:                                ; %B18
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #8
@@ -7346,7 +7441,7 @@ LBB172_3:                               ; %B16
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB172_5:                               ; %B15
+LBB175_5:                               ; %B15
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #8
 	add	w8, w8, #243
@@ -7354,9 +7449,9 @@ LBB172_5:                               ; %B15
 	neg	w8, w22
 	orr	x22, x8, #0xfffe000000000000
 	br	x1
-LBB172_6:                               ; %B3
+LBB175_6:                               ; %B3
 	tst	x22, #0xfffe000000000000
-	b.eq	LBB172_3
+	b.eq	LBB175_3
 ; %bb.7:                                ; %B7
 	movi	d0, #0000000000000000
 	add	x8, x22, x8
@@ -7373,7 +7468,7 @@ LBB172_6:                               ; %B3
 	add	x9, x9, x10
 	csel	x22, x9, x8, vc
 	br	x1
-LBB172_8:                               ; %B17
+LBB175_8:                               ; %B17
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function plus_0_asm_h
@@ -7382,28 +7477,28 @@ l_plus_0_asm_h:                         ; @plus_0_asm_h
 	ldur	x22, [x20, #-8]
 	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
 	cmp	x22, x8
-	b.hi	LBB173_4
+	b.hi	LBB176_4
 ; %bb.1:                                ; %B1
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x22, x8
-	b.lo	LBB173_3
-LBB173_2:                               ; %B7
+	b.lo	LBB176_3
+LBB176_2:                               ; %B7
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #8
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB173_3:                               ; %B3
+LBB176_3:                               ; %B3
 	tst	x22, #0xfffe000000000000
-	b.ne	LBB173_2
-LBB173_4:                               ; %B10
+	b.ne	LBB176_2
+LBB176_4:                               ; %B10
 	mov	x0, x24
 	mov	x1, x22
 	mov	w2, #141                        ; =0x8d
 	str	x20, [x23, #48]
 	bl	_prim_js_unary_arith_slow_gc
 	cmp	x0, #130
-	b.eq	LBB173_6
+	b.eq	LBB176_6
 ; %bb.5:                                ; %B12
 	mov	x22, x0
 	ldrb	w8, [x19], #1
@@ -7411,7 +7506,7 @@ LBB173_4:                               ; %B10
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB173_6:                               ; %B11
+LBB176_6:                               ; %B11
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function dec_0_asm_h
@@ -7420,14 +7515,14 @@ l_dec_0_asm_h:                          ; @dec_0_asm_h
 	ldur	x22, [x20, #-8]
 	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
 	cmp	x22, x8
-	b.hi	LBB174_6
+	b.hi	LBB177_6
 ; %bb.1:                                ; %B1
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x22, x8
-	b.lo	LBB174_4
+	b.lo	LBB177_4
 ; %bb.2:                                ; %B13
 	subs	w8, w22, #1
-	b.vs	LBB174_6
+	b.vs	LBB177_6
 ; %bb.3:                                ; %B15
 	ldrb	w9, [x19], #1
 	sub	x20, x20, #8
@@ -7435,9 +7530,9 @@ l_dec_0_asm_h:                          ; @dec_0_asm_h
 	add	w9, w9, #243
 	ldr	x1, [x25, w9, uxtw #3]
 	br	x1
-LBB174_4:                               ; %B3
+LBB177_4:                               ; %B3
 	tst	x22, #0xfffe000000000000
-	b.eq	LBB174_6
+	b.eq	LBB177_6
 ; %bb.5:                                ; %B7
 	add	x8, x22, x8
 	fmov	d0, #-1.00000000
@@ -7454,14 +7549,14 @@ LBB174_4:                               ; %B3
 	add	x9, x9, x10
 	csel	x22, x9, x8, vc
 	br	x1
-LBB174_6:                               ; %B16
+LBB177_6:                               ; %B16
 	mov	x0, x24
 	mov	x1, x22
 	mov	w2, #142                        ; =0x8e
 	str	x20, [x23, #48]
 	bl	_prim_js_unary_arith_slow_gc
 	cmp	x0, #130
-	b.eq	LBB174_8
+	b.eq	LBB177_8
 ; %bb.7:                                ; %B18
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #8
@@ -7469,7 +7564,7 @@ LBB174_6:                               ; %B16
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB174_8:                               ; %B17
+LBB177_8:                               ; %B17
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function inc_0_asm_h
@@ -7478,14 +7573,14 @@ l_inc_0_asm_h:                          ; @inc_0_asm_h
 	ldur	x22, [x20, #-8]
 	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
 	cmp	x22, x8
-	b.hi	LBB175_6
+	b.hi	LBB178_6
 ; %bb.1:                                ; %B1
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x22, x8
-	b.lo	LBB175_4
+	b.lo	LBB178_4
 ; %bb.2:                                ; %B13
 	adds	w8, w22, #1
-	b.vs	LBB175_6
+	b.vs	LBB178_6
 ; %bb.3:                                ; %B15
 	ldrb	w9, [x19], #1
 	sub	x20, x20, #8
@@ -7493,9 +7588,9 @@ l_inc_0_asm_h:                          ; @inc_0_asm_h
 	add	w9, w9, #243
 	ldr	x1, [x25, w9, uxtw #3]
 	br	x1
-LBB175_4:                               ; %B3
+LBB178_4:                               ; %B3
 	tst	x22, #0xfffe000000000000
-	b.eq	LBB175_6
+	b.eq	LBB178_6
 ; %bb.5:                                ; %B7
 	add	x8, x22, x8
 	fmov	d0, #1.00000000
@@ -7512,14 +7607,14 @@ LBB175_4:                               ; %B3
 	add	x9, x9, x10
 	csel	x22, x9, x8, vc
 	br	x1
-LBB175_6:                               ; %B16
+LBB178_6:                               ; %B16
 	mov	x0, x24
 	mov	x1, x22
 	mov	w2, #143                        ; =0x8f
 	str	x20, [x23, #48]
 	bl	_prim_js_unary_arith_slow_gc
 	cmp	x0, #130
-	b.eq	LBB175_8
+	b.eq	LBB178_8
 ; %bb.7:                                ; %B18
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #8
@@ -7527,7 +7622,7 @@ LBB175_6:                               ; %B16
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB175_8:                               ; %B17
+LBB178_8:                               ; %B17
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function post_dec_0_asm_h
@@ -7536,14 +7631,14 @@ l_post_dec_0_asm_h:                     ; @post_dec_0_asm_h
 	ldur	x22, [x20, #-8]
 	mov	x8, #-281474976710656           ; =0xffff000000000000
 	cmp	x22, x8
-	b.hs	LBB176_6
+	b.hs	LBB179_6
 ; %bb.1:                                ; %B1
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x22, x8
-	b.lo	LBB176_4
+	b.lo	LBB179_4
 ; %bb.2:                                ; %B13
 	subs	w8, w22, #1
-	b.vs	LBB176_6
+	b.vs	LBB179_6
 ; %bb.3:                                ; %B15
 	ldrb	w9, [x19], #1
 	sub	x20, x20, #8
@@ -7551,9 +7646,9 @@ l_post_dec_0_asm_h:                     ; @post_dec_0_asm_h
 	add	w9, w9, #486
 	ldr	x1, [x25, w9, uxtw #3]
 	br	x1
-LBB176_4:                               ; %B3
+LBB179_4:                               ; %B3
 	tst	x22, #0xfffe000000000000
-	b.eq	LBB176_6
+	b.eq	LBB179_6
 ; %bb.5:                                ; %B8
 	add	x8, x22, x8
 	fmov	d0, #-1.00000000
@@ -7570,7 +7665,7 @@ LBB176_4:                               ; %B3
 	add	x9, x9, x10
 	csel	x21, x9, x8, vc
 	br	x1
-LBB176_6:                               ; %B5
+LBB179_6:                               ; %B5
 	mov	w0, #144                        ; =0x90
 	b	l_SlowJSPostInc_asm_h
                                         ; -- End function
@@ -7580,14 +7675,14 @@ l_post_inc_0_asm_h:                     ; @post_inc_0_asm_h
 	ldur	x22, [x20, #-8]
 	mov	x8, #-281474976710656           ; =0xffff000000000000
 	cmp	x22, x8
-	b.hs	LBB177_6
+	b.hs	LBB180_6
 ; %bb.1:                                ; %B1
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x22, x8
-	b.lo	LBB177_4
+	b.lo	LBB180_4
 ; %bb.2:                                ; %B13
 	adds	w8, w22, #1
-	b.vs	LBB177_6
+	b.vs	LBB180_6
 ; %bb.3:                                ; %B15
 	ldrb	w9, [x19], #1
 	sub	x20, x20, #8
@@ -7595,9 +7690,9 @@ l_post_inc_0_asm_h:                     ; @post_inc_0_asm_h
 	add	w9, w9, #486
 	ldr	x1, [x25, w9, uxtw #3]
 	br	x1
-LBB177_4:                               ; %B3
+LBB180_4:                               ; %B3
 	tst	x22, #0xfffe000000000000
-	b.eq	LBB177_6
+	b.eq	LBB180_6
 ; %bb.5:                                ; %B8
 	add	x8, x22, x8
 	fmov	d0, #1.00000000
@@ -7614,7 +7709,7 @@ LBB177_4:                               ; %B3
 	add	x9, x9, x10
 	csel	x21, x9, x8, vc
 	br	x1
-LBB177_6:                               ; %B5
+LBB180_6:                               ; %B5
 	mov	w0, #145                        ; =0x91
 	b	l_SlowJSPostInc_asm_h
                                         ; -- End function
@@ -7625,14 +7720,14 @@ l_dec_loc_0_asm_h:                      ; @dec_loc_0_asm_h
 	mov	x9, #-281474976710657           ; =0xfffeffffffffffff
 	ldr	x1, [x27, x8, lsl #3]
 	cmp	x1, x9
-	b.hi	LBB178_6
+	b.hi	LBB181_6
 ; %bb.1:                                ; %B2
 	mov	x9, #-562949953421312           ; =0xfffe000000000000
 	cmp	x1, x9
-	b.lo	LBB178_4
+	b.lo	LBB181_4
 ; %bb.2:                                ; %B13
 	subs	w9, w1, #1
-	b.vs	LBB178_6
+	b.vs	LBB181_6
 ; %bb.3:                                ; %B15
 	orr	x9, x9, #0xfffe000000000000
 	str	x9, [x27, w8, uxtw #3]
@@ -7640,9 +7735,9 @@ l_dec_loc_0_asm_h:                      ; @dec_loc_0_asm_h
 	add	x19, x19, #2
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB178_4:                               ; %B4
+LBB181_4:                               ; %B4
 	tst	x1, #0xfffe000000000000
-	b.eq	LBB178_6
+	b.eq	LBB181_6
 ; %bb.5:                                ; %B8
 	add	x9, x1, x9
 	fmov	d0, #-1.00000000
@@ -7659,13 +7754,13 @@ LBB178_4:                               ; %B4
 	add	x19, x19, #2
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB178_6:                               ; %B16
+LBB181_6:                               ; %B16
 	mov	x0, x24
 	mov	w2, #142                        ; =0x8e
 	str	x20, [x23, #48]
 	bl	_prim_js_unary_arith_slow_gc
 	cmp	x0, #130
-	b.eq	LBB178_8
+	b.eq	LBB181_8
 ; %bb.7:                                ; %B18
 	ldrb	w8, [x19]
 	str	x0, [x27, x8, lsl #3]
@@ -7673,7 +7768,7 @@ LBB178_6:                               ; %B16
 	add	x19, x19, #2
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB178_8:                               ; %B17
+LBB181_8:                               ; %B17
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function inc_loc_0_asm_h
@@ -7683,14 +7778,14 @@ l_inc_loc_0_asm_h:                      ; @inc_loc_0_asm_h
 	mov	x9, #-281474976710657           ; =0xfffeffffffffffff
 	ldr	x1, [x27, x8, lsl #3]
 	cmp	x1, x9
-	b.hi	LBB179_6
+	b.hi	LBB182_6
 ; %bb.1:                                ; %B2
 	mov	x9, #-562949953421312           ; =0xfffe000000000000
 	cmp	x1, x9
-	b.lo	LBB179_4
+	b.lo	LBB182_4
 ; %bb.2:                                ; %B13
 	adds	w9, w1, #1
-	b.vs	LBB179_6
+	b.vs	LBB182_6
 ; %bb.3:                                ; %B15
 	orr	x9, x9, #0xfffe000000000000
 	str	x9, [x27, w8, uxtw #3]
@@ -7698,9 +7793,9 @@ l_inc_loc_0_asm_h:                      ; @inc_loc_0_asm_h
 	add	x19, x19, #2
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB179_4:                               ; %B4
+LBB182_4:                               ; %B4
 	tst	x1, #0xfffe000000000000
-	b.eq	LBB179_6
+	b.eq	LBB182_6
 ; %bb.5:                                ; %B8
 	add	x9, x1, x9
 	fmov	d0, #1.00000000
@@ -7717,13 +7812,13 @@ LBB179_4:                               ; %B4
 	add	x19, x19, #2
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB179_6:                               ; %B16
+LBB182_6:                               ; %B16
 	mov	x0, x24
 	mov	w2, #143                        ; =0x8f
 	str	x20, [x23, #48]
 	bl	_prim_js_unary_arith_slow_gc
 	cmp	x0, #130
-	b.eq	LBB179_8
+	b.eq	LBB182_8
 ; %bb.7:                                ; %B18
 	ldrb	w8, [x19]
 	str	x0, [x27, x8, lsl #3]
@@ -7731,7 +7826,7 @@ LBB179_6:                               ; %B16
 	add	x19, x19, #2
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB179_8:                               ; %B17
+LBB182_8:                               ; %B17
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function add_loc_0_asm_h
@@ -7743,18 +7838,18 @@ l_add_loc_0_asm_h:                      ; @add_loc_0_asm_h
 	ldr	x1, [x27, x8, lsl #3]
 	cmp	x1, x9
 	ccmp	x22, x9, #2, ls
-	b.hi	LBB180_15
+	b.hi	LBB183_15
 ; %bb.1:                                ; %B2
 	mov	x9, #-562949953421312           ; =0xfffe000000000000
 	cmp	x1, x9
-	b.lo	LBB180_5
+	b.lo	LBB183_5
 ; %bb.2:                                ; %B26
 	cmp	x22, x9
-	b.lo	LBB180_8
+	b.lo	LBB183_8
 ; %bb.3:                                ; %B36
 	adds	w9, w1, w22
 	sub	x20, x20, #8
-	b.vs	LBB180_12
+	b.vs	LBB183_12
 ; %bb.4:                                ; %B42
 	orr	x9, x9, #0xfffe000000000000
 	str	x9, [x27, w8, uxtw #3]
@@ -7762,28 +7857,28 @@ l_add_loc_0_asm_h:                      ; @add_loc_0_asm_h
 	add	x19, x19, #2
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB180_5:                               ; %B4
+LBB183_5:                               ; %B4
 	tst	x1, #0xfffe000000000000
-	b.eq	LBB180_15
+	b.eq	LBB183_15
 ; %bb.6:                                ; %B11
 	cmp	x22, x9
-	b.lo	LBB180_13
+	b.lo	LBB183_13
 ; %bb.7:                                ; %B21
 	scvtf	d0, w22
 	add	x9, x1, x9
 	fmov	d1, x9
 	fadd	d0, d1, d0
-	b	LBB180_11
-LBB180_8:                               ; %B28
+	b	LBB183_11
+LBB183_8:                               ; %B28
 	tst	x22, #0xfffe000000000000
-	b.eq	LBB180_15
+	b.eq	LBB183_15
 ; %bb.9:                                ; %B31
 	scvtf	d0, w1
 	add	x9, x22, x9
-LBB180_10:                              ; %B31
+LBB183_10:                              ; %B31
 	fmov	d1, x9
 	fadd	d0, d0, d1
-LBB180_11:                              ; %B31
+LBB183_11:                              ; %B31
 	fmov	x9, d0
 	fcmp	d0, d0
 	mov	x10, #562949953421312           ; =0x2000000000000
@@ -7796,7 +7891,7 @@ LBB180_11:                              ; %B31
 	add	x19, x19, #2
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB180_12:                              ; %B38
+LBB183_12:                              ; %B38
 	scvtf	d0, w1
 	scvtf	d1, w22
 	mov	x10, #562949953421312           ; =0x2000000000000
@@ -7811,15 +7906,15 @@ LBB180_12:                              ; %B38
 	add	x19, x19, #2
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB180_13:                              ; %B13
+LBB183_13:                              ; %B13
 	tst	x22, #0xfffe000000000000
-	b.eq	LBB180_15
+	b.eq	LBB183_15
 ; %bb.14:                               ; %B16
 	add	x10, x1, x9
 	add	x9, x22, x9
 	fmov	d0, x10
-	b	LBB180_10
-LBB180_15:                              ; %B7
+	b	LBB183_10
+LBB183_15:                              ; %B7
 	and	x8, x22, #0xffff000000000003
 	mov	x9, #-281474976710653           ; =0xffff000000000003
 	mov	x10, #2                         ; =0x2
@@ -7831,14 +7926,14 @@ LBB180_15:                              ; %B7
 	cmp	x11, x10
 	ccmp	x11, x9, #4, ne
 	ccmp	w8, #0, #4, eq
-	b.ne	LBB180_18
+	b.ne	LBB183_18
 ; %bb.16:                               ; %B43
 	mov	x0, x24
 	mov	x2, x22
 	str	x20, [x23, #48]
 	bl	_prim_js_add_slow_gc
 	cmp	x0, #130
-	b.eq	LBB180_19
+	b.eq	LBB183_19
 ; %bb.17:                               ; %B45
 	ldrb	w8, [x19]
 	str	x0, [x27, x8, lsl #3]
@@ -7847,10 +7942,10 @@ LBB180_15:                              ; %B7
 	add	x19, x19, #2
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB180_18:                              ; %B8
+LBB183_18:                              ; %B8
 	mov	w0, #1                          ; =0x1
 	b	l_FastJSConcatString_asm_h
-LBB180_19:                              ; %B44
+LBB183_19:                              ; %B44
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function not_0_asm_h
@@ -7859,7 +7954,7 @@ l_not_0_asm_h:                          ; @not_0_asm_h
 	ldur	x22, [x20, #-8]
 	mov	w8, #65534                      ; =0xfffe
 	cmp	x8, x22, lsr #48
-	b.ne	LBB181_2
+	b.ne	LBB184_2
 ; %bb.1:                                ; %B3
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #8
@@ -7868,7 +7963,7 @@ l_not_0_asm_h:                          ; @not_0_asm_h
 	mvn	w8, w22
 	orr	x22, x8, #0xfffe000000000000
 	br	x1
-LBB181_2:                               ; %B4
+LBB184_2:                               ; %B4
 	mov	x0, x22
 	b	l_SlowJSNot_asm_h
                                         ; -- End function
@@ -7877,43 +7972,43 @@ l_lnot_0_asm_h:                         ; @lnot_0_asm_h
 ; %bb.0:                                ; %B14
 	ldur	x22, [x20, #-8]
 	cmp	x22, #5
-	b.le	LBB182_4
+	b.le	LBB185_4
 ; %bb.1:                                ; %B14
 	cmp	x22, #6
-	b.eq	LBB182_6
+	b.eq	LBB185_6
 ; %bb.2:                                ; %B14
 	cmp	x22, #7
-	b.eq	LBB182_8
+	b.eq	LBB185_8
 ; %bb.3:                                ; %B14
 	cmp	x22, #18
-	b.eq	LBB182_6
-	b	LBB182_7
-LBB182_4:                               ; %B14
+	b.eq	LBB185_6
+	b	LBB185_7
+LBB185_4:                               ; %B14
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x22, x8
-	b.eq	LBB182_6
+	b.eq	LBB185_6
 ; %bb.5:                                ; %B14
 	cmp	x22, #2
-	b.ne	LBB182_7
-LBB182_6:                               ; %B3
+	b.ne	LBB185_7
+LBB185_6:                               ; %B3
 	mov	w22, #7                         ; =0x7
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #8
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB182_7:                               ; %B10
+LBB185_7:                               ; %B10
 	mov	w8, #65534                      ; =0xfffe
 	cmp	x8, x22, lsr #48
-	b.ne	LBB182_9
-LBB182_8:                               ; %B12
+	b.ne	LBB185_9
+LBB185_8:                               ; %B12
 	mov	w22, #6                         ; =0x6
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #8
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB182_9:                               ; %B13
+LBB185_9:                               ; %B13
 	mov	x0, x22
 	b	l_SlowToBoolean_asm_h
                                         ; -- End function
@@ -7930,7 +8025,7 @@ l_typeof_0_asm_h:                       ; @typeof_0_asm_h
 	str	x20, [x23, #48]
 	bl	___JS_AtomToValue_GC
 	cmp	x0, #130
-	b.eq	LBB183_2
+	b.eq	LBB186_2
 ; %bb.1:                                ; %B3
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #8
@@ -7938,7 +8033,7 @@ l_typeof_0_asm_h:                       ; @typeof_0_asm_h
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB183_2:                               ; %B2
+LBB186_2:                               ; %B2
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function delete_0_asm_h
@@ -7951,7 +8046,7 @@ l_delete_0_asm_h:                       ; @delete_0_asm_h
 	mov	x2, x21
 	bl	_prim_js_operator_delete_gc
 	cmp	x0, #130
-	b.eq	LBB184_2
+	b.eq	LBB187_2
 ; %bb.1:                                ; %B3
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #16
@@ -7959,7 +8054,7 @@ l_delete_0_asm_h:                       ; @delete_0_asm_h
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB184_2:                               ; %B2
+LBB187_2:                               ; %B2
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function delete_var_0_asm_h
@@ -7971,7 +8066,7 @@ l_delete_var_0_asm_h:                   ; @delete_var_0_asm_h
 	mov	w3, wzr
 	str	x20, [x23, #48]
 	bl	_JS_DeleteProperty_GC
-	tbnz	w0, #31, LBB185_2
+	tbnz	w0, #31, LBB188_2
 ; %bb.1:                                ; %B3
 	ldrb	w8, [x19, #4]
 	cmp	w0, #0
@@ -7981,7 +8076,7 @@ l_delete_var_0_asm_h:                   ; @delete_var_0_asm_h
 	mov	w8, #6                          ; =0x6
 	cinc	x22, x8, ne
 	br	x1
-LBB185_2:                               ; %B2
+LBB188_2:                               ; %B2
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function mul_0_asm_h
@@ -7990,56 +8085,56 @@ l_mul_0_asm_h:                          ; @mul_0_asm_h
 	ldp	x22, x21, [x20, #-16]
 	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
 	cmp	x22, x8
-	b.hi	LBB186_19
+	b.hi	LBB189_19
 ; %bb.1:                                ; %B51
 	cmp	x21, x8
-	b.hi	LBB186_19
+	b.hi	LBB189_19
 ; %bb.2:                                ; %B1
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x22, x8
-	b.lo	LBB186_8
+	b.lo	LBB189_8
 ; %bb.3:                                ; %B23
 	cmp	x21, x8
-	b.lo	LBB186_11
+	b.lo	LBB189_11
 ; %bb.4:                                ; %B33
 	smull	x8, w22, w21
 	sub	x20, x20, #16
 	cmp	x8, w8, sxtw
-	b.ne	LBB186_15
+	b.ne	LBB189_15
 ; %bb.5:                                ; %B40
-	cbnz	w8, LBB186_7
+	cbnz	w8, LBB189_7
 ; %bb.6:                                ; %B40
 	orr	w9, w22, w21
-	tbnz	w9, #31, LBB186_16
-LBB186_7:                               ; %B47
+	tbnz	w9, #31, LBB189_16
+LBB189_7:                               ; %B47
 	mov	w8, w8
 	orr	x22, x8, #0xfffe000000000000
 	ldrb	w8, [x19], #1
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB186_8:                               ; %B3
+LBB189_8:                               ; %B3
 	tst	x22, #0xfffe000000000000
-	b.eq	LBB186_19
+	b.eq	LBB189_19
 ; %bb.9:                                ; %B7
 	cmp	x21, x8
-	b.lo	LBB186_17
+	b.lo	LBB189_17
 ; %bb.10:                               ; %B18
 	scvtf	d0, w21
 	add	x8, x22, x8
 	fmov	d1, x8
 	fmul	d0, d1, d0
-	b	LBB186_14
-LBB186_11:                              ; %B25
+	b	LBB189_14
+LBB189_11:                              ; %B25
 	tst	x21, #0xfffe000000000000
-	b.eq	LBB186_19
+	b.eq	LBB189_19
 ; %bb.12:                               ; %B28
 	scvtf	d0, w22
 	add	x8, x21, x8
-LBB186_13:                              ; %B28
+LBB189_13:                              ; %B28
 	fmov	d1, x8
 	fmul	d0, d0, d1
-LBB186_14:                              ; %B28
+LBB189_14:                              ; %B28
 	ldrb	w8, [x19], #1
 	fmov	x9, d0
 	fcmp	d0, d0
@@ -8051,7 +8146,7 @@ LBB186_14:                              ; %B28
 	mov	x8, #9221683186994511872        ; =0x7ffa000000000000
 	csel	x22, x9, x8, vc
 	br	x1
-LBB186_15:                              ; %B35
+LBB189_15:                              ; %B35
 	scvtf	d0, w22
 	scvtf	d1, w21
 	mov	x10, #562949953421312           ; =0x2000000000000
@@ -8065,21 +8160,21 @@ LBB186_15:                              ; %B35
 	mov	x8, #9221683186994511872        ; =0x7ffa000000000000
 	csel	x22, x9, x8, vc
 	br	x1
-LBB186_16:                              ; %B44
+LBB189_16:                              ; %B44
 	mov	x22, #-9222809086901354496      ; =0x8002000000000000
 	ldrb	w8, [x19], #1
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB186_17:                              ; %B9
+LBB189_17:                              ; %B9
 	tst	x21, #0xfffe000000000000
-	b.eq	LBB186_19
+	b.eq	LBB189_19
 ; %bb.18:                               ; %B12
 	add	x9, x22, x8
 	add	x8, x21, x8
 	fmov	d0, x9
-	b	LBB186_13
-LBB186_19:                              ; %B48
+	b	LBB189_13
+LBB189_19:                              ; %B48
 	mov	x0, x24
 	mov	x1, x22
 	mov	x2, x21
@@ -8087,7 +8182,7 @@ LBB186_19:                              ; %B48
 	str	x20, [x23, #48]
 	bl	_prim_js_binary_arith_slow_gc
 	cmp	x0, #130
-	b.eq	LBB186_21
+	b.eq	LBB189_21
 ; %bb.20:                               ; %B50
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #16
@@ -8095,7 +8190,7 @@ LBB186_19:                              ; %B48
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB186_21:                              ; %B49
+LBB189_21:                              ; %B49
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function div_0_asm_h
@@ -8104,17 +8199,17 @@ l_div_0_asm_h:                          ; @div_0_asm_h
 	ldp	x22, x21, [x20, #-16]
 	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
 	cmp	x22, x8
-	b.hi	LBB187_14
+	b.hi	LBB190_14
 ; %bb.1:                                ; %B44
 	cmp	x21, x8
-	b.hi	LBB187_14
+	b.hi	LBB190_14
 ; %bb.2:                                ; %B1
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x22, x8
-	b.lo	LBB187_5
+	b.lo	LBB190_5
 ; %bb.3:                                ; %B23
 	cmp	x21, x8
-	b.lo	LBB187_8
+	b.lo	LBB190_8
 ; %bb.4:                                ; %B33
 	scvtf	d0, w22
 	scvtf	d1, w21
@@ -8134,28 +8229,28 @@ l_div_0_asm_h:                          ; @div_0_asm_h
 	orr	x9, x9, #0xfffe000000000000
 	csel	x22, x8, x9, ne
 	br	x1
-LBB187_5:                               ; %B3
+LBB190_5:                               ; %B3
 	tst	x22, #0xfffe000000000000
-	b.eq	LBB187_14
+	b.eq	LBB190_14
 ; %bb.6:                                ; %B7
 	cmp	x21, x8
-	b.lo	LBB187_12
+	b.lo	LBB190_12
 ; %bb.7:                                ; %B18
 	scvtf	d0, w21
 	add	x8, x22, x8
 	fmov	d1, x8
 	fdiv	d0, d1, d0
-	b	LBB187_11
-LBB187_8:                               ; %B25
+	b	LBB190_11
+LBB190_8:                               ; %B25
 	tst	x21, #0xfffe000000000000
-	b.eq	LBB187_14
+	b.eq	LBB190_14
 ; %bb.9:                                ; %B28
 	scvtf	d0, w22
 	add	x8, x21, x8
-LBB187_10:                              ; %B28
+LBB190_10:                              ; %B28
 	fmov	d1, x8
 	fdiv	d0, d0, d1
-LBB187_11:                              ; %B28
+LBB190_11:                              ; %B28
 	ldrb	w8, [x19], #1
 	fmov	x9, d0
 	fcmp	d0, d0
@@ -8167,15 +8262,15 @@ LBB187_11:                              ; %B28
 	mov	x8, #9221683186994511872        ; =0x7ffa000000000000
 	csel	x22, x9, x8, vc
 	br	x1
-LBB187_12:                              ; %B9
+LBB190_12:                              ; %B9
 	tst	x21, #0xfffe000000000000
-	b.eq	LBB187_14
+	b.eq	LBB190_14
 ; %bb.13:                               ; %B12
 	add	x9, x22, x8
 	add	x8, x21, x8
 	fmov	d0, x9
-	b	LBB187_10
-LBB187_14:                              ; %B41
+	b	LBB190_10
+LBB190_14:                              ; %B41
 	mov	x0, x24
 	mov	x1, x22
 	mov	x2, x21
@@ -8183,7 +8278,7 @@ LBB187_14:                              ; %B41
 	str	x20, [x23, #48]
 	bl	_prim_js_binary_arith_slow_gc
 	cmp	x0, #130
-	b.eq	LBB187_16
+	b.eq	LBB190_16
 ; %bb.15:                               ; %B43
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #16
@@ -8191,7 +8286,7 @@ LBB187_14:                              ; %B41
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB187_16:                              ; %B42
+LBB190_16:                              ; %B42
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function mod_0_asm_h
@@ -8200,22 +8295,22 @@ l_mod_0_asm_h:                          ; @mod_0_asm_h
 	ldp	x22, x21, [x20, #-16]
 	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
 	cmp	x22, x8
-	b.hi	LBB188_16
+	b.hi	LBB191_16
 ; %bb.1:                                ; %B39
 	cmp	x21, x8
-	b.hi	LBB188_16
+	b.hi	LBB191_16
 ; %bb.2:                                ; %B1
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x22, x8
-	b.lo	LBB188_7
+	b.lo	LBB191_7
 ; %bb.3:                                ; %B23
 	cmp	x21, x8
-	b.lo	LBB188_10
+	b.lo	LBB191_10
 ; %bb.4:                                ; %B33
-	tbnz	w22, #31, LBB188_16
+	tbnz	w22, #31, LBB191_16
 ; %bb.5:                                ; %B33
 	cmp	w21, #1
-	b.lt	LBB188_16
+	b.lt	LBB191_16
 ; %bb.6:                                ; %B35
 	sdiv	w8, w22, w21
 	ldrb	w9, [x19], #1
@@ -8225,26 +8320,26 @@ l_mod_0_asm_h:                          ; @mod_0_asm_h
 	msub	w8, w8, w21, w22
 	orr	x22, x8, #0xfffe000000000000
 	br	x1
-LBB188_7:                               ; %B3
+LBB191_7:                               ; %B3
 	tst	x22, #0xfffe000000000000
-	b.eq	LBB188_16
+	b.eq	LBB191_16
 ; %bb.8:                                ; %B7
 	cmp	x21, x8
-	b.lo	LBB188_14
+	b.lo	LBB191_14
 ; %bb.9:                                ; %B18
 	add	x8, x22, x8
 	scvtf	d1, w21
 	fmov	d0, x8
-	b	LBB188_13
-LBB188_10:                              ; %B25
+	b	LBB191_13
+LBB191_10:                              ; %B25
 	tst	x21, #0xfffe000000000000
-	b.eq	LBB188_16
+	b.eq	LBB191_16
 ; %bb.11:                               ; %B28
 	scvtf	d0, w22
 	add	x8, x21, x8
-LBB188_12:                              ; %B28
+LBB191_12:                              ; %B28
 	fmov	d1, x8
-LBB188_13:                              ; %B28
+LBB191_13:                              ; %B28
 	bl	_fmod
 	ldrb	w8, [x19], #1
 	fmov	x9, d0
@@ -8257,15 +8352,15 @@ LBB188_13:                              ; %B28
 	mov	x8, #9221683186994511872        ; =0x7ffa000000000000
 	csel	x22, x9, x8, vc
 	br	x1
-LBB188_14:                              ; %B9
+LBB191_14:                              ; %B9
 	tst	x21, #0xfffe000000000000
-	b.eq	LBB188_16
+	b.eq	LBB191_16
 ; %bb.15:                               ; %B12
 	add	x9, x22, x8
 	add	x8, x21, x8
 	fmov	d0, x9
-	b	LBB188_12
-LBB188_16:                              ; %B36
+	b	LBB191_12
+LBB191_16:                              ; %B36
 	mov	x0, x24
 	mov	x1, x22
 	mov	x2, x21
@@ -8273,7 +8368,7 @@ LBB188_16:                              ; %B36
 	str	x20, [x23, #48]
 	bl	_prim_js_binary_arith_slow_gc
 	cmp	x0, #130
-	b.eq	LBB188_18
+	b.eq	LBB191_18
 ; %bb.17:                               ; %B38
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #16
@@ -8281,7 +8376,7 @@ LBB188_16:                              ; %B36
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB188_18:                              ; %B37
+LBB191_18:                              ; %B37
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function add_0_asm_h
@@ -8290,49 +8385,49 @@ l_add_0_asm_h:                          ; @add_0_asm_h
 	ldp	x22, x21, [x20, #-16]
 	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
 	cmp	x22, x8
-	b.hi	LBB189_16
+	b.hi	LBB192_16
 ; %bb.1:                                ; %B46
 	cmp	x21, x8
-	b.hi	LBB189_16
+	b.hi	LBB192_16
 ; %bb.2:                                ; %B1
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x22, x8
-	b.lo	LBB189_6
+	b.lo	LBB192_6
 ; %bb.3:                                ; %B26
 	cmp	x21, x8
-	b.lo	LBB189_9
+	b.lo	LBB192_9
 ; %bb.4:                                ; %B36
 	adds	w8, w22, w21
 	sub	x20, x20, #16
-	b.vs	LBB189_13
+	b.vs	LBB192_13
 ; %bb.5:                                ; %B42
 	ldrb	w9, [x19], #1
 	orr	x22, x8, #0xfffe000000000000
 	add	w9, w9, #243
 	ldr	x1, [x25, w9, uxtw #3]
 	br	x1
-LBB189_6:                               ; %B3
+LBB192_6:                               ; %B3
 	tst	x22, #0xfffe000000000000
-	b.eq	LBB189_16
+	b.eq	LBB192_16
 ; %bb.7:                                ; %B11
 	cmp	x21, x8
-	b.lo	LBB189_14
+	b.lo	LBB192_14
 ; %bb.8:                                ; %B21
 	scvtf	d0, w21
 	add	x8, x22, x8
 	fmov	d1, x8
 	fadd	d0, d1, d0
-	b	LBB189_12
-LBB189_9:                               ; %B28
+	b	LBB192_12
+LBB192_9:                               ; %B28
 	tst	x21, #0xfffe000000000000
-	b.eq	LBB189_16
+	b.eq	LBB192_16
 ; %bb.10:                               ; %B31
 	scvtf	d0, w22
 	add	x8, x21, x8
-LBB189_11:                              ; %B31
+LBB192_11:                              ; %B31
 	fmov	d1, x8
 	fadd	d0, d0, d1
-LBB189_12:                              ; %B31
+LBB192_12:                              ; %B31
 	ldrb	w8, [x19], #1
 	fmov	x9, d0
 	fcmp	d0, d0
@@ -8344,7 +8439,7 @@ LBB189_12:                              ; %B31
 	mov	x8, #9221683186994511872        ; =0x7ffa000000000000
 	csel	x22, x9, x8, vc
 	br	x1
-LBB189_13:                              ; %B38
+LBB192_13:                              ; %B38
 	scvtf	d0, w22
 	scvtf	d1, w21
 	mov	x10, #562949953421312           ; =0x2000000000000
@@ -8358,15 +8453,15 @@ LBB189_13:                              ; %B38
 	mov	x8, #9221683186994511872        ; =0x7ffa000000000000
 	csel	x22, x9, x8, vc
 	br	x1
-LBB189_14:                              ; %B13
+LBB192_14:                              ; %B13
 	tst	x21, #0xfffe000000000000
-	b.eq	LBB189_16
+	b.eq	LBB192_16
 ; %bb.15:                               ; %B16
 	add	x9, x22, x8
 	add	x8, x21, x8
 	fmov	d0, x9
-	b	LBB189_11
-LBB189_16:                              ; %B7
+	b	LBB192_11
+LBB192_16:                              ; %B7
 	and	x8, x21, #0xffff000000000003
 	mov	x9, #-281474976710653           ; =0xffff000000000003
 	mov	x10, #2                         ; =0x2
@@ -8377,20 +8472,20 @@ LBB189_16:                              ; %B7
 	cset	w8, eq
 	cmp	x11, x10
 	ccmp	x11, x9, #4, ne
-	b.ne	LBB189_19
+	b.ne	LBB192_19
 ; %bb.17:                               ; %B7
-	cbz	w8, LBB189_19
+	cbz	w8, LBB192_19
 ; %bb.18:                               ; %B8
 	mov	x0, xzr
 	b	l_FastJSConcatString_asm_h
-LBB189_19:                              ; %B43
+LBB192_19:                              ; %B43
 	mov	x0, x24
 	mov	x1, x22
 	mov	x2, x21
 	str	x20, [x23, #48]
 	bl	_prim_js_add_slow_gc
 	cmp	x0, #130
-	b.eq	LBB189_21
+	b.eq	LBB192_21
 ; %bb.20:                               ; %B45
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #16
@@ -8398,7 +8493,7 @@ LBB189_19:                              ; %B43
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB189_21:                              ; %B44
+LBB192_21:                              ; %B44
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function sub_0_asm_h
@@ -8407,49 +8502,49 @@ l_sub_0_asm_h:                          ; @sub_0_asm_h
 	ldp	x22, x21, [x20, #-16]
 	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
 	cmp	x22, x8
-	b.hi	LBB190_16
+	b.hi	LBB193_16
 ; %bb.1:                                ; %B43
 	cmp	x21, x8
-	b.hi	LBB190_16
+	b.hi	LBB193_16
 ; %bb.2:                                ; %B1
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x22, x8
-	b.lo	LBB190_6
+	b.lo	LBB193_6
 ; %bb.3:                                ; %B23
 	cmp	x21, x8
-	b.lo	LBB190_9
+	b.lo	LBB193_9
 ; %bb.4:                                ; %B33
 	subs	w8, w22, w21
 	sub	x20, x20, #16
-	b.vs	LBB190_13
+	b.vs	LBB193_13
 ; %bb.5:                                ; %B39
 	ldrb	w9, [x19], #1
 	orr	x22, x8, #0xfffe000000000000
 	add	w9, w9, #243
 	ldr	x1, [x25, w9, uxtw #3]
 	br	x1
-LBB190_6:                               ; %B3
+LBB193_6:                               ; %B3
 	tst	x22, #0xfffe000000000000
-	b.eq	LBB190_16
+	b.eq	LBB193_16
 ; %bb.7:                                ; %B7
 	cmp	x21, x8
-	b.lo	LBB190_14
+	b.lo	LBB193_14
 ; %bb.8:                                ; %B18
 	scvtf	d0, w21
 	add	x8, x22, x8
 	fmov	d1, x8
 	fsub	d0, d1, d0
-	b	LBB190_12
-LBB190_9:                               ; %B25
+	b	LBB193_12
+LBB193_9:                               ; %B25
 	tst	x21, #0xfffe000000000000
-	b.eq	LBB190_16
+	b.eq	LBB193_16
 ; %bb.10:                               ; %B28
 	scvtf	d0, w22
 	add	x8, x21, x8
-LBB190_11:                              ; %B28
+LBB193_11:                              ; %B28
 	fmov	d1, x8
 	fsub	d0, d0, d1
-LBB190_12:                              ; %B28
+LBB193_12:                              ; %B28
 	ldrb	w8, [x19], #1
 	fmov	x9, d0
 	fcmp	d0, d0
@@ -8461,7 +8556,7 @@ LBB190_12:                              ; %B28
 	mov	x8, #9221683186994511872        ; =0x7ffa000000000000
 	csel	x22, x9, x8, vc
 	br	x1
-LBB190_13:                              ; %B35
+LBB193_13:                              ; %B35
 	scvtf	d0, w22
 	scvtf	d1, w21
 	mov	x10, #562949953421312           ; =0x2000000000000
@@ -8475,15 +8570,15 @@ LBB190_13:                              ; %B35
 	mov	x8, #9221683186994511872        ; =0x7ffa000000000000
 	csel	x22, x9, x8, vc
 	br	x1
-LBB190_14:                              ; %B9
+LBB193_14:                              ; %B9
 	tst	x21, #0xfffe000000000000
-	b.eq	LBB190_16
+	b.eq	LBB193_16
 ; %bb.15:                               ; %B12
 	add	x9, x22, x8
 	add	x8, x21, x8
 	fmov	d0, x9
-	b	LBB190_11
-LBB190_16:                              ; %B40
+	b	LBB193_11
+LBB193_16:                              ; %B40
 	mov	x0, x24
 	mov	x1, x22
 	mov	x2, x21
@@ -8491,7 +8586,7 @@ LBB190_16:                              ; %B40
 	str	x20, [x23, #48]
 	bl	_prim_js_binary_arith_slow_gc
 	cmp	x0, #130
-	b.eq	LBB190_18
+	b.eq	LBB193_18
 ; %bb.17:                               ; %B42
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #16
@@ -8499,7 +8594,7 @@ LBB190_16:                              ; %B40
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB190_18:                              ; %B41
+LBB193_18:                              ; %B41
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function pow_0_asm_h
@@ -8513,7 +8608,7 @@ l_pow_0_asm_h:                          ; @pow_0_asm_h
 	mov	x2, x21
 	bl	_prim_js_binary_arith_slow_gc
 	cmp	x0, #130
-	b.eq	LBB191_2
+	b.eq	LBB194_2
 ; %bb.1:                                ; %B3
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #16
@@ -8521,7 +8616,7 @@ l_pow_0_asm_h:                          ; @pow_0_asm_h
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB191_2:                               ; %B2
+LBB194_2:                               ; %B2
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function shl_0_asm_h
@@ -8530,20 +8625,20 @@ l_shl_0_asm_h:                          ; @shl_0_asm_h
 	ldp	x22, x21, [x20, #-16]
 	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
 	cmp	x22, x8
-	b.hi	LBB192_10
+	b.hi	LBB195_10
 ; %bb.1:                                ; %B28
 	cmp	x21, x8
-	b.hi	LBB192_10
+	b.hi	LBB195_10
 ; %bb.2:                                ; %B2
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x22, x8
-	b.lo	LBB192_6
+	b.lo	LBB195_6
 ; %bb.3:                                ; %B19
 	cmp	x21, x8
-	b.lo	LBB192_10
+	b.lo	LBB195_10
 ; %bb.4:                                ; %B24
 	mov	w8, w22
-LBB192_5:                               ; %B16
+LBB195_5:                               ; %B16
 	ldrb	w9, [x19], #1
 	lsl	w8, w8, w21
 	sub	x20, x20, #16
@@ -8551,23 +8646,23 @@ LBB192_5:                               ; %B16
 	orr	x22, x8, #0xfffe000000000000
 	ldr	x1, [x25, w9, uxtw #3]
 	br	x1
-LBB192_6:                               ; %B4
+LBB195_6:                               ; %B4
 	tst	x22, #0xfffe000000000000
-	b.eq	LBB192_10
+	b.eq	LBB195_10
 ; %bb.7:                                ; %B4
 	cmp	x21, x8
-	b.lo	LBB192_10
+	b.lo	LBB195_10
 ; %bb.8:                                ; %B14
 	ubfx	x8, x22, #52, #11
 	cmp	x8, #1053
-	b.gt	LBB192_10
+	b.gt	LBB195_10
 ; %bb.9:                                ; %B15
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	add	x8, x22, x8
 	fmov	d0, x8
 	fcvtzs	w8, d0
-	b	LBB192_5
-LBB192_10:                              ; %B25
+	b	LBB195_5
+LBB195_10:                              ; %B25
 	mov	x0, x24
 	mov	x1, x22
 	mov	x2, x21
@@ -8575,7 +8670,7 @@ LBB192_10:                              ; %B25
 	str	x20, [x23, #48]
 	bl	_prim_js_binary_logic_slow_gc
 	cmp	x0, #130
-	b.eq	LBB192_12
+	b.eq	LBB195_12
 ; %bb.11:                               ; %B27
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #16
@@ -8583,7 +8678,7 @@ LBB192_10:                              ; %B25
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB192_12:                              ; %B26
+LBB195_12:                              ; %B26
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function sar_0_asm_h
@@ -8592,20 +8687,20 @@ l_sar_0_asm_h:                          ; @sar_0_asm_h
 	ldp	x22, x21, [x20, #-16]
 	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
 	cmp	x22, x8
-	b.hi	LBB193_10
+	b.hi	LBB196_10
 ; %bb.1:                                ; %B28
 	cmp	x21, x8
-	b.hi	LBB193_10
+	b.hi	LBB196_10
 ; %bb.2:                                ; %B2
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x22, x8
-	b.lo	LBB193_6
+	b.lo	LBB196_6
 ; %bb.3:                                ; %B19
 	cmp	x21, x8
-	b.lo	LBB193_10
+	b.lo	LBB196_10
 ; %bb.4:                                ; %B24
 	mov	w8, w22
-LBB193_5:                               ; %B16
+LBB196_5:                               ; %B16
 	ldrb	w9, [x19], #1
 	asr	w8, w8, w21
 	sub	x20, x20, #16
@@ -8613,23 +8708,23 @@ LBB193_5:                               ; %B16
 	orr	x22, x8, #0xfffe000000000000
 	ldr	x1, [x25, w9, uxtw #3]
 	br	x1
-LBB193_6:                               ; %B4
+LBB196_6:                               ; %B4
 	tst	x22, #0xfffe000000000000
-	b.eq	LBB193_10
+	b.eq	LBB196_10
 ; %bb.7:                                ; %B4
 	cmp	x21, x8
-	b.lo	LBB193_10
+	b.lo	LBB196_10
 ; %bb.8:                                ; %B14
 	ubfx	x8, x22, #52, #11
 	cmp	x8, #1053
-	b.gt	LBB193_10
+	b.gt	LBB196_10
 ; %bb.9:                                ; %B15
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	add	x8, x22, x8
 	fmov	d0, x8
 	fcvtzs	w8, d0
-	b	LBB193_5
-LBB193_10:                              ; %B25
+	b	LBB196_5
+LBB196_10:                              ; %B25
 	mov	x0, x24
 	mov	x1, x22
 	mov	x2, x21
@@ -8637,7 +8732,7 @@ LBB193_10:                              ; %B25
 	str	x20, [x23, #48]
 	bl	_prim_js_binary_logic_slow_gc
 	cmp	x0, #130
-	b.eq	LBB193_12
+	b.eq	LBB196_12
 ; %bb.11:                               ; %B27
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #16
@@ -8645,7 +8740,7 @@ LBB193_10:                              ; %B25
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB193_12:                              ; %B26
+LBB196_12:                              ; %B26
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function shr_0_asm_h
@@ -8654,22 +8749,22 @@ l_shr_0_asm_h:                          ; @shr_0_asm_h
 	ldp	x22, x21, [x20, #-16]
 	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
 	cmp	x22, x8
-	b.hi	LBB194_11
+	b.hi	LBB197_11
 ; %bb.1:                                ; %B36
 	cmp	x21, x8
-	b.hi	LBB194_11
+	b.hi	LBB197_11
 ; %bb.2:                                ; %B10
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x22, x8
-	b.lo	LBB194_6
+	b.lo	LBB197_6
 ; %bb.3:                                ; %B27
 	cmp	x21, x8
-	b.lo	LBB194_11
+	b.lo	LBB197_11
 ; %bb.4:                                ; %B32
 	mov	w8, w22
 	lsr	w8, w8, w21
-	tbnz	w8, #31, LBB194_10
-LBB194_5:                               ; %B2
+	tbnz	w8, #31, LBB197_10
+LBB197_5:                               ; %B2
 	orr	x8, x8, #0xfffe000000000000
 	ldrb	w9, [x19], #1
 	sub	x20, x20, #16
@@ -8677,24 +8772,24 @@ LBB194_5:                               ; %B2
 	add	w9, w9, #243
 	ldr	x1, [x25, w9, uxtw #3]
 	br	x1
-LBB194_6:                               ; %B12
+LBB197_6:                               ; %B12
 	tst	x22, #0xfffe000000000000
-	b.eq	LBB194_11
+	b.eq	LBB197_11
 ; %bb.7:                                ; %B12
 	cmp	x21, x8
-	b.lo	LBB194_11
+	b.lo	LBB197_11
 ; %bb.8:                                ; %B22
 	ubfx	x8, x22, #52, #11
 	cmp	x8, #1053
-	b.gt	LBB194_11
+	b.gt	LBB197_11
 ; %bb.9:                                ; %B23
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	add	x8, x22, x8
 	fmov	d0, x8
 	fcvtzs	w8, d0
 	lsr	w8, w8, w21
-	tbz	w8, #31, LBB194_5
-LBB194_10:                              ; %B6
+	tbz	w8, #31, LBB197_5
+LBB197_10:                              ; %B6
 	ucvtf	d0, w8
 	mov	x9, #562949953421312            ; =0x2000000000000
 	fmov	x8, d0
@@ -8708,14 +8803,14 @@ LBB194_10:                              ; %B6
 	add	w9, w9, #243
 	ldr	x1, [x25, w9, uxtw #3]
 	br	x1
-LBB194_11:                              ; %B33
+LBB197_11:                              ; %B33
 	mov	x0, x24
 	mov	x1, x22
 	mov	x2, x21
 	str	x20, [x23, #48]
 	bl	_prim_js_shr_slow_gc
 	cmp	x0, #130
-	b.eq	LBB194_13
+	b.eq	LBB197_13
 ; %bb.12:                               ; %B35
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #16
@@ -8723,293 +8818,11 @@ LBB194_11:                              ; %B33
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB194_13:                              ; %B34
+LBB197_13:                              ; %B34
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function lt_0_asm_h
 l_lt_0_asm_h:                           ; @lt_0_asm_h
-; %bb.0:                                ; %B24
-	ldp	x22, x21, [x20, #-16]
-	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
-	cmp	x22, x8
-	b.hi	LBB195_12
-; %bb.1:                                ; %B24
-	cmp	x21, x8
-	b.hi	LBB195_12
-; %bb.2:                                ; %B1
-	mov	x8, #-562949953421312           ; =0xfffe000000000000
-	cmp	x22, x8
-	b.lo	LBB195_5
-; %bb.3:                                ; %B15
-	cmp	x21, x8
-	b.lo	LBB195_8
-; %bb.4:                                ; %B20
-	ldrb	w8, [x19], #1
-	cmp	w22, w21
-	sub	x20, x20, #16
-	add	w8, w8, #243
-	ldr	x1, [x25, w8, uxtw #3]
-	mov	w8, #6                          ; =0x6
-	cinc	x22, x8, lt
-	br	x1
-LBB195_5:                               ; %B3
-	tst	x22, #0xfffe000000000000
-	b.eq	LBB195_12
-; %bb.6:                                ; %B7
-	cmp	x21, x8
-	b.lo	LBB195_10
-; %bb.7:                                ; %B13
-	scvtf	d0, w21
-	add	x8, x22, x8
-	fmov	d1, x8
-	ldrb	w9, [x19], #1
-	fcmp	d1, d0
-	add	w8, w9, #243
-	ldr	x1, [x25, w8, uxtw #3]
-	sub	x20, x20, #16
-	mov	w8, #6                          ; =0x6
-	cinc	x22, x8, mi
-	br	x1
-LBB195_8:                               ; %B17
-	tst	x21, #0xfffe000000000000
-	b.eq	LBB195_12
-; %bb.9:                                ; %B19
-	scvtf	d0, w22
-	add	x8, x21, x8
-	fmov	d1, x8
-	ldrb	w9, [x19], #1
-	fcmp	d0, d1
-	add	w8, w9, #243
-	ldr	x1, [x25, w8, uxtw #3]
-	sub	x20, x20, #16
-	mov	w8, #6                          ; =0x6
-	cinc	x22, x8, mi
-	br	x1
-LBB195_10:                              ; %B9
-	tst	x21, #0xfffe000000000000
-	b.eq	LBB195_12
-; %bb.11:                               ; %B11
-	add	x9, x22, x8
-	add	x8, x21, x8
-	fmov	d0, x9
-	fmov	d1, x8
-	ldrb	w10, [x19], #1
-	fcmp	d0, d1
-	add	w8, w10, #243
-	ldr	x1, [x25, w8, uxtw #3]
-	sub	x20, x20, #16
-	mov	w8, #6                          ; =0x6
-	cinc	x22, x8, mi
-	br	x1
-LBB195_12:                              ; %B21
-	mov	x0, x24
-	mov	x1, x22
-	mov	x2, x21
-	mov	w3, #163                        ; =0xa3
-	str	x20, [x23, #48]
-	bl	_prim_js_relation_slow_gc
-	cmp	x0, #130
-	b.eq	LBB195_14
-; %bb.13:                               ; %B23
-	ldrb	w8, [x19], #1
-	sub	x20, x20, #16
-	mov	x22, x0
-	add	w8, w8, #243
-	ldr	x1, [x25, w8, uxtw #3]
-	br	x1
-LBB195_14:                              ; %B22
-	b	l_exception_asm_h
-                                        ; -- End function
-	.p2align	2                               ; -- Begin function lte_0_asm_h
-l_lte_0_asm_h:                          ; @lte_0_asm_h
-; %bb.0:                                ; %B24
-	ldp	x22, x21, [x20, #-16]
-	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
-	cmp	x22, x8
-	b.hi	LBB196_12
-; %bb.1:                                ; %B24
-	cmp	x21, x8
-	b.hi	LBB196_12
-; %bb.2:                                ; %B1
-	mov	x8, #-562949953421312           ; =0xfffe000000000000
-	cmp	x22, x8
-	b.lo	LBB196_5
-; %bb.3:                                ; %B15
-	cmp	x21, x8
-	b.lo	LBB196_8
-; %bb.4:                                ; %B20
-	ldrb	w8, [x19], #1
-	cmp	w22, w21
-	sub	x20, x20, #16
-	add	w8, w8, #243
-	ldr	x1, [x25, w8, uxtw #3]
-	mov	w8, #6                          ; =0x6
-	cinc	x22, x8, le
-	br	x1
-LBB196_5:                               ; %B3
-	tst	x22, #0xfffe000000000000
-	b.eq	LBB196_12
-; %bb.6:                                ; %B7
-	cmp	x21, x8
-	b.lo	LBB196_10
-; %bb.7:                                ; %B13
-	scvtf	d0, w21
-	add	x8, x22, x8
-	fmov	d1, x8
-	ldrb	w9, [x19], #1
-	fcmp	d1, d0
-	add	w8, w9, #243
-	ldr	x1, [x25, w8, uxtw #3]
-	sub	x20, x20, #16
-	mov	w8, #6                          ; =0x6
-	cinc	x22, x8, ls
-	br	x1
-LBB196_8:                               ; %B17
-	tst	x21, #0xfffe000000000000
-	b.eq	LBB196_12
-; %bb.9:                                ; %B19
-	scvtf	d0, w22
-	add	x8, x21, x8
-	fmov	d1, x8
-	ldrb	w9, [x19], #1
-	fcmp	d0, d1
-	add	w8, w9, #243
-	ldr	x1, [x25, w8, uxtw #3]
-	sub	x20, x20, #16
-	mov	w8, #6                          ; =0x6
-	cinc	x22, x8, ls
-	br	x1
-LBB196_10:                              ; %B9
-	tst	x21, #0xfffe000000000000
-	b.eq	LBB196_12
-; %bb.11:                               ; %B11
-	add	x9, x22, x8
-	add	x8, x21, x8
-	fmov	d0, x9
-	fmov	d1, x8
-	ldrb	w10, [x19], #1
-	fcmp	d0, d1
-	add	w8, w10, #243
-	ldr	x1, [x25, w8, uxtw #3]
-	sub	x20, x20, #16
-	mov	w8, #6                          ; =0x6
-	cinc	x22, x8, ls
-	br	x1
-LBB196_12:                              ; %B21
-	mov	x0, x24
-	mov	x1, x22
-	mov	x2, x21
-	mov	w3, #164                        ; =0xa4
-	str	x20, [x23, #48]
-	bl	_prim_js_relation_slow_gc
-	cmp	x0, #130
-	b.eq	LBB196_14
-; %bb.13:                               ; %B23
-	ldrb	w8, [x19], #1
-	sub	x20, x20, #16
-	mov	x22, x0
-	add	w8, w8, #243
-	ldr	x1, [x25, w8, uxtw #3]
-	br	x1
-LBB196_14:                              ; %B22
-	b	l_exception_asm_h
-                                        ; -- End function
-	.p2align	2                               ; -- Begin function gt_0_asm_h
-l_gt_0_asm_h:                           ; @gt_0_asm_h
-; %bb.0:                                ; %B24
-	ldp	x22, x21, [x20, #-16]
-	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
-	cmp	x22, x8
-	b.hi	LBB197_12
-; %bb.1:                                ; %B24
-	cmp	x21, x8
-	b.hi	LBB197_12
-; %bb.2:                                ; %B1
-	mov	x8, #-562949953421312           ; =0xfffe000000000000
-	cmp	x22, x8
-	b.lo	LBB197_5
-; %bb.3:                                ; %B15
-	cmp	x21, x8
-	b.lo	LBB197_8
-; %bb.4:                                ; %B20
-	ldrb	w8, [x19], #1
-	cmp	w22, w21
-	add	w8, w8, #243
-	ldr	x1, [x25, w8, uxtw #3]
-	sub	x20, x20, #16
-	mov	w8, #6                          ; =0x6
-	cinc	x22, x8, gt
-	br	x1
-LBB197_5:                               ; %B3
-	tst	x22, #0xfffe000000000000
-	b.eq	LBB197_12
-; %bb.6:                                ; %B7
-	cmp	x21, x8
-	b.lo	LBB197_10
-; %bb.7:                                ; %B13
-	scvtf	d0, w21
-	add	x8, x22, x8
-	fmov	d1, x8
-	ldrb	w9, [x19], #1
-	fcmp	d1, d0
-	add	w8, w9, #243
-	ldr	x1, [x25, w8, uxtw #3]
-	sub	x20, x20, #16
-	mov	w8, #6                          ; =0x6
-	cinc	x22, x8, gt
-	br	x1
-LBB197_8:                               ; %B17
-	tst	x21, #0xfffe000000000000
-	b.eq	LBB197_12
-; %bb.9:                                ; %B19
-	scvtf	d0, w22
-	add	x8, x21, x8
-	fmov	d1, x8
-	ldrb	w9, [x19], #1
-	fcmp	d0, d1
-	add	w8, w9, #243
-	ldr	x1, [x25, w8, uxtw #3]
-	sub	x20, x20, #16
-	mov	w8, #6                          ; =0x6
-	cinc	x22, x8, gt
-	br	x1
-LBB197_10:                              ; %B9
-	tst	x21, #0xfffe000000000000
-	b.eq	LBB197_12
-; %bb.11:                               ; %B11
-	add	x9, x22, x8
-	add	x8, x21, x8
-	fmov	d0, x9
-	fmov	d1, x8
-	ldrb	w10, [x19], #1
-	fcmp	d0, d1
-	add	w8, w10, #243
-	ldr	x1, [x25, w8, uxtw #3]
-	sub	x20, x20, #16
-	mov	w8, #6                          ; =0x6
-	cinc	x22, x8, gt
-	br	x1
-LBB197_12:                              ; %B21
-	mov	x0, x24
-	mov	x1, x22
-	mov	x2, x21
-	mov	w3, #165                        ; =0xa5
-	str	x20, [x23, #48]
-	bl	_prim_js_relation_slow_gc
-	cmp	x0, #130
-	b.eq	LBB197_14
-; %bb.13:                               ; %B23
-	ldrb	w8, [x19], #1
-	sub	x20, x20, #16
-	mov	x22, x0
-	add	w8, w8, #243
-	ldr	x1, [x25, w8, uxtw #3]
-	br	x1
-LBB197_14:                              ; %B22
-	b	l_exception_asm_h
-                                        ; -- End function
-	.p2align	2                               ; -- Begin function gte_0_asm_h
-l_gte_0_asm_h:                          ; @gte_0_asm_h
 ; %bb.0:                                ; %B24
 	ldp	x22, x21, [x20, #-16]
 	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
@@ -9028,11 +8841,11 @@ l_gte_0_asm_h:                          ; @gte_0_asm_h
 ; %bb.4:                                ; %B20
 	ldrb	w8, [x19], #1
 	cmp	w22, w21
+	sub	x20, x20, #16
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
-	sub	x20, x20, #16
 	mov	w8, #6                          ; =0x6
-	cinc	x22, x8, ge
+	cinc	x22, x8, lt
 	br	x1
 LBB198_5:                               ; %B3
 	tst	x22, #0xfffe000000000000
@@ -9050,7 +8863,7 @@ LBB198_5:                               ; %B3
 	ldr	x1, [x25, w8, uxtw #3]
 	sub	x20, x20, #16
 	mov	w8, #6                          ; =0x6
-	cinc	x22, x8, ge
+	cinc	x22, x8, mi
 	br	x1
 LBB198_8:                               ; %B17
 	tst	x21, #0xfffe000000000000
@@ -9065,7 +8878,7 @@ LBB198_8:                               ; %B17
 	ldr	x1, [x25, w8, uxtw #3]
 	sub	x20, x20, #16
 	mov	w8, #6                          ; =0x6
-	cinc	x22, x8, ge
+	cinc	x22, x8, mi
 	br	x1
 LBB198_10:                              ; %B9
 	tst	x21, #0xfffe000000000000
@@ -9081,13 +8894,13 @@ LBB198_10:                              ; %B9
 	ldr	x1, [x25, w8, uxtw #3]
 	sub	x20, x20, #16
 	mov	w8, #6                          ; =0x6
-	cinc	x22, x8, ge
+	cinc	x22, x8, mi
 	br	x1
 LBB198_12:                              ; %B21
 	mov	x0, x24
 	mov	x1, x22
 	mov	x2, x21
-	mov	w3, #166                        ; =0xa6
+	mov	w3, #163                        ; =0xa3
 	str	x20, [x23, #48]
 	bl	_prim_js_relation_slow_gc
 	cmp	x0, #130
@@ -9102,6 +8915,288 @@ LBB198_12:                              ; %B21
 LBB198_14:                              ; %B22
 	b	l_exception_asm_h
                                         ; -- End function
+	.p2align	2                               ; -- Begin function lte_0_asm_h
+l_lte_0_asm_h:                          ; @lte_0_asm_h
+; %bb.0:                                ; %B24
+	ldp	x22, x21, [x20, #-16]
+	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
+	cmp	x22, x8
+	b.hi	LBB199_12
+; %bb.1:                                ; %B24
+	cmp	x21, x8
+	b.hi	LBB199_12
+; %bb.2:                                ; %B1
+	mov	x8, #-562949953421312           ; =0xfffe000000000000
+	cmp	x22, x8
+	b.lo	LBB199_5
+; %bb.3:                                ; %B15
+	cmp	x21, x8
+	b.lo	LBB199_8
+; %bb.4:                                ; %B20
+	ldrb	w8, [x19], #1
+	cmp	w22, w21
+	sub	x20, x20, #16
+	add	w8, w8, #243
+	ldr	x1, [x25, w8, uxtw #3]
+	mov	w8, #6                          ; =0x6
+	cinc	x22, x8, le
+	br	x1
+LBB199_5:                               ; %B3
+	tst	x22, #0xfffe000000000000
+	b.eq	LBB199_12
+; %bb.6:                                ; %B7
+	cmp	x21, x8
+	b.lo	LBB199_10
+; %bb.7:                                ; %B13
+	scvtf	d0, w21
+	add	x8, x22, x8
+	fmov	d1, x8
+	ldrb	w9, [x19], #1
+	fcmp	d1, d0
+	add	w8, w9, #243
+	ldr	x1, [x25, w8, uxtw #3]
+	sub	x20, x20, #16
+	mov	w8, #6                          ; =0x6
+	cinc	x22, x8, ls
+	br	x1
+LBB199_8:                               ; %B17
+	tst	x21, #0xfffe000000000000
+	b.eq	LBB199_12
+; %bb.9:                                ; %B19
+	scvtf	d0, w22
+	add	x8, x21, x8
+	fmov	d1, x8
+	ldrb	w9, [x19], #1
+	fcmp	d0, d1
+	add	w8, w9, #243
+	ldr	x1, [x25, w8, uxtw #3]
+	sub	x20, x20, #16
+	mov	w8, #6                          ; =0x6
+	cinc	x22, x8, ls
+	br	x1
+LBB199_10:                              ; %B9
+	tst	x21, #0xfffe000000000000
+	b.eq	LBB199_12
+; %bb.11:                               ; %B11
+	add	x9, x22, x8
+	add	x8, x21, x8
+	fmov	d0, x9
+	fmov	d1, x8
+	ldrb	w10, [x19], #1
+	fcmp	d0, d1
+	add	w8, w10, #243
+	ldr	x1, [x25, w8, uxtw #3]
+	sub	x20, x20, #16
+	mov	w8, #6                          ; =0x6
+	cinc	x22, x8, ls
+	br	x1
+LBB199_12:                              ; %B21
+	mov	x0, x24
+	mov	x1, x22
+	mov	x2, x21
+	mov	w3, #164                        ; =0xa4
+	str	x20, [x23, #48]
+	bl	_prim_js_relation_slow_gc
+	cmp	x0, #130
+	b.eq	LBB199_14
+; %bb.13:                               ; %B23
+	ldrb	w8, [x19], #1
+	sub	x20, x20, #16
+	mov	x22, x0
+	add	w8, w8, #243
+	ldr	x1, [x25, w8, uxtw #3]
+	br	x1
+LBB199_14:                              ; %B22
+	b	l_exception_asm_h
+                                        ; -- End function
+	.p2align	2                               ; -- Begin function gt_0_asm_h
+l_gt_0_asm_h:                           ; @gt_0_asm_h
+; %bb.0:                                ; %B24
+	ldp	x22, x21, [x20, #-16]
+	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
+	cmp	x22, x8
+	b.hi	LBB200_12
+; %bb.1:                                ; %B24
+	cmp	x21, x8
+	b.hi	LBB200_12
+; %bb.2:                                ; %B1
+	mov	x8, #-562949953421312           ; =0xfffe000000000000
+	cmp	x22, x8
+	b.lo	LBB200_5
+; %bb.3:                                ; %B15
+	cmp	x21, x8
+	b.lo	LBB200_8
+; %bb.4:                                ; %B20
+	ldrb	w8, [x19], #1
+	cmp	w22, w21
+	add	w8, w8, #243
+	ldr	x1, [x25, w8, uxtw #3]
+	sub	x20, x20, #16
+	mov	w8, #6                          ; =0x6
+	cinc	x22, x8, gt
+	br	x1
+LBB200_5:                               ; %B3
+	tst	x22, #0xfffe000000000000
+	b.eq	LBB200_12
+; %bb.6:                                ; %B7
+	cmp	x21, x8
+	b.lo	LBB200_10
+; %bb.7:                                ; %B13
+	scvtf	d0, w21
+	add	x8, x22, x8
+	fmov	d1, x8
+	ldrb	w9, [x19], #1
+	fcmp	d1, d0
+	add	w8, w9, #243
+	ldr	x1, [x25, w8, uxtw #3]
+	sub	x20, x20, #16
+	mov	w8, #6                          ; =0x6
+	cinc	x22, x8, gt
+	br	x1
+LBB200_8:                               ; %B17
+	tst	x21, #0xfffe000000000000
+	b.eq	LBB200_12
+; %bb.9:                                ; %B19
+	scvtf	d0, w22
+	add	x8, x21, x8
+	fmov	d1, x8
+	ldrb	w9, [x19], #1
+	fcmp	d0, d1
+	add	w8, w9, #243
+	ldr	x1, [x25, w8, uxtw #3]
+	sub	x20, x20, #16
+	mov	w8, #6                          ; =0x6
+	cinc	x22, x8, gt
+	br	x1
+LBB200_10:                              ; %B9
+	tst	x21, #0xfffe000000000000
+	b.eq	LBB200_12
+; %bb.11:                               ; %B11
+	add	x9, x22, x8
+	add	x8, x21, x8
+	fmov	d0, x9
+	fmov	d1, x8
+	ldrb	w10, [x19], #1
+	fcmp	d0, d1
+	add	w8, w10, #243
+	ldr	x1, [x25, w8, uxtw #3]
+	sub	x20, x20, #16
+	mov	w8, #6                          ; =0x6
+	cinc	x22, x8, gt
+	br	x1
+LBB200_12:                              ; %B21
+	mov	x0, x24
+	mov	x1, x22
+	mov	x2, x21
+	mov	w3, #165                        ; =0xa5
+	str	x20, [x23, #48]
+	bl	_prim_js_relation_slow_gc
+	cmp	x0, #130
+	b.eq	LBB200_14
+; %bb.13:                               ; %B23
+	ldrb	w8, [x19], #1
+	sub	x20, x20, #16
+	mov	x22, x0
+	add	w8, w8, #243
+	ldr	x1, [x25, w8, uxtw #3]
+	br	x1
+LBB200_14:                              ; %B22
+	b	l_exception_asm_h
+                                        ; -- End function
+	.p2align	2                               ; -- Begin function gte_0_asm_h
+l_gte_0_asm_h:                          ; @gte_0_asm_h
+; %bb.0:                                ; %B24
+	ldp	x22, x21, [x20, #-16]
+	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
+	cmp	x22, x8
+	b.hi	LBB201_12
+; %bb.1:                                ; %B24
+	cmp	x21, x8
+	b.hi	LBB201_12
+; %bb.2:                                ; %B1
+	mov	x8, #-562949953421312           ; =0xfffe000000000000
+	cmp	x22, x8
+	b.lo	LBB201_5
+; %bb.3:                                ; %B15
+	cmp	x21, x8
+	b.lo	LBB201_8
+; %bb.4:                                ; %B20
+	ldrb	w8, [x19], #1
+	cmp	w22, w21
+	add	w8, w8, #243
+	ldr	x1, [x25, w8, uxtw #3]
+	sub	x20, x20, #16
+	mov	w8, #6                          ; =0x6
+	cinc	x22, x8, ge
+	br	x1
+LBB201_5:                               ; %B3
+	tst	x22, #0xfffe000000000000
+	b.eq	LBB201_12
+; %bb.6:                                ; %B7
+	cmp	x21, x8
+	b.lo	LBB201_10
+; %bb.7:                                ; %B13
+	scvtf	d0, w21
+	add	x8, x22, x8
+	fmov	d1, x8
+	ldrb	w9, [x19], #1
+	fcmp	d1, d0
+	add	w8, w9, #243
+	ldr	x1, [x25, w8, uxtw #3]
+	sub	x20, x20, #16
+	mov	w8, #6                          ; =0x6
+	cinc	x22, x8, ge
+	br	x1
+LBB201_8:                               ; %B17
+	tst	x21, #0xfffe000000000000
+	b.eq	LBB201_12
+; %bb.9:                                ; %B19
+	scvtf	d0, w22
+	add	x8, x21, x8
+	fmov	d1, x8
+	ldrb	w9, [x19], #1
+	fcmp	d0, d1
+	add	w8, w9, #243
+	ldr	x1, [x25, w8, uxtw #3]
+	sub	x20, x20, #16
+	mov	w8, #6                          ; =0x6
+	cinc	x22, x8, ge
+	br	x1
+LBB201_10:                              ; %B9
+	tst	x21, #0xfffe000000000000
+	b.eq	LBB201_12
+; %bb.11:                               ; %B11
+	add	x9, x22, x8
+	add	x8, x21, x8
+	fmov	d0, x9
+	fmov	d1, x8
+	ldrb	w10, [x19], #1
+	fcmp	d0, d1
+	add	w8, w10, #243
+	ldr	x1, [x25, w8, uxtw #3]
+	sub	x20, x20, #16
+	mov	w8, #6                          ; =0x6
+	cinc	x22, x8, ge
+	br	x1
+LBB201_12:                              ; %B21
+	mov	x0, x24
+	mov	x1, x22
+	mov	x2, x21
+	mov	w3, #166                        ; =0xa6
+	str	x20, [x23, #48]
+	bl	_prim_js_relation_slow_gc
+	cmp	x0, #130
+	b.eq	LBB201_14
+; %bb.13:                               ; %B23
+	ldrb	w8, [x19], #1
+	sub	x20, x20, #16
+	mov	x22, x0
+	add	w8, w8, #243
+	ldr	x1, [x25, w8, uxtw #3]
+	br	x1
+LBB201_14:                              ; %B22
+	b	l_exception_asm_h
+                                        ; -- End function
 	.p2align	2                               ; -- Begin function instanceof_0_asm_h
 l_instanceof_0_asm_h:                   ; @instanceof_0_asm_h
 ; %bb.0:                                ; %B1
@@ -9112,7 +9207,7 @@ l_instanceof_0_asm_h:                   ; @instanceof_0_asm_h
 	mov	x2, x21
 	bl	_prim_js_operator_instanceof_gc
 	cmp	x0, #130
-	b.eq	LBB199_2
+	b.eq	LBB202_2
 ; %bb.1:                                ; %B3
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #16
@@ -9120,7 +9215,7 @@ l_instanceof_0_asm_h:                   ; @instanceof_0_asm_h
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB199_2:                               ; %B2
+LBB202_2:                               ; %B2
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function in_0_asm_h
@@ -9133,7 +9228,7 @@ l_in_0_asm_h:                           ; @in_0_asm_h
 	mov	x2, x21
 	bl	_prim_js_operator_in_gc
 	cmp	x0, #130
-	b.eq	LBB200_2
+	b.eq	LBB203_2
 ; %bb.1:                                ; %B3
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #16
@@ -9141,7 +9236,7 @@ l_in_0_asm_h:                           ; @in_0_asm_h
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB200_2:                               ; %B2
+LBB203_2:                               ; %B2
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function eq_0_asm_h
@@ -9150,17 +9245,17 @@ l_eq_0_asm_h:                           ; @eq_0_asm_h
 	ldp	x22, x21, [x20, #-16]
 	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
 	cmp	x22, x8
-	b.hi	LBB201_13
+	b.hi	LBB204_13
 ; %bb.1:                                ; %B44
 	cmp	x21, x8
-	b.hi	LBB201_13
+	b.hi	LBB204_13
 ; %bb.2:                                ; %B1
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x22, x8
-	b.lo	LBB201_5
+	b.lo	LBB204_5
 ; %bb.3:                                ; %B35
 	cmp	x21, x8
-	b.lo	LBB201_8
+	b.lo	LBB204_8
 ; %bb.4:                                ; %B40
 	ldrb	w8, [x19], #1
 	cmp	w22, w21
@@ -9170,12 +9265,12 @@ l_eq_0_asm_h:                           ; @eq_0_asm_h
 	mov	w8, #6                          ; =0x6
 	cinc	x22, x8, eq
 	br	x1
-LBB201_5:                               ; %B3
+LBB204_5:                               ; %B3
 	tst	x22, #0xfffe000000000000
-	b.eq	LBB201_13
+	b.eq	LBB204_13
 ; %bb.6:                                ; %B28
 	cmp	x21, x8
-	b.lo	LBB201_11
+	b.lo	LBB204_11
 ; %bb.7:                                ; %B33
 	scvtf	d0, w21
 	add	x8, x22, x8
@@ -9190,13 +9285,13 @@ LBB201_5:                               ; %B3
 	csel	w8, wzr, w9, vs
 	orr	x22, x8, #0x6
 	br	x1
-LBB201_8:                               ; %B37
+LBB204_8:                               ; %B37
 	tst	x21, #0xfffe000000000000
-	b.eq	LBB201_13
+	b.eq	LBB204_13
 ; %bb.9:                                ; %B39
 	scvtf	d0, w22
 	add	x8, x21, x8
-LBB201_10:                              ; %B39
+LBB204_10:                              ; %B39
 	fmov	d1, x8
 	ldrb	w8, [x19], #1
 	fcmp	d0, d1
@@ -9208,53 +9303,53 @@ LBB201_10:                              ; %B39
 	csel	w8, wzr, w9, vs
 	orr	x22, x8, #0x6
 	br	x1
-LBB201_11:                              ; %B30
+LBB204_11:                              ; %B30
 	tst	x21, #0xfffe000000000000
-	b.eq	LBB201_13
+	b.eq	LBB204_13
 ; %bb.12:                               ; %B32
 	add	x9, x22, x8
 	add	x8, x21, x8
 	fmov	d0, x9
-	b	LBB201_10
-LBB201_13:                              ; %B7
+	b	LBB204_10
+LBB204_13:                              ; %B7
 	cmp	x22, x21
-	b.ne	LBB201_15
-LBB201_14:                              ; %B8
+	b.ne	LBB204_15
+LBB204_14:                              ; %B8
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #16
 	mov	w22, #7                         ; =0x7
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB201_15:                              ; %B10
+LBB204_15:                              ; %B10
 	orr	x8, x21, #0x10
 	cmp	x8, #18
-	b.ne	LBB201_17
+	b.ne	LBB204_17
 ; %bb.16:                               ; %B12
 	orr	x8, x22, #0x10
 	cmp	x8, #18
-	b.eq	LBB201_14
-	b	LBB201_20
-LBB201_17:                              ; %B17
+	b.eq	LBB204_14
+	b	LBB204_20
+LBB204_17:                              ; %B17
 	orr	x8, x22, #0x10
 	cmp	x8, #18
-	b.eq	LBB201_20
+	b.eq	LBB204_20
 ; %bb.18:                               ; %B20
 	sub	x8, x21, #6
 	cmp	x8, #1
-	b.hi	LBB201_21
+	b.hi	LBB204_21
 ; %bb.19:                               ; %B20
 	sub	x8, x22, #6
 	cmp	x8, #2
-	b.hs	LBB201_21
-LBB201_20:                              ; %B15
+	b.hs	LBB204_21
+LBB204_20:                              ; %B15
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #16
 	mov	w22, #6                         ; =0x6
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB201_21:                              ; %B41
+LBB204_21:                              ; %B41
 	mov	x0, x24
 	mov	x1, x22
 	mov	x2, x21
@@ -9262,7 +9357,7 @@ LBB201_21:                              ; %B41
 	str	x20, [x23, #48]
 	bl	_prim_js_eq_slow_gc
 	cmp	x0, #130
-	b.eq	LBB201_23
+	b.eq	LBB204_23
 ; %bb.22:                               ; %B43
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #16
@@ -9270,7 +9365,7 @@ LBB201_21:                              ; %B41
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB201_23:                              ; %B42
+LBB204_23:                              ; %B42
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function neq_0_asm_h
@@ -9279,17 +9374,17 @@ l_neq_0_asm_h:                          ; @neq_0_asm_h
 	ldp	x22, x21, [x20, #-16]
 	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
 	cmp	x22, x8
-	b.hi	LBB202_13
+	b.hi	LBB205_13
 ; %bb.1:                                ; %B44
 	cmp	x21, x8
-	b.hi	LBB202_13
+	b.hi	LBB205_13
 ; %bb.2:                                ; %B1
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x22, x8
-	b.lo	LBB202_5
+	b.lo	LBB205_5
 ; %bb.3:                                ; %B35
 	cmp	x21, x8
-	b.lo	LBB202_8
+	b.lo	LBB205_8
 ; %bb.4:                                ; %B40
 	ldrb	w8, [x19], #1
 	cmp	w22, w21
@@ -9299,12 +9394,12 @@ l_neq_0_asm_h:                          ; @neq_0_asm_h
 	mov	w8, #6                          ; =0x6
 	cinc	x22, x8, ne
 	br	x1
-LBB202_5:                               ; %B3
+LBB205_5:                               ; %B3
 	tst	x22, #0xfffe000000000000
-	b.eq	LBB202_13
+	b.eq	LBB205_13
 ; %bb.6:                                ; %B28
 	cmp	x21, x8
-	b.lo	LBB202_11
+	b.lo	LBB205_11
 ; %bb.7:                                ; %B33
 	scvtf	d0, w21
 	add	x8, x22, x8
@@ -9319,13 +9414,13 @@ LBB202_5:                               ; %B3
 	csinc	w8, w9, wzr, vc
 	orr	x22, x8, #0x6
 	br	x1
-LBB202_8:                               ; %B37
+LBB205_8:                               ; %B37
 	tst	x21, #0xfffe000000000000
-	b.eq	LBB202_13
+	b.eq	LBB205_13
 ; %bb.9:                                ; %B39
 	scvtf	d0, w22
 	add	x8, x21, x8
-LBB202_10:                              ; %B39
+LBB205_10:                              ; %B39
 	fmov	d1, x8
 	ldrb	w8, [x19], #1
 	fcmp	d0, d1
@@ -9337,53 +9432,53 @@ LBB202_10:                              ; %B39
 	csinc	w8, w9, wzr, vc
 	orr	x22, x8, #0x6
 	br	x1
-LBB202_11:                              ; %B30
+LBB205_11:                              ; %B30
 	tst	x21, #0xfffe000000000000
-	b.eq	LBB202_13
+	b.eq	LBB205_13
 ; %bb.12:                               ; %B32
 	add	x9, x22, x8
 	add	x8, x21, x8
 	fmov	d0, x9
-	b	LBB202_10
-LBB202_13:                              ; %B7
+	b	LBB205_10
+LBB205_13:                              ; %B7
 	cmp	x22, x21
-	b.ne	LBB202_15
-LBB202_14:                              ; %B8
+	b.ne	LBB205_15
+LBB205_14:                              ; %B8
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #16
 	mov	w22, #6                         ; =0x6
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB202_15:                              ; %B10
+LBB205_15:                              ; %B10
 	orr	x8, x21, #0x10
 	cmp	x8, #18
-	b.ne	LBB202_17
+	b.ne	LBB205_17
 ; %bb.16:                               ; %B12
 	orr	x8, x22, #0x10
 	cmp	x8, #18
-	b.eq	LBB202_14
-	b	LBB202_20
-LBB202_17:                              ; %B17
+	b.eq	LBB205_14
+	b	LBB205_20
+LBB205_17:                              ; %B17
 	orr	x8, x22, #0x10
 	cmp	x8, #18
-	b.eq	LBB202_20
+	b.eq	LBB205_20
 ; %bb.18:                               ; %B20
 	sub	x8, x21, #6
 	cmp	x8, #1
-	b.hi	LBB202_21
+	b.hi	LBB205_21
 ; %bb.19:                               ; %B20
 	sub	x8, x22, #6
 	cmp	x8, #2
-	b.hs	LBB202_21
-LBB202_20:                              ; %B15
+	b.hs	LBB205_21
+LBB205_20:                              ; %B15
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #16
 	mov	w22, #7                         ; =0x7
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB202_21:                              ; %B41
+LBB205_21:                              ; %B41
 	mov	x0, x24
 	mov	x1, x22
 	mov	x2, x21
@@ -9391,7 +9486,7 @@ LBB202_21:                              ; %B41
 	str	x20, [x23, #48]
 	bl	_prim_js_eq_slow_gc
 	cmp	x0, #130
-	b.eq	LBB202_23
+	b.eq	LBB205_23
 ; %bb.22:                               ; %B43
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #16
@@ -9399,7 +9494,7 @@ LBB202_21:                              ; %B41
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB202_23:                              ; %B42
+LBB205_23:                              ; %B42
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function strict_eq_0_asm_h
@@ -9408,17 +9503,17 @@ l_strict_eq_0_asm_h:                    ; @strict_eq_0_asm_h
 	ldp	x22, x21, [x20, #-16]
 	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
 	cmp	x22, x8
-	b.hi	LBB203_13
+	b.hi	LBB206_13
 ; %bb.1:                                ; %B39
 	cmp	x21, x8
-	b.hi	LBB203_13
+	b.hi	LBB206_13
 ; %bb.2:                                ; %B1
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x22, x8
-	b.lo	LBB203_5
+	b.lo	LBB206_5
 ; %bb.3:                                ; %B30
 	cmp	x21, x8
-	b.lo	LBB203_8
+	b.lo	LBB206_8
 ; %bb.4:                                ; %B35
 	ldrb	w8, [x19], #1
 	cmp	w22, w21
@@ -9428,12 +9523,12 @@ l_strict_eq_0_asm_h:                    ; @strict_eq_0_asm_h
 	mov	w8, #6                          ; =0x6
 	cinc	x22, x8, eq
 	br	x1
-LBB203_5:                               ; %B3
+LBB206_5:                               ; %B3
 	tst	x22, #0xfffe000000000000
-	b.eq	LBB203_13
+	b.eq	LBB206_13
 ; %bb.6:                                ; %B23
 	cmp	x21, x8
-	b.lo	LBB203_11
+	b.lo	LBB206_11
 ; %bb.7:                                ; %B28
 	scvtf	d0, w21
 	add	x8, x22, x8
@@ -9448,13 +9543,13 @@ LBB203_5:                               ; %B3
 	csel	w8, wzr, w9, vs
 	orr	x22, x8, #0x6
 	br	x1
-LBB203_8:                               ; %B32
+LBB206_8:                               ; %B32
 	tst	x21, #0xfffe000000000000
-	b.eq	LBB203_13
+	b.eq	LBB206_13
 ; %bb.9:                                ; %B34
 	scvtf	d0, w22
 	add	x8, x21, x8
-LBB203_10:                              ; %B34
+LBB206_10:                              ; %B34
 	fmov	d1, x8
 	ldrb	w8, [x19], #1
 	fcmp	d0, d1
@@ -9466,17 +9561,17 @@ LBB203_10:                              ; %B34
 	csel	w8, wzr, w9, vs
 	orr	x22, x8, #0x6
 	br	x1
-LBB203_11:                              ; %B25
+LBB206_11:                              ; %B25
 	tst	x21, #0xfffe000000000000
-	b.eq	LBB203_13
+	b.eq	LBB206_13
 ; %bb.12:                               ; %B27
 	add	x9, x22, x8
 	add	x8, x21, x8
 	fmov	d0, x9
-	b	LBB203_10
-LBB203_13:                              ; %B10
+	b	LBB206_10
+LBB206_13:                              ; %B10
 	cmp	x22, x21
-	b.ne	LBB203_15
+	b.ne	LBB206_15
 ; %bb.14:                               ; %B11
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #16
@@ -9484,7 +9579,7 @@ LBB203_13:                              ; %B10
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB203_15:                              ; %B13
+LBB206_15:                              ; %B13
 	and	x8, x22, #0xffff000000000003
 	mov	x11, #-281474976710653          ; =0xffff000000000003
 	mov	x12, #2                         ; =0x2
@@ -9497,10 +9592,10 @@ LBB203_15:                              ; %B13
 	ccmp	x10, x12, #4, ne
 	cset	w11, eq
 	cmp	w9, #1
-	b.ne	LBB203_17
+	b.ne	LBB206_17
 ; %bb.16:                               ; %B13
-	cbnz	w11, LBB203_22
-LBB203_17:                              ; %B16
+	cbnz	w11, LBB206_22
+LBB206_17:                              ; %B16
 	mov	x12, #2                         ; =0x2
 	movk	x12, #65535, lsl #48
 	cmp	x8, x12
@@ -9508,29 +9603,29 @@ LBB203_17:                              ; %B16
 	cmp	x10, x12
 	bic	w9, w8, w9
 	csinc	w8, w11, wzr, ne
-	tbnz	w9, #0, LBB203_19
+	tbnz	w9, #0, LBB206_19
 ; %bb.18:                               ; %B16
-	tbnz	w8, #0, LBB203_23
-LBB203_19:                              ; %B19
+	tbnz	w8, #0, LBB206_23
+LBB206_19:                              ; %B19
 	and	x9, x22, #0xffff000000000003
 	mov	x8, #-281474976710656           ; =0xffff000000000000
 	cmp	x9, x8
-	b.ne	LBB203_21
+	b.ne	LBB206_21
 ; %bb.20:                               ; %B19
 	and	x9, x21, #0xffff000000000003
 	cmp	x9, x8
-	b.eq	LBB203_25
-LBB203_21:                              ; %B21
+	b.eq	LBB206_25
+LBB206_21:                              ; %B21
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #16
 	mov	w22, #6                         ; =0x6
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB203_22:                              ; %B14
+LBB206_22:                              ; %B14
 	mov	x0, xzr
 	b	l_FastStringEqual_asm_h
-LBB203_23:                              ; %B36
+LBB206_23:                              ; %B36
 	mov	x0, x24
 	mov	x1, x22
 	mov	x2, x21
@@ -9538,7 +9633,7 @@ LBB203_23:                              ; %B36
 	str	x20, [x23, #48]
 	bl	_prim_js_strict_eq_slow_gc
 	cmp	x0, #130
-	b.eq	LBB203_27
+	b.eq	LBB206_27
 ; %bb.24:                               ; %B38
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #16
@@ -9546,23 +9641,23 @@ LBB203_23:                              ; %B36
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB203_25:                              ; %B7
+LBB206_25:                              ; %B7
 	and	x8, x22, #0xfffffffffffc
 	and	x9, x21, #0xfffffffffffc
 	sub	x20, x20, #16
 	ldr	x8, [x8, #8]
 	ldr	x9, [x9, #8]
 	cmp	x8, x9
-	b.eq	LBB203_28
+	b.eq	LBB206_28
 ; %bb.26:                               ; %B9
 	ldrb	w8, [x19], #1
 	mov	w22, #6                         ; =0x6
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB203_27:                              ; %B37
+LBB206_27:                              ; %B37
 	b	l_exception_asm_h
-LBB203_28:                              ; %B8
+LBB206_28:                              ; %B8
 	ldrb	w8, [x19], #1
 	mov	w22, #7                         ; =0x7
 	add	w8, w8, #243
@@ -9575,17 +9670,17 @@ l_strict_neq_0_asm_h:                   ; @strict_neq_0_asm_h
 	ldp	x22, x21, [x20, #-16]
 	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
 	cmp	x22, x8
-	b.hi	LBB204_13
+	b.hi	LBB207_13
 ; %bb.1:                                ; %B39
 	cmp	x21, x8
-	b.hi	LBB204_13
+	b.hi	LBB207_13
 ; %bb.2:                                ; %B1
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x22, x8
-	b.lo	LBB204_5
+	b.lo	LBB207_5
 ; %bb.3:                                ; %B30
 	cmp	x21, x8
-	b.lo	LBB204_8
+	b.lo	LBB207_8
 ; %bb.4:                                ; %B35
 	ldrb	w8, [x19], #1
 	cmp	w22, w21
@@ -9595,12 +9690,12 @@ l_strict_neq_0_asm_h:                   ; @strict_neq_0_asm_h
 	mov	w8, #6                          ; =0x6
 	cinc	x22, x8, ne
 	br	x1
-LBB204_5:                               ; %B3
+LBB207_5:                               ; %B3
 	tst	x22, #0xfffe000000000000
-	b.eq	LBB204_13
+	b.eq	LBB207_13
 ; %bb.6:                                ; %B23
 	cmp	x21, x8
-	b.lo	LBB204_11
+	b.lo	LBB207_11
 ; %bb.7:                                ; %B28
 	scvtf	d0, w21
 	add	x8, x22, x8
@@ -9615,13 +9710,13 @@ LBB204_5:                               ; %B3
 	csinc	w8, w9, wzr, vc
 	orr	x22, x8, #0x6
 	br	x1
-LBB204_8:                               ; %B32
+LBB207_8:                               ; %B32
 	tst	x21, #0xfffe000000000000
-	b.eq	LBB204_13
+	b.eq	LBB207_13
 ; %bb.9:                                ; %B34
 	scvtf	d0, w22
 	add	x8, x21, x8
-LBB204_10:                              ; %B34
+LBB207_10:                              ; %B34
 	fmov	d1, x8
 	ldrb	w8, [x19], #1
 	fcmp	d0, d1
@@ -9633,17 +9728,17 @@ LBB204_10:                              ; %B34
 	csinc	w8, w9, wzr, vc
 	orr	x22, x8, #0x6
 	br	x1
-LBB204_11:                              ; %B25
+LBB207_11:                              ; %B25
 	tst	x21, #0xfffe000000000000
-	b.eq	LBB204_13
+	b.eq	LBB207_13
 ; %bb.12:                               ; %B27
 	add	x9, x22, x8
 	add	x8, x21, x8
 	fmov	d0, x9
-	b	LBB204_10
-LBB204_13:                              ; %B10
+	b	LBB207_10
+LBB207_13:                              ; %B10
 	cmp	x22, x21
-	b.ne	LBB204_15
+	b.ne	LBB207_15
 ; %bb.14:                               ; %B11
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #16
@@ -9651,7 +9746,7 @@ LBB204_13:                              ; %B10
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB204_15:                              ; %B13
+LBB207_15:                              ; %B13
 	and	x8, x22, #0xffff000000000003
 	mov	x11, #-281474976710653          ; =0xffff000000000003
 	mov	x12, #2                         ; =0x2
@@ -9664,10 +9759,10 @@ LBB204_15:                              ; %B13
 	ccmp	x10, x12, #4, ne
 	cset	w11, eq
 	cmp	w9, #1
-	b.ne	LBB204_17
+	b.ne	LBB207_17
 ; %bb.16:                               ; %B13
-	cbnz	w11, LBB204_22
-LBB204_17:                              ; %B16
+	cbnz	w11, LBB207_22
+LBB207_17:                              ; %B16
 	mov	x12, #2                         ; =0x2
 	movk	x12, #65535, lsl #48
 	cmp	x8, x12
@@ -9675,29 +9770,29 @@ LBB204_17:                              ; %B16
 	cmp	x10, x12
 	bic	w9, w8, w9
 	csinc	w8, w11, wzr, ne
-	tbnz	w9, #0, LBB204_19
+	tbnz	w9, #0, LBB207_19
 ; %bb.18:                               ; %B16
-	tbnz	w8, #0, LBB204_23
-LBB204_19:                              ; %B19
+	tbnz	w8, #0, LBB207_23
+LBB207_19:                              ; %B19
 	and	x9, x22, #0xffff000000000003
 	mov	x8, #-281474976710656           ; =0xffff000000000000
 	cmp	x9, x8
-	b.ne	LBB204_21
+	b.ne	LBB207_21
 ; %bb.20:                               ; %B19
 	and	x9, x21, #0xffff000000000003
 	cmp	x9, x8
-	b.eq	LBB204_25
-LBB204_21:                              ; %B21
+	b.eq	LBB207_25
+LBB207_21:                              ; %B21
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #16
 	mov	w22, #7                         ; =0x7
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB204_22:                              ; %B14
+LBB207_22:                              ; %B14
 	mov	w0, #1                          ; =0x1
 	b	l_FastStringEqual_asm_h
-LBB204_23:                              ; %B36
+LBB207_23:                              ; %B36
 	mov	x0, x24
 	mov	x1, x22
 	mov	x2, x21
@@ -9705,7 +9800,7 @@ LBB204_23:                              ; %B36
 	str	x20, [x23, #48]
 	bl	_prim_js_strict_eq_slow_gc
 	cmp	x0, #130
-	b.eq	LBB204_27
+	b.eq	LBB207_27
 ; %bb.24:                               ; %B38
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #16
@@ -9713,23 +9808,23 @@ LBB204_23:                              ; %B36
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB204_25:                              ; %B7
+LBB207_25:                              ; %B7
 	and	x8, x22, #0xfffffffffffc
 	and	x9, x21, #0xfffffffffffc
 	sub	x20, x20, #16
 	ldr	x8, [x8, #8]
 	ldr	x9, [x9, #8]
 	cmp	x8, x9
-	b.eq	LBB204_28
+	b.eq	LBB207_28
 ; %bb.26:                               ; %B9
 	ldrb	w8, [x19], #1
 	mov	w22, #7                         ; =0x7
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB204_27:                              ; %B37
+LBB207_27:                              ; %B37
 	b	l_exception_asm_h
-LBB204_28:                              ; %B8
+LBB207_28:                              ; %B8
 	ldrb	w8, [x19], #1
 	mov	w22, #6                         ; =0x6
 	add	w8, w8, #243
@@ -9742,20 +9837,20 @@ l_and_0_asm_h:                          ; @and_0_asm_h
 	ldp	x22, x21, [x20, #-16]
 	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
 	cmp	x22, x8
-	b.hi	LBB205_10
+	b.hi	LBB208_10
 ; %bb.1:                                ; %B28
 	cmp	x21, x8
-	b.hi	LBB205_10
+	b.hi	LBB208_10
 ; %bb.2:                                ; %B2
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x22, x8
-	b.lo	LBB205_6
+	b.lo	LBB208_6
 ; %bb.3:                                ; %B19
 	cmp	x21, x8
-	b.lo	LBB205_10
+	b.lo	LBB208_10
 ; %bb.4:                                ; %B24
 	mov	w8, w22
-LBB205_5:                               ; %B16
+LBB208_5:                               ; %B16
 	ldrb	w9, [x19], #1
 	sub	x20, x20, #16
 	and	w8, w8, w21
@@ -9763,23 +9858,23 @@ LBB205_5:                               ; %B16
 	orr	x22, x8, #0xfffe000000000000
 	ldr	x1, [x25, w9, uxtw #3]
 	br	x1
-LBB205_6:                               ; %B4
+LBB208_6:                               ; %B4
 	tst	x22, #0xfffe000000000000
-	b.eq	LBB205_10
+	b.eq	LBB208_10
 ; %bb.7:                                ; %B4
 	cmp	x21, x8
-	b.lo	LBB205_10
+	b.lo	LBB208_10
 ; %bb.8:                                ; %B14
 	ubfx	x8, x22, #52, #11
 	cmp	x8, #1053
-	b.gt	LBB205_10
+	b.gt	LBB208_10
 ; %bb.9:                                ; %B15
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	add	x8, x22, x8
 	fmov	d0, x8
 	fcvtzs	w8, d0
-	b	LBB205_5
-LBB205_10:                              ; %B25
+	b	LBB208_5
+LBB208_10:                              ; %B25
 	mov	x0, x24
 	mov	x1, x22
 	mov	x2, x21
@@ -9787,7 +9882,7 @@ LBB205_10:                              ; %B25
 	str	x20, [x23, #48]
 	bl	_prim_js_binary_logic_slow_gc
 	cmp	x0, #130
-	b.eq	LBB205_12
+	b.eq	LBB208_12
 ; %bb.11:                               ; %B27
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #16
@@ -9795,7 +9890,7 @@ LBB205_10:                              ; %B25
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB205_12:                              ; %B26
+LBB208_12:                              ; %B26
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function xor_0_asm_h
@@ -9804,20 +9899,20 @@ l_xor_0_asm_h:                          ; @xor_0_asm_h
 	ldp	x22, x21, [x20, #-16]
 	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
 	cmp	x22, x8
-	b.hi	LBB206_10
+	b.hi	LBB209_10
 ; %bb.1:                                ; %B28
 	cmp	x21, x8
-	b.hi	LBB206_10
+	b.hi	LBB209_10
 ; %bb.2:                                ; %B2
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x22, x8
-	b.lo	LBB206_6
+	b.lo	LBB209_6
 ; %bb.3:                                ; %B19
 	cmp	x21, x8
-	b.lo	LBB206_10
+	b.lo	LBB209_10
 ; %bb.4:                                ; %B24
 	mov	w8, w22
-LBB206_5:                               ; %B16
+LBB209_5:                               ; %B16
 	ldrb	w9, [x19], #1
 	sub	x20, x20, #16
 	eor	w8, w8, w21
@@ -9825,23 +9920,23 @@ LBB206_5:                               ; %B16
 	orr	x22, x8, #0xfffe000000000000
 	ldr	x1, [x25, w9, uxtw #3]
 	br	x1
-LBB206_6:                               ; %B4
+LBB209_6:                               ; %B4
 	tst	x22, #0xfffe000000000000
-	b.eq	LBB206_10
+	b.eq	LBB209_10
 ; %bb.7:                                ; %B4
 	cmp	x21, x8
-	b.lo	LBB206_10
+	b.lo	LBB209_10
 ; %bb.8:                                ; %B14
 	ubfx	x8, x22, #52, #11
 	cmp	x8, #1053
-	b.gt	LBB206_10
+	b.gt	LBB209_10
 ; %bb.9:                                ; %B15
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	add	x8, x22, x8
 	fmov	d0, x8
 	fcvtzs	w8, d0
-	b	LBB206_5
-LBB206_10:                              ; %B25
+	b	LBB209_5
+LBB209_10:                              ; %B25
 	mov	x0, x24
 	mov	x1, x22
 	mov	x2, x21
@@ -9849,7 +9944,7 @@ LBB206_10:                              ; %B25
 	str	x20, [x23, #48]
 	bl	_prim_js_binary_logic_slow_gc
 	cmp	x0, #130
-	b.eq	LBB206_12
+	b.eq	LBB209_12
 ; %bb.11:                               ; %B27
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #16
@@ -9857,7 +9952,7 @@ LBB206_10:                              ; %B25
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB206_12:                              ; %B26
+LBB209_12:                              ; %B26
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function or_0_asm_h
@@ -9866,20 +9961,20 @@ l_or_0_asm_h:                           ; @or_0_asm_h
 	ldp	x22, x21, [x20, #-16]
 	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
 	cmp	x22, x8
-	b.hi	LBB207_10
+	b.hi	LBB210_10
 ; %bb.1:                                ; %B28
 	cmp	x21, x8
-	b.hi	LBB207_10
+	b.hi	LBB210_10
 ; %bb.2:                                ; %B2
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x22, x8
-	b.lo	LBB207_6
+	b.lo	LBB210_6
 ; %bb.3:                                ; %B19
 	cmp	x21, x8
-	b.lo	LBB207_10
+	b.lo	LBB210_10
 ; %bb.4:                                ; %B24
 	mov	w8, w22
-LBB207_5:                               ; %B16
+LBB210_5:                               ; %B16
 	ldrb	w9, [x19], #1
 	sub	x20, x20, #16
 	orr	w8, w8, w21
@@ -9887,23 +9982,23 @@ LBB207_5:                               ; %B16
 	orr	x22, x8, #0xfffe000000000000
 	ldr	x1, [x25, w9, uxtw #3]
 	br	x1
-LBB207_6:                               ; %B4
+LBB210_6:                               ; %B4
 	tst	x22, #0xfffe000000000000
-	b.eq	LBB207_10
+	b.eq	LBB210_10
 ; %bb.7:                                ; %B4
 	cmp	x21, x8
-	b.lo	LBB207_10
+	b.lo	LBB210_10
 ; %bb.8:                                ; %B14
 	ubfx	x8, x22, #52, #11
 	cmp	x8, #1053
-	b.gt	LBB207_10
+	b.gt	LBB210_10
 ; %bb.9:                                ; %B15
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	add	x8, x22, x8
 	fmov	d0, x8
 	fcvtzs	w8, d0
-	b	LBB207_5
-LBB207_10:                              ; %B25
+	b	LBB210_5
+LBB210_10:                              ; %B25
 	mov	x0, x24
 	mov	x1, x22
 	mov	x2, x21
@@ -9911,7 +10006,7 @@ LBB207_10:                              ; %B25
 	str	x20, [x23, #48]
 	bl	_prim_js_binary_logic_slow_gc
 	cmp	x0, #130
-	b.eq	LBB207_12
+	b.eq	LBB210_12
 ; %bb.11:                               ; %B27
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #16
@@ -9919,7 +10014,7 @@ LBB207_10:                              ; %B25
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB207_12:                              ; %B26
+LBB210_12:                              ; %B26
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function nop_0_asm_h
@@ -10048,7 +10143,7 @@ l_push_const8_0_asm_h:                  ; @push_const8_0_asm_h
 	ldrb	w9, [x19]
 	ldr	w10, [x24, #328]
 	ldr	x1, [x8, x9, lsl #3]
-	cbz	w10, LBB220_2
+	cbz	w10, LBB223_2
 ; %bb.1:                                ; %B4
 	mov	x0, x24
 	mov	x2, x19
@@ -10056,7 +10151,7 @@ l_push_const8_0_asm_h:                  ; @push_const8_0_asm_h
 	str	x1, [sp, #8]                    ; 8-byte Folded Spill
 	bl	_DebuggerPause
 	ldr	x1, [sp, #8]                    ; 8-byte Folded Reload
-LBB220_2:                               ; %B1
+LBB223_2:                               ; %B1
 	ldrb	w8, [x19, #1]
 	add	x19, x19, #2
 	mov	x22, x1
@@ -10082,14 +10177,14 @@ l_push_empty_string_0_asm_h:            ; @push_empty_string_0_asm_h
 	str	x20, [x23, #48]
 	bl	___JS_AtomToValue_GC
 	cmp	x0, #130
-	b.eq	LBB222_2
+	b.eq	LBB225_2
 ; %bb.1:                                ; %B3
 	ldrb	w8, [x19], #1
 	mov	x22, x0
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB222_2:                               ; %B2
+LBB225_2:                               ; %B2
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function get_loc8_0_asm_h
@@ -10495,7 +10590,7 @@ l_get_length_0_asm_h:                   ; @get_length_0_asm_h
 	cmp	x9, x8
 	mov	x8, #-281474976710653           ; =0xffff000000000003
 	ccmp	x9, x8, #4, ne
-	b.ne	LBB262_2
+	b.ne	LBB265_2
 ; %bb.1:                                ; %B28
 	and	x8, x22, #0xfffffffffffc
 	ldrb	w9, [x19], #1
@@ -10507,17 +10602,17 @@ l_get_length_0_asm_h:                   ; @get_length_0_asm_h
 	ldr	x1, [x25, w9, uxtw #3]
 	mov	x22, x10
 	br	x1
-LBB262_2:                               ; %B21
+LBB265_2:                               ; %B21
 	mov	x8, #2                          ; =0x2
 	movk	x8, #65535, lsl #48
 	tst	x22, x8
-	b.ne	LBB262_12
+	b.ne	LBB265_12
 ; %bb.3:                                ; %B22
 	mov	x9, x22
 	mov	w8, #18                         ; =0x12
-LBB262_4:                               ; %B19
+LBB265_4:                               ; %B19
                                         ; =>This Loop Header: Depth=1
-                                        ;     Child Loop BB262_5 Depth 2
+                                        ;     Child Loop BB265_5 Depth 2
 	ldr	x10, [x9, #8]
 	ldr	w11, [x10, #12]
 	add	x13, x10, #64
@@ -10526,48 +10621,48 @@ LBB262_4:                               ; %B19
 	ldr	w10, [x13, w10, uxtw #2]
 	add	w11, w12, #4
 	add	x11, x13, x11
-	cbz	w10, LBB262_7
-LBB262_5:                               ; %B1
-                                        ;   Parent Loop BB262_4 Depth=1
+	cbz	w10, LBB265_7
+LBB265_5:                               ; %B1
+                                        ;   Parent Loop BB265_4 Depth=1
                                         ; =>  This Inner Loop Header: Depth=2
 	lsl	w12, w10, #3
 	sub	w12, w12, #8
 	add	x12, x11, x12
 	ldp	w12, w13, [x12]
 	cmp	w13, #48
-	b.eq	LBB262_9
+	b.eq	LBB265_9
 ; %bb.6:                                ; %B9
-                                        ;   in Loop: Header=BB262_5 Depth=2
+                                        ;   in Loop: Header=BB265_5 Depth=2
 	and	w10, w12, #0x3ffffff
-	cbnz	w10, LBB262_5
-LBB262_7:                               ; %B14
-                                        ;   in Loop: Header=BB262_4 Depth=1
+	cbnz	w10, LBB265_5
+LBB265_7:                               ; %B14
+                                        ;   in Loop: Header=BB265_4 Depth=1
 	ldr	w10, [x9, #4]
 	ubfx	w10, w10, #10, #1
 	cmp	w10, #1
-	b.eq	LBB262_12
+	b.eq	LBB265_12
 ; %bb.8:                                ; %B17
-                                        ;   in Loop: Header=BB262_4 Depth=1
+                                        ;   in Loop: Header=BB265_4 Depth=1
 	ldr	x9, [x9, #8]
 	ldr	x9, [x9, #32]
-	cbnz	x9, LBB262_4
-	b	LBB262_11
-LBB262_9:                               ; %B3
+	cbnz	x9, LBB265_4
+	b	LBB265_11
+LBB265_9:                               ; %B3
 	lsr	w8, w12, #26
 	tst	w8, #0x30
-	b.ne	LBB262_12
+	b.ne	LBB265_12
 ; %bb.10:                               ; %B4
 	ldr	x8, [x9, #16]
 	sub	w9, w10, #1
 	ldr	x8, [x8, w9, sxtw #3]
-LBB262_11:                              ; %B6
+LBB265_11:                              ; %B6
 	ldrb	w9, [x19], #1
 	sub	x20, x20, #8
 	mov	x22, x8
 	add	w9, w9, #243
 	ldr	x1, [x25, w9, uxtw #3]
 	br	x1
-LBB262_12:                              ; %B24
+LBB265_12:                              ; %B24
 	mov	x0, x24
 	mov	x1, x22
 	mov	w2, #48                         ; =0x30
@@ -10576,7 +10671,7 @@ LBB262_12:                              ; %B24
 	str	x20, [x23, #48]
 	bl	_JS_GetPropertyInternalImpl_GC
 	cmp	x0, #130
-	b.eq	LBB262_14
+	b.eq	LBB265_14
 ; %bb.13:                               ; %B26
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #8
@@ -10584,152 +10679,192 @@ LBB262_12:                              ; %B24
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB262_14:                              ; %B25
+LBB265_14:                              ; %B25
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function if_false8_0_asm_h
 l_if_false8_0_asm_h:                    ; @if_false8_0_asm_h
-; %bb.0:                                ; %B23
+; %bb.0:                                ; %B29
 	mov	x8, x20
 	ldr	x22, [x20, #-8]!
 	cmp	x22, #5
-	b.le	LBB263_4
-; %bb.1:                                ; %B23
+	b.le	LBB266_4
+; %bb.1:                                ; %B29
 	cmp	x22, #6
-	b.eq	LBB263_6
-; %bb.2:                                ; %B23
+	b.eq	LBB266_6
+; %bb.2:                                ; %B29
 	cmp	x22, #7
-	b.eq	LBB263_9
-; %bb.3:                                ; %B23
+	b.eq	LBB266_10
+; %bb.3:                                ; %B29
 	cmp	x22, #18
-	b.eq	LBB263_6
-	b	LBB263_7
-LBB263_4:                               ; %B23
+	b.eq	LBB266_6
+	b	LBB266_8
+LBB266_4:                               ; %B29
 	mov	x9, #-562949953421312           ; =0xfffe000000000000
 	cmp	x22, x9
-	b.eq	LBB263_6
-; %bb.5:                                ; %B23
+	b.eq	LBB266_6
+; %bb.5:                                ; %B29
 	cmp	x22, #2
-	b.ne	LBB263_7
-LBB263_6:                               ; %B3
+	b.ne	LBB266_8
+LBB266_6:                               ; %B8
 	ldrsb	x8, [x19]
 	add	x19, x19, x8
+	tbnz	x8, #63, LBB266_11
+LBB266_7:                               ; %B10
 	ldrb	w8, [x19], #1
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB263_7:                               ; %B9
+LBB266_8:                               ; %B15
 	mov	x9, #-281474976710656           ; =0xffff000000000000
 	cmp	x22, x9
-	b.hs	LBB263_13
-; %bb.8:                                ; %B11
+	b.hs	LBB266_16
+; %bb.9:                                ; %B17
 	mov	x9, #-562949953421312           ; =0xfffe000000000000
 	cmp	x22, x9
-	b.lo	LBB263_10
-LBB263_9:                               ; %B19
+	b.lo	LBB266_13
+LBB266_10:                              ; %B25
 	ldrb	w8, [x19, #1]
 	add	x19, x19, #2
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB263_10:                              ; %B13
+LBB266_11:                              ; %B5
+	ldr	w8, [x24, #232]
+	subs	w8, w8, #1
+	str	w8, [x24, #232]
+	b.pl	LBB266_7
+; %bb.12:                               ; %B6
+	add	x19, x19, #1
+	b	l_PollInterrupts_asm_h
+LBB266_13:                              ; %B19
 	tst	x22, #0xfffe000000000000
-	b.eq	LBB263_13
-; %bb.11:                               ; %B17
+	b.eq	LBB266_16
+; %bb.14:                               ; %B23
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	add	x8, x22, x8
 	fmov	d0, x8
 	fcmp	d0, d0
 	cset	w8, vc
 	fcmp	d0, #0.0
-	b.eq	LBB263_6
-	b.vs	LBB263_6
-; %bb.12:                               ; %B17
-	tbnz	w8, #0, LBB263_9
-	b	LBB263_6
-LBB263_13:                              ; %B15
+	b.eq	LBB266_6
+	b.vs	LBB266_6
+; %bb.15:                               ; %B23
+	tbnz	w8, #0, LBB266_10
+	b	LBB266_6
+LBB266_16:                              ; %B21
 	mov	x20, x8
 	mov	x0, x22
 	b	l_SlowToBoolean_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function if_true8_0_asm_h
 l_if_true8_0_asm_h:                     ; @if_true8_0_asm_h
-; %bb.0:                                ; %B23
+; %bb.0:                                ; %B29
 	mov	x8, x20
 	ldr	x22, [x20, #-8]!
 	cmp	x22, #5
-	b.le	LBB264_4
-; %bb.1:                                ; %B23
+	b.le	LBB267_4
+; %bb.1:                                ; %B29
 	cmp	x22, #6
-	b.eq	LBB264_6
-; %bb.2:                                ; %B23
+	b.eq	LBB267_6
+; %bb.2:                                ; %B29
 	cmp	x22, #7
-	b.eq	LBB264_9
-; %bb.3:                                ; %B23
+	b.eq	LBB267_9
+; %bb.3:                                ; %B29
 	cmp	x22, #18
-	b.eq	LBB264_6
-	b	LBB264_7
-LBB264_4:                               ; %B23
+	b.eq	LBB267_6
+	b	LBB267_7
+LBB267_4:                               ; %B29
 	mov	x9, #-562949953421312           ; =0xfffe000000000000
 	cmp	x22, x9
-	b.eq	LBB264_6
-; %bb.5:                                ; %B23
+	b.eq	LBB267_6
+; %bb.5:                                ; %B29
 	cmp	x22, #2
-	b.ne	LBB264_7
-LBB264_6:                               ; %B3
+	b.ne	LBB267_7
+LBB267_6:                               ; %B3
 	ldrb	w8, [x19, #1]
 	add	x19, x19, #2
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB264_7:                               ; %B9
+LBB267_7:                               ; %B9
 	mov	x9, #-281474976710656           ; =0xffff000000000000
 	cmp	x22, x9
-	b.hs	LBB264_13
+	b.hs	LBB267_16
 ; %bb.8:                                ; %B11
-	mov	x9, #-562949953421312           ; =0xfffe000000000000
+	mov	x9, #-562949953421313           ; =0xfffdffffffffffff
 	cmp	x22, x9
-	b.lo	LBB264_10
-LBB264_9:                               ; %B19
+	b.ls	LBB267_13
+LBB267_9:                               ; %B23
 	ldrsb	x8, [x19]
 	add	x19, x19, x8
+	tbnz	x8, #63, LBB267_11
+LBB267_10:                              ; %B25
 	ldrb	w8, [x19], #1
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB264_10:                              ; %B13
+LBB267_11:                              ; %B20
+	ldr	w8, [x24, #232]
+	subs	w8, w8, #1
+	str	w8, [x24, #232]
+	b.pl	LBB267_10
+; %bb.12:                               ; %B21
+	add	x19, x19, #1
+	b	l_PollInterrupts_asm_h
+LBB267_13:                              ; %B13
 	tst	x22, #0xfffe000000000000
-	b.eq	LBB264_13
-; %bb.11:                               ; %B17
+	b.eq	LBB267_16
+; %bb.14:                               ; %B17
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	add	x8, x22, x8
 	fmov	d0, x8
 	fcmp	d0, d0
 	cset	w8, vc
 	fcmp	d0, #0.0
-	b.eq	LBB264_6
-	b.vs	LBB264_6
-; %bb.12:                               ; %B17
-	tbnz	w8, #0, LBB264_9
-	b	LBB264_6
-LBB264_13:                              ; %B15
+	b.eq	LBB267_6
+	b.vs	LBB267_6
+; %bb.15:                               ; %B17
+	tbnz	w8, #0, LBB267_9
+	b	LBB267_6
+LBB267_16:                              ; %B15
 	mov	x20, x8
 	mov	x0, x22
 	b	l_SlowToBoolean_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function goto8_0_asm_h
 l_goto8_0_asm_h:                        ; @goto8_0_asm_h
-; %bb.0:                                ; %B0
+; %bb.0:                                ; %B5
 	ldrsb	x8, [x19]
 	add	x19, x19, x8
+	tbnz	x8, #63, LBB268_2
+LBB268_1:                               ; %B7
 	ldrb	w8, [x19], #1
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
+LBB268_2:                               ; %B2
+	ldr	w8, [x24, #232]
+	subs	w8, w8, #1
+	str	w8, [x24, #232]
+	b.pl	LBB268_1
+; %bb.3:                                ; %B3
+	add	x19, x19, #1
+	b	l_PollInterrupts_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function goto16_0_asm_h
 l_goto16_0_asm_h:                       ; @goto16_0_asm_h
-; %bb.0:                                ; %B0
+; %bb.0:                                ; %B5
 	ldrsh	x8, [x19]
 	add	x19, x19, x8
+	tbnz	x8, #63, LBB269_2
+LBB269_1:                               ; %B7
 	ldrb	w8, [x19], #1
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
+LBB269_2:                               ; %B2
+	ldr	w8, [x24, #232]
+	subs	w8, w8, #1
+	str	w8, [x24, #232]
+	b.pl	LBB269_1
+; %bb.3:                                ; %B3
+	add	x19, x19, #1
+	b	l_PollInterrupts_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function call0_0_asm_h
 l_call0_0_asm_h:                        ; @call0_0_asm_h
@@ -10746,13 +10881,13 @@ l_call0_0_asm_h:                        ; @call0_0_asm_h
 	ldr	x20, [x23, #48]
 	ldr	x28, [x23, #16]
 	ldr	x26, [x23, #104]
-	b.eq	LBB267_2
+	b.eq	LBB270_2
 ; %bb.1:                                ; %B4
 	stur	x0, [x20, #-8]
 	ldrb	w8, [x19], #1
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB267_2:                               ; %B3
+LBB270_2:                               ; %B3
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function call1_0_asm_h
@@ -10771,14 +10906,14 @@ l_call1_0_asm_h:                        ; @call1_0_asm_h
 	ldr	x20, [x23, #48]
 	ldr	x28, [x23, #16]
 	ldr	x26, [x23, #104]
-	b.eq	LBB268_2
+	b.eq	LBB271_2
 ; %bb.1:                                ; %B4
 	stur	x0, [x20, #-16]
 	sub	x20, x20, #8
 	ldrb	w8, [x19], #1
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB268_2:                               ; %B3
+LBB271_2:                               ; %B3
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function call2_0_asm_h
@@ -10797,14 +10932,14 @@ l_call2_0_asm_h:                        ; @call2_0_asm_h
 	ldr	x20, [x23, #48]
 	ldr	x28, [x23, #16]
 	ldr	x26, [x23, #104]
-	b.eq	LBB269_2
+	b.eq	LBB272_2
 ; %bb.1:                                ; %B4
 	stur	x0, [x20, #-24]
 	sub	x20, x20, #16
 	ldrb	w8, [x19], #1
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB269_2:                               ; %B3
+LBB272_2:                               ; %B3
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function call3_0_asm_h
@@ -10823,14 +10958,14 @@ l_call3_0_asm_h:                        ; @call3_0_asm_h
 	ldr	x20, [x23, #48]
 	ldr	x28, [x23, #16]
 	ldr	x26, [x23, #104]
-	b.eq	LBB270_2
+	b.eq	LBB273_2
 ; %bb.1:                                ; %B4
 	stur	x0, [x20, #-32]
 	sub	x20, x20, #24
 	ldrb	w8, [x19], #1
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB270_2:                               ; %B3
+LBB273_2:                               ; %B3
 	b	l_exception_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function is_undefined_0_asm_h
@@ -10838,7 +10973,7 @@ l_is_undefined_0_asm_h:                 ; @is_undefined_0_asm_h
 ; %bb.0:                                ; %B2
 	ldur	x22, [x20, #-8]
 	cmp	x22, #18
-	b.ne	LBB271_2
+	b.ne	LBB274_2
 ; %bb.1:                                ; %B3
 	mov	w22, #7                         ; =0x7
 	ldrb	w8, [x19], #1
@@ -10846,7 +10981,7 @@ l_is_undefined_0_asm_h:                 ; @is_undefined_0_asm_h
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB271_2:                               ; %B5
+LBB274_2:                               ; %B5
 	mov	w22, #6                         ; =0x6
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #8
@@ -10859,7 +10994,7 @@ l_is_null_0_asm_h:                      ; @is_null_0_asm_h
 ; %bb.0:                                ; %B2
 	ldur	x22, [x20, #-8]
 	cmp	x22, #2
-	b.ne	LBB272_2
+	b.ne	LBB275_2
 ; %bb.1:                                ; %B3
 	mov	w22, #7                         ; =0x7
 	ldrb	w8, [x19], #1
@@ -10867,7 +11002,7 @@ l_is_null_0_asm_h:                      ; @is_null_0_asm_h
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB272_2:                               ; %B5
+LBB275_2:                               ; %B5
 	mov	w22, #6                         ; =0x6
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #8
@@ -10883,7 +11018,7 @@ l_is_function_0_asm_h:                  ; @is_function_0_asm_h
 	mov	x1, x22
 	bl	_js_operator_typeof_gc
 	cmp	w0, #27
-	b.ne	LBB273_2
+	b.ne	LBB276_2
 ; %bb.1:                                ; %B2
 	mov	w22, #7                         ; =0x7
 	ldrb	w8, [x19], #1
@@ -10891,7 +11026,7 @@ l_is_function_0_asm_h:                  ; @is_function_0_asm_h
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB273_2:                               ; %B5
+LBB276_2:                               ; %B5
 	mov	w22, #6                         ; =0x6
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #8
@@ -10905,30 +11040,30 @@ l_inc_coverage_0_asm_h:                 ; @inc_coverage_0_asm_h
 	ldr	x8, [x23, #8]
 	ldr	x1, [x8, #32]
 	ldr	x8, [x1, #112]
-	cbz	x8, LBB274_3
+	cbz	x8, LBB277_3
 ; %bb.1:                                ; %B7
 	ldr	x8, [x23, #8]
 	ldr	x10, [x8, #32]
 	ldr	x8, [x10, #112]
-	cbnz	x8, LBB274_4
-LBB274_2:                               ; %B4
+	cbnz	x8, LBB277_4
+LBB277_2:                               ; %B4
 	ldrb	w8, [x19, #4]
 	add	x19, x19, #5
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB274_3:                               ; %B11
+LBB277_3:                               ; %B11
 	mov	x0, x24
 	str	x20, [x23, #48]
 	bl	_EnsureCoverageCounters
 	ldr	x8, [x23, #8]
 	ldr	x10, [x8, #32]
 	ldr	x8, [x10, #112]
-	cbz	x8, LBB274_2
-LBB274_4:                               ; %B2
+	cbz	x8, LBB277_2
+LBB277_4:                               ; %B2
 	ldr	w9, [x19]
 	ldr	w10, [x10, #104]
 	cmp	w9, w10
-	b.hs	LBB274_2
+	b.hs	LBB277_2
 ; %bb.5:                                ; %B6
 	ldr	w10, [x8, w9, sxtw #2]
 	add	w10, w10, #1
@@ -10976,7 +11111,7 @@ l_push_const_1_asm_h:                   ; @push_const_1_asm_h
 	ldrsw	x9, [x19]
 	ldr	w10, [x24, #328]
 	ldr	x1, [x8, x9, lsl #3]
-	cbz	w10, LBB277_2
+	cbz	w10, LBB280_2
 ; %bb.1:                                ; %B4
 	mov	x8, x20
 	mov	x0, x24
@@ -10986,7 +11121,7 @@ l_push_const_1_asm_h:                   ; @push_const_1_asm_h
 	str	x1, [sp, #8]                    ; 8-byte Folded Spill
 	bl	_DebuggerPause
 	ldr	x1, [sp, #8]                    ; 8-byte Folded Reload
-LBB277_2:                               ; %B1
+LBB280_2:                               ; %B1
 	ldrb	w8, [x19, #4]
 	add	x19, x19, #5
 	mov	x21, x1
@@ -11005,19 +11140,19 @@ l_fclosure_1_asm_h:                     ; @fclosure_1_asm_h
 l_push_atom_value_1_asm_h:              ; @push_atom_value_1_asm_h
 ; %bb.0:                                ; %B13
 	ldr	w1, [x19]
-	tbnz	w1, #31, LBB279_5
+	tbnz	w1, #31, LBB282_5
 ; %bb.1:                                ; %B1
 	ldr	x8, [x24, #8]
 	ldr	x8, [x8, #64]
 	ldr	x8, [x8, w1, sxtw #3]
 	ldrb	w9, [x8, #7]
-	tbnz	w9, #6, LBB279_4
+	tbnz	w9, #6, LBB282_4
 ; %bb.2:                                ; %B9
 	ldr	w9, [x8, #8]
 	asr	w9, w9, #30
 	cmp	w9, #1
-	b.ne	LBB279_5
-LBB279_3:                               ; %B7
+	b.ne	LBB282_5
+LBB282_3:                               ; %B7
 	ldrb	w9, [x19, #4]
 	add	x19, x19, #5
 	add	w9, w9, #486
@@ -11026,13 +11161,13 @@ LBB279_3:                               ; %B7
 	movk	x9, #1, lsl #48
 	orr	x21, x8, x9
 	br	x1
-LBB279_4:                               ; %B2
+LBB282_4:                               ; %B2
 	ldr	x9, [x8, #8]
 	ldr	w9, [x9]
 	asr	w9, w9, #30
 	cmp	w9, #1
-	b.eq	LBB279_3
-LBB279_5:                               ; %B10
+	b.eq	LBB282_3
+LBB282_5:                               ; %B10
 	mov	x8, x20
 	mov	x0, x24
 	mov	w2, wzr
@@ -11040,7 +11175,7 @@ LBB279_5:                               ; %B10
 	str	x8, [x23, #48]
 	bl	___JS_AtomToValue_GC
 	cmp	x0, #130
-	b.eq	LBB279_7
+	b.eq	LBB282_7
 ; %bb.6:                                ; %B12
 	ldrb	w8, [x19, #4]
 	add	x19, x19, #5
@@ -11048,7 +11183,7 @@ LBB279_5:                               ; %B10
 	add	w8, w8, #486
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB279_7:                               ; %B11
+LBB282_7:                               ; %B11
 	b	l_exception_spill_top0_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function private_symbol_1_asm_h
@@ -11080,43 +11215,43 @@ l_push_this_1_asm_h:                    ; @push_this_1_asm_h
 ; %bb.0:                                ; %B12
 	ldr	w8, [x23, #44]
 	ldr	x1, [x23, #88]
-	tbnz	w8, #0, LBB283_2
+	tbnz	w8, #0, LBB286_2
 ; %bb.1:                                ; %B12
 	ldr	x8, [x23, #88]
 	and	x9, x8, #0xfffffffffffffffe
 	and	x9, x9, #0xffff000000000003
-	cbnz	x9, LBB283_3
-LBB283_2:                               ; %B3
+	cbnz	x9, LBB286_3
+LBB286_2:                               ; %B3
 	ldrb	w8, [x19], #1
 	mov	x21, x1
 	add	w8, w8, #486
 	ldr	x2, [x25, w8, uxtw #3]
 	br	x2
-LBB283_3:                               ; %B6
+LBB286_3:                               ; %B6
 	orr	x8, x8, #0x10
 	cmp	x8, #18
-	b.ne	LBB283_5
+	b.ne	LBB286_5
 ; %bb.4:                                ; %B7
 	ldrb	w8, [x19], #1
 	ldr	x21, [x24, #208]
 	add	w8, w8, #486
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB283_5:                               ; %B9
+LBB286_5:                               ; %B9
 	mov	x8, x20
 	mov	x0, x24
 	str	x22, [x8], #8
 	str	x8, [x23, #48]
 	bl	_JS_ToObject_GC
 	cmp	x0, #130
-	b.eq	LBB283_7
+	b.eq	LBB286_7
 ; %bb.6:                                ; %B11
 	ldrb	w8, [x19], #1
 	mov	x21, x0
 	add	w8, w8, #486
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB283_7:                               ; %B10
+LBB286_7:                               ; %B10
 	b	l_exception_spill_top0_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function push_false_1_asm_h
@@ -11142,10 +11277,10 @@ l_object_1_asm_h:                       ; @object_1_asm_h
 ; %bb.0:                                ; %B16
 	ldrb	w8, [x24, #363]
 	stp	x19, x20, [sp, #-16]!           ; 16-byte Folded Spill
-	cbnz	w8, LBB286_5
+	cbnz	w8, LBB289_5
 ; %bb.1:                                ; %B1
 	ldr	x19, [x24, #400]
-	cbz	x19, LBB286_5
+	cbz	x19, LBB289_5
 ; %bb.2:                                ; %B5
 	mov	x8, x20
 	mov	x0, x24
@@ -11156,7 +11291,7 @@ l_object_1_asm_h:                       ; @object_1_asm_h
 	bl	_prim_try_malloc_gc
 	ldr	x20, [sp, #8]                   ; 8-byte Folded Reload
 	mov	x9, x0
-	cbz	x9, LBB286_5
+	cbz	x9, LBB289_5
 ; %bb.3:                                ; %B7
 	ldr	w8, [x19]
 	add	w8, w8, #1
@@ -11168,8 +11303,8 @@ l_object_1_asm_h:                       ; @object_1_asm_h
 	add	x8, x9, #8
 	stlr	x19, [x8]
 	ldrb	w8, [x24, #384]
-	cbnz	w8, LBB286_7
-LBB286_4:                               ; %B9
+	cbnz	w8, LBB289_7
+LBB289_4:                               ; %B9
 	add	x8, x9, #32
 	ldr	x19, [sp]                       ; 8-byte Folded Reload
 	mov	x21, x9
@@ -11179,14 +11314,14 @@ LBB286_4:                               ; %B9
 	ldr	x1, [x25, w8, uxtw #3]
 	add	sp, sp, #16
 	br	x1
-LBB286_5:                               ; %B13
+LBB289_5:                               ; %B13
 	mov	x8, x20
 	mov	x0, x24
 	str	x22, [x8], #8
 	str	x8, [x23, #48]
 	bl	_PRIM_JS_NewObject_GC
 	cmp	x0, #130
-	b.eq	LBB286_8
+	b.eq	LBB289_8
 ; %bb.6:                                ; %B15
 	ldp	x19, x20, [sp]                  ; 16-byte Folded Reload
 	mov	x21, x0
@@ -11195,7 +11330,7 @@ LBB286_5:                               ; %B13
 	ldr	x1, [x25, w8, uxtw #3]
 	add	sp, sp, #16
 	br	x1
-LBB286_7:                               ; %B11
+LBB289_7:                               ; %B11
 	mov	x8, #-844424930131968           ; =0xfffd000000000000
 	mov	x1, x24
 	orr	x0, x19, x8
@@ -11203,8 +11338,8 @@ LBB286_7:                               ; %B11
 	bl	_prim_WriteBarrierNoStore
 	ldr	x20, [sp, #8]                   ; 8-byte Folded Reload
 	mov	x9, x19
-	b	LBB286_4
-LBB286_8:                               ; %B14
+	b	LBB289_4
+LBB289_8:                               ; %B14
 	ldp	x19, x20, [sp], #16             ; 16-byte Folded Reload
 	b	l_exception_spill_top0_asm_h
                                         ; -- End function
@@ -11607,26 +11742,26 @@ l_get_var_undef_1_asm_h:                ; @get_var_undef_1_asm_h
 	ldr	w11, [x10, w11, sxtw #2]
 	add	w12, w12, #4
 	add	x10, x10, x12
-	cbz	w11, LBB330_3
-LBB330_1:                               ; %B5
+	cbz	w11, LBB333_3
+LBB333_1:                               ; %B5
                                         ; =>This Inner Loop Header: Depth=1
 	lsl	w12, w11, #3
 	sub	w12, w12, #8
 	add	x12, x10, x12
 	ldr	w13, [x12, #4]
 	cmp	w13, w9
-	b.eq	LBB330_10
+	b.eq	LBB333_10
 ; %bb.2:                                ; %B8
-                                        ;   in Loop: Header=BB330_1 Depth=1
+                                        ;   in Loop: Header=BB333_1 Depth=1
 	ldr	w11, [x12]
 	and	w11, w11, #0x3ffffff
-	cbnz	w11, LBB330_1
-LBB330_3:                               ; %B11
+	cbnz	w11, LBB333_1
+LBB333_3:                               ; %B11
 	ldr	x8, [x24, #208]
 	mov	w10, #18                        ; =0x12
-LBB330_4:                               ; %B33
+LBB333_4:                               ; %B33
                                         ; =>This Loop Header: Depth=1
-                                        ;     Child Loop BB330_5 Depth 2
+                                        ;     Child Loop BB333_5 Depth 2
 	ldr	x11, [x8, #8]
 	ldr	w12, [x11, #12]
 	add	x14, x11, #64
@@ -11635,43 +11770,43 @@ LBB330_4:                               ; %B33
 	ldr	w11, [x14, w11, sxtw #2]
 	add	w12, w13, #4
 	add	x12, x14, x12
-	cbz	w11, LBB330_7
-LBB330_5:                               ; %B22
-                                        ;   Parent Loop BB330_4 Depth=1
+	cbz	w11, LBB333_7
+LBB333_5:                               ; %B22
+                                        ;   Parent Loop BB333_4 Depth=1
                                         ; =>  This Inner Loop Header: Depth=2
 	lsl	w13, w11, #3
 	sub	w13, w13, #8
 	add	x13, x12, x13
 	ldp	w13, w14, [x13]
 	cmp	w14, w9
-	b.eq	LBB330_9
+	b.eq	LBB333_9
 ; %bb.6:                                ; %B24
-                                        ;   in Loop: Header=BB330_5 Depth=2
+                                        ;   in Loop: Header=BB333_5 Depth=2
 	and	w11, w13, #0x3ffffff
-	cbnz	w11, LBB330_5
-LBB330_7:                               ; %B27
-                                        ;   in Loop: Header=BB330_4 Depth=1
+	cbnz	w11, LBB333_5
+LBB333_7:                               ; %B27
+                                        ;   in Loop: Header=BB333_4 Depth=1
 	ldr	w11, [x8, #4]
 	ubfx	w11, w11, #10, #1
 	cmp	w11, #1
-	b.eq	LBB330_13
+	b.eq	LBB333_13
 ; %bb.8:                                ; %B30
-                                        ;   in Loop: Header=BB330_4 Depth=1
+                                        ;   in Loop: Header=BB333_4 Depth=1
 	ldr	x8, [x8, #8]
 	ldr	x8, [x8, #32]
-	cbnz	x8, LBB330_4
-	b	LBB330_11
-LBB330_9:                               ; %B12
+	cbnz	x8, LBB333_4
+	b	LBB333_11
+LBB333_9:                               ; %B12
 	lsr	w9, w13, #26
 	tst	w9, #0x30
-	b.ne	LBB330_13
-LBB330_10:                              ; %B7.sink.split
+	b.ne	LBB333_13
+LBB333_10:                              ; %B7.sink.split
 	ldr	x8, [x8, #16]
 	sub	w9, w11, #1
 	ldr	x10, [x8, w9, sxtw #3]
-LBB330_11:                              ; %B7
+LBB333_11:                              ; %B7
 	cmp	x10, #34
-	b.eq	LBB330_15
+	b.eq	LBB333_15
 ; %bb.12:                               ; %B4
 	ldrb	w8, [x19, #4]
 	add	x19, x19, #5
@@ -11679,7 +11814,7 @@ LBB330_11:                              ; %B7
 	add	w8, w8, #486
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB330_13:                              ; %B17
+LBB333_13:                              ; %B17
 	ldr	w1, [x19]
 	mov	x8, x20
 	mov	x0, x24
@@ -11688,7 +11823,7 @@ LBB330_13:                              ; %B17
 	str	x8, [x23, #48]
 	bl	_JS_GetGlobalVarImpl_GC
 	cmp	x0, #130
-	b.eq	LBB330_16
+	b.eq	LBB333_16
 ; %bb.14:                               ; %B19
 	ldrb	w8, [x19, #4]
 	add	x19, x19, #5
@@ -11696,10 +11831,10 @@ LBB330_13:                              ; %B17
 	add	w8, w8, #486
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB330_15:                              ; %B3
+LBB333_15:                              ; %B3
 	str	x22, [x20], #8
 	b	l_ThrowReferenceErrorUninitialized_asm_h
-LBB330_16:                              ; %B18
+LBB333_16:                              ; %B18
 	b	l_exception_spill_top0_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function get_var_1_asm_h
@@ -11715,25 +11850,25 @@ l_get_var_1_asm_h:                      ; @get_var_1_asm_h
 	ldr	w10, [x13, w10, sxtw #2]
 	add	w11, w12, #4
 	add	x11, x13, x11
-	cbz	w10, LBB331_3
-LBB331_1:                               ; %B5
+	cbz	w10, LBB334_3
+LBB334_1:                               ; %B5
                                         ; =>This Inner Loop Header: Depth=1
 	lsl	w12, w10, #3
 	sub	w12, w12, #8
 	add	x12, x11, x12
 	ldr	w13, [x12, #4]
 	cmp	w13, w9
-	b.eq	LBB331_10
+	b.eq	LBB334_10
 ; %bb.2:                                ; %B8
-                                        ;   in Loop: Header=BB331_1 Depth=1
+                                        ;   in Loop: Header=BB334_1 Depth=1
 	ldr	w10, [x12]
 	and	w10, w10, #0x3ffffff
-	cbnz	w10, LBB331_1
-LBB331_3:                               ; %B11
+	cbnz	w10, LBB334_1
+LBB334_3:                               ; %B11
 	ldr	x8, [x24, #208]
-LBB331_4:                               ; %B32
+LBB334_4:                               ; %B32
                                         ; =>This Loop Header: Depth=1
-                                        ;     Child Loop BB331_5 Depth 2
+                                        ;     Child Loop BB334_5 Depth 2
 	ldr	x10, [x8, #8]
 	ldr	w11, [x10, #12]
 	add	x13, x10, #64
@@ -11742,42 +11877,42 @@ LBB331_4:                               ; %B32
 	ldr	w10, [x13, w10, sxtw #2]
 	add	w11, w12, #4
 	add	x11, x13, x11
-	cbz	w10, LBB331_7
-LBB331_5:                               ; %B21
-                                        ;   Parent Loop BB331_4 Depth=1
+	cbz	w10, LBB334_7
+LBB334_5:                               ; %B21
+                                        ;   Parent Loop BB334_4 Depth=1
                                         ; =>  This Inner Loop Header: Depth=2
 	lsl	w12, w10, #3
 	sub	w12, w12, #8
 	add	x12, x11, x12
 	ldp	w12, w13, [x12]
 	cmp	w13, w9
-	b.eq	LBB331_9
+	b.eq	LBB334_9
 ; %bb.6:                                ; %B23
-                                        ;   in Loop: Header=BB331_5 Depth=2
+                                        ;   in Loop: Header=BB334_5 Depth=2
 	and	w10, w12, #0x3ffffff
-	cbnz	w10, LBB331_5
-LBB331_7:                               ; %B26
-                                        ;   in Loop: Header=BB331_4 Depth=1
+	cbnz	w10, LBB334_5
+LBB334_7:                               ; %B26
+                                        ;   in Loop: Header=BB334_4 Depth=1
 	ldr	w10, [x8, #4]
 	ubfx	w10, w10, #10, #1
 	cmp	w10, #1
-	b.eq	LBB331_12
+	b.eq	LBB334_12
 ; %bb.8:                                ; %B29
-                                        ;   in Loop: Header=BB331_4 Depth=1
+                                        ;   in Loop: Header=BB334_4 Depth=1
 	ldr	x8, [x8, #8]
 	ldr	x8, [x8, #32]
-	cbnz	x8, LBB331_4
-	b	LBB331_12
-LBB331_9:                               ; %B12
+	cbnz	x8, LBB334_4
+	b	LBB334_12
+LBB334_9:                               ; %B12
 	lsr	w9, w12, #26
 	tst	w9, #0x30
-	b.ne	LBB331_12
-LBB331_10:                              ; %B7
+	b.ne	LBB334_12
+LBB334_10:                              ; %B7
 	ldr	x8, [x8, #16]
 	sub	w9, w10, #1
 	ldr	x8, [x8, w9, sxtw #3]
 	cmp	x8, #34
-	b.eq	LBB331_14
+	b.eq	LBB334_14
 ; %bb.11:                               ; %B4
 	ldrb	w9, [x19, #4]
 	add	x19, x19, #5
@@ -11785,7 +11920,7 @@ LBB331_10:                              ; %B7
 	add	w9, w9, #486
 	ldr	x1, [x25, w9, uxtw #3]
 	br	x1
-LBB331_12:                              ; %B16
+LBB334_12:                              ; %B16
 	ldr	w1, [x19]
 	mov	x8, x20
 	mov	x0, x24
@@ -11794,7 +11929,7 @@ LBB331_12:                              ; %B16
 	str	x8, [x23, #48]
 	bl	_JS_GetGlobalVarImpl_GC
 	cmp	x0, #130
-	b.eq	LBB331_15
+	b.eq	LBB334_15
 ; %bb.13:                               ; %B18
 	ldrb	w8, [x19, #4]
 	add	x19, x19, #5
@@ -11802,10 +11937,10 @@ LBB331_12:                              ; %B16
 	add	w8, w8, #486
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB331_14:                              ; %B3
+LBB334_14:                              ; %B3
 	str	x22, [x20], #8
 	b	l_ThrowReferenceErrorUninitialized_asm_h
-LBB331_15:                              ; %B17
+LBB334_15:                              ; %B17
 	b	l_exception_spill_top0_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function put_var_1_asm_h
@@ -11821,20 +11956,20 @@ l_put_var_1_asm_h:                      ; @put_var_1_asm_h
 	ldr	w9, [x12, w9, sxtw #2]
 	add	w10, w11, #4
 	add	x10, x12, x10
-	cbz	w9, LBB332_3
-LBB332_1:                               ; %B1
+	cbz	w9, LBB335_3
+LBB335_1:                               ; %B1
                                         ; =>This Inner Loop Header: Depth=1
 	lsl	w11, w9, #3
 	sub	w11, w11, #8
 	add	x11, x10, x11
 	ldp	w11, w12, [x11]
 	cmp	w12, w1
-	b.eq	LBB332_6
+	b.eq	LBB335_6
 ; %bb.2:                                ; %B16
-                                        ;   in Loop: Header=BB332_1 Depth=1
+                                        ;   in Loop: Header=BB335_1 Depth=1
 	and	w9, w11, #0x3ffffff
-	cbnz	w9, LBB332_1
-LBB332_3:                               ; %B19
+	cbnz	w9, LBB335_1
+LBB335_3:                               ; %B19
 	ldr	x8, [x24, #208]
 	ldr	x9, [x8, #8]
 	ldr	w10, [x9, #12]
@@ -11844,52 +11979,52 @@ LBB332_3:                               ; %B19
 	ldr	w9, [x12, w9, sxtw #2]
 	add	w10, w11, #4
 	add	x10, x12, x10
-	cbz	w9, LBB332_13
-LBB332_4:                               ; %B26
+	cbz	w9, LBB335_13
+LBB335_4:                               ; %B26
                                         ; =>This Inner Loop Header: Depth=1
 	lsl	w11, w9, #3
 	sub	w11, w11, #8
 	add	x11, x10, x11
 	ldp	w11, w12, [x11]
 	cmp	w12, w1
-	b.eq	LBB332_10
+	b.eq	LBB335_10
 ; %bb.5:                                ; %B31
-                                        ;   in Loop: Header=BB332_4 Depth=1
+                                        ;   in Loop: Header=BB335_4 Depth=1
 	and	w9, w11, #0x3ffffff
-	cbnz	w9, LBB332_4
-	b	LBB332_13
-LBB332_6:                               ; %B13
+	cbnz	w9, LBB335_4
+	b	LBB335_13
+LBB335_6:                               ; %B13
 	mov	w10, #58                        ; =0x3a
 	and	w10, w10, w11, lsr #26
 	cmp	w10, #2
-	b.ne	LBB332_13
+	b.ne	LBB335_13
 ; %bb.7:                                ; %B3
 	ldr	x8, [x8, #16]
 	sub	w9, w9, #1
 	ldr	x10, [x8, w9, sxtw #3]
 	cmp	x10, #34
-	b.eq	LBB332_13
+	b.eq	LBB335_13
 ; %bb.8:                                ; %B20
 	str	x22, [x8, w9, sxtw #3]
 	ldrb	w8, [x24, #384]
-	cbnz	w8, LBB332_12
-LBB332_9:                               ; %B8
+	cbnz	w8, LBB335_12
+LBB335_9:                               ; %B8
 	ldrb	w8, [x19, #4]
 	add	x19, x19, #5
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB332_10:                              ; %B28
+LBB335_10:                              ; %B28
 	mov	w10, #58                        ; =0x3a
 	and	w10, w10, w11, lsr #26
 	cmp	w10, #2
-	b.ne	LBB332_13
+	b.ne	LBB335_13
 ; %bb.11:                               ; %B20
 	ldr	x8, [x8, #16]
 	sub	w9, w9, #1
 	str	x22, [x8, w9, sxtw #3]
 	ldrb	w8, [x24, #384]
-	cbz	w8, LBB332_9
-LBB332_12:
+	cbz	w8, LBB335_9
+LBB335_12:
 	mov	x1, x24
 	mov	x0, x22
 	bl	_prim_WriteBarrierNoStore
@@ -11897,7 +12032,7 @@ LBB332_12:
 	add	x19, x19, #5
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB332_13:                              ; %B34
+LBB335_13:                              ; %B34
 	mov	x8, x20
 	mov	x0, x24
 	mov	x2, x22
@@ -11905,7 +12040,7 @@ LBB332_13:                              ; %B34
 	str	x22, [x8], #8
 	str	x8, [x23, #48]
 	bl	_JS_SetGlobalVar_GC
-	tbz	w0, #31, LBB332_9
+	tbz	w0, #31, LBB335_9
 ; %bb.14:                               ; %B35
 	b	l_exception_spill_top0_asm_h
                                         ; -- End function
@@ -11958,13 +12093,13 @@ l_get_field_1_asm_h:                    ; @get_field_1_asm_h
 	ldr	w2, [x19]
 	movk	x8, #65535, lsl #48
 	tst	x22, x8
-	b.ne	LBB340_10
+	b.ne	LBB343_10
 ; %bb.1:                                ; %B25
 	mov	x9, x22
 	mov	w8, #18                         ; =0x12
-LBB340_2:                               ; %B19
+LBB343_2:                               ; %B19
                                         ; =>This Loop Header: Depth=1
-                                        ;     Child Loop BB340_3 Depth 2
+                                        ;     Child Loop BB343_3 Depth 2
 	ldr	x10, [x9, #8]
 	ldr	w11, [x10, #12]
 	add	x13, x10, #64
@@ -11973,48 +12108,48 @@ LBB340_2:                               ; %B19
 	ldr	w10, [x13, w10, sxtw #2]
 	add	w11, w12, #4
 	add	x11, x13, x11
-	cbz	w10, LBB340_5
-LBB340_3:                               ; %B1
-                                        ;   Parent Loop BB340_2 Depth=1
+	cbz	w10, LBB343_5
+LBB343_3:                               ; %B1
+                                        ;   Parent Loop BB343_2 Depth=1
                                         ; =>  This Inner Loop Header: Depth=2
 	lsl	w12, w10, #3
 	sub	w12, w12, #8
 	add	x12, x11, x12
 	ldp	w12, w13, [x12]
 	cmp	w13, w2
-	b.eq	LBB340_7
+	b.eq	LBB343_7
 ; %bb.4:                                ; %B9
-                                        ;   in Loop: Header=BB340_3 Depth=2
+                                        ;   in Loop: Header=BB343_3 Depth=2
 	and	w10, w12, #0x3ffffff
-	cbnz	w10, LBB340_3
-LBB340_5:                               ; %B14
-                                        ;   in Loop: Header=BB340_2 Depth=1
+	cbnz	w10, LBB343_3
+LBB343_5:                               ; %B14
+                                        ;   in Loop: Header=BB343_2 Depth=1
 	ldr	w10, [x9, #4]
 	ubfx	w10, w10, #10, #1
 	cmp	w10, #1
-	b.eq	LBB340_10
+	b.eq	LBB343_10
 ; %bb.6:                                ; %B17
-                                        ;   in Loop: Header=BB340_2 Depth=1
+                                        ;   in Loop: Header=BB343_2 Depth=1
 	ldr	x9, [x9, #8]
 	ldr	x9, [x9, #32]
-	cbnz	x9, LBB340_2
-	b	LBB340_9
-LBB340_7:                               ; %B3
+	cbnz	x9, LBB343_2
+	b	LBB343_9
+LBB343_7:                               ; %B3
 	lsr	w8, w12, #26
 	tst	w8, #0x30
-	b.ne	LBB340_10
+	b.ne	LBB343_10
 ; %bb.8:                                ; %B4
 	ldr	x8, [x9, #16]
 	sub	w9, w10, #1
 	ldr	x8, [x8, w9, sxtw #3]
-LBB340_9:                               ; %B6
+LBB343_9:                               ; %B6
 	ldrb	w9, [x19, #4]
 	add	x19, x19, #5
 	mov	x22, x8
 	add	w9, w9, #243
 	ldr	x1, [x25, w9, uxtw #3]
 	br	x1
-LBB340_10:                              ; %B21
+LBB343_10:                              ; %B21
 	mov	x8, x20
 	mov	x0, x24
 	mov	x1, x22
@@ -12024,7 +12159,7 @@ LBB340_10:                              ; %B21
 	str	x8, [x23, #48]
 	bl	_JS_GetPropertyInternalImpl_GC
 	cmp	x0, #130
-	b.eq	LBB340_12
+	b.eq	LBB343_12
 ; %bb.11:                               ; %B23
 	ldrb	w8, [x19, #4]
 	add	x19, x19, #5
@@ -12032,7 +12167,7 @@ LBB340_10:                              ; %B21
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB340_12:                              ; %B22
+LBB343_12:                              ; %B22
 	b	l_exception_spill_top0_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function get_field2_1_asm_h
@@ -12042,13 +12177,13 @@ l_get_field2_1_asm_h:                   ; @get_field2_1_asm_h
 	ldr	w2, [x19]
 	movk	x8, #65535, lsl #48
 	tst	x22, x8
-	b.ne	LBB341_10
+	b.ne	LBB344_10
 ; %bb.1:                                ; %B25
 	mov	x9, x22
 	mov	w8, #18                         ; =0x12
-LBB341_2:                               ; %B19
+LBB344_2:                               ; %B19
                                         ; =>This Loop Header: Depth=1
-                                        ;     Child Loop BB341_3 Depth 2
+                                        ;     Child Loop BB344_3 Depth 2
 	ldr	x10, [x9, #8]
 	ldr	w11, [x10, #12]
 	add	x13, x10, #64
@@ -12057,48 +12192,48 @@ LBB341_2:                               ; %B19
 	ldr	w10, [x13, w10, sxtw #2]
 	add	w11, w12, #4
 	add	x11, x13, x11
-	cbz	w10, LBB341_5
-LBB341_3:                               ; %B1
-                                        ;   Parent Loop BB341_2 Depth=1
+	cbz	w10, LBB344_5
+LBB344_3:                               ; %B1
+                                        ;   Parent Loop BB344_2 Depth=1
                                         ; =>  This Inner Loop Header: Depth=2
 	lsl	w12, w10, #3
 	sub	w12, w12, #8
 	add	x12, x11, x12
 	ldp	w12, w13, [x12]
 	cmp	w13, w2
-	b.eq	LBB341_7
+	b.eq	LBB344_7
 ; %bb.4:                                ; %B9
-                                        ;   in Loop: Header=BB341_3 Depth=2
+                                        ;   in Loop: Header=BB344_3 Depth=2
 	and	w10, w12, #0x3ffffff
-	cbnz	w10, LBB341_3
-LBB341_5:                               ; %B14
-                                        ;   in Loop: Header=BB341_2 Depth=1
+	cbnz	w10, LBB344_3
+LBB344_5:                               ; %B14
+                                        ;   in Loop: Header=BB344_2 Depth=1
 	ldr	w10, [x9, #4]
 	ubfx	w10, w10, #10, #1
 	cmp	w10, #1
-	b.eq	LBB341_10
+	b.eq	LBB344_10
 ; %bb.6:                                ; %B17
-                                        ;   in Loop: Header=BB341_2 Depth=1
+                                        ;   in Loop: Header=BB344_2 Depth=1
 	ldr	x9, [x9, #8]
 	ldr	x9, [x9, #32]
-	cbnz	x9, LBB341_2
-	b	LBB341_9
-LBB341_7:                               ; %B3
+	cbnz	x9, LBB344_2
+	b	LBB344_9
+LBB344_7:                               ; %B3
 	lsr	w8, w12, #26
 	tst	w8, #0x30
-	b.ne	LBB341_10
+	b.ne	LBB344_10
 ; %bb.8:                                ; %B4
 	ldr	x8, [x9, #16]
 	sub	w9, w10, #1
 	ldr	x8, [x8, w9, sxtw #3]
-LBB341_9:                               ; %B6
+LBB344_9:                               ; %B6
 	ldrb	w9, [x19, #4]
 	add	x19, x19, #5
 	mov	x21, x8
 	add	w9, w9, #486
 	ldr	x1, [x25, w9, uxtw #3]
 	br	x1
-LBB341_10:                              ; %B21
+LBB344_10:                              ; %B21
 	mov	x8, x20
 	mov	x0, x24
 	mov	x1, x22
@@ -12108,7 +12243,7 @@ LBB341_10:                              ; %B21
 	str	x8, [x23, #48]
 	bl	_JS_GetPropertyInternalImpl_GC
 	cmp	x0, #130
-	b.eq	LBB341_12
+	b.eq	LBB344_12
 ; %bb.11:                               ; %B23
 	ldrb	w8, [x19, #4]
 	add	x19, x19, #5
@@ -12116,7 +12251,7 @@ LBB341_10:                              ; %B21
 	add	w8, w8, #486
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB341_12:                              ; %B22
+LBB344_12:                              ; %B22
 	b	l_exception_spill_top0_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function put_field_1_asm_h
@@ -12128,7 +12263,7 @@ l_put_field_1_asm_h:                    ; @put_field_1_asm_h
 	movk	x8, #65535, lsl #48
 	ldr	w2, [x19]
 	tst	x22, x8
-	b.ne	LBB342_18
+	b.ne	LBB345_18
 ; %bb.1:                                ; %B56
 	ldr	x8, [x22, #8]
 	ldr	w9, [x8, #12]
@@ -12138,24 +12273,24 @@ l_put_field_1_asm_h:                    ; @put_field_1_asm_h
 	ldr	w8, [x11, w8, sxtw #2]
 	add	w9, w10, #4
 	add	x9, x11, x9
-	cbz	w8, LBB342_4
-LBB342_2:                               ; %B1
+	cbz	w8, LBB345_4
+LBB345_2:                               ; %B1
                                         ; =>This Inner Loop Header: Depth=1
 	lsl	w10, w8, #3
 	sub	w10, w10, #8
 	add	x10, x9, x10
 	ldp	w10, w11, [x10]
 	cmp	w11, w2
-	b.eq	LBB342_10
+	b.eq	LBB345_10
 ; %bb.3:                                ; %B12
-                                        ;   in Loop: Header=BB342_2 Depth=1
+                                        ;   in Loop: Header=BB345_2 Depth=1
 	and	w8, w10, #0x3ffffff
-	cbnz	w8, LBB342_2
-LBB342_4:                               ; %B17.preheader
+	cbnz	w8, LBB345_2
+LBB345_4:                               ; %B17.preheader
 	mov	x8, x22
-LBB342_5:                               ; %B17
+LBB345_5:                               ; %B17
                                         ; =>This Loop Header: Depth=1
-                                        ;     Child Loop BB342_6 Depth 2
+                                        ;     Child Loop BB345_6 Depth 2
 	ldr	x9, [x8, #8]
 	ldr	w10, [x9, #12]
 	add	x9, x9, #64
@@ -12164,72 +12299,72 @@ LBB342_5:                               ; %B17
 	ldr	w10, [x9, w10, sxtw #2]
 	add	w11, w11, #4
 	add	x9, x9, x11
-	cbz	w10, LBB342_8
-LBB342_6:                               ; %B18
-                                        ;   Parent Loop BB342_5 Depth=1
+	cbz	w10, LBB345_8
+LBB345_6:                               ; %B18
+                                        ;   Parent Loop BB345_5 Depth=1
                                         ; =>  This Inner Loop Header: Depth=2
 	lsl	w10, w10, #3
 	sub	w10, w10, #8
 	add	x10, x9, x10
 	ldp	w10, w11, [x10]
 	cmp	w11, w2
-	b.eq	LBB342_13
+	b.eq	LBB345_13
 ; %bb.7:                                ; %B34
-                                        ;   in Loop: Header=BB342_6 Depth=2
+                                        ;   in Loop: Header=BB345_6 Depth=2
 	and	w10, w10, #0x3ffffff
-	cbnz	w10, LBB342_6
-LBB342_8:                               ; %B41
-                                        ;   in Loop: Header=BB342_5 Depth=1
+	cbnz	w10, LBB345_6
+LBB345_8:                               ; %B41
+                                        ;   in Loop: Header=BB345_5 Depth=1
 	ldr	w9, [x8, #4]
 	ubfx	w9, w9, #10, #1
 	cmp	w9, #1
-	b.eq	LBB342_18
+	b.eq	LBB345_18
 ; %bb.9:                                ; %B38
-                                        ;   in Loop: Header=BB342_5 Depth=1
+                                        ;   in Loop: Header=BB345_5 Depth=1
 	ldr	x8, [x8, #8]
 	ldr	x8, [x8, #32]
-	cbnz	x8, LBB342_5
-	b	LBB342_14
-LBB342_10:                              ; %B3
+	cbnz	x8, LBB345_5
+	b	LBB345_14
+LBB345_10:                              ; %B3
 	mov	w9, #58                         ; =0x3a
 	and	w9, w9, w10, lsr #26
 	cmp	w9, #2
-	b.ne	LBB342_18
+	b.ne	LBB345_18
 ; %bb.11:                               ; %B7
 	ldr	x9, [x22, #16]
 	sub	w8, w8, #1
 	str	x21, [x9, w8, sxtw #3]
 	ldrb	w8, [x24, #384]
-	cbnz	w8, LBB342_22
-LBB342_12:                              ; %B48
+	cbnz	w8, LBB345_22
+LBB345_12:                              ; %B48
 	ldrb	w8, [x19, #4]
 	sub	x20, x20, #8
 	add	x19, x19, #5
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB342_13:                              ; %B20
+LBB345_13:                              ; %B20
 	mov	w8, #58                         ; =0x3a
 	and	w8, w8, w10, lsr #26
 	cmp	w8, #2
-	b.ne	LBB342_18
-LBB342_14:                              ; %B23
+	b.ne	LBB345_18
+LBB345_14:                              ; %B23
 	ldr	w8, [x22, #4]
 	ubfx	w8, w8, #8, #1
 	cmp	w8, #1
-	b.ne	LBB342_18
+	b.ne	LBB345_18
 ; %bb.15:                               ; %B25
 	ldrh	w8, [x22, #6]
 	cmp	w8, #1
 	add	x8, x20, #8
-	b.ne	LBB342_20
+	b.ne	LBB345_20
 ; %bb.16:                               ; %B25
-	tbnz	w2, #31, LBB342_20
+	tbnz	w2, #31, LBB345_20
 ; %bb.17:                               ; %B31
 	mov	x20, x8
 	stur	x21, [x8, #-8]
 	mov	x0, x2
 	b	l_FastAddNamedProperty_asm_h
-LBB342_18:                              ; %B52
+LBB345_18:                              ; %B52
 	mov	x8, x20
 	mov	x0, x24
 	mov	x1, x22
@@ -12239,10 +12374,10 @@ LBB342_18:                              ; %B52
 	str	x21, [x8], #8
 	str	x8, [x23, #48]
 	bl	_JS_SetPropertyInternalImpl_GC
-	tbz	w0, #31, LBB342_12
+	tbz	w0, #31, LBB345_12
 ; %bb.19:                               ; %B53
 	b	l_exception_spill_top1_asm_h
-LBB342_20:                              ; %B45
+LBB345_20:                              ; %B45
 	mov	x0, x24
 	mov	x1, x22
 	mov	w3, #7                          ; =0x7
@@ -12250,12 +12385,12 @@ LBB342_20:                              ; %B45
                                         ; kill: def $w2 killed $w2 killed $x2
 	str	x8, [x23, #48]
 	bl	_add_property_gc
-	cbz	x0, LBB342_23
+	cbz	x0, LBB345_23
 ; %bb.21:                               ; %B49
 	str	x21, [x0]
 	ldrb	w8, [x24, #384]
-	cbz	w8, LBB342_12
-LBB342_22:                              ; %B51
+	cbz	w8, LBB345_12
+LBB345_22:                              ; %B51
 	mov	x0, x21
 	mov	x1, x24
 	bl	_prim_WriteBarrierNoStore
@@ -12264,7 +12399,7 @@ LBB342_22:                              ; %B51
 	add	x19, x19, #5
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB342_23:                              ; %B46
+LBB345_23:                              ; %B46
 	sub	x20, x20, #8
 	b	l_exception_spill_top1_asm_h
                                         ; -- End function
@@ -12294,19 +12429,19 @@ l_get_array_el_1_asm_h:                 ; @get_array_el_1_asm_h
 	mov	x8, #2                          ; =0x2
 	movk	x8, #65535, lsl #48
 	tst	x22, x8
-	b.ne	LBB346_12
+	b.ne	LBB349_12
 ; %bb.1:                                ; %B73
 	mov	w9, #65534                      ; =0xfffe
 	ldrh	w8, [x22, #6]
 	cmp	x9, x21, lsr #48
-	b.ne	LBB346_5
+	b.ne	LBB349_5
 ; %bb.2:                                ; %B1
 	cmp	w8, #2
-	b.ne	LBB346_10
+	b.ne	LBB349_10
 ; %bb.3:                                ; %B3
 	ldr	w8, [x22, #48]
 	cmp	w21, w8
-	b.hs	LBB346_14
+	b.hs	LBB349_14
 ; %bb.4:                                ; %B4
 	ldrb	w8, [x19], #1
 	ldr	x9, [x22, #40]
@@ -12315,35 +12450,35 @@ l_get_array_el_1_asm_h:                 ; @get_array_el_1_asm_h
 	ldr	x22, [x9, w21, sxtw #3]
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB346_5:                               ; %B33
+LBB349_5:                               ; %B33
 	cmp	w8, #1
-	b.ne	LBB346_12
+	b.ne	LBB349_12
 ; %bb.6:                                ; %B36
 	ldr	w8, [x22, #4]
 	ubfx	w8, w8, #10, #1
 	cmp	w8, #1
-	b.eq	LBB346_12
+	b.eq	LBB349_12
 ; %bb.7:                                ; %B36
 	mov	x9, #2                          ; =0x2
 	and	x8, x21, #0xffff000000000003
 	movk	x9, #1, lsl #48
 	cmp	x8, x9
-	b.ne	LBB346_12
+	b.ne	LBB349_12
 ; %bb.8:                                ; %B65
 	and	x1, x21, #0xfffffffffffc
 	ldrb	w8, [x1, #7]
-	tbnz	w8, #6, LBB346_24
+	tbnz	w8, #6, LBB349_24
 ; %bb.9:                                ; %B68
 	ldr	w8, [x1, #8]
-	b	LBB346_25
-LBB346_10:                              ; %B30
+	b	LBB349_25
+LBB349_10:                              ; %B30
 	sxth	w8, w8
 	cmp	w8, #21
-	b.lt	LBB346_12
+	b.lt	LBB349_12
 ; %bb.11:                               ; %B30
 	cmp	w8, #29
-	b.le	LBB346_33
-LBB346_12:                              ; %B70
+	b.le	LBB349_33
+LBB349_12:                              ; %B70
 	mov	x8, x20
 	mov	x0, x24
 	mov	x1, x22
@@ -12352,7 +12487,7 @@ LBB346_12:                              ; %B70
 	str	x8, [x23, #48]
 	bl	_JS_GetPropertyValue_GC
 	cmp	x0, #130
-	b.eq	LBB346_34
+	b.eq	LBB349_34
 ; %bb.13:                               ; %B72
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #8
@@ -12360,14 +12495,14 @@ LBB346_12:                              ; %B70
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB346_14:                              ; %B7
-	tbnz	w21, #31, LBB346_12
+LBB349_14:                              ; %B7
+	tbnz	w21, #31, LBB349_12
 ; %bb.15:                               ; %B9.preheader
 	mov	x9, x22
 	mov	w8, #18                         ; =0x12
-LBB346_16:                              ; %B9
+LBB349_16:                              ; %B9
                                         ; =>This Loop Header: Depth=1
-                                        ;     Child Loop BB346_17 Depth 2
+                                        ;     Child Loop BB349_17 Depth 2
 	ldr	x11, [x9, #8]
 	orr	w10, w21, #0x80000000
 	ldr	w12, [x11, #12]
@@ -12377,64 +12512,64 @@ LBB346_16:                              ; %B9
 	ldr	w11, [x14, w11, sxtw #2]
 	add	w12, w13, #4
 	add	x12, x14, x12
-	cbz	w11, LBB346_19
-LBB346_17:                              ; %B10
-                                        ;   Parent Loop BB346_16 Depth=1
+	cbz	w11, LBB349_19
+LBB349_17:                              ; %B10
+                                        ;   Parent Loop BB349_16 Depth=1
                                         ; =>  This Inner Loop Header: Depth=2
 	lsl	w13, w11, #3
 	sub	w13, w13, #8
 	add	x13, x12, x13
 	ldp	w13, w14, [x13]
 	cmp	w14, w10
-	b.eq	LBB346_21
+	b.eq	LBB349_21
 ; %bb.18:                               ; %B17
-                                        ;   in Loop: Header=BB346_17 Depth=2
+                                        ;   in Loop: Header=BB349_17 Depth=2
 	and	w11, w13, #0x3ffffff
-	cbnz	w11, LBB346_17
-LBB346_19:                              ; %B24
-                                        ;   in Loop: Header=BB346_16 Depth=1
+	cbnz	w11, LBB349_17
+LBB349_19:                              ; %B24
+                                        ;   in Loop: Header=BB349_16 Depth=1
 	ldr	w10, [x9, #4]
 	ubfx	w10, w10, #10, #1
 	cmp	w10, #1
-	b.eq	LBB346_12
+	b.eq	LBB349_12
 ; %bb.20:                               ; %B21
-                                        ;   in Loop: Header=BB346_16 Depth=1
+                                        ;   in Loop: Header=BB349_16 Depth=1
 	ldr	x9, [x9, #8]
 	ldr	x9, [x9, #32]
-	cbnz	x9, LBB346_16
-	b	LBB346_23
-LBB346_21:                              ; %B12
+	cbnz	x9, LBB349_16
+	b	LBB349_23
+LBB349_21:                              ; %B12
 	lsr	w8, w13, #26
 	tst	w8, #0x30
-	b.ne	LBB346_12
+	b.ne	LBB349_12
 ; %bb.22:                               ; %B13
 	ldr	x8, [x9, #16]
 	sub	w9, w11, #1
 	ldr	x8, [x8, w9, sxtw #3]
-LBB346_23:                              ; %B51
+LBB349_23:                              ; %B51
 	ldrb	w9, [x19], #1
 	sub	x20, x20, #8
 	mov	x22, x8
 	add	w9, w9, #243
 	ldr	x1, [x25, w9, uxtw #3]
 	br	x1
-LBB346_24:                              ; %B66
+LBB349_24:                              ; %B66
 	ldr	x8, [x1, #8]
 	ldr	w8, [x8]
-LBB346_25:                              ; %B62
+LBB349_25:                              ; %B62
 	asr	w8, w8, #30
 	cmp	w8, #1
-	b.ne	LBB346_12
+	b.ne	LBB349_12
 ; %bb.26:                               ; %B41
 	ldr	x0, [x24, #8]
 	bl	_prim_get_interned_non_index_atom
-	cbz	w0, LBB346_12
+	cbz	w0, LBB349_12
 ; %bb.27:                               ; %B44.preheader
 	mov	x9, x22
 	mov	w8, #18                         ; =0x12
-LBB346_28:                              ; %B44
+LBB349_28:                              ; %B44
                                         ; =>This Loop Header: Depth=1
-                                        ;     Child Loop BB346_29 Depth 2
+                                        ;     Child Loop BB349_29 Depth 2
 	ldr	x10, [x9, #8]
 	ldr	w11, [x10, #12]
 	add	x13, x10, #64
@@ -12443,42 +12578,42 @@ LBB346_28:                              ; %B44
 	ldr	w10, [x13, w10, sxtw #2]
 	add	w11, w12, #4
 	add	x11, x13, x11
-	cbz	w10, LBB346_31
-LBB346_29:                              ; %B47
-                                        ;   Parent Loop BB346_28 Depth=1
+	cbz	w10, LBB349_31
+LBB349_29:                              ; %B47
+                                        ;   Parent Loop BB349_28 Depth=1
                                         ; =>  This Inner Loop Header: Depth=2
 	lsl	w12, w10, #3
 	sub	w12, w12, #8
 	add	x12, x11, x12
 	ldp	w12, w13, [x12]
 	cmp	w13, w0
-	b.eq	LBB346_35
+	b.eq	LBB349_35
 ; %bb.30:                               ; %B53
-                                        ;   in Loop: Header=BB346_29 Depth=2
+                                        ;   in Loop: Header=BB349_29 Depth=2
 	and	w10, w12, #0x3ffffff
-	cbnz	w10, LBB346_29
-LBB346_31:                              ; %B58
-                                        ;   in Loop: Header=BB346_28 Depth=1
+	cbnz	w10, LBB349_29
+LBB349_31:                              ; %B58
+                                        ;   in Loop: Header=BB349_28 Depth=1
 	ldr	w10, [x9, #4]
 	ubfx	w10, w10, #10, #1
 	cmp	w10, #1
-	b.eq	LBB346_12
+	b.eq	LBB349_12
 ; %bb.32:                               ; %B55
-                                        ;   in Loop: Header=BB346_28 Depth=1
+                                        ;   in Loop: Header=BB349_28 Depth=1
 	ldr	x9, [x9, #8]
 	ldr	x9, [x9, #32]
-	cbnz	x9, LBB346_28
-	b	LBB346_23
-LBB346_33:                              ; %B31
+	cbnz	x9, LBB349_28
+	b	LBB349_23
+LBB349_33:                              ; %B31
 	str	x21, [x20], #8
 	mov	x0, xzr
 	b	l_FastTypedArrayGet_asm_h
-LBB346_34:                              ; %B71
+LBB349_34:                              ; %B71
 	b	l_exception_spill_top1_asm_h
-LBB346_35:                              ; %B49
+LBB349_35:                              ; %B49
 	lsr	w8, w12, #26
 	tst	w8, #0x30
-	b.ne	LBB346_12
+	b.ne	LBB349_12
 ; %bb.36:                               ; %B50
 	ldr	x8, [x9, #16]
 	sub	w9, w10, #1
@@ -12498,19 +12633,19 @@ l_get_array_el2_1_asm_h:                ; @get_array_el2_1_asm_h
 	mov	x8, #2                          ; =0x2
 	movk	x8, #65535, lsl #48
 	tst	x22, x8
-	b.ne	LBB347_12
+	b.ne	LBB350_12
 ; %bb.1:                                ; %B73
 	mov	w9, #65534                      ; =0xfffe
 	ldrh	w8, [x22, #6]
 	cmp	x9, x21, lsr #48
-	b.ne	LBB347_5
+	b.ne	LBB350_5
 ; %bb.2:                                ; %B1
 	cmp	w8, #2
-	b.ne	LBB347_10
+	b.ne	LBB350_10
 ; %bb.3:                                ; %B3
 	ldr	w8, [x22, #48]
 	cmp	w21, w8
-	b.hs	LBB347_14
+	b.hs	LBB350_14
 ; %bb.4:                                ; %B4
 	ldrb	w8, [x19], #1
 	ldr	x9, [x22, #40]
@@ -12519,35 +12654,35 @@ l_get_array_el2_1_asm_h:                ; @get_array_el2_1_asm_h
 	ldr	x21, [x9, w21, sxtw #3]
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB347_5:                               ; %B33
+LBB350_5:                               ; %B33
 	cmp	w8, #1
-	b.ne	LBB347_12
+	b.ne	LBB350_12
 ; %bb.6:                                ; %B36
 	ldr	w8, [x22, #4]
 	ubfx	w8, w8, #10, #1
 	cmp	w8, #1
-	b.eq	LBB347_12
+	b.eq	LBB350_12
 ; %bb.7:                                ; %B36
 	mov	x9, #2                          ; =0x2
 	and	x8, x21, #0xffff000000000003
 	movk	x9, #1, lsl #48
 	cmp	x8, x9
-	b.ne	LBB347_12
+	b.ne	LBB350_12
 ; %bb.8:                                ; %B65
 	and	x1, x21, #0xfffffffffffc
 	ldrb	w8, [x1, #7]
-	tbnz	w8, #6, LBB347_24
+	tbnz	w8, #6, LBB350_24
 ; %bb.9:                                ; %B68
 	ldr	w8, [x1, #8]
-	b	LBB347_25
-LBB347_10:                              ; %B30
+	b	LBB350_25
+LBB350_10:                              ; %B30
 	sxth	w8, w8
 	cmp	w8, #21
-	b.lt	LBB347_12
+	b.lt	LBB350_12
 ; %bb.11:                               ; %B30
 	cmp	w8, #29
-	b.le	LBB347_33
-LBB347_12:                              ; %B70
+	b.le	LBB350_33
+LBB350_12:                              ; %B70
 	mov	x8, x20
 	mov	x0, x24
 	mov	x1, x22
@@ -12556,7 +12691,7 @@ LBB347_12:                              ; %B70
 	str	x8, [x23, #48]
 	bl	_JS_GetPropertyValue_GC
 	cmp	x0, #130
-	b.eq	LBB347_34
+	b.eq	LBB350_34
 ; %bb.13:                               ; %B72
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #8
@@ -12564,14 +12699,14 @@ LBB347_12:                              ; %B70
 	add	w8, w8, #486
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB347_14:                              ; %B7
-	tbnz	w21, #31, LBB347_12
+LBB350_14:                              ; %B7
+	tbnz	w21, #31, LBB350_12
 ; %bb.15:                               ; %B9.preheader
 	mov	x9, x22
 	mov	w8, #18                         ; =0x12
-LBB347_16:                              ; %B9
+LBB350_16:                              ; %B9
                                         ; =>This Loop Header: Depth=1
-                                        ;     Child Loop BB347_17 Depth 2
+                                        ;     Child Loop BB350_17 Depth 2
 	ldr	x11, [x9, #8]
 	orr	w10, w21, #0x80000000
 	ldr	w12, [x11, #12]
@@ -12581,64 +12716,64 @@ LBB347_16:                              ; %B9
 	ldr	w11, [x14, w11, sxtw #2]
 	add	w12, w13, #4
 	add	x12, x14, x12
-	cbz	w11, LBB347_19
-LBB347_17:                              ; %B10
-                                        ;   Parent Loop BB347_16 Depth=1
+	cbz	w11, LBB350_19
+LBB350_17:                              ; %B10
+                                        ;   Parent Loop BB350_16 Depth=1
                                         ; =>  This Inner Loop Header: Depth=2
 	lsl	w13, w11, #3
 	sub	w13, w13, #8
 	add	x13, x12, x13
 	ldp	w13, w14, [x13]
 	cmp	w14, w10
-	b.eq	LBB347_21
+	b.eq	LBB350_21
 ; %bb.18:                               ; %B17
-                                        ;   in Loop: Header=BB347_17 Depth=2
+                                        ;   in Loop: Header=BB350_17 Depth=2
 	and	w11, w13, #0x3ffffff
-	cbnz	w11, LBB347_17
-LBB347_19:                              ; %B24
-                                        ;   in Loop: Header=BB347_16 Depth=1
+	cbnz	w11, LBB350_17
+LBB350_19:                              ; %B24
+                                        ;   in Loop: Header=BB350_16 Depth=1
 	ldr	w10, [x9, #4]
 	ubfx	w10, w10, #10, #1
 	cmp	w10, #1
-	b.eq	LBB347_12
+	b.eq	LBB350_12
 ; %bb.20:                               ; %B21
-                                        ;   in Loop: Header=BB347_16 Depth=1
+                                        ;   in Loop: Header=BB350_16 Depth=1
 	ldr	x9, [x9, #8]
 	ldr	x9, [x9, #32]
-	cbnz	x9, LBB347_16
-	b	LBB347_23
-LBB347_21:                              ; %B12
+	cbnz	x9, LBB350_16
+	b	LBB350_23
+LBB350_21:                              ; %B12
 	lsr	w8, w13, #26
 	tst	w8, #0x30
-	b.ne	LBB347_12
+	b.ne	LBB350_12
 ; %bb.22:                               ; %B13
 	ldr	x8, [x9, #16]
 	sub	w9, w11, #1
 	ldr	x8, [x8, w9, sxtw #3]
-LBB347_23:                              ; %B51
+LBB350_23:                              ; %B51
 	ldrb	w9, [x19], #1
 	sub	x20, x20, #8
 	mov	x21, x8
 	add	w9, w9, #486
 	ldr	x1, [x25, w9, uxtw #3]
 	br	x1
-LBB347_24:                              ; %B66
+LBB350_24:                              ; %B66
 	ldr	x8, [x1, #8]
 	ldr	w8, [x8]
-LBB347_25:                              ; %B62
+LBB350_25:                              ; %B62
 	asr	w8, w8, #30
 	cmp	w8, #1
-	b.ne	LBB347_12
+	b.ne	LBB350_12
 ; %bb.26:                               ; %B41
 	ldr	x0, [x24, #8]
 	bl	_prim_get_interned_non_index_atom
-	cbz	w0, LBB347_12
+	cbz	w0, LBB350_12
 ; %bb.27:                               ; %B44.preheader
 	mov	x9, x22
 	mov	w8, #18                         ; =0x12
-LBB347_28:                              ; %B44
+LBB350_28:                              ; %B44
                                         ; =>This Loop Header: Depth=1
-                                        ;     Child Loop BB347_29 Depth 2
+                                        ;     Child Loop BB350_29 Depth 2
 	ldr	x10, [x9, #8]
 	ldr	w11, [x10, #12]
 	add	x13, x10, #64
@@ -12647,42 +12782,42 @@ LBB347_28:                              ; %B44
 	ldr	w10, [x13, w10, sxtw #2]
 	add	w11, w12, #4
 	add	x11, x13, x11
-	cbz	w10, LBB347_31
-LBB347_29:                              ; %B47
-                                        ;   Parent Loop BB347_28 Depth=1
+	cbz	w10, LBB350_31
+LBB350_29:                              ; %B47
+                                        ;   Parent Loop BB350_28 Depth=1
                                         ; =>  This Inner Loop Header: Depth=2
 	lsl	w12, w10, #3
 	sub	w12, w12, #8
 	add	x12, x11, x12
 	ldp	w12, w13, [x12]
 	cmp	w13, w0
-	b.eq	LBB347_35
+	b.eq	LBB350_35
 ; %bb.30:                               ; %B53
-                                        ;   in Loop: Header=BB347_29 Depth=2
+                                        ;   in Loop: Header=BB350_29 Depth=2
 	and	w10, w12, #0x3ffffff
-	cbnz	w10, LBB347_29
-LBB347_31:                              ; %B58
-                                        ;   in Loop: Header=BB347_28 Depth=1
+	cbnz	w10, LBB350_29
+LBB350_31:                              ; %B58
+                                        ;   in Loop: Header=BB350_28 Depth=1
 	ldr	w10, [x9, #4]
 	ubfx	w10, w10, #10, #1
 	cmp	w10, #1
-	b.eq	LBB347_12
+	b.eq	LBB350_12
 ; %bb.32:                               ; %B55
-                                        ;   in Loop: Header=BB347_28 Depth=1
+                                        ;   in Loop: Header=BB350_28 Depth=1
 	ldr	x9, [x9, #8]
 	ldr	x9, [x9, #32]
-	cbnz	x9, LBB347_28
-	b	LBB347_23
-LBB347_33:                              ; %B31
+	cbnz	x9, LBB350_28
+	b	LBB350_23
+LBB350_33:                              ; %B31
 	str	x21, [x20], #8
 	mov	w0, #1                          ; =0x1
 	b	l_FastTypedArrayGet_asm_h
-LBB347_34:                              ; %B71
+LBB350_34:                              ; %B71
 	b	l_exception_spill_top1_asm_h
-LBB347_35:                              ; %B49
+LBB350_35:                              ; %B49
 	lsr	w8, w12, #26
 	tst	w8, #0x30
-	b.ne	LBB347_12
+	b.ne	LBB350_12
 ; %bb.36:                               ; %B50
 	ldr	x8, [x9, #16]
 	sub	w9, w10, #1
@@ -12703,112 +12838,112 @@ l_put_array_el_1_asm_h:                 ; @put_array_el_1_asm_h
 	mov	x8, #2                          ; =0x2
 	movk	x8, #65535, lsl #48
 	tst	x11, x8
-	b.ne	LBB348_45
+	b.ne	LBB351_45
 ; %bb.1:                                ; %B1
 	mov	w9, #65534                      ; =0xfffe
 	ldrh	w8, [x11, #6]
 	cmp	x9, x22, lsr #48
-	b.ne	LBB348_7
+	b.ne	LBB351_7
 ; %bb.2:                                ; %B3
 	cmp	w8, #2
-	b.ne	LBB348_12
+	b.ne	LBB351_12
 ; %bb.3:                                ; %B5
 	mov	w8, #65534                      ; =0xfffe
 	cmp	x8, x22, lsr #48
-	b.ne	LBB348_45
+	b.ne	LBB351_45
 ; %bb.4:                                ; %B50
 	ldr	w8, [x11, #48]
 	cmp	w22, w8
-	b.hs	LBB348_15
+	b.hs	LBB351_15
 ; %bb.5:                                ; %B7
 	ldr	x8, [x11, #40]
 	str	x21, [x8, w22, sxtw #3]
 	ldrb	w8, [x24, #384]
-	cbnz	w8, LBB348_24
+	cbnz	w8, LBB351_24
 ; %bb.6:                                ; %B9
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #16
 	ldr	x1, [x25, x8, lsl #3]
 	add	sp, sp, #16
 	br	x1
-LBB348_7:                               ; %B59
+LBB351_7:                               ; %B59
 	cmp	w8, #1
-	b.ne	LBB348_45
+	b.ne	LBB351_45
 ; %bb.8:                                ; %B107
 	ldr	w8, [x11, #4]
 	ubfx	w8, w8, #10, #1
 	cmp	w8, #1
-	b.eq	LBB348_45
+	b.eq	LBB351_45
 ; %bb.9:                                ; %B107
 	mov	x9, #2                          ; =0x2
 	and	x8, x22, #0xffff000000000003
 	movk	x9, #1, lsl #48
 	cmp	x8, x9
-	b.ne	LBB348_45
+	b.ne	LBB351_45
 ; %bb.10:                               ; %B62
 	and	x1, x22, #0xfffffffffffc
 	stp	x11, x20, [sp]                  ; 16-byte Folded Spill
 	ldrb	w8, [x1, #7]
-	tbnz	w8, #6, LBB348_25
+	tbnz	w8, #6, LBB351_25
 ; %bb.11:                               ; %B106
 	ldr	w8, [x1, #8]
-	b	LBB348_26
-LBB348_12:                              ; %B55
+	b	LBB351_26
+LBB351_12:                              ; %B55
 	sxth	w8, w8
 	cmp	w8, #21
-	b.lt	LBB348_45
+	b.lt	LBB351_45
 ; %bb.13:                               ; %B55
 	cmp	w8, #29
-	b.gt	LBB348_45
+	b.gt	LBB351_45
 ; %bb.14:                               ; %B56
 	str	x21, [x20], #8
 	add	sp, sp, #16
 	b	l_FastTypedArraySet_asm_h
-LBB348_15:                              ; %B12
+LBB351_15:                              ; %B12
 	mov	x1, x11
 	str	x20, [sp, #8]                   ; 8-byte Folded Spill
-	b.ne	LBB348_37
+	b.ne	LBB351_37
 ; %bb.16:                               ; %B40
 	ldr	w9, [x1, #4]
 	ldr	x20, [sp, #8]                   ; 8-byte Folded Reload
 	mov	x11, x1
 	ubfx	w10, w9, #11, #1
 	cmp	w10, #1
-	b.ne	LBB348_45
+	b.ne	LBB351_45
 ; %bb.17:                               ; %B40
 	ubfx	w9, w9, #8, #1
-	cbz	w9, LBB348_45
+	cbz	w9, LBB351_45
 ; %bb.18:                               ; %B14
 	ldr	x9, [x11, #8]
 	ldr	x9, [x9, #32]
-	cbz	x9, LBB348_20
+	cbz	x9, LBB351_20
 ; %bb.19:                               ; %B36
 	ldr	w9, [x9, #4]
 	ubfx	w9, w9, #13, #1
 	cmp	w9, #1
-	b.ne	LBB348_45
-LBB348_20:                              ; %B32
+	b.ne	LBB351_45
+LBB351_20:                              ; %B32
 	ldr	x9, [x11, #16]
 	ldr	x10, [x9]
 	mov	w9, #65534                      ; =0xfffe
 	cmp	x9, x10, lsr #48
 	add	w9, w8, #1
-	b.ne	LBB348_22
+	b.ne	LBB351_22
 ; %bb.21:                               ; %B32
 	cmp	w9, w10
-	b.hi	LBB348_39
-LBB348_22:                              ; %B29
+	b.hi	LBB351_39
+LBB351_22:                              ; %B29
 	ldr	w10, [x1, #32]
 	cmp	w9, w10
-	b.hi	LBB348_39
+	b.hi	LBB351_39
 ; %bb.23:                               ; %B25
 	ldr	x10, [x1, #40]
 	str	w9, [x1, #48]
 	str	x21, [x10, w8, sxtw #3]
 	ldrb	w8, [x24, #384]
-	cbz	w8, LBB348_46
-	b	LBB348_42
-LBB348_24:                              ; %B11
+	cbz	w8, LBB351_46
+	b	LBB351_42
+LBB351_24:                              ; %B11
 	mov	x0, x21
 	mov	x1, x24
 	bl	_prim_WriteBarrierNoStore
@@ -12817,19 +12952,19 @@ LBB348_24:                              ; %B11
 	ldr	x1, [x25, x8, lsl #3]
 	add	sp, sp, #16
 	br	x1
-LBB348_25:                              ; %B63
+LBB351_25:                              ; %B63
 	ldr	x8, [x1, #8]
 	ldr	w8, [x8]
-LBB348_26:                              ; %B102
+LBB351_26:                              ; %B102
 	asr	w8, w8, #30
 	ldp	x11, x20, [sp]                  ; 16-byte Folded Reload
 	cmp	w8, #1
-	b.ne	LBB348_45
+	b.ne	LBB351_45
 ; %bb.27:                               ; %B64
 	ldr	x0, [x24, #8]
 	bl	_prim_get_interned_non_index_atom
 	ldp	x11, x20, [sp]                  ; 16-byte Folded Reload
-	cbz	w0, LBB348_45
+	cbz	w0, LBB351_45
 ; %bb.28:                               ; %B66
 	ldr	x8, [x11, #8]
 	ldr	w9, [x8, #12]
@@ -12839,24 +12974,24 @@ LBB348_26:                              ; %B102
 	ldr	w8, [x11, w8, sxtw #2]
 	add	w9, w10, #4
 	add	x9, x11, x9
-	cbz	w8, LBB348_31
-LBB348_29:                              ; %B69
+	cbz	w8, LBB351_31
+LBB351_29:                              ; %B69
                                         ; =>This Inner Loop Header: Depth=1
 	lsl	w10, w8, #3
 	sub	w10, w10, #8
 	add	x10, x9, x10
 	ldp	w10, w11, [x10]
 	cmp	w11, w0
-	b.eq	LBB348_40
+	b.eq	LBB351_40
 ; %bb.30:                               ; %B78
-                                        ;   in Loop: Header=BB348_29 Depth=1
+                                        ;   in Loop: Header=BB351_29 Depth=1
 	and	w8, w10, #0x3ffffff
-	cbnz	w8, LBB348_29
-LBB348_31:                              ; %B80.preheader
+	cbnz	w8, LBB351_29
+LBB351_31:                              ; %B80.preheader
 	ldp	x8, x20, [sp]                   ; 16-byte Folded Reload
-LBB348_32:                              ; %B80
+LBB351_32:                              ; %B80
                                         ; =>This Loop Header: Depth=1
-                                        ;     Child Loop BB348_33 Depth 2
+                                        ;     Child Loop BB351_33 Depth 2
 	ldr	x9, [x8, #8]
 	ldr	w10, [x9, #12]
 	add	x9, x9, #64
@@ -12865,37 +13000,37 @@ LBB348_32:                              ; %B80
 	ldr	w10, [x9, w10, sxtw #2]
 	add	w11, w11, #4
 	add	x9, x9, x11
-	cbz	w10, LBB348_35
-LBB348_33:                              ; %B93
-                                        ;   Parent Loop BB348_32 Depth=1
+	cbz	w10, LBB351_35
+LBB351_33:                              ; %B93
+                                        ;   Parent Loop BB351_32 Depth=1
                                         ; =>  This Inner Loop Header: Depth=2
 	lsl	w10, w10, #3
 	sub	w10, w10, #8
 	add	x10, x9, x10
 	ldp	w10, w11, [x10]
 	cmp	w11, w0
-	b.eq	LBB348_43
+	b.eq	LBB351_43
 ; %bb.34:                               ; %B98
-                                        ;   in Loop: Header=BB348_33 Depth=2
+                                        ;   in Loop: Header=BB351_33 Depth=2
 	and	w10, w10, #0x3ffffff
-	cbnz	w10, LBB348_33
-LBB348_35:                              ; %B81
-                                        ;   in Loop: Header=BB348_32 Depth=1
+	cbnz	w10, LBB351_33
+LBB351_35:                              ; %B81
+                                        ;   in Loop: Header=BB351_32 Depth=1
 	ldr	w9, [x8, #4]
 	ldr	x11, [sp]                       ; 8-byte Folded Reload
 	ubfx	w9, w9, #10, #1
 	cmp	w9, #1
-	b.eq	LBB348_45
+	b.eq	LBB351_45
 ; %bb.36:                               ; %B87
-                                        ;   in Loop: Header=BB348_32 Depth=1
+                                        ;   in Loop: Header=BB351_32 Depth=1
 	ldr	x8, [x8, #8]
 	ldr	x8, [x8, #32]
-	cbnz	x8, LBB348_32
-	b	LBB348_44
-LBB348_37:                              ; %B44
+	cbnz	x8, LBB351_32
+	b	LBB351_44
+LBB351_37:                              ; %B44
 	ldr	x20, [sp, #8]                   ; 8-byte Folded Reload
 	mov	x11, x1
-	tbnz	w22, #31, LBB348_45
+	tbnz	w22, #31, LBB351_45
 ; %bb.38:                               ; %B46
 	mov	x8, x20
 	mov	x0, x24
@@ -12906,9 +13041,9 @@ LBB348_37:                              ; %B44
 	str	x21, [x8], #8
 	str	x8, [x23, #48]
 	bl	_JS_SetArrayIntPropertyValue_GC
-	tbz	w0, #31, LBB348_46
-	b	LBB348_48
-LBB348_39:                              ; %B20
+	tbz	w0, #31, LBB351_46
+	b	LBB351_48
+LBB351_39:                              ; %B20
 	ldr	x8, [sp, #8]                    ; 8-byte Folded Reload
 	mov	x0, x24
 	mov	x2, x21
@@ -12916,21 +13051,21 @@ LBB348_39:                              ; %B20
 	str	x21, [x8], #8
 	str	x8, [x23, #48]
 	bl	_add_fast_array_element_gc
-	tbz	w0, #31, LBB348_46
-	b	LBB348_48
-LBB348_40:                              ; %B71
+	tbz	w0, #31, LBB351_46
+	b	LBB351_48
+LBB351_40:                              ; %B71
 	mov	w9, #58                         ; =0x3a
 	ldp	x11, x20, [sp]                  ; 16-byte Folded Reload
 	and	w9, w9, w10, lsr #26
 	cmp	w9, #2
-	b.ne	LBB348_45
+	b.ne	LBB351_45
 ; %bb.41:                               ; %B74
 	ldr	x9, [x11, #16]
 	sub	w8, w8, #1
 	str	x21, [x9, w8, sxtw #3]
 	ldrb	w8, [x24, #384]
-	cbz	w8, LBB348_46
-LBB348_42:                              ; %B76
+	cbz	w8, LBB351_46
+LBB351_42:                              ; %B76
 	mov	x0, x21
 	mov	x1, x24
 	bl	_prim_WriteBarrierNoStore
@@ -12940,18 +13075,18 @@ LBB348_42:                              ; %B76
 	sub	x20, x8, #16
 	add	sp, sp, #16
 	br	x1
-LBB348_43:                              ; %B95
+LBB351_43:                              ; %B95
 	mov	w8, #58                         ; =0x3a
 	ldp	x11, x20, [sp]                  ; 16-byte Folded Reload
 	and	w8, w8, w10, lsr #26
 	cmp	w8, #2
-	b.ne	LBB348_45
-LBB348_44:                              ; %B84
+	b.ne	LBB351_45
+LBB351_44:                              ; %B84
 	ldr	w8, [x11, #4]
 	ubfx	w8, w8, #8, #1
 	cmp	w8, #1
-	b.eq	LBB348_47
-LBB348_45:                              ; %B113
+	b.eq	LBB351_47
+LBB351_45:                              ; %B113
 	mov	x8, x20
 	mov	x0, x24
 	mov	x1, x11
@@ -12962,20 +13097,20 @@ LBB348_45:                              ; %B113
 	str	x21, [x8], #8
 	str	x8, [x23, #48]
 	bl	_JS_SetPropertyValue_GC
-	tbnz	w0, #31, LBB348_48
-LBB348_46:                              ; %B73
+	tbnz	w0, #31, LBB351_48
+LBB351_46:                              ; %B73
 	ldrb	w8, [x19], #1
 	ldr	x1, [x25, x8, lsl #3]
 	ldr	x8, [sp, #8]                    ; 8-byte Folded Reload
 	sub	x20, x8, #16
 	add	sp, sp, #16
 	br	x1
-LBB348_47:                              ; %B85
+LBB351_47:                              ; %B85
 	str	x21, [x20], #8
 	mov	w0, w0
 	add	sp, sp, #16
 	b	l_FastAddNamedProperty_asm_h
-LBB348_48:                              ; %B47
+LBB351_48:                              ; %B47
 	ldr	x20, [sp, #8]                   ; 8-byte Folded Reload
 	add	sp, sp, #16
 	b	l_exception_spill_top1_asm_h
@@ -13176,60 +13311,6 @@ l_get_loc_check_1_asm_h:                ; @get_loc_check_1_asm_h
 	ldrh	w8, [x19]
 	ldr	x8, [x27, x8, lsl #3]
 	cmp	x8, #34
-	b.eq	LBB372_2
-; %bb.1:                                ; %B4
-	ldrb	w9, [x19, #2]
-	add	x19, x19, #3
-	mov	x21, x8
-	add	w9, w9, #486
-	ldr	x1, [x25, w9, uxtw #3]
-	br	x1
-LBB372_2:                               ; %B3
-	str	x22, [x20], #8
-	b	l_ThrowReferenceErrorUninitialized_asm_h
-                                        ; -- End function
-	.p2align	2                               ; -- Begin function put_loc_check_1_asm_h
-l_put_loc_check_1_asm_h:                ; @put_loc_check_1_asm_h
-; %bb.0:                                ; %B2
-	ldrh	w8, [x19]
-	ldr	x9, [x27, x8, lsl #3]
-	cmp	x9, #34
-	b.eq	LBB373_2
-; %bb.1:                                ; %B4
-	str	x22, [x27, w8, uxtw #3]
-	ldrb	w8, [x19, #2]
-	add	x19, x19, #3
-	ldr	x1, [x25, x8, lsl #3]
-	br	x1
-LBB373_2:                               ; %B3
-	str	x22, [x20], #8
-	b	l_ThrowReferenceErrorUninitialized_asm_h
-                                        ; -- End function
-	.p2align	2                               ; -- Begin function put_loc_check_init_1_asm_h
-l_put_loc_check_init_1_asm_h:           ; @put_loc_check_init_1_asm_h
-; %bb.0:                                ; %B2
-	ldrh	w8, [x19]
-	ldr	x9, [x27, x8, lsl #3]
-	cmp	x9, #34
-	b.ne	LBB374_2
-; %bb.1:                                ; %B4
-	str	x22, [x27, w8, uxtw #3]
-	ldrb	w8, [x19, #2]
-	add	x19, x19, #3
-	ldr	x1, [x25, x8, lsl #3]
-	br	x1
-LBB374_2:                               ; %B3
-	str	x22, [x20], #8
-	b	l_ThrowThisReferenceError_asm_h
-                                        ; -- End function
-	.p2align	2                               ; -- Begin function get_var_ref_check_1_asm_h
-l_get_var_ref_check_1_asm_h:            ; @get_var_ref_check_1_asm_h
-; %bb.0:                                ; %B2
-	ldrh	w8, [x19]
-	ldr	x8, [x26, x8, lsl #3]
-	ldr	x8, [x8]
-	ldr	x8, [x8]
-	cmp	x8, #34
 	b.eq	LBB375_2
 ; %bb.1:                                ; %B4
 	ldrb	w9, [x19, #2]
@@ -13242,6 +13323,60 @@ LBB375_2:                               ; %B3
 	str	x22, [x20], #8
 	b	l_ThrowReferenceErrorUninitialized_asm_h
                                         ; -- End function
+	.p2align	2                               ; -- Begin function put_loc_check_1_asm_h
+l_put_loc_check_1_asm_h:                ; @put_loc_check_1_asm_h
+; %bb.0:                                ; %B2
+	ldrh	w8, [x19]
+	ldr	x9, [x27, x8, lsl #3]
+	cmp	x9, #34
+	b.eq	LBB376_2
+; %bb.1:                                ; %B4
+	str	x22, [x27, w8, uxtw #3]
+	ldrb	w8, [x19, #2]
+	add	x19, x19, #3
+	ldr	x1, [x25, x8, lsl #3]
+	br	x1
+LBB376_2:                               ; %B3
+	str	x22, [x20], #8
+	b	l_ThrowReferenceErrorUninitialized_asm_h
+                                        ; -- End function
+	.p2align	2                               ; -- Begin function put_loc_check_init_1_asm_h
+l_put_loc_check_init_1_asm_h:           ; @put_loc_check_init_1_asm_h
+; %bb.0:                                ; %B2
+	ldrh	w8, [x19]
+	ldr	x9, [x27, x8, lsl #3]
+	cmp	x9, #34
+	b.ne	LBB377_2
+; %bb.1:                                ; %B4
+	str	x22, [x27, w8, uxtw #3]
+	ldrb	w8, [x19, #2]
+	add	x19, x19, #3
+	ldr	x1, [x25, x8, lsl #3]
+	br	x1
+LBB377_2:                               ; %B3
+	str	x22, [x20], #8
+	b	l_ThrowThisReferenceError_asm_h
+                                        ; -- End function
+	.p2align	2                               ; -- Begin function get_var_ref_check_1_asm_h
+l_get_var_ref_check_1_asm_h:            ; @get_var_ref_check_1_asm_h
+; %bb.0:                                ; %B2
+	ldrh	w8, [x19]
+	ldr	x8, [x26, x8, lsl #3]
+	ldr	x8, [x8]
+	ldr	x8, [x8]
+	cmp	x8, #34
+	b.eq	LBB378_2
+; %bb.1:                                ; %B4
+	ldrb	w9, [x19, #2]
+	add	x19, x19, #3
+	mov	x21, x8
+	add	w9, w9, #486
+	ldr	x1, [x25, w9, uxtw #3]
+	br	x1
+LBB378_2:                               ; %B3
+	str	x22, [x20], #8
+	b	l_ThrowReferenceErrorUninitialized_asm_h
+                                        ; -- End function
 	.p2align	2                               ; -- Begin function put_var_ref_check_1_asm_h
 l_put_var_ref_check_1_asm_h:            ; @put_var_ref_check_1_asm_h
 ; %bb.0:                                ; %B2
@@ -13250,14 +13385,14 @@ l_put_var_ref_check_1_asm_h:            ; @put_var_ref_check_1_asm_h
 	ldr	x8, [x8]
 	ldr	x9, [x8]
 	cmp	x9, #34
-	b.eq	LBB376_2
+	b.eq	LBB379_2
 ; %bb.1:                                ; %B4
 	str	x22, [x8]
 	ldrb	w8, [x19, #2]
 	add	x19, x19, #3
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB376_2:                               ; %B3
+LBB379_2:                               ; %B3
 	str	x22, [x20], #8
 	b	l_ThrowReferenceErrorUninitialized_asm_h
                                         ; -- End function
@@ -13269,14 +13404,14 @@ l_put_var_ref_check_init_1_asm_h:       ; @put_var_ref_check_init_1_asm_h
 	ldr	x8, [x8]
 	ldr	x9, [x8]
 	cmp	x9, #34
-	b.ne	LBB377_2
+	b.ne	LBB380_2
 ; %bb.1:                                ; %B4
 	str	x22, [x8]
 	ldrb	w8, [x19, #2]
 	add	x19, x19, #3
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB377_2:                               ; %B3
+LBB380_2:                               ; %B3
 	str	x22, [x20], #8
 	b	l_ThrowReferenceErrorUninitialized_asm_h
                                         ; -- End function
@@ -13295,133 +13430,164 @@ l_close_loc_1_asm_h:                    ; @close_loc_1_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function if_false_1_asm_h
 l_if_false_1_asm_h:                     ; @if_false_1_asm_h
-; %bb.0:                                ; %B23
+; %bb.0:                                ; %B29
 	cmp	x22, #5
-	b.le	LBB379_4
-; %bb.1:                                ; %B23
+	b.le	LBB382_4
+; %bb.1:                                ; %B29
 	cmp	x22, #6
-	b.eq	LBB379_6
-; %bb.2:                                ; %B23
+	b.eq	LBB382_6
+; %bb.2:                                ; %B29
 	cmp	x22, #7
-	b.eq	LBB379_9
-; %bb.3:                                ; %B23
+	b.eq	LBB382_10
+; %bb.3:                                ; %B29
 	cmp	x22, #18
-	b.eq	LBB379_6
-	b	LBB379_7
-LBB379_4:                               ; %B23
+	b.eq	LBB382_6
+	b	LBB382_8
+LBB382_4:                               ; %B29
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x22, x8
-	b.eq	LBB379_6
-; %bb.5:                                ; %B23
+	b.eq	LBB382_6
+; %bb.5:                                ; %B29
 	cmp	x22, #2
-	b.ne	LBB379_7
-LBB379_6:                               ; %B3
+	b.ne	LBB382_8
+LBB382_6:                               ; %B8
 	ldrsw	x8, [x19]
 	add	x19, x19, x8
+	tbnz	x8, #63, LBB382_11
+LBB382_7:                               ; %B10
 	ldrb	w8, [x19], #1
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB379_7:                               ; %B9
+LBB382_8:                               ; %B15
 	mov	x8, #-281474976710656           ; =0xffff000000000000
 	cmp	x22, x8
-	b.hs	LBB379_13
-; %bb.8:                                ; %B11
+	b.hs	LBB382_16
+; %bb.9:                                ; %B17
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x22, x8
-	b.lo	LBB379_10
-LBB379_9:                               ; %B19
+	b.lo	LBB382_13
+LBB382_10:                              ; %B25
 	ldrb	w8, [x19, #4]
 	add	x19, x19, #5
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB379_10:                              ; %B13
+LBB382_11:                              ; %B5
+	ldr	w8, [x24, #232]
+	subs	w8, w8, #1
+	str	w8, [x24, #232]
+	b.pl	LBB382_7
+; %bb.12:                               ; %B6
+	add	x19, x19, #1
+	b	l_PollInterrupts_asm_h
+LBB382_13:                              ; %B19
 	tst	x22, #0xfffe000000000000
-	b.eq	LBB379_13
-; %bb.11:                               ; %B17
+	b.eq	LBB382_16
+; %bb.14:                               ; %B23
 	add	x8, x22, x8
 	fmov	d0, x8
 	fcmp	d0, d0
 	cset	w8, vc
 	fcmp	d0, #0.0
-	b.eq	LBB379_6
-	b.vs	LBB379_6
-; %bb.12:                               ; %B17
-	tbnz	w8, #0, LBB379_9
-	b	LBB379_6
-LBB379_13:                              ; %B15
+	b.eq	LBB382_6
+	b.vs	LBB382_6
+; %bb.15:                               ; %B23
+	tbnz	w8, #0, LBB382_10
+	b	LBB382_6
+LBB382_16:                              ; %B21
 	str	x22, [x20], #8
 	mov	x0, x22
 	b	l_SlowToBoolean_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function if_true_1_asm_h
 l_if_true_1_asm_h:                      ; @if_true_1_asm_h
-; %bb.0:                                ; %B23
+; %bb.0:                                ; %B29
 	cmp	x22, #5
-	b.le	LBB380_4
-; %bb.1:                                ; %B23
+	b.le	LBB383_4
+; %bb.1:                                ; %B29
 	cmp	x22, #6
-	b.eq	LBB380_6
-; %bb.2:                                ; %B23
+	b.eq	LBB383_6
+; %bb.2:                                ; %B29
 	cmp	x22, #7
-	b.eq	LBB380_9
-; %bb.3:                                ; %B23
+	b.eq	LBB383_9
+; %bb.3:                                ; %B29
 	cmp	x22, #18
-	b.eq	LBB380_6
-	b	LBB380_7
-LBB380_4:                               ; %B23
+	b.eq	LBB383_6
+	b	LBB383_7
+LBB383_4:                               ; %B29
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x22, x8
-	b.eq	LBB380_6
-; %bb.5:                                ; %B23
+	b.eq	LBB383_6
+; %bb.5:                                ; %B29
 	cmp	x22, #2
-	b.ne	LBB380_7
-LBB380_6:                               ; %B3
+	b.ne	LBB383_7
+LBB383_6:                               ; %B3
 	ldrb	w8, [x19, #4]
 	add	x19, x19, #5
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB380_7:                               ; %B9
+LBB383_7:                               ; %B9
 	mov	x8, #-281474976710656           ; =0xffff000000000000
 	cmp	x22, x8
-	b.hs	LBB380_13
+	b.hs	LBB383_16
 ; %bb.8:                                ; %B11
-	mov	x8, #-562949953421312           ; =0xfffe000000000000
+	mov	x8, #-562949953421313           ; =0xfffdffffffffffff
 	cmp	x22, x8
-	b.lo	LBB380_10
-LBB380_9:                               ; %B19
+	b.ls	LBB383_13
+LBB383_9:                               ; %B23
 	ldrsw	x8, [x19]
 	add	x19, x19, x8
+	tbnz	x8, #63, LBB383_11
+LBB383_10:                              ; %B25
 	ldrb	w8, [x19], #1
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB380_10:                              ; %B13
+LBB383_11:                              ; %B20
+	ldr	w8, [x24, #232]
+	subs	w8, w8, #1
+	str	w8, [x24, #232]
+	b.pl	LBB383_10
+; %bb.12:                               ; %B21
+	add	x19, x19, #1
+	b	l_PollInterrupts_asm_h
+LBB383_13:                              ; %B13
 	tst	x22, #0xfffe000000000000
-	b.eq	LBB380_13
-; %bb.11:                               ; %B17
+	b.eq	LBB383_16
+; %bb.14:                               ; %B17
+	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	add	x8, x22, x8
 	fmov	d0, x8
 	fcmp	d0, d0
 	cset	w8, vc
 	fcmp	d0, #0.0
-	b.eq	LBB380_6
-	b.vs	LBB380_6
-; %bb.12:                               ; %B17
-	tbnz	w8, #0, LBB380_9
-	b	LBB380_6
-LBB380_13:                              ; %B15
+	b.eq	LBB383_6
+	b.vs	LBB383_6
+; %bb.15:                               ; %B17
+	tbnz	w8, #0, LBB383_9
+	b	LBB383_6
+LBB383_16:                              ; %B15
 	str	x22, [x20], #8
 	mov	x0, x22
 	b	l_SlowToBoolean_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function goto_1_asm_h
 l_goto_1_asm_h:                         ; @goto_1_asm_h
-; %bb.0:                                ; %B0
+; %bb.0:                                ; %B5
 	ldrsw	x8, [x19]
 	add	x19, x19, x8
+	tbnz	x8, #63, LBB384_2
+LBB384_1:                               ; %B7
 	ldrb	w8, [x19], #1
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
+LBB384_2:                               ; %B2
+	ldr	w8, [x24, #232]
+	subs	w8, w8, #1
+	str	w8, [x24, #232]
+	b.pl	LBB384_1
+; %bb.3:                                ; %B3
+	add	x19, x19, #1
+	b	l_PollInterrupts_spill_top0_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function catch_1_asm_h
 l_catch_1_asm_h:                        ; @catch_1_asm_h
@@ -13452,27 +13618,27 @@ l_to_propkey_1_asm_h:                   ; @to_propkey_1_asm_h
 ; %bb.0:                                ; %B15
 	mov	w8, #65534                      ; =0xfffe
 	cmp	x8, x22, lsr #48
-	b.eq	LBB386_4
+	b.eq	LBB389_4
 ; %bb.1:                                ; %B15
 	mov	x9, #1                          ; =0x1
 	and	x8, x22, #0xffff000000000003
 	movk	x9, #1, lsl #48
 	add	x10, x9, #1
 	cmp	x8, x10
-	b.eq	LBB386_4
+	b.eq	LBB389_4
 ; %bb.2:                                ; %B15
 	cmp	x8, x9
-	b.eq	LBB386_4
+	b.eq	LBB389_4
 ; %bb.3:                                ; %B15
 	mov	x9, #-281474976710653           ; =0xffff000000000003
 	cmp	x8, x9
-	b.ne	LBB386_5
-LBB386_4:                               ; %B3
+	b.ne	LBB389_5
+LBB389_4:                               ; %B3
 	ldrb	w8, [x19], #1
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB386_5:                               ; %B12
+LBB389_5:                               ; %B12
 	mov	x8, x20
 	mov	x0, x24
 	mov	x1, x22
@@ -13480,14 +13646,14 @@ LBB386_5:                               ; %B12
 	str	x8, [x23, #48]
 	bl	_JS_ToPropertyKey_GC
 	cmp	x0, #130
-	b.eq	LBB386_7
+	b.eq	LBB389_7
 ; %bb.6:                                ; %B14
 	ldrb	w8, [x19], #1
 	mov	x22, x0
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB386_7:                               ; %B13
+LBB389_7:                               ; %B13
 	b	l_exception_spill_top0_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function to_propkey2_1_asm_h
@@ -13497,7 +13663,7 @@ l_to_propkey2_1_asm_h:                  ; @to_propkey2_1_asm_h
 	ldur	x22, [x20, #-8]
 	orr	x8, x22, #0x10
 	cmp	x8, #18
-	b.ne	LBB387_3
+	b.ne	LBB390_3
 ; %bb.1:                                ; %B19
 	mov	x8, x20
 Lloh22:
@@ -13508,33 +13674,33 @@ Lloh23:
 	str	x21, [x8], #8
 	str	x8, [x23, #48]
 	bl	_LEPUS_ThrowTypeError
-LBB387_2:                               ; %B16
+LBB390_2:                               ; %B16
 	b	l_exception_spill_top1_asm_h
-LBB387_3:                               ; %B2
+LBB390_3:                               ; %B2
 	mov	w8, #65534                      ; =0xfffe
 	cmp	x8, x21, lsr #48
-	b.eq	LBB387_7
+	b.eq	LBB390_7
 ; %bb.4:                                ; %B2
 	mov	x9, #1                          ; =0x1
 	and	x8, x21, #0xffff000000000003
 	movk	x9, #1, lsl #48
 	add	x10, x9, #1
 	cmp	x8, x10
-	b.eq	LBB387_7
+	b.eq	LBB390_7
 ; %bb.5:                                ; %B2
 	cmp	x8, x9
-	b.eq	LBB387_7
+	b.eq	LBB390_7
 ; %bb.6:                                ; %B2
 	mov	x9, #-281474976710653           ; =0xffff000000000003
 	cmp	x8, x9
-	b.ne	LBB387_8
-LBB387_7:                               ; %B4
+	b.ne	LBB390_8
+LBB390_7:                               ; %B4
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #8
 	add	w8, w8, #486
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB387_8:                               ; %B15
+LBB390_8:                               ; %B15
 	mov	x8, x20
 	mov	x0, x24
 	mov	x1, x21
@@ -13542,7 +13708,7 @@ LBB387_8:                               ; %B15
 	str	x8, [x23, #48]
 	bl	_JS_ToPropertyKey_GC
 	cmp	x0, #130
-	b.eq	LBB387_2
+	b.eq	LBB390_2
 ; %bb.9:                                ; %B17
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #8
@@ -13719,17 +13885,17 @@ l_neg_1_asm_h:                          ; @neg_1_asm_h
 ; %bb.0:                                ; %B19
 	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
 	cmp	x22, x8
-	b.hi	LBB415_3
+	b.hi	LBB418_3
 ; %bb.1:                                ; %B1
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x22, x8
-	b.lo	LBB415_6
+	b.lo	LBB418_6
 ; %bb.2:                                ; %B13
 	orr	w8, w22, #0x80000000
 	mov	w9, #-2147483648                ; =0x80000000
 	cmp	w8, w9
-	b.ne	LBB415_5
-LBB415_3:                               ; %B16
+	b.ne	LBB418_5
+LBB418_3:                               ; %B16
 	mov	x8, x20
 	mov	x0, x24
 	mov	x1, x22
@@ -13738,23 +13904,23 @@ LBB415_3:                               ; %B16
 	str	x8, [x23, #48]
 	bl	_prim_js_unary_arith_slow_gc
 	cmp	x0, #130
-	b.eq	LBB415_8
+	b.eq	LBB418_8
 ; %bb.4:                                ; %B18
 	ldrb	w8, [x19], #1
 	mov	x22, x0
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB415_5:                               ; %B15
+LBB418_5:                               ; %B15
 	ldrb	w8, [x19], #1
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	neg	w8, w22
 	orr	x22, x8, #0xfffe000000000000
 	br	x1
-LBB415_6:                               ; %B3
+LBB418_6:                               ; %B3
 	tst	x22, #0xfffe000000000000
-	b.eq	LBB415_3
+	b.eq	LBB418_3
 ; %bb.7:                                ; %B7
 	movi	d0, #0000000000000000
 	add	x8, x22, x8
@@ -13770,7 +13936,7 @@ LBB415_6:                               ; %B3
 	add	x9, x9, x10
 	csel	x22, x9, x8, vc
 	br	x1
-LBB415_8:                               ; %B17
+LBB418_8:                               ; %B17
 	b	l_exception_spill_top0_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function plus_1_asm_h
@@ -13778,20 +13944,20 @@ l_plus_1_asm_h:                         ; @plus_1_asm_h
 ; %bb.0:                                ; %B13
 	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
 	cmp	x22, x8
-	b.hi	LBB416_4
+	b.hi	LBB419_4
 ; %bb.1:                                ; %B1
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x22, x8
-	b.lo	LBB416_3
-LBB416_2:                               ; %B7
+	b.lo	LBB419_3
+LBB419_2:                               ; %B7
 	ldrb	w8, [x19], #1
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB416_3:                               ; %B3
+LBB419_3:                               ; %B3
 	tst	x22, #0xfffe000000000000
-	b.ne	LBB416_2
-LBB416_4:                               ; %B10
+	b.ne	LBB419_2
+LBB419_4:                               ; %B10
 	mov	x8, x20
 	mov	x0, x24
 	mov	x1, x22
@@ -13800,14 +13966,14 @@ LBB416_4:                               ; %B10
 	str	x8, [x23, #48]
 	bl	_prim_js_unary_arith_slow_gc
 	cmp	x0, #130
-	b.eq	LBB416_6
+	b.eq	LBB419_6
 ; %bb.5:                                ; %B12
 	mov	x22, x0
 	ldrb	w8, [x19], #1
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB416_6:                               ; %B11
+LBB419_6:                               ; %B11
 	b	l_exception_spill_top0_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function dec_1_asm_h
@@ -13815,23 +13981,23 @@ l_dec_1_asm_h:                          ; @dec_1_asm_h
 ; %bb.0:                                ; %B19
 	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
 	cmp	x22, x8
-	b.hi	LBB417_6
+	b.hi	LBB420_6
 ; %bb.1:                                ; %B1
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x22, x8
-	b.lo	LBB417_4
+	b.lo	LBB420_4
 ; %bb.2:                                ; %B13
 	subs	w8, w22, #1
-	b.vs	LBB417_6
+	b.vs	LBB420_6
 ; %bb.3:                                ; %B15
 	ldrb	w9, [x19], #1
 	orr	x22, x8, #0xfffe000000000000
 	add	w9, w9, #243
 	ldr	x1, [x25, w9, uxtw #3]
 	br	x1
-LBB417_4:                               ; %B3
+LBB420_4:                               ; %B3
 	tst	x22, #0xfffe000000000000
-	b.eq	LBB417_6
+	b.eq	LBB420_6
 ; %bb.5:                                ; %B7
 	add	x8, x22, x8
 	fmov	d0, #-1.00000000
@@ -13847,7 +14013,7 @@ LBB417_4:                               ; %B3
 	add	x9, x9, x10
 	csel	x22, x9, x8, vc
 	br	x1
-LBB417_6:                               ; %B16
+LBB420_6:                               ; %B16
 	mov	x8, x20
 	mov	x0, x24
 	mov	x1, x22
@@ -13856,14 +14022,14 @@ LBB417_6:                               ; %B16
 	str	x8, [x23, #48]
 	bl	_prim_js_unary_arith_slow_gc
 	cmp	x0, #130
-	b.eq	LBB417_8
+	b.eq	LBB420_8
 ; %bb.7:                                ; %B18
 	ldrb	w8, [x19], #1
 	mov	x22, x0
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB417_8:                               ; %B17
+LBB420_8:                               ; %B17
 	b	l_exception_spill_top0_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function inc_1_asm_h
@@ -13871,23 +14037,23 @@ l_inc_1_asm_h:                          ; @inc_1_asm_h
 ; %bb.0:                                ; %B19
 	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
 	cmp	x22, x8
-	b.hi	LBB418_6
+	b.hi	LBB421_6
 ; %bb.1:                                ; %B1
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x22, x8
-	b.lo	LBB418_4
+	b.lo	LBB421_4
 ; %bb.2:                                ; %B13
 	adds	w8, w22, #1
-	b.vs	LBB418_6
+	b.vs	LBB421_6
 ; %bb.3:                                ; %B15
 	ldrb	w9, [x19], #1
 	orr	x22, x8, #0xfffe000000000000
 	add	w9, w9, #243
 	ldr	x1, [x25, w9, uxtw #3]
 	br	x1
-LBB418_4:                               ; %B3
+LBB421_4:                               ; %B3
 	tst	x22, #0xfffe000000000000
-	b.eq	LBB418_6
+	b.eq	LBB421_6
 ; %bb.5:                                ; %B7
 	add	x8, x22, x8
 	fmov	d0, #1.00000000
@@ -13903,7 +14069,7 @@ LBB418_4:                               ; %B3
 	add	x9, x9, x10
 	csel	x22, x9, x8, vc
 	br	x1
-LBB418_6:                               ; %B16
+LBB421_6:                               ; %B16
 	mov	x8, x20
 	mov	x0, x24
 	mov	x1, x22
@@ -13912,14 +14078,14 @@ LBB418_6:                               ; %B16
 	str	x8, [x23, #48]
 	bl	_prim_js_unary_arith_slow_gc
 	cmp	x0, #130
-	b.eq	LBB418_8
+	b.eq	LBB421_8
 ; %bb.7:                                ; %B18
 	ldrb	w8, [x19], #1
 	mov	x22, x0
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB418_8:                               ; %B17
+LBB421_8:                               ; %B17
 	b	l_exception_spill_top0_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function post_dec_1_asm_h
@@ -13927,23 +14093,23 @@ l_post_dec_1_asm_h:                     ; @post_dec_1_asm_h
 ; %bb.0:                                ; %B16
 	mov	x8, #-281474976710656           ; =0xffff000000000000
 	cmp	x22, x8
-	b.hs	LBB419_6
+	b.hs	LBB422_6
 ; %bb.1:                                ; %B1
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x22, x8
-	b.lo	LBB419_4
+	b.lo	LBB422_4
 ; %bb.2:                                ; %B13
 	subs	w8, w22, #1
-	b.vs	LBB419_6
+	b.vs	LBB422_6
 ; %bb.3:                                ; %B15
 	ldrb	w9, [x19], #1
 	orr	x21, x8, #0xfffe000000000000
 	add	w9, w9, #486
 	ldr	x1, [x25, w9, uxtw #3]
 	br	x1
-LBB419_4:                               ; %B3
+LBB422_4:                               ; %B3
 	tst	x22, #0xfffe000000000000
-	b.eq	LBB419_6
+	b.eq	LBB422_6
 ; %bb.5:                                ; %B8
 	add	x8, x22, x8
 	fmov	d0, #-1.00000000
@@ -13959,7 +14125,7 @@ LBB419_4:                               ; %B3
 	add	x9, x9, x10
 	csel	x21, x9, x8, vc
 	br	x1
-LBB419_6:                               ; %B5
+LBB422_6:                               ; %B5
 	str	x22, [x20], #8
 	mov	w0, #144                        ; =0x90
 	b	l_SlowJSPostInc_asm_h
@@ -13969,23 +14135,23 @@ l_post_inc_1_asm_h:                     ; @post_inc_1_asm_h
 ; %bb.0:                                ; %B16
 	mov	x8, #-281474976710656           ; =0xffff000000000000
 	cmp	x22, x8
-	b.hs	LBB420_6
+	b.hs	LBB423_6
 ; %bb.1:                                ; %B1
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x22, x8
-	b.lo	LBB420_4
+	b.lo	LBB423_4
 ; %bb.2:                                ; %B13
 	adds	w8, w22, #1
-	b.vs	LBB420_6
+	b.vs	LBB423_6
 ; %bb.3:                                ; %B15
 	ldrb	w9, [x19], #1
 	orr	x21, x8, #0xfffe000000000000
 	add	w9, w9, #486
 	ldr	x1, [x25, w9, uxtw #3]
 	br	x1
-LBB420_4:                               ; %B3
+LBB423_4:                               ; %B3
 	tst	x22, #0xfffe000000000000
-	b.eq	LBB420_6
+	b.eq	LBB423_6
 ; %bb.5:                                ; %B8
 	add	x8, x22, x8
 	fmov	d0, #1.00000000
@@ -14001,7 +14167,7 @@ LBB420_4:                               ; %B3
 	add	x9, x9, x10
 	csel	x21, x9, x8, vc
 	br	x1
-LBB420_6:                               ; %B5
+LBB423_6:                               ; %B5
 	str	x22, [x20], #8
 	mov	w0, #145                        ; =0x91
 	b	l_SlowJSPostInc_asm_h
@@ -14013,14 +14179,14 @@ l_dec_loc_1_asm_h:                      ; @dec_loc_1_asm_h
 	mov	x9, #-281474976710657           ; =0xfffeffffffffffff
 	ldr	x1, [x27, x8, lsl #3]
 	cmp	x1, x9
-	b.hi	LBB421_6
+	b.hi	LBB424_6
 ; %bb.1:                                ; %B2
 	mov	x9, #-562949953421312           ; =0xfffe000000000000
 	cmp	x1, x9
-	b.lo	LBB421_4
+	b.lo	LBB424_4
 ; %bb.2:                                ; %B13
 	subs	w9, w1, #1
-	b.vs	LBB421_6
+	b.vs	LBB424_6
 ; %bb.3:                                ; %B15
 	orr	x9, x9, #0xfffe000000000000
 	str	x9, [x27, w8, uxtw #3]
@@ -14029,9 +14195,9 @@ l_dec_loc_1_asm_h:                      ; @dec_loc_1_asm_h
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB421_4:                               ; %B4
+LBB424_4:                               ; %B4
 	tst	x1, #0xfffe000000000000
-	b.eq	LBB421_6
+	b.eq	LBB424_6
 ; %bb.5:                                ; %B8
 	add	x9, x1, x9
 	fmov	d0, #-1.00000000
@@ -14049,7 +14215,7 @@ LBB421_4:                               ; %B4
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB421_6:                               ; %B16
+LBB424_6:                               ; %B16
 	mov	x8, x20
 	mov	x0, x24
 	mov	w2, #142                        ; =0x8e
@@ -14057,7 +14223,7 @@ LBB421_6:                               ; %B16
 	str	x8, [x23, #48]
 	bl	_prim_js_unary_arith_slow_gc
 	cmp	x0, #130
-	b.eq	LBB421_8
+	b.eq	LBB424_8
 ; %bb.7:                                ; %B18
 	ldrb	w8, [x19]
 	str	x0, [x27, x8, lsl #3]
@@ -14066,7 +14232,7 @@ LBB421_6:                               ; %B16
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB421_8:                               ; %B17
+LBB424_8:                               ; %B17
 	b	l_exception_spill_top0_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function inc_loc_1_asm_h
@@ -14076,14 +14242,14 @@ l_inc_loc_1_asm_h:                      ; @inc_loc_1_asm_h
 	mov	x9, #-281474976710657           ; =0xfffeffffffffffff
 	ldr	x1, [x27, x8, lsl #3]
 	cmp	x1, x9
-	b.hi	LBB422_6
+	b.hi	LBB425_6
 ; %bb.1:                                ; %B2
 	mov	x9, #-562949953421312           ; =0xfffe000000000000
 	cmp	x1, x9
-	b.lo	LBB422_4
+	b.lo	LBB425_4
 ; %bb.2:                                ; %B13
 	adds	w9, w1, #1
-	b.vs	LBB422_6
+	b.vs	LBB425_6
 ; %bb.3:                                ; %B15
 	orr	x9, x9, #0xfffe000000000000
 	str	x9, [x27, w8, uxtw #3]
@@ -14092,9 +14258,9 @@ l_inc_loc_1_asm_h:                      ; @inc_loc_1_asm_h
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB422_4:                               ; %B4
+LBB425_4:                               ; %B4
 	tst	x1, #0xfffe000000000000
-	b.eq	LBB422_6
+	b.eq	LBB425_6
 ; %bb.5:                                ; %B8
 	add	x9, x1, x9
 	fmov	d0, #1.00000000
@@ -14112,7 +14278,7 @@ LBB422_4:                               ; %B4
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB422_6:                               ; %B16
+LBB425_6:                               ; %B16
 	mov	x8, x20
 	mov	x0, x24
 	mov	w2, #143                        ; =0x8f
@@ -14120,7 +14286,7 @@ LBB422_6:                               ; %B16
 	str	x8, [x23, #48]
 	bl	_prim_js_unary_arith_slow_gc
 	cmp	x0, #130
-	b.eq	LBB422_8
+	b.eq	LBB425_8
 ; %bb.7:                                ; %B18
 	ldrb	w8, [x19]
 	str	x0, [x27, x8, lsl #3]
@@ -14129,7 +14295,7 @@ LBB422_6:                               ; %B16
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB422_8:                               ; %B17
+LBB425_8:                               ; %B17
 	b	l_exception_spill_top0_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function add_loc_1_asm_h
@@ -14140,17 +14306,17 @@ l_add_loc_1_asm_h:                      ; @add_loc_1_asm_h
 	ldr	x1, [x27, x8, lsl #3]
 	cmp	x1, x9
 	ccmp	x22, x9, #2, ls
-	b.hi	LBB423_16
+	b.hi	LBB426_16
 ; %bb.1:                                ; %B2
 	mov	x9, #-562949953421312           ; =0xfffe000000000000
 	cmp	x1, x9
-	b.lo	LBB423_5
+	b.lo	LBB426_5
 ; %bb.2:                                ; %B26
 	cmp	x22, x9
-	b.lo	LBB423_8
+	b.lo	LBB426_8
 ; %bb.3:                                ; %B36
 	adds	w9, w1, w22
-	b.vs	LBB423_11
+	b.vs	LBB426_11
 ; %bb.4:                                ; %B42
 	orr	x9, x9, #0xfffe000000000000
 	str	x9, [x27, w8, uxtw #3]
@@ -14158,33 +14324,33 @@ l_add_loc_1_asm_h:                      ; @add_loc_1_asm_h
 	add	x19, x19, #2
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB423_5:                               ; %B4
+LBB426_5:                               ; %B4
 	tst	x1, #0xfffe000000000000
-	b.eq	LBB423_16
+	b.eq	LBB426_16
 ; %bb.6:                                ; %B11
 	cmp	x22, x9
-	b.lo	LBB423_14
+	b.lo	LBB426_14
 ; %bb.7:                                ; %B21
 	scvtf	d0, w22
 	add	x9, x1, x9
 	fmov	d1, x9
 	fadd	d0, d1, d0
-	b	LBB423_13
-LBB423_8:                               ; %B28
+	b	LBB426_13
+LBB426_8:                               ; %B28
 	tst	x22, #0xfffe000000000000
-	b.eq	LBB423_16
+	b.eq	LBB426_16
 ; %bb.9:                                ; %B31
 	scvtf	d0, w1
 	add	x9, x22, x9
-LBB423_10:                              ; %B31
+LBB426_10:                              ; %B31
 	fmov	d1, x9
-	b	LBB423_12
-LBB423_11:                              ; %B38
+	b	LBB426_12
+LBB426_11:                              ; %B38
 	scvtf	d0, w1
 	scvtf	d1, w22
-LBB423_12:                              ; %B31
+LBB426_12:                              ; %B31
 	fadd	d0, d0, d1
-LBB423_13:                              ; %B31
+LBB426_13:                              ; %B31
 	fmov	x9, d0
 	fcmp	d0, d0
 	mov	x10, #562949953421312           ; =0x2000000000000
@@ -14196,15 +14362,15 @@ LBB423_13:                              ; %B31
 	add	x19, x19, #2
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB423_14:                              ; %B13
+LBB426_14:                              ; %B13
 	tst	x22, #0xfffe000000000000
-	b.eq	LBB423_16
+	b.eq	LBB426_16
 ; %bb.15:                               ; %B16
 	add	x10, x1, x9
 	add	x9, x22, x9
 	fmov	d0, x10
-	b	LBB423_10
-LBB423_16:                              ; %B7
+	b	LBB426_10
+LBB426_16:                              ; %B7
 	and	x8, x22, #0xffff000000000003
 	mov	x9, #-281474976710653           ; =0xffff000000000003
 	mov	x10, #2                         ; =0x2
@@ -14217,7 +14383,7 @@ LBB423_16:                              ; %B7
 	ccmp	x11, x9, #4, ne
 	ccmp	w8, #0, #4, eq
 	add	x8, x20, #8
-	b.ne	LBB423_19
+	b.ne	LBB426_19
 ; %bb.17:                               ; %B43
 	mov	x0, x24
 	mov	x2, x22
@@ -14225,7 +14391,7 @@ LBB423_16:                              ; %B7
 	str	x8, [x23, #48]
 	bl	_prim_js_add_slow_gc
 	cmp	x0, #130
-	b.eq	LBB423_20
+	b.eq	LBB426_20
 ; %bb.18:                               ; %B45
 	ldrb	w8, [x19]
 	str	x0, [x27, x8, lsl #3]
@@ -14233,12 +14399,12 @@ LBB423_16:                              ; %B7
 	add	x19, x19, #2
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB423_19:                              ; %B8
+LBB426_19:                              ; %B8
 	mov	x20, x8
 	stur	x22, [x8, #-8]
 	mov	w0, #1                          ; =0x1
 	b	l_FastJSConcatString_asm_h
-LBB423_20:                              ; %B44
+LBB426_20:                              ; %B44
 	b	l_exception_spill_top0_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function not_1_asm_h
@@ -14246,7 +14412,7 @@ l_not_1_asm_h:                          ; @not_1_asm_h
 ; %bb.0:                                ; %B2
 	mov	w8, #65534                      ; =0xfffe
 	cmp	x8, x22, lsr #48
-	b.ne	LBB424_2
+	b.ne	LBB427_2
 ; %bb.1:                                ; %B3
 	ldrb	w8, [x19], #1
 	add	w8, w8, #243
@@ -14254,7 +14420,7 @@ l_not_1_asm_h:                          ; @not_1_asm_h
 	mvn	w8, w22
 	orr	x22, x8, #0xfffe000000000000
 	br	x1
-LBB424_2:                               ; %B4
+LBB427_2:                               ; %B4
 	str	x22, [x20], #8
 	mov	x0, x22
 	b	l_SlowJSNot_asm_h
@@ -14263,41 +14429,41 @@ LBB424_2:                               ; %B4
 l_lnot_1_asm_h:                         ; @lnot_1_asm_h
 ; %bb.0:                                ; %B14
 	cmp	x22, #5
-	b.le	LBB425_4
+	b.le	LBB428_4
 ; %bb.1:                                ; %B14
 	cmp	x22, #6
-	b.eq	LBB425_6
+	b.eq	LBB428_6
 ; %bb.2:                                ; %B14
 	cmp	x22, #7
-	b.eq	LBB425_8
+	b.eq	LBB428_8
 ; %bb.3:                                ; %B14
 	cmp	x22, #18
-	b.eq	LBB425_6
-	b	LBB425_7
-LBB425_4:                               ; %B14
+	b.eq	LBB428_6
+	b	LBB428_7
+LBB428_4:                               ; %B14
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x22, x8
-	b.eq	LBB425_6
+	b.eq	LBB428_6
 ; %bb.5:                                ; %B14
 	cmp	x22, #2
-	b.ne	LBB425_7
-LBB425_6:                               ; %B3
+	b.ne	LBB428_7
+LBB428_6:                               ; %B3
 	mov	w22, #7                         ; =0x7
 	ldrb	w8, [x19], #1
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB425_7:                               ; %B10
+LBB428_7:                               ; %B10
 	mov	w8, #65534                      ; =0xfffe
 	cmp	x8, x22, lsr #48
-	b.ne	LBB425_9
-LBB425_8:                               ; %B12
+	b.ne	LBB428_9
+LBB428_8:                               ; %B12
 	mov	w22, #6                         ; =0x6
 	ldrb	w8, [x19], #1
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB425_9:                               ; %B13
+LBB428_9:                               ; %B13
 	str	x22, [x20], #8
 	mov	x0, x22
 	b	l_SlowToBoolean_asm_h
@@ -14316,14 +14482,14 @@ l_typeof_1_asm_h:                       ; @typeof_1_asm_h
 	str	x8, [x23, #48]
 	bl	___JS_AtomToValue_GC
 	cmp	x0, #130
-	b.eq	LBB426_2
+	b.eq	LBB429_2
 ; %bb.1:                                ; %B3
 	ldrb	w8, [x19], #1
 	mov	x22, x0
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB426_2:                               ; %B2
+LBB429_2:                               ; %B2
 	b	l_exception_spill_top0_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function delete_1_asm_h
@@ -14345,56 +14511,56 @@ l_mul_1_asm_h:                          ; @mul_1_asm_h
 	ldur	x22, [x20, #-8]
 	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
 	cmp	x22, x8
-	b.hi	LBB429_19
+	b.hi	LBB432_19
 ; %bb.1:                                ; %B51
 	cmp	x21, x8
-	b.hi	LBB429_19
+	b.hi	LBB432_19
 ; %bb.2:                                ; %B1
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x22, x8
-	b.lo	LBB429_8
+	b.lo	LBB432_8
 ; %bb.3:                                ; %B23
 	cmp	x21, x8
-	b.lo	LBB429_11
+	b.lo	LBB432_11
 ; %bb.4:                                ; %B33
 	smull	x8, w22, w21
 	sub	x20, x20, #8
 	cmp	x8, w8, sxtw
-	b.ne	LBB429_15
+	b.ne	LBB432_15
 ; %bb.5:                                ; %B40
-	cbnz	w8, LBB429_7
+	cbnz	w8, LBB432_7
 ; %bb.6:                                ; %B40
 	orr	w9, w22, w21
-	tbnz	w9, #31, LBB429_16
-LBB429_7:                               ; %B47
+	tbnz	w9, #31, LBB432_16
+LBB432_7:                               ; %B47
 	mov	w8, w8
 	orr	x22, x8, #0xfffe000000000000
 	ldrb	w8, [x19], #1
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB429_8:                               ; %B3
+LBB432_8:                               ; %B3
 	tst	x22, #0xfffe000000000000
-	b.eq	LBB429_19
+	b.eq	LBB432_19
 ; %bb.9:                                ; %B7
 	cmp	x21, x8
-	b.lo	LBB429_17
+	b.lo	LBB432_17
 ; %bb.10:                               ; %B18
 	scvtf	d0, w21
 	add	x8, x22, x8
 	fmov	d1, x8
 	fmul	d0, d1, d0
-	b	LBB429_14
-LBB429_11:                              ; %B25
+	b	LBB432_14
+LBB432_11:                              ; %B25
 	tst	x21, #0xfffe000000000000
-	b.eq	LBB429_19
+	b.eq	LBB432_19
 ; %bb.12:                               ; %B28
 	scvtf	d0, w22
 	add	x8, x21, x8
-LBB429_13:                              ; %B28
+LBB432_13:                              ; %B28
 	fmov	d1, x8
 	fmul	d0, d0, d1
-LBB429_14:                              ; %B28
+LBB432_14:                              ; %B28
 	ldrb	w8, [x19], #1
 	fmov	x9, d0
 	fcmp	d0, d0
@@ -14406,7 +14572,7 @@ LBB429_14:                              ; %B28
 	mov	x8, #9221683186994511872        ; =0x7ffa000000000000
 	csel	x22, x9, x8, vc
 	br	x1
-LBB429_15:                              ; %B35
+LBB432_15:                              ; %B35
 	scvtf	d0, w22
 	scvtf	d1, w21
 	mov	x10, #562949953421312           ; =0x2000000000000
@@ -14420,21 +14586,21 @@ LBB429_15:                              ; %B35
 	mov	x8, #9221683186994511872        ; =0x7ffa000000000000
 	csel	x22, x9, x8, vc
 	br	x1
-LBB429_16:                              ; %B44
+LBB432_16:                              ; %B44
 	mov	x22, #-9222809086901354496      ; =0x8002000000000000
 	ldrb	w8, [x19], #1
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB429_17:                              ; %B9
+LBB432_17:                              ; %B9
 	tst	x21, #0xfffe000000000000
-	b.eq	LBB429_19
+	b.eq	LBB432_19
 ; %bb.18:                               ; %B12
 	add	x9, x22, x8
 	add	x8, x21, x8
 	fmov	d0, x9
-	b	LBB429_13
-LBB429_19:                              ; %B48
+	b	LBB432_13
+LBB432_19:                              ; %B48
 	mov	x8, x20
 	mov	x0, x24
 	mov	x1, x22
@@ -14444,7 +14610,7 @@ LBB429_19:                              ; %B48
 	str	x8, [x23, #48]
 	bl	_prim_js_binary_arith_slow_gc
 	cmp	x0, #130
-	b.eq	LBB429_21
+	b.eq	LBB432_21
 ; %bb.20:                               ; %B50
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #8
@@ -14452,7 +14618,7 @@ LBB429_19:                              ; %B48
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB429_21:                              ; %B49
+LBB432_21:                              ; %B49
 	b	l_exception_spill_top1_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function div_1_asm_h
@@ -14462,17 +14628,17 @@ l_div_1_asm_h:                          ; @div_1_asm_h
 	ldur	x22, [x20, #-8]
 	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
 	cmp	x22, x8
-	b.hi	LBB430_14
+	b.hi	LBB433_14
 ; %bb.1:                                ; %B44
 	cmp	x21, x8
-	b.hi	LBB430_14
+	b.hi	LBB433_14
 ; %bb.2:                                ; %B1
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x22, x8
-	b.lo	LBB430_5
+	b.lo	LBB433_5
 ; %bb.3:                                ; %B23
 	cmp	x21, x8
-	b.lo	LBB430_8
+	b.lo	LBB433_8
 ; %bb.4:                                ; %B33
 	scvtf	d0, w22
 	scvtf	d1, w21
@@ -14492,28 +14658,28 @@ l_div_1_asm_h:                          ; @div_1_asm_h
 	orr	x9, x9, #0xfffe000000000000
 	csel	x22, x8, x9, ne
 	br	x1
-LBB430_5:                               ; %B3
+LBB433_5:                               ; %B3
 	tst	x22, #0xfffe000000000000
-	b.eq	LBB430_14
+	b.eq	LBB433_14
 ; %bb.6:                                ; %B7
 	cmp	x21, x8
-	b.lo	LBB430_12
+	b.lo	LBB433_12
 ; %bb.7:                                ; %B18
 	scvtf	d0, w21
 	add	x8, x22, x8
 	fmov	d1, x8
 	fdiv	d0, d1, d0
-	b	LBB430_11
-LBB430_8:                               ; %B25
+	b	LBB433_11
+LBB433_8:                               ; %B25
 	tst	x21, #0xfffe000000000000
-	b.eq	LBB430_14
+	b.eq	LBB433_14
 ; %bb.9:                                ; %B28
 	scvtf	d0, w22
 	add	x8, x21, x8
-LBB430_10:                              ; %B28
+LBB433_10:                              ; %B28
 	fmov	d1, x8
 	fdiv	d0, d0, d1
-LBB430_11:                              ; %B28
+LBB433_11:                              ; %B28
 	ldrb	w8, [x19], #1
 	fmov	x9, d0
 	fcmp	d0, d0
@@ -14525,15 +14691,15 @@ LBB430_11:                              ; %B28
 	mov	x8, #9221683186994511872        ; =0x7ffa000000000000
 	csel	x22, x9, x8, vc
 	br	x1
-LBB430_12:                              ; %B9
+LBB433_12:                              ; %B9
 	tst	x21, #0xfffe000000000000
-	b.eq	LBB430_14
+	b.eq	LBB433_14
 ; %bb.13:                               ; %B12
 	add	x9, x22, x8
 	add	x8, x21, x8
 	fmov	d0, x9
-	b	LBB430_10
-LBB430_14:                              ; %B41
+	b	LBB433_10
+LBB433_14:                              ; %B41
 	mov	x8, x20
 	mov	x0, x24
 	mov	x1, x22
@@ -14543,7 +14709,7 @@ LBB430_14:                              ; %B41
 	str	x8, [x23, #48]
 	bl	_prim_js_binary_arith_slow_gc
 	cmp	x0, #130
-	b.eq	LBB430_16
+	b.eq	LBB433_16
 ; %bb.15:                               ; %B43
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #8
@@ -14551,7 +14717,7 @@ LBB430_14:                              ; %B41
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB430_16:                              ; %B42
+LBB433_16:                              ; %B42
 	b	l_exception_spill_top1_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function mod_1_asm_h
@@ -14561,22 +14727,22 @@ l_mod_1_asm_h:                          ; @mod_1_asm_h
 	ldur	x22, [x20, #-8]
 	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
 	cmp	x22, x8
-	b.hi	LBB431_16
+	b.hi	LBB434_16
 ; %bb.1:                                ; %B39
 	cmp	x21, x8
-	b.hi	LBB431_16
+	b.hi	LBB434_16
 ; %bb.2:                                ; %B1
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x22, x8
-	b.lo	LBB431_7
+	b.lo	LBB434_7
 ; %bb.3:                                ; %B23
 	cmp	x21, x8
-	b.lo	LBB431_10
+	b.lo	LBB434_10
 ; %bb.4:                                ; %B33
-	tbnz	w22, #31, LBB431_16
+	tbnz	w22, #31, LBB434_16
 ; %bb.5:                                ; %B33
 	cmp	w21, #1
-	b.lt	LBB431_16
+	b.lt	LBB434_16
 ; %bb.6:                                ; %B35
 	sdiv	w8, w22, w21
 	ldrb	w9, [x19], #1
@@ -14586,26 +14752,26 @@ l_mod_1_asm_h:                          ; @mod_1_asm_h
 	msub	w8, w8, w21, w22
 	orr	x22, x8, #0xfffe000000000000
 	br	x1
-LBB431_7:                               ; %B3
+LBB434_7:                               ; %B3
 	tst	x22, #0xfffe000000000000
-	b.eq	LBB431_16
+	b.eq	LBB434_16
 ; %bb.8:                                ; %B7
 	cmp	x21, x8
-	b.lo	LBB431_14
+	b.lo	LBB434_14
 ; %bb.9:                                ; %B18
 	add	x8, x22, x8
 	scvtf	d1, w21
 	fmov	d0, x8
-	b	LBB431_13
-LBB431_10:                              ; %B25
+	b	LBB434_13
+LBB434_10:                              ; %B25
 	tst	x21, #0xfffe000000000000
-	b.eq	LBB431_16
+	b.eq	LBB434_16
 ; %bb.11:                               ; %B28
 	scvtf	d0, w22
 	add	x8, x21, x8
-LBB431_12:                              ; %B28
+LBB434_12:                              ; %B28
 	fmov	d1, x8
-LBB431_13:                              ; %B28
+LBB434_13:                              ; %B28
 	bl	_fmod
 	ldrb	w8, [x19], #1
 	fmov	x9, d0
@@ -14618,15 +14784,15 @@ LBB431_13:                              ; %B28
 	mov	x8, #9221683186994511872        ; =0x7ffa000000000000
 	csel	x22, x9, x8, vc
 	br	x1
-LBB431_14:                              ; %B9
+LBB434_14:                              ; %B9
 	tst	x21, #0xfffe000000000000
-	b.eq	LBB431_16
+	b.eq	LBB434_16
 ; %bb.15:                               ; %B12
 	add	x9, x22, x8
 	add	x8, x21, x8
 	fmov	d0, x9
-	b	LBB431_12
-LBB431_16:                              ; %B36
+	b	LBB434_12
+LBB434_16:                              ; %B36
 	mov	x8, x20
 	mov	x0, x24
 	mov	x1, x22
@@ -14636,7 +14802,7 @@ LBB431_16:                              ; %B36
 	str	x8, [x23, #48]
 	bl	_prim_js_binary_arith_slow_gc
 	cmp	x0, #130
-	b.eq	LBB431_18
+	b.eq	LBB434_18
 ; %bb.17:                               ; %B38
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #8
@@ -14644,7 +14810,7 @@ LBB431_16:                              ; %B36
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB431_18:                              ; %B37
+LBB434_18:                              ; %B37
 	b	l_exception_spill_top1_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function add_1_asm_h
@@ -14654,49 +14820,49 @@ l_add_1_asm_h:                          ; @add_1_asm_h
 	ldur	x22, [x20, #-8]
 	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
 	cmp	x22, x8
-	b.hi	LBB432_16
+	b.hi	LBB435_16
 ; %bb.1:                                ; %B46
 	cmp	x21, x8
-	b.hi	LBB432_16
+	b.hi	LBB435_16
 ; %bb.2:                                ; %B1
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x22, x8
-	b.lo	LBB432_6
+	b.lo	LBB435_6
 ; %bb.3:                                ; %B26
 	cmp	x21, x8
-	b.lo	LBB432_9
+	b.lo	LBB435_9
 ; %bb.4:                                ; %B36
 	adds	w8, w22, w21
 	sub	x20, x20, #8
-	b.vs	LBB432_13
+	b.vs	LBB435_13
 ; %bb.5:                                ; %B42
 	ldrb	w9, [x19], #1
 	orr	x22, x8, #0xfffe000000000000
 	add	w9, w9, #243
 	ldr	x1, [x25, w9, uxtw #3]
 	br	x1
-LBB432_6:                               ; %B3
+LBB435_6:                               ; %B3
 	tst	x22, #0xfffe000000000000
-	b.eq	LBB432_16
+	b.eq	LBB435_16
 ; %bb.7:                                ; %B11
 	cmp	x21, x8
-	b.lo	LBB432_14
+	b.lo	LBB435_14
 ; %bb.8:                                ; %B21
 	scvtf	d0, w21
 	add	x8, x22, x8
 	fmov	d1, x8
 	fadd	d0, d1, d0
-	b	LBB432_12
-LBB432_9:                               ; %B28
+	b	LBB435_12
+LBB435_9:                               ; %B28
 	tst	x21, #0xfffe000000000000
-	b.eq	LBB432_16
+	b.eq	LBB435_16
 ; %bb.10:                               ; %B31
 	scvtf	d0, w22
 	add	x8, x21, x8
-LBB432_11:                              ; %B31
+LBB435_11:                              ; %B31
 	fmov	d1, x8
 	fadd	d0, d0, d1
-LBB432_12:                              ; %B31
+LBB435_12:                              ; %B31
 	ldrb	w8, [x19], #1
 	fmov	x9, d0
 	fcmp	d0, d0
@@ -14708,7 +14874,7 @@ LBB432_12:                              ; %B31
 	mov	x8, #9221683186994511872        ; =0x7ffa000000000000
 	csel	x22, x9, x8, vc
 	br	x1
-LBB432_13:                              ; %B38
+LBB435_13:                              ; %B38
 	scvtf	d0, w22
 	scvtf	d1, w21
 	mov	x10, #562949953421312           ; =0x2000000000000
@@ -14722,15 +14888,15 @@ LBB432_13:                              ; %B38
 	mov	x8, #9221683186994511872        ; =0x7ffa000000000000
 	csel	x22, x9, x8, vc
 	br	x1
-LBB432_14:                              ; %B13
+LBB435_14:                              ; %B13
 	tst	x21, #0xfffe000000000000
-	b.eq	LBB432_16
+	b.eq	LBB435_16
 ; %bb.15:                               ; %B16
 	add	x9, x22, x8
 	add	x8, x21, x8
 	fmov	d0, x9
-	b	LBB432_11
-LBB432_16:                              ; %B7
+	b	LBB435_11
+LBB435_16:                              ; %B7
 	and	x8, x21, #0xffff000000000003
 	mov	x10, #-281474976710653          ; =0xffff000000000003
 	mov	x11, #2                         ; =0x2
@@ -14742,15 +14908,15 @@ LBB432_16:                              ; %B7
 	cset	w9, eq
 	cmp	x12, x11
 	ccmp	x12, x10, #4, ne
-	b.ne	LBB432_19
+	b.ne	LBB435_19
 ; %bb.17:                               ; %B7
-	cbz	w9, LBB432_19
+	cbz	w9, LBB435_19
 ; %bb.18:                               ; %B8
 	mov	x20, x8
 	stur	x21, [x8, #-8]
 	mov	x0, xzr
 	b	l_FastJSConcatString_asm_h
-LBB432_19:                              ; %B43
+LBB435_19:                              ; %B43
 	mov	x0, x24
 	mov	x1, x22
 	mov	x2, x21
@@ -14758,7 +14924,7 @@ LBB432_19:                              ; %B43
 	str	x8, [x23, #48]
 	bl	_prim_js_add_slow_gc
 	cmp	x0, #130
-	b.eq	LBB432_21
+	b.eq	LBB435_21
 ; %bb.20:                               ; %B45
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #8
@@ -14766,7 +14932,7 @@ LBB432_19:                              ; %B43
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB432_21:                              ; %B44
+LBB435_21:                              ; %B44
 	b	l_exception_spill_top1_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function sub_1_asm_h
@@ -14776,49 +14942,49 @@ l_sub_1_asm_h:                          ; @sub_1_asm_h
 	ldur	x22, [x20, #-8]
 	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
 	cmp	x22, x8
-	b.hi	LBB433_16
+	b.hi	LBB436_16
 ; %bb.1:                                ; %B43
 	cmp	x21, x8
-	b.hi	LBB433_16
+	b.hi	LBB436_16
 ; %bb.2:                                ; %B1
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x22, x8
-	b.lo	LBB433_6
+	b.lo	LBB436_6
 ; %bb.3:                                ; %B23
 	cmp	x21, x8
-	b.lo	LBB433_9
+	b.lo	LBB436_9
 ; %bb.4:                                ; %B33
 	subs	w8, w22, w21
 	sub	x20, x20, #8
-	b.vs	LBB433_13
+	b.vs	LBB436_13
 ; %bb.5:                                ; %B39
 	ldrb	w9, [x19], #1
 	orr	x22, x8, #0xfffe000000000000
 	add	w9, w9, #243
 	ldr	x1, [x25, w9, uxtw #3]
 	br	x1
-LBB433_6:                               ; %B3
+LBB436_6:                               ; %B3
 	tst	x22, #0xfffe000000000000
-	b.eq	LBB433_16
+	b.eq	LBB436_16
 ; %bb.7:                                ; %B7
 	cmp	x21, x8
-	b.lo	LBB433_14
+	b.lo	LBB436_14
 ; %bb.8:                                ; %B18
 	scvtf	d0, w21
 	add	x8, x22, x8
 	fmov	d1, x8
 	fsub	d0, d1, d0
-	b	LBB433_12
-LBB433_9:                               ; %B25
+	b	LBB436_12
+LBB436_9:                               ; %B25
 	tst	x21, #0xfffe000000000000
-	b.eq	LBB433_16
+	b.eq	LBB436_16
 ; %bb.10:                               ; %B28
 	scvtf	d0, w22
 	add	x8, x21, x8
-LBB433_11:                              ; %B28
+LBB436_11:                              ; %B28
 	fmov	d1, x8
 	fsub	d0, d0, d1
-LBB433_12:                              ; %B28
+LBB436_12:                              ; %B28
 	ldrb	w8, [x19], #1
 	fmov	x9, d0
 	fcmp	d0, d0
@@ -14830,7 +14996,7 @@ LBB433_12:                              ; %B28
 	mov	x8, #9221683186994511872        ; =0x7ffa000000000000
 	csel	x22, x9, x8, vc
 	br	x1
-LBB433_13:                              ; %B35
+LBB436_13:                              ; %B35
 	scvtf	d0, w22
 	scvtf	d1, w21
 	mov	x10, #562949953421312           ; =0x2000000000000
@@ -14844,15 +15010,15 @@ LBB433_13:                              ; %B35
 	mov	x8, #9221683186994511872        ; =0x7ffa000000000000
 	csel	x22, x9, x8, vc
 	br	x1
-LBB433_14:                              ; %B9
+LBB436_14:                              ; %B9
 	tst	x21, #0xfffe000000000000
-	b.eq	LBB433_16
+	b.eq	LBB436_16
 ; %bb.15:                               ; %B12
 	add	x9, x22, x8
 	add	x8, x21, x8
 	fmov	d0, x9
-	b	LBB433_11
-LBB433_16:                              ; %B40
+	b	LBB436_11
+LBB436_16:                              ; %B40
 	mov	x8, x20
 	mov	x0, x24
 	mov	x1, x22
@@ -14862,7 +15028,7 @@ LBB433_16:                              ; %B40
 	str	x8, [x23, #48]
 	bl	_prim_js_binary_arith_slow_gc
 	cmp	x0, #130
-	b.eq	LBB433_18
+	b.eq	LBB436_18
 ; %bb.17:                               ; %B42
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #8
@@ -14870,7 +15036,7 @@ LBB433_16:                              ; %B40
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB433_18:                              ; %B41
+LBB436_18:                              ; %B41
 	b	l_exception_spill_top1_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function pow_1_asm_h
@@ -14887,7 +15053,7 @@ l_pow_1_asm_h:                          ; @pow_1_asm_h
 	str	x8, [x23, #48]
 	bl	_prim_js_binary_arith_slow_gc
 	cmp	x0, #130
-	b.eq	LBB434_2
+	b.eq	LBB437_2
 ; %bb.1:                                ; %B3
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #8
@@ -14895,7 +15061,7 @@ l_pow_1_asm_h:                          ; @pow_1_asm_h
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB434_2:                               ; %B2
+LBB437_2:                               ; %B2
 	b	l_exception_spill_top1_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function shl_1_asm_h
@@ -14905,20 +15071,20 @@ l_shl_1_asm_h:                          ; @shl_1_asm_h
 	ldur	x22, [x20, #-8]
 	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
 	cmp	x22, x8
-	b.hi	LBB435_10
+	b.hi	LBB438_10
 ; %bb.1:                                ; %B28
 	cmp	x21, x8
-	b.hi	LBB435_10
+	b.hi	LBB438_10
 ; %bb.2:                                ; %B2
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x22, x8
-	b.lo	LBB435_6
+	b.lo	LBB438_6
 ; %bb.3:                                ; %B19
 	cmp	x21, x8
-	b.lo	LBB435_10
+	b.lo	LBB438_10
 ; %bb.4:                                ; %B24
 	mov	w8, w22
-LBB435_5:                               ; %B16
+LBB438_5:                               ; %B16
 	ldrb	w9, [x19], #1
 	lsl	w8, w8, w21
 	sub	x20, x20, #8
@@ -14926,23 +15092,23 @@ LBB435_5:                               ; %B16
 	orr	x22, x8, #0xfffe000000000000
 	ldr	x1, [x25, w9, uxtw #3]
 	br	x1
-LBB435_6:                               ; %B4
+LBB438_6:                               ; %B4
 	tst	x22, #0xfffe000000000000
-	b.eq	LBB435_10
+	b.eq	LBB438_10
 ; %bb.7:                                ; %B4
 	cmp	x21, x8
-	b.lo	LBB435_10
+	b.lo	LBB438_10
 ; %bb.8:                                ; %B14
 	ubfx	x8, x22, #52, #11
 	cmp	x8, #1053
-	b.gt	LBB435_10
+	b.gt	LBB438_10
 ; %bb.9:                                ; %B15
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	add	x8, x22, x8
 	fmov	d0, x8
 	fcvtzs	w8, d0
-	b	LBB435_5
-LBB435_10:                              ; %B25
+	b	LBB438_5
+LBB438_10:                              ; %B25
 	mov	x8, x20
 	mov	x0, x24
 	mov	x1, x22
@@ -14952,7 +15118,7 @@ LBB435_10:                              ; %B25
 	str	x8, [x23, #48]
 	bl	_prim_js_binary_logic_slow_gc
 	cmp	x0, #130
-	b.eq	LBB435_12
+	b.eq	LBB438_12
 ; %bb.11:                               ; %B27
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #8
@@ -14960,7 +15126,7 @@ LBB435_10:                              ; %B25
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB435_12:                              ; %B26
+LBB438_12:                              ; %B26
 	b	l_exception_spill_top1_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function sar_1_asm_h
@@ -14970,20 +15136,20 @@ l_sar_1_asm_h:                          ; @sar_1_asm_h
 	ldur	x22, [x20, #-8]
 	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
 	cmp	x22, x8
-	b.hi	LBB436_10
+	b.hi	LBB439_10
 ; %bb.1:                                ; %B28
 	cmp	x21, x8
-	b.hi	LBB436_10
+	b.hi	LBB439_10
 ; %bb.2:                                ; %B2
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x22, x8
-	b.lo	LBB436_6
+	b.lo	LBB439_6
 ; %bb.3:                                ; %B19
 	cmp	x21, x8
-	b.lo	LBB436_10
+	b.lo	LBB439_10
 ; %bb.4:                                ; %B24
 	mov	w8, w22
-LBB436_5:                               ; %B16
+LBB439_5:                               ; %B16
 	ldrb	w9, [x19], #1
 	asr	w8, w8, w21
 	sub	x20, x20, #8
@@ -14991,23 +15157,23 @@ LBB436_5:                               ; %B16
 	orr	x22, x8, #0xfffe000000000000
 	ldr	x1, [x25, w9, uxtw #3]
 	br	x1
-LBB436_6:                               ; %B4
+LBB439_6:                               ; %B4
 	tst	x22, #0xfffe000000000000
-	b.eq	LBB436_10
+	b.eq	LBB439_10
 ; %bb.7:                                ; %B4
 	cmp	x21, x8
-	b.lo	LBB436_10
+	b.lo	LBB439_10
 ; %bb.8:                                ; %B14
 	ubfx	x8, x22, #52, #11
 	cmp	x8, #1053
-	b.gt	LBB436_10
+	b.gt	LBB439_10
 ; %bb.9:                                ; %B15
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	add	x8, x22, x8
 	fmov	d0, x8
 	fcvtzs	w8, d0
-	b	LBB436_5
-LBB436_10:                              ; %B25
+	b	LBB439_5
+LBB439_10:                              ; %B25
 	mov	x8, x20
 	mov	x0, x24
 	mov	x1, x22
@@ -15017,7 +15183,7 @@ LBB436_10:                              ; %B25
 	str	x8, [x23, #48]
 	bl	_prim_js_binary_logic_slow_gc
 	cmp	x0, #130
-	b.eq	LBB436_12
+	b.eq	LBB439_12
 ; %bb.11:                               ; %B27
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #8
@@ -15025,7 +15191,7 @@ LBB436_10:                              ; %B25
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB436_12:                              ; %B26
+LBB439_12:                              ; %B26
 	b	l_exception_spill_top1_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function shr_1_asm_h
@@ -15035,22 +15201,22 @@ l_shr_1_asm_h:                          ; @shr_1_asm_h
 	ldur	x22, [x20, #-8]
 	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
 	cmp	x22, x8
-	b.hi	LBB437_11
+	b.hi	LBB440_11
 ; %bb.1:                                ; %B36
 	cmp	x21, x8
-	b.hi	LBB437_11
+	b.hi	LBB440_11
 ; %bb.2:                                ; %B10
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x22, x8
-	b.lo	LBB437_6
+	b.lo	LBB440_6
 ; %bb.3:                                ; %B27
 	cmp	x21, x8
-	b.lo	LBB437_11
+	b.lo	LBB440_11
 ; %bb.4:                                ; %B32
 	mov	w8, w22
 	lsr	w8, w8, w21
-	tbnz	w8, #31, LBB437_10
-LBB437_5:                               ; %B2
+	tbnz	w8, #31, LBB440_10
+LBB440_5:                               ; %B2
 	orr	x8, x8, #0xfffe000000000000
 	ldrb	w9, [x19], #1
 	sub	x20, x20, #8
@@ -15058,24 +15224,24 @@ LBB437_5:                               ; %B2
 	add	w9, w9, #243
 	ldr	x1, [x25, w9, uxtw #3]
 	br	x1
-LBB437_6:                               ; %B12
+LBB440_6:                               ; %B12
 	tst	x22, #0xfffe000000000000
-	b.eq	LBB437_11
+	b.eq	LBB440_11
 ; %bb.7:                                ; %B12
 	cmp	x21, x8
-	b.lo	LBB437_11
+	b.lo	LBB440_11
 ; %bb.8:                                ; %B22
 	ubfx	x8, x22, #52, #11
 	cmp	x8, #1053
-	b.gt	LBB437_11
+	b.gt	LBB440_11
 ; %bb.9:                                ; %B23
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	add	x8, x22, x8
 	fmov	d0, x8
 	fcvtzs	w8, d0
 	lsr	w8, w8, w21
-	tbz	w8, #31, LBB437_5
-LBB437_10:                              ; %B6
+	tbz	w8, #31, LBB440_5
+LBB440_10:                              ; %B6
 	ucvtf	d0, w8
 	mov	x9, #562949953421312            ; =0x2000000000000
 	fmov	x8, d0
@@ -15089,7 +15255,7 @@ LBB437_10:                              ; %B6
 	add	w9, w9, #243
 	ldr	x1, [x25, w9, uxtw #3]
 	br	x1
-LBB437_11:                              ; %B33
+LBB440_11:                              ; %B33
 	mov	x8, x20
 	mov	x0, x24
 	mov	x1, x22
@@ -15098,7 +15264,7 @@ LBB437_11:                              ; %B33
 	str	x8, [x23, #48]
 	bl	_prim_js_shr_slow_gc
 	cmp	x0, #130
-	b.eq	LBB437_13
+	b.eq	LBB440_13
 ; %bb.12:                               ; %B35
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #8
@@ -15106,302 +15272,11 @@ LBB437_11:                              ; %B33
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB437_13:                              ; %B34
+LBB440_13:                              ; %B34
 	b	l_exception_spill_top1_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function lt_1_asm_h
 l_lt_1_asm_h:                           ; @lt_1_asm_h
-; %bb.0:                                ; %B24
-	mov	x21, x22
-	ldur	x22, [x20, #-8]
-	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
-	cmp	x22, x8
-	b.hi	LBB438_12
-; %bb.1:                                ; %B24
-	cmp	x21, x8
-	b.hi	LBB438_12
-; %bb.2:                                ; %B1
-	mov	x8, #-562949953421312           ; =0xfffe000000000000
-	cmp	x22, x8
-	b.lo	LBB438_5
-; %bb.3:                                ; %B15
-	cmp	x21, x8
-	b.lo	LBB438_8
-; %bb.4:                                ; %B20
-	ldrb	w8, [x19], #1
-	cmp	w22, w21
-	sub	x20, x20, #8
-	add	w8, w8, #243
-	ldr	x1, [x25, w8, uxtw #3]
-	mov	w8, #6                          ; =0x6
-	cinc	x22, x8, lt
-	br	x1
-LBB438_5:                               ; %B3
-	tst	x22, #0xfffe000000000000
-	b.eq	LBB438_12
-; %bb.6:                                ; %B7
-	cmp	x21, x8
-	b.lo	LBB438_10
-; %bb.7:                                ; %B13
-	scvtf	d0, w21
-	add	x8, x22, x8
-	fmov	d1, x8
-	ldrb	w9, [x19], #1
-	fcmp	d1, d0
-	add	w8, w9, #243
-	ldr	x1, [x25, w8, uxtw #3]
-	sub	x20, x20, #8
-	mov	w8, #6                          ; =0x6
-	cinc	x22, x8, mi
-	br	x1
-LBB438_8:                               ; %B17
-	tst	x21, #0xfffe000000000000
-	b.eq	LBB438_12
-; %bb.9:                                ; %B19
-	scvtf	d0, w22
-	add	x8, x21, x8
-	fmov	d1, x8
-	ldrb	w9, [x19], #1
-	fcmp	d0, d1
-	add	w8, w9, #243
-	ldr	x1, [x25, w8, uxtw #3]
-	sub	x20, x20, #8
-	mov	w8, #6                          ; =0x6
-	cinc	x22, x8, mi
-	br	x1
-LBB438_10:                              ; %B9
-	tst	x21, #0xfffe000000000000
-	b.eq	LBB438_12
-; %bb.11:                               ; %B11
-	add	x9, x22, x8
-	add	x8, x21, x8
-	fmov	d0, x9
-	fmov	d1, x8
-	ldrb	w10, [x19], #1
-	fcmp	d0, d1
-	add	w8, w10, #243
-	ldr	x1, [x25, w8, uxtw #3]
-	sub	x20, x20, #8
-	mov	w8, #6                          ; =0x6
-	cinc	x22, x8, mi
-	br	x1
-LBB438_12:                              ; %B21
-	mov	x8, x20
-	mov	x0, x24
-	mov	x1, x22
-	mov	x2, x21
-	mov	w3, #163                        ; =0xa3
-	str	x21, [x8], #8
-	str	x8, [x23, #48]
-	bl	_prim_js_relation_slow_gc
-	cmp	x0, #130
-	b.eq	LBB438_14
-; %bb.13:                               ; %B23
-	ldrb	w8, [x19], #1
-	sub	x20, x20, #8
-	mov	x22, x0
-	add	w8, w8, #243
-	ldr	x1, [x25, w8, uxtw #3]
-	br	x1
-LBB438_14:                              ; %B22
-	b	l_exception_spill_top1_asm_h
-                                        ; -- End function
-	.p2align	2                               ; -- Begin function lte_1_asm_h
-l_lte_1_asm_h:                          ; @lte_1_asm_h
-; %bb.0:                                ; %B24
-	mov	x21, x22
-	ldur	x22, [x20, #-8]
-	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
-	cmp	x22, x8
-	b.hi	LBB439_12
-; %bb.1:                                ; %B24
-	cmp	x21, x8
-	b.hi	LBB439_12
-; %bb.2:                                ; %B1
-	mov	x8, #-562949953421312           ; =0xfffe000000000000
-	cmp	x22, x8
-	b.lo	LBB439_5
-; %bb.3:                                ; %B15
-	cmp	x21, x8
-	b.lo	LBB439_8
-; %bb.4:                                ; %B20
-	ldrb	w8, [x19], #1
-	cmp	w22, w21
-	sub	x20, x20, #8
-	add	w8, w8, #243
-	ldr	x1, [x25, w8, uxtw #3]
-	mov	w8, #6                          ; =0x6
-	cinc	x22, x8, le
-	br	x1
-LBB439_5:                               ; %B3
-	tst	x22, #0xfffe000000000000
-	b.eq	LBB439_12
-; %bb.6:                                ; %B7
-	cmp	x21, x8
-	b.lo	LBB439_10
-; %bb.7:                                ; %B13
-	scvtf	d0, w21
-	add	x8, x22, x8
-	fmov	d1, x8
-	ldrb	w9, [x19], #1
-	fcmp	d1, d0
-	add	w8, w9, #243
-	ldr	x1, [x25, w8, uxtw #3]
-	sub	x20, x20, #8
-	mov	w8, #6                          ; =0x6
-	cinc	x22, x8, ls
-	br	x1
-LBB439_8:                               ; %B17
-	tst	x21, #0xfffe000000000000
-	b.eq	LBB439_12
-; %bb.9:                                ; %B19
-	scvtf	d0, w22
-	add	x8, x21, x8
-	fmov	d1, x8
-	ldrb	w9, [x19], #1
-	fcmp	d0, d1
-	add	w8, w9, #243
-	ldr	x1, [x25, w8, uxtw #3]
-	sub	x20, x20, #8
-	mov	w8, #6                          ; =0x6
-	cinc	x22, x8, ls
-	br	x1
-LBB439_10:                              ; %B9
-	tst	x21, #0xfffe000000000000
-	b.eq	LBB439_12
-; %bb.11:                               ; %B11
-	add	x9, x22, x8
-	add	x8, x21, x8
-	fmov	d0, x9
-	fmov	d1, x8
-	ldrb	w10, [x19], #1
-	fcmp	d0, d1
-	add	w8, w10, #243
-	ldr	x1, [x25, w8, uxtw #3]
-	sub	x20, x20, #8
-	mov	w8, #6                          ; =0x6
-	cinc	x22, x8, ls
-	br	x1
-LBB439_12:                              ; %B21
-	mov	x8, x20
-	mov	x0, x24
-	mov	x1, x22
-	mov	x2, x21
-	mov	w3, #164                        ; =0xa4
-	str	x21, [x8], #8
-	str	x8, [x23, #48]
-	bl	_prim_js_relation_slow_gc
-	cmp	x0, #130
-	b.eq	LBB439_14
-; %bb.13:                               ; %B23
-	ldrb	w8, [x19], #1
-	sub	x20, x20, #8
-	mov	x22, x0
-	add	w8, w8, #243
-	ldr	x1, [x25, w8, uxtw #3]
-	br	x1
-LBB439_14:                              ; %B22
-	b	l_exception_spill_top1_asm_h
-                                        ; -- End function
-	.p2align	2                               ; -- Begin function gt_1_asm_h
-l_gt_1_asm_h:                           ; @gt_1_asm_h
-; %bb.0:                                ; %B24
-	mov	x21, x22
-	ldur	x22, [x20, #-8]
-	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
-	cmp	x22, x8
-	b.hi	LBB440_12
-; %bb.1:                                ; %B24
-	cmp	x21, x8
-	b.hi	LBB440_12
-; %bb.2:                                ; %B1
-	mov	x8, #-562949953421312           ; =0xfffe000000000000
-	cmp	x22, x8
-	b.lo	LBB440_5
-; %bb.3:                                ; %B15
-	cmp	x21, x8
-	b.lo	LBB440_8
-; %bb.4:                                ; %B20
-	ldrb	w8, [x19], #1
-	cmp	w22, w21
-	add	w8, w8, #243
-	ldr	x1, [x25, w8, uxtw #3]
-	sub	x20, x20, #8
-	mov	w8, #6                          ; =0x6
-	cinc	x22, x8, gt
-	br	x1
-LBB440_5:                               ; %B3
-	tst	x22, #0xfffe000000000000
-	b.eq	LBB440_12
-; %bb.6:                                ; %B7
-	cmp	x21, x8
-	b.lo	LBB440_10
-; %bb.7:                                ; %B13
-	scvtf	d0, w21
-	add	x8, x22, x8
-	fmov	d1, x8
-	ldrb	w9, [x19], #1
-	fcmp	d1, d0
-	add	w8, w9, #243
-	ldr	x1, [x25, w8, uxtw #3]
-	sub	x20, x20, #8
-	mov	w8, #6                          ; =0x6
-	cinc	x22, x8, gt
-	br	x1
-LBB440_8:                               ; %B17
-	tst	x21, #0xfffe000000000000
-	b.eq	LBB440_12
-; %bb.9:                                ; %B19
-	scvtf	d0, w22
-	add	x8, x21, x8
-	fmov	d1, x8
-	ldrb	w9, [x19], #1
-	fcmp	d0, d1
-	add	w8, w9, #243
-	ldr	x1, [x25, w8, uxtw #3]
-	sub	x20, x20, #8
-	mov	w8, #6                          ; =0x6
-	cinc	x22, x8, gt
-	br	x1
-LBB440_10:                              ; %B9
-	tst	x21, #0xfffe000000000000
-	b.eq	LBB440_12
-; %bb.11:                               ; %B11
-	add	x9, x22, x8
-	add	x8, x21, x8
-	fmov	d0, x9
-	fmov	d1, x8
-	ldrb	w10, [x19], #1
-	fcmp	d0, d1
-	add	w8, w10, #243
-	ldr	x1, [x25, w8, uxtw #3]
-	sub	x20, x20, #8
-	mov	w8, #6                          ; =0x6
-	cinc	x22, x8, gt
-	br	x1
-LBB440_12:                              ; %B21
-	mov	x8, x20
-	mov	x0, x24
-	mov	x1, x22
-	mov	x2, x21
-	mov	w3, #165                        ; =0xa5
-	str	x21, [x8], #8
-	str	x8, [x23, #48]
-	bl	_prim_js_relation_slow_gc
-	cmp	x0, #130
-	b.eq	LBB440_14
-; %bb.13:                               ; %B23
-	ldrb	w8, [x19], #1
-	sub	x20, x20, #8
-	mov	x22, x0
-	add	w8, w8, #243
-	ldr	x1, [x25, w8, uxtw #3]
-	br	x1
-LBB440_14:                              ; %B22
-	b	l_exception_spill_top1_asm_h
-                                        ; -- End function
-	.p2align	2                               ; -- Begin function gte_1_asm_h
-l_gte_1_asm_h:                          ; @gte_1_asm_h
 ; %bb.0:                                ; %B24
 	mov	x21, x22
 	ldur	x22, [x20, #-8]
@@ -15421,11 +15296,11 @@ l_gte_1_asm_h:                          ; @gte_1_asm_h
 ; %bb.4:                                ; %B20
 	ldrb	w8, [x19], #1
 	cmp	w22, w21
+	sub	x20, x20, #8
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
-	sub	x20, x20, #8
 	mov	w8, #6                          ; =0x6
-	cinc	x22, x8, ge
+	cinc	x22, x8, lt
 	br	x1
 LBB441_5:                               ; %B3
 	tst	x22, #0xfffe000000000000
@@ -15443,7 +15318,7 @@ LBB441_5:                               ; %B3
 	ldr	x1, [x25, w8, uxtw #3]
 	sub	x20, x20, #8
 	mov	w8, #6                          ; =0x6
-	cinc	x22, x8, ge
+	cinc	x22, x8, mi
 	br	x1
 LBB441_8:                               ; %B17
 	tst	x21, #0xfffe000000000000
@@ -15458,7 +15333,7 @@ LBB441_8:                               ; %B17
 	ldr	x1, [x25, w8, uxtw #3]
 	sub	x20, x20, #8
 	mov	w8, #6                          ; =0x6
-	cinc	x22, x8, ge
+	cinc	x22, x8, mi
 	br	x1
 LBB441_10:                              ; %B9
 	tst	x21, #0xfffe000000000000
@@ -15474,14 +15349,14 @@ LBB441_10:                              ; %B9
 	ldr	x1, [x25, w8, uxtw #3]
 	sub	x20, x20, #8
 	mov	w8, #6                          ; =0x6
-	cinc	x22, x8, ge
+	cinc	x22, x8, mi
 	br	x1
 LBB441_12:                              ; %B21
 	mov	x8, x20
 	mov	x0, x24
 	mov	x1, x22
 	mov	x2, x21
-	mov	w3, #166                        ; =0xa6
+	mov	w3, #163                        ; =0xa3
 	str	x21, [x8], #8
 	str	x8, [x23, #48]
 	bl	_prim_js_relation_slow_gc
@@ -15497,6 +15372,297 @@ LBB441_12:                              ; %B21
 LBB441_14:                              ; %B22
 	b	l_exception_spill_top1_asm_h
                                         ; -- End function
+	.p2align	2                               ; -- Begin function lte_1_asm_h
+l_lte_1_asm_h:                          ; @lte_1_asm_h
+; %bb.0:                                ; %B24
+	mov	x21, x22
+	ldur	x22, [x20, #-8]
+	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
+	cmp	x22, x8
+	b.hi	LBB442_12
+; %bb.1:                                ; %B24
+	cmp	x21, x8
+	b.hi	LBB442_12
+; %bb.2:                                ; %B1
+	mov	x8, #-562949953421312           ; =0xfffe000000000000
+	cmp	x22, x8
+	b.lo	LBB442_5
+; %bb.3:                                ; %B15
+	cmp	x21, x8
+	b.lo	LBB442_8
+; %bb.4:                                ; %B20
+	ldrb	w8, [x19], #1
+	cmp	w22, w21
+	sub	x20, x20, #8
+	add	w8, w8, #243
+	ldr	x1, [x25, w8, uxtw #3]
+	mov	w8, #6                          ; =0x6
+	cinc	x22, x8, le
+	br	x1
+LBB442_5:                               ; %B3
+	tst	x22, #0xfffe000000000000
+	b.eq	LBB442_12
+; %bb.6:                                ; %B7
+	cmp	x21, x8
+	b.lo	LBB442_10
+; %bb.7:                                ; %B13
+	scvtf	d0, w21
+	add	x8, x22, x8
+	fmov	d1, x8
+	ldrb	w9, [x19], #1
+	fcmp	d1, d0
+	add	w8, w9, #243
+	ldr	x1, [x25, w8, uxtw #3]
+	sub	x20, x20, #8
+	mov	w8, #6                          ; =0x6
+	cinc	x22, x8, ls
+	br	x1
+LBB442_8:                               ; %B17
+	tst	x21, #0xfffe000000000000
+	b.eq	LBB442_12
+; %bb.9:                                ; %B19
+	scvtf	d0, w22
+	add	x8, x21, x8
+	fmov	d1, x8
+	ldrb	w9, [x19], #1
+	fcmp	d0, d1
+	add	w8, w9, #243
+	ldr	x1, [x25, w8, uxtw #3]
+	sub	x20, x20, #8
+	mov	w8, #6                          ; =0x6
+	cinc	x22, x8, ls
+	br	x1
+LBB442_10:                              ; %B9
+	tst	x21, #0xfffe000000000000
+	b.eq	LBB442_12
+; %bb.11:                               ; %B11
+	add	x9, x22, x8
+	add	x8, x21, x8
+	fmov	d0, x9
+	fmov	d1, x8
+	ldrb	w10, [x19], #1
+	fcmp	d0, d1
+	add	w8, w10, #243
+	ldr	x1, [x25, w8, uxtw #3]
+	sub	x20, x20, #8
+	mov	w8, #6                          ; =0x6
+	cinc	x22, x8, ls
+	br	x1
+LBB442_12:                              ; %B21
+	mov	x8, x20
+	mov	x0, x24
+	mov	x1, x22
+	mov	x2, x21
+	mov	w3, #164                        ; =0xa4
+	str	x21, [x8], #8
+	str	x8, [x23, #48]
+	bl	_prim_js_relation_slow_gc
+	cmp	x0, #130
+	b.eq	LBB442_14
+; %bb.13:                               ; %B23
+	ldrb	w8, [x19], #1
+	sub	x20, x20, #8
+	mov	x22, x0
+	add	w8, w8, #243
+	ldr	x1, [x25, w8, uxtw #3]
+	br	x1
+LBB442_14:                              ; %B22
+	b	l_exception_spill_top1_asm_h
+                                        ; -- End function
+	.p2align	2                               ; -- Begin function gt_1_asm_h
+l_gt_1_asm_h:                           ; @gt_1_asm_h
+; %bb.0:                                ; %B24
+	mov	x21, x22
+	ldur	x22, [x20, #-8]
+	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
+	cmp	x22, x8
+	b.hi	LBB443_12
+; %bb.1:                                ; %B24
+	cmp	x21, x8
+	b.hi	LBB443_12
+; %bb.2:                                ; %B1
+	mov	x8, #-562949953421312           ; =0xfffe000000000000
+	cmp	x22, x8
+	b.lo	LBB443_5
+; %bb.3:                                ; %B15
+	cmp	x21, x8
+	b.lo	LBB443_8
+; %bb.4:                                ; %B20
+	ldrb	w8, [x19], #1
+	cmp	w22, w21
+	add	w8, w8, #243
+	ldr	x1, [x25, w8, uxtw #3]
+	sub	x20, x20, #8
+	mov	w8, #6                          ; =0x6
+	cinc	x22, x8, gt
+	br	x1
+LBB443_5:                               ; %B3
+	tst	x22, #0xfffe000000000000
+	b.eq	LBB443_12
+; %bb.6:                                ; %B7
+	cmp	x21, x8
+	b.lo	LBB443_10
+; %bb.7:                                ; %B13
+	scvtf	d0, w21
+	add	x8, x22, x8
+	fmov	d1, x8
+	ldrb	w9, [x19], #1
+	fcmp	d1, d0
+	add	w8, w9, #243
+	ldr	x1, [x25, w8, uxtw #3]
+	sub	x20, x20, #8
+	mov	w8, #6                          ; =0x6
+	cinc	x22, x8, gt
+	br	x1
+LBB443_8:                               ; %B17
+	tst	x21, #0xfffe000000000000
+	b.eq	LBB443_12
+; %bb.9:                                ; %B19
+	scvtf	d0, w22
+	add	x8, x21, x8
+	fmov	d1, x8
+	ldrb	w9, [x19], #1
+	fcmp	d0, d1
+	add	w8, w9, #243
+	ldr	x1, [x25, w8, uxtw #3]
+	sub	x20, x20, #8
+	mov	w8, #6                          ; =0x6
+	cinc	x22, x8, gt
+	br	x1
+LBB443_10:                              ; %B9
+	tst	x21, #0xfffe000000000000
+	b.eq	LBB443_12
+; %bb.11:                               ; %B11
+	add	x9, x22, x8
+	add	x8, x21, x8
+	fmov	d0, x9
+	fmov	d1, x8
+	ldrb	w10, [x19], #1
+	fcmp	d0, d1
+	add	w8, w10, #243
+	ldr	x1, [x25, w8, uxtw #3]
+	sub	x20, x20, #8
+	mov	w8, #6                          ; =0x6
+	cinc	x22, x8, gt
+	br	x1
+LBB443_12:                              ; %B21
+	mov	x8, x20
+	mov	x0, x24
+	mov	x1, x22
+	mov	x2, x21
+	mov	w3, #165                        ; =0xa5
+	str	x21, [x8], #8
+	str	x8, [x23, #48]
+	bl	_prim_js_relation_slow_gc
+	cmp	x0, #130
+	b.eq	LBB443_14
+; %bb.13:                               ; %B23
+	ldrb	w8, [x19], #1
+	sub	x20, x20, #8
+	mov	x22, x0
+	add	w8, w8, #243
+	ldr	x1, [x25, w8, uxtw #3]
+	br	x1
+LBB443_14:                              ; %B22
+	b	l_exception_spill_top1_asm_h
+                                        ; -- End function
+	.p2align	2                               ; -- Begin function gte_1_asm_h
+l_gte_1_asm_h:                          ; @gte_1_asm_h
+; %bb.0:                                ; %B24
+	mov	x21, x22
+	ldur	x22, [x20, #-8]
+	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
+	cmp	x22, x8
+	b.hi	LBB444_12
+; %bb.1:                                ; %B24
+	cmp	x21, x8
+	b.hi	LBB444_12
+; %bb.2:                                ; %B1
+	mov	x8, #-562949953421312           ; =0xfffe000000000000
+	cmp	x22, x8
+	b.lo	LBB444_5
+; %bb.3:                                ; %B15
+	cmp	x21, x8
+	b.lo	LBB444_8
+; %bb.4:                                ; %B20
+	ldrb	w8, [x19], #1
+	cmp	w22, w21
+	add	w8, w8, #243
+	ldr	x1, [x25, w8, uxtw #3]
+	sub	x20, x20, #8
+	mov	w8, #6                          ; =0x6
+	cinc	x22, x8, ge
+	br	x1
+LBB444_5:                               ; %B3
+	tst	x22, #0xfffe000000000000
+	b.eq	LBB444_12
+; %bb.6:                                ; %B7
+	cmp	x21, x8
+	b.lo	LBB444_10
+; %bb.7:                                ; %B13
+	scvtf	d0, w21
+	add	x8, x22, x8
+	fmov	d1, x8
+	ldrb	w9, [x19], #1
+	fcmp	d1, d0
+	add	w8, w9, #243
+	ldr	x1, [x25, w8, uxtw #3]
+	sub	x20, x20, #8
+	mov	w8, #6                          ; =0x6
+	cinc	x22, x8, ge
+	br	x1
+LBB444_8:                               ; %B17
+	tst	x21, #0xfffe000000000000
+	b.eq	LBB444_12
+; %bb.9:                                ; %B19
+	scvtf	d0, w22
+	add	x8, x21, x8
+	fmov	d1, x8
+	ldrb	w9, [x19], #1
+	fcmp	d0, d1
+	add	w8, w9, #243
+	ldr	x1, [x25, w8, uxtw #3]
+	sub	x20, x20, #8
+	mov	w8, #6                          ; =0x6
+	cinc	x22, x8, ge
+	br	x1
+LBB444_10:                              ; %B9
+	tst	x21, #0xfffe000000000000
+	b.eq	LBB444_12
+; %bb.11:                               ; %B11
+	add	x9, x22, x8
+	add	x8, x21, x8
+	fmov	d0, x9
+	fmov	d1, x8
+	ldrb	w10, [x19], #1
+	fcmp	d0, d1
+	add	w8, w10, #243
+	ldr	x1, [x25, w8, uxtw #3]
+	sub	x20, x20, #8
+	mov	w8, #6                          ; =0x6
+	cinc	x22, x8, ge
+	br	x1
+LBB444_12:                              ; %B21
+	mov	x8, x20
+	mov	x0, x24
+	mov	x1, x22
+	mov	x2, x21
+	mov	w3, #166                        ; =0xa6
+	str	x21, [x8], #8
+	str	x8, [x23, #48]
+	bl	_prim_js_relation_slow_gc
+	cmp	x0, #130
+	b.eq	LBB444_14
+; %bb.13:                               ; %B23
+	ldrb	w8, [x19], #1
+	sub	x20, x20, #8
+	mov	x22, x0
+	add	w8, w8, #243
+	ldr	x1, [x25, w8, uxtw #3]
+	br	x1
+LBB444_14:                              ; %B22
+	b	l_exception_spill_top1_asm_h
+                                        ; -- End function
 	.p2align	2                               ; -- Begin function instanceof_1_asm_h
 l_instanceof_1_asm_h:                   ; @instanceof_1_asm_h
 ; %bb.0:                                ; %B1
@@ -15510,7 +15676,7 @@ l_instanceof_1_asm_h:                   ; @instanceof_1_asm_h
 	str	x8, [x23, #48]
 	bl	_prim_js_operator_instanceof_gc
 	cmp	x0, #130
-	b.eq	LBB442_2
+	b.eq	LBB445_2
 ; %bb.1:                                ; %B3
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #8
@@ -15518,7 +15684,7 @@ l_instanceof_1_asm_h:                   ; @instanceof_1_asm_h
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB442_2:                               ; %B2
+LBB445_2:                               ; %B2
 	b	l_exception_spill_top1_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function in_1_asm_h
@@ -15534,7 +15700,7 @@ l_in_1_asm_h:                           ; @in_1_asm_h
 	str	x8, [x23, #48]
 	bl	_prim_js_operator_in_gc
 	cmp	x0, #130
-	b.eq	LBB443_2
+	b.eq	LBB446_2
 ; %bb.1:                                ; %B3
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #8
@@ -15542,7 +15708,7 @@ l_in_1_asm_h:                           ; @in_1_asm_h
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB443_2:                               ; %B2
+LBB446_2:                               ; %B2
 	b	l_exception_spill_top1_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function eq_1_asm_h
@@ -15552,17 +15718,17 @@ l_eq_1_asm_h:                           ; @eq_1_asm_h
 	ldur	x22, [x20, #-8]
 	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
 	cmp	x22, x8
-	b.hi	LBB444_13
+	b.hi	LBB447_13
 ; %bb.1:                                ; %B44
 	cmp	x21, x8
-	b.hi	LBB444_13
+	b.hi	LBB447_13
 ; %bb.2:                                ; %B1
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x22, x8
-	b.lo	LBB444_5
+	b.lo	LBB447_5
 ; %bb.3:                                ; %B35
 	cmp	x21, x8
-	b.lo	LBB444_8
+	b.lo	LBB447_8
 ; %bb.4:                                ; %B40
 	ldrb	w8, [x19], #1
 	cmp	w22, w21
@@ -15572,12 +15738,12 @@ l_eq_1_asm_h:                           ; @eq_1_asm_h
 	mov	w8, #6                          ; =0x6
 	cinc	x22, x8, eq
 	br	x1
-LBB444_5:                               ; %B3
+LBB447_5:                               ; %B3
 	tst	x22, #0xfffe000000000000
-	b.eq	LBB444_13
+	b.eq	LBB447_13
 ; %bb.6:                                ; %B28
 	cmp	x21, x8
-	b.lo	LBB444_11
+	b.lo	LBB447_11
 ; %bb.7:                                ; %B33
 	scvtf	d0, w21
 	add	x8, x22, x8
@@ -15592,13 +15758,13 @@ LBB444_5:                               ; %B3
 	csel	w8, wzr, w9, vs
 	orr	x22, x8, #0x6
 	br	x1
-LBB444_8:                               ; %B37
+LBB447_8:                               ; %B37
 	tst	x21, #0xfffe000000000000
-	b.eq	LBB444_13
+	b.eq	LBB447_13
 ; %bb.9:                                ; %B39
 	scvtf	d0, w22
 	add	x8, x21, x8
-LBB444_10:                              ; %B39
+LBB447_10:                              ; %B39
 	fmov	d1, x8
 	ldrb	w8, [x19], #1
 	fcmp	d0, d1
@@ -15610,53 +15776,53 @@ LBB444_10:                              ; %B39
 	csel	w8, wzr, w9, vs
 	orr	x22, x8, #0x6
 	br	x1
-LBB444_11:                              ; %B30
+LBB447_11:                              ; %B30
 	tst	x21, #0xfffe000000000000
-	b.eq	LBB444_13
+	b.eq	LBB447_13
 ; %bb.12:                               ; %B32
 	add	x9, x22, x8
 	add	x8, x21, x8
 	fmov	d0, x9
-	b	LBB444_10
-LBB444_13:                              ; %B7
+	b	LBB447_10
+LBB447_13:                              ; %B7
 	cmp	x22, x21
-	b.ne	LBB444_15
-LBB444_14:                              ; %B8
+	b.ne	LBB447_15
+LBB447_14:                              ; %B8
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #8
 	mov	w22, #7                         ; =0x7
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB444_15:                              ; %B10
+LBB447_15:                              ; %B10
 	orr	x8, x21, #0x10
 	cmp	x8, #18
-	b.ne	LBB444_17
+	b.ne	LBB447_17
 ; %bb.16:                               ; %B12
 	orr	x8, x22, #0x10
 	cmp	x8, #18
-	b.eq	LBB444_14
-	b	LBB444_20
-LBB444_17:                              ; %B17
+	b.eq	LBB447_14
+	b	LBB447_20
+LBB447_17:                              ; %B17
 	orr	x8, x22, #0x10
 	cmp	x8, #18
-	b.eq	LBB444_20
+	b.eq	LBB447_20
 ; %bb.18:                               ; %B20
 	sub	x8, x21, #6
 	cmp	x8, #1
-	b.hi	LBB444_21
+	b.hi	LBB447_21
 ; %bb.19:                               ; %B20
 	sub	x8, x22, #6
 	cmp	x8, #2
-	b.hs	LBB444_21
-LBB444_20:                              ; %B15
+	b.hs	LBB447_21
+LBB447_20:                              ; %B15
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #8
 	mov	w22, #6                         ; =0x6
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB444_21:                              ; %B41
+LBB447_21:                              ; %B41
 	mov	x8, x20
 	mov	x0, x24
 	mov	x1, x22
@@ -15666,7 +15832,7 @@ LBB444_21:                              ; %B41
 	str	x8, [x23, #48]
 	bl	_prim_js_eq_slow_gc
 	cmp	x0, #130
-	b.eq	LBB444_23
+	b.eq	LBB447_23
 ; %bb.22:                               ; %B43
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #8
@@ -15674,7 +15840,7 @@ LBB444_21:                              ; %B41
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB444_23:                              ; %B42
+LBB447_23:                              ; %B42
 	b	l_exception_spill_top1_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function neq_1_asm_h
@@ -15684,17 +15850,17 @@ l_neq_1_asm_h:                          ; @neq_1_asm_h
 	ldur	x22, [x20, #-8]
 	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
 	cmp	x22, x8
-	b.hi	LBB445_13
+	b.hi	LBB448_13
 ; %bb.1:                                ; %B44
 	cmp	x21, x8
-	b.hi	LBB445_13
+	b.hi	LBB448_13
 ; %bb.2:                                ; %B1
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x22, x8
-	b.lo	LBB445_5
+	b.lo	LBB448_5
 ; %bb.3:                                ; %B35
 	cmp	x21, x8
-	b.lo	LBB445_8
+	b.lo	LBB448_8
 ; %bb.4:                                ; %B40
 	ldrb	w8, [x19], #1
 	cmp	w22, w21
@@ -15704,12 +15870,12 @@ l_neq_1_asm_h:                          ; @neq_1_asm_h
 	mov	w8, #6                          ; =0x6
 	cinc	x22, x8, ne
 	br	x1
-LBB445_5:                               ; %B3
+LBB448_5:                               ; %B3
 	tst	x22, #0xfffe000000000000
-	b.eq	LBB445_13
+	b.eq	LBB448_13
 ; %bb.6:                                ; %B28
 	cmp	x21, x8
-	b.lo	LBB445_11
+	b.lo	LBB448_11
 ; %bb.7:                                ; %B33
 	scvtf	d0, w21
 	add	x8, x22, x8
@@ -15724,13 +15890,13 @@ LBB445_5:                               ; %B3
 	csinc	w8, w9, wzr, vc
 	orr	x22, x8, #0x6
 	br	x1
-LBB445_8:                               ; %B37
+LBB448_8:                               ; %B37
 	tst	x21, #0xfffe000000000000
-	b.eq	LBB445_13
+	b.eq	LBB448_13
 ; %bb.9:                                ; %B39
 	scvtf	d0, w22
 	add	x8, x21, x8
-LBB445_10:                              ; %B39
+LBB448_10:                              ; %B39
 	fmov	d1, x8
 	ldrb	w8, [x19], #1
 	fcmp	d0, d1
@@ -15742,53 +15908,53 @@ LBB445_10:                              ; %B39
 	csinc	w8, w9, wzr, vc
 	orr	x22, x8, #0x6
 	br	x1
-LBB445_11:                              ; %B30
+LBB448_11:                              ; %B30
 	tst	x21, #0xfffe000000000000
-	b.eq	LBB445_13
+	b.eq	LBB448_13
 ; %bb.12:                               ; %B32
 	add	x9, x22, x8
 	add	x8, x21, x8
 	fmov	d0, x9
-	b	LBB445_10
-LBB445_13:                              ; %B7
+	b	LBB448_10
+LBB448_13:                              ; %B7
 	cmp	x22, x21
-	b.ne	LBB445_15
-LBB445_14:                              ; %B8
+	b.ne	LBB448_15
+LBB448_14:                              ; %B8
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #8
 	mov	w22, #6                         ; =0x6
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB445_15:                              ; %B10
+LBB448_15:                              ; %B10
 	orr	x8, x21, #0x10
 	cmp	x8, #18
-	b.ne	LBB445_17
+	b.ne	LBB448_17
 ; %bb.16:                               ; %B12
 	orr	x8, x22, #0x10
 	cmp	x8, #18
-	b.eq	LBB445_14
-	b	LBB445_20
-LBB445_17:                              ; %B17
+	b.eq	LBB448_14
+	b	LBB448_20
+LBB448_17:                              ; %B17
 	orr	x8, x22, #0x10
 	cmp	x8, #18
-	b.eq	LBB445_20
+	b.eq	LBB448_20
 ; %bb.18:                               ; %B20
 	sub	x8, x21, #6
 	cmp	x8, #1
-	b.hi	LBB445_21
+	b.hi	LBB448_21
 ; %bb.19:                               ; %B20
 	sub	x8, x22, #6
 	cmp	x8, #2
-	b.hs	LBB445_21
-LBB445_20:                              ; %B15
+	b.hs	LBB448_21
+LBB448_20:                              ; %B15
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #8
 	mov	w22, #7                         ; =0x7
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB445_21:                              ; %B41
+LBB448_21:                              ; %B41
 	mov	x8, x20
 	mov	x0, x24
 	mov	x1, x22
@@ -15798,7 +15964,7 @@ LBB445_21:                              ; %B41
 	str	x8, [x23, #48]
 	bl	_prim_js_eq_slow_gc
 	cmp	x0, #130
-	b.eq	LBB445_23
+	b.eq	LBB448_23
 ; %bb.22:                               ; %B43
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #8
@@ -15806,7 +15972,7 @@ LBB445_21:                              ; %B41
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB445_23:                              ; %B42
+LBB448_23:                              ; %B42
 	b	l_exception_spill_top1_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function strict_eq_1_asm_h
@@ -15816,17 +15982,17 @@ l_strict_eq_1_asm_h:                    ; @strict_eq_1_asm_h
 	ldur	x22, [x20, #-8]
 	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
 	cmp	x22, x8
-	b.hi	LBB446_13
+	b.hi	LBB449_13
 ; %bb.1:                                ; %B39
 	cmp	x21, x8
-	b.hi	LBB446_13
+	b.hi	LBB449_13
 ; %bb.2:                                ; %B1
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x22, x8
-	b.lo	LBB446_5
+	b.lo	LBB449_5
 ; %bb.3:                                ; %B30
 	cmp	x21, x8
-	b.lo	LBB446_8
+	b.lo	LBB449_8
 ; %bb.4:                                ; %B35
 	ldrb	w8, [x19], #1
 	cmp	w22, w21
@@ -15836,12 +16002,12 @@ l_strict_eq_1_asm_h:                    ; @strict_eq_1_asm_h
 	mov	w8, #6                          ; =0x6
 	cinc	x22, x8, eq
 	br	x1
-LBB446_5:                               ; %B3
+LBB449_5:                               ; %B3
 	tst	x22, #0xfffe000000000000
-	b.eq	LBB446_13
+	b.eq	LBB449_13
 ; %bb.6:                                ; %B23
 	cmp	x21, x8
-	b.lo	LBB446_11
+	b.lo	LBB449_11
 ; %bb.7:                                ; %B28
 	scvtf	d0, w21
 	add	x8, x22, x8
@@ -15856,13 +16022,13 @@ LBB446_5:                               ; %B3
 	csel	w8, wzr, w9, vs
 	orr	x22, x8, #0x6
 	br	x1
-LBB446_8:                               ; %B32
+LBB449_8:                               ; %B32
 	tst	x21, #0xfffe000000000000
-	b.eq	LBB446_13
+	b.eq	LBB449_13
 ; %bb.9:                                ; %B34
 	scvtf	d0, w22
 	add	x8, x21, x8
-LBB446_10:                              ; %B34
+LBB449_10:                              ; %B34
 	fmov	d1, x8
 	ldrb	w8, [x19], #1
 	fcmp	d0, d1
@@ -15874,17 +16040,17 @@ LBB446_10:                              ; %B34
 	csel	w8, wzr, w9, vs
 	orr	x22, x8, #0x6
 	br	x1
-LBB446_11:                              ; %B25
+LBB449_11:                              ; %B25
 	tst	x21, #0xfffe000000000000
-	b.eq	LBB446_13
+	b.eq	LBB449_13
 ; %bb.12:                               ; %B27
 	add	x9, x22, x8
 	add	x8, x21, x8
 	fmov	d0, x9
-	b	LBB446_10
-LBB446_13:                              ; %B10
+	b	LBB449_10
+LBB449_13:                              ; %B10
 	cmp	x22, x21
-	b.ne	LBB446_15
+	b.ne	LBB449_15
 ; %bb.14:                               ; %B11
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #8
@@ -15892,7 +16058,7 @@ LBB446_13:                              ; %B10
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB446_15:                              ; %B13
+LBB449_15:                              ; %B13
 	and	x8, x22, #0xffff000000000003
 	mov	x11, #-281474976710653          ; =0xffff000000000003
 	mov	x12, #2                         ; =0x2
@@ -15905,10 +16071,10 @@ LBB446_15:                              ; %B13
 	ccmp	x10, x12, #4, ne
 	cset	w11, eq
 	cmp	w9, #1
-	b.ne	LBB446_17
+	b.ne	LBB449_17
 ; %bb.16:                               ; %B13
-	cbnz	w11, LBB446_22
-LBB446_17:                              ; %B16
+	cbnz	w11, LBB449_22
+LBB449_17:                              ; %B16
 	mov	x12, #2                         ; =0x2
 	movk	x12, #65535, lsl #48
 	cmp	x8, x12
@@ -15916,30 +16082,30 @@ LBB446_17:                              ; %B16
 	cmp	x10, x12
 	bic	w9, w8, w9
 	csinc	w8, w11, wzr, ne
-	tbnz	w9, #0, LBB446_19
+	tbnz	w9, #0, LBB449_19
 ; %bb.18:                               ; %B16
-	tbnz	w8, #0, LBB446_23
-LBB446_19:                              ; %B19
+	tbnz	w8, #0, LBB449_23
+LBB449_19:                              ; %B19
 	and	x9, x22, #0xffff000000000003
 	mov	x8, #-281474976710656           ; =0xffff000000000000
 	cmp	x9, x8
-	b.ne	LBB446_21
+	b.ne	LBB449_21
 ; %bb.20:                               ; %B19
 	and	x9, x21, #0xffff000000000003
 	cmp	x9, x8
-	b.eq	LBB446_25
-LBB446_21:                              ; %B21
+	b.eq	LBB449_25
+LBB449_21:                              ; %B21
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #8
 	mov	w22, #6                         ; =0x6
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB446_22:                              ; %B14
+LBB449_22:                              ; %B14
 	str	x21, [x20], #8
 	mov	x0, xzr
 	b	l_FastStringEqual_asm_h
-LBB446_23:                              ; %B36
+LBB449_23:                              ; %B36
 	mov	x8, x20
 	mov	x0, x24
 	mov	x1, x22
@@ -15949,7 +16115,7 @@ LBB446_23:                              ; %B36
 	str	x8, [x23, #48]
 	bl	_prim_js_strict_eq_slow_gc
 	cmp	x0, #130
-	b.eq	LBB446_27
+	b.eq	LBB449_27
 ; %bb.24:                               ; %B38
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #8
@@ -15957,23 +16123,23 @@ LBB446_23:                              ; %B36
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB446_25:                              ; %B7
+LBB449_25:                              ; %B7
 	and	x8, x22, #0xfffffffffffc
 	and	x9, x21, #0xfffffffffffc
 	sub	x20, x20, #8
 	ldr	x8, [x8, #8]
 	ldr	x9, [x9, #8]
 	cmp	x8, x9
-	b.eq	LBB446_28
+	b.eq	LBB449_28
 ; %bb.26:                               ; %B9
 	ldrb	w8, [x19], #1
 	mov	w22, #6                         ; =0x6
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB446_27:                              ; %B37
+LBB449_27:                              ; %B37
 	b	l_exception_spill_top1_asm_h
-LBB446_28:                              ; %B8
+LBB449_28:                              ; %B8
 	ldrb	w8, [x19], #1
 	mov	w22, #7                         ; =0x7
 	add	w8, w8, #243
@@ -15987,17 +16153,17 @@ l_strict_neq_1_asm_h:                   ; @strict_neq_1_asm_h
 	ldur	x22, [x20, #-8]
 	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
 	cmp	x22, x8
-	b.hi	LBB447_13
+	b.hi	LBB450_13
 ; %bb.1:                                ; %B39
 	cmp	x21, x8
-	b.hi	LBB447_13
+	b.hi	LBB450_13
 ; %bb.2:                                ; %B1
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x22, x8
-	b.lo	LBB447_5
+	b.lo	LBB450_5
 ; %bb.3:                                ; %B30
 	cmp	x21, x8
-	b.lo	LBB447_8
+	b.lo	LBB450_8
 ; %bb.4:                                ; %B35
 	ldrb	w8, [x19], #1
 	cmp	w22, w21
@@ -16007,12 +16173,12 @@ l_strict_neq_1_asm_h:                   ; @strict_neq_1_asm_h
 	mov	w8, #6                          ; =0x6
 	cinc	x22, x8, ne
 	br	x1
-LBB447_5:                               ; %B3
+LBB450_5:                               ; %B3
 	tst	x22, #0xfffe000000000000
-	b.eq	LBB447_13
+	b.eq	LBB450_13
 ; %bb.6:                                ; %B23
 	cmp	x21, x8
-	b.lo	LBB447_11
+	b.lo	LBB450_11
 ; %bb.7:                                ; %B28
 	scvtf	d0, w21
 	add	x8, x22, x8
@@ -16027,13 +16193,13 @@ LBB447_5:                               ; %B3
 	csinc	w8, w9, wzr, vc
 	orr	x22, x8, #0x6
 	br	x1
-LBB447_8:                               ; %B32
+LBB450_8:                               ; %B32
 	tst	x21, #0xfffe000000000000
-	b.eq	LBB447_13
+	b.eq	LBB450_13
 ; %bb.9:                                ; %B34
 	scvtf	d0, w22
 	add	x8, x21, x8
-LBB447_10:                              ; %B34
+LBB450_10:                              ; %B34
 	fmov	d1, x8
 	ldrb	w8, [x19], #1
 	fcmp	d0, d1
@@ -16045,17 +16211,17 @@ LBB447_10:                              ; %B34
 	csinc	w8, w9, wzr, vc
 	orr	x22, x8, #0x6
 	br	x1
-LBB447_11:                              ; %B25
+LBB450_11:                              ; %B25
 	tst	x21, #0xfffe000000000000
-	b.eq	LBB447_13
+	b.eq	LBB450_13
 ; %bb.12:                               ; %B27
 	add	x9, x22, x8
 	add	x8, x21, x8
 	fmov	d0, x9
-	b	LBB447_10
-LBB447_13:                              ; %B10
+	b	LBB450_10
+LBB450_13:                              ; %B10
 	cmp	x22, x21
-	b.ne	LBB447_15
+	b.ne	LBB450_15
 ; %bb.14:                               ; %B11
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #8
@@ -16063,7 +16229,7 @@ LBB447_13:                              ; %B10
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB447_15:                              ; %B13
+LBB450_15:                              ; %B13
 	and	x8, x22, #0xffff000000000003
 	mov	x11, #-281474976710653          ; =0xffff000000000003
 	mov	x12, #2                         ; =0x2
@@ -16076,10 +16242,10 @@ LBB447_15:                              ; %B13
 	ccmp	x10, x12, #4, ne
 	cset	w11, eq
 	cmp	w9, #1
-	b.ne	LBB447_17
+	b.ne	LBB450_17
 ; %bb.16:                               ; %B13
-	cbnz	w11, LBB447_22
-LBB447_17:                              ; %B16
+	cbnz	w11, LBB450_22
+LBB450_17:                              ; %B16
 	mov	x12, #2                         ; =0x2
 	movk	x12, #65535, lsl #48
 	cmp	x8, x12
@@ -16087,30 +16253,30 @@ LBB447_17:                              ; %B16
 	cmp	x10, x12
 	bic	w9, w8, w9
 	csinc	w8, w11, wzr, ne
-	tbnz	w9, #0, LBB447_19
+	tbnz	w9, #0, LBB450_19
 ; %bb.18:                               ; %B16
-	tbnz	w8, #0, LBB447_23
-LBB447_19:                              ; %B19
+	tbnz	w8, #0, LBB450_23
+LBB450_19:                              ; %B19
 	and	x9, x22, #0xffff000000000003
 	mov	x8, #-281474976710656           ; =0xffff000000000000
 	cmp	x9, x8
-	b.ne	LBB447_21
+	b.ne	LBB450_21
 ; %bb.20:                               ; %B19
 	and	x9, x21, #0xffff000000000003
 	cmp	x9, x8
-	b.eq	LBB447_25
-LBB447_21:                              ; %B21
+	b.eq	LBB450_25
+LBB450_21:                              ; %B21
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #8
 	mov	w22, #7                         ; =0x7
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB447_22:                              ; %B14
+LBB450_22:                              ; %B14
 	str	x21, [x20], #8
 	mov	w0, #1                          ; =0x1
 	b	l_FastStringEqual_asm_h
-LBB447_23:                              ; %B36
+LBB450_23:                              ; %B36
 	mov	x8, x20
 	mov	x0, x24
 	mov	x1, x22
@@ -16120,7 +16286,7 @@ LBB447_23:                              ; %B36
 	str	x8, [x23, #48]
 	bl	_prim_js_strict_eq_slow_gc
 	cmp	x0, #130
-	b.eq	LBB447_27
+	b.eq	LBB450_27
 ; %bb.24:                               ; %B38
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #8
@@ -16128,23 +16294,23 @@ LBB447_23:                              ; %B36
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB447_25:                              ; %B7
+LBB450_25:                              ; %B7
 	and	x8, x22, #0xfffffffffffc
 	and	x9, x21, #0xfffffffffffc
 	sub	x20, x20, #8
 	ldr	x8, [x8, #8]
 	ldr	x9, [x9, #8]
 	cmp	x8, x9
-	b.eq	LBB447_28
+	b.eq	LBB450_28
 ; %bb.26:                               ; %B9
 	ldrb	w8, [x19], #1
 	mov	w22, #7                         ; =0x7
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB447_27:                              ; %B37
+LBB450_27:                              ; %B37
 	b	l_exception_spill_top1_asm_h
-LBB447_28:                              ; %B8
+LBB450_28:                              ; %B8
 	ldrb	w8, [x19], #1
 	mov	w22, #6                         ; =0x6
 	add	w8, w8, #243
@@ -16158,20 +16324,20 @@ l_and_1_asm_h:                          ; @and_1_asm_h
 	ldur	x22, [x20, #-8]
 	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
 	cmp	x22, x8
-	b.hi	LBB448_10
+	b.hi	LBB451_10
 ; %bb.1:                                ; %B28
 	cmp	x21, x8
-	b.hi	LBB448_10
+	b.hi	LBB451_10
 ; %bb.2:                                ; %B2
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x22, x8
-	b.lo	LBB448_6
+	b.lo	LBB451_6
 ; %bb.3:                                ; %B19
 	cmp	x21, x8
-	b.lo	LBB448_10
+	b.lo	LBB451_10
 ; %bb.4:                                ; %B24
 	mov	w8, w22
-LBB448_5:                               ; %B16
+LBB451_5:                               ; %B16
 	ldrb	w9, [x19], #1
 	sub	x20, x20, #8
 	and	w8, w8, w21
@@ -16179,23 +16345,23 @@ LBB448_5:                               ; %B16
 	orr	x22, x8, #0xfffe000000000000
 	ldr	x1, [x25, w9, uxtw #3]
 	br	x1
-LBB448_6:                               ; %B4
+LBB451_6:                               ; %B4
 	tst	x22, #0xfffe000000000000
-	b.eq	LBB448_10
+	b.eq	LBB451_10
 ; %bb.7:                                ; %B4
 	cmp	x21, x8
-	b.lo	LBB448_10
+	b.lo	LBB451_10
 ; %bb.8:                                ; %B14
 	ubfx	x8, x22, #52, #11
 	cmp	x8, #1053
-	b.gt	LBB448_10
+	b.gt	LBB451_10
 ; %bb.9:                                ; %B15
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	add	x8, x22, x8
 	fmov	d0, x8
 	fcvtzs	w8, d0
-	b	LBB448_5
-LBB448_10:                              ; %B25
+	b	LBB451_5
+LBB451_10:                              ; %B25
 	mov	x8, x20
 	mov	x0, x24
 	mov	x1, x22
@@ -16205,7 +16371,7 @@ LBB448_10:                              ; %B25
 	str	x8, [x23, #48]
 	bl	_prim_js_binary_logic_slow_gc
 	cmp	x0, #130
-	b.eq	LBB448_12
+	b.eq	LBB451_12
 ; %bb.11:                               ; %B27
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #8
@@ -16213,7 +16379,7 @@ LBB448_10:                              ; %B25
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB448_12:                              ; %B26
+LBB451_12:                              ; %B26
 	b	l_exception_spill_top1_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function xor_1_asm_h
@@ -16223,20 +16389,20 @@ l_xor_1_asm_h:                          ; @xor_1_asm_h
 	ldur	x22, [x20, #-8]
 	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
 	cmp	x22, x8
-	b.hi	LBB449_10
+	b.hi	LBB452_10
 ; %bb.1:                                ; %B28
 	cmp	x21, x8
-	b.hi	LBB449_10
+	b.hi	LBB452_10
 ; %bb.2:                                ; %B2
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x22, x8
-	b.lo	LBB449_6
+	b.lo	LBB452_6
 ; %bb.3:                                ; %B19
 	cmp	x21, x8
-	b.lo	LBB449_10
+	b.lo	LBB452_10
 ; %bb.4:                                ; %B24
 	mov	w8, w22
-LBB449_5:                               ; %B16
+LBB452_5:                               ; %B16
 	ldrb	w9, [x19], #1
 	sub	x20, x20, #8
 	eor	w8, w8, w21
@@ -16244,23 +16410,23 @@ LBB449_5:                               ; %B16
 	orr	x22, x8, #0xfffe000000000000
 	ldr	x1, [x25, w9, uxtw #3]
 	br	x1
-LBB449_6:                               ; %B4
+LBB452_6:                               ; %B4
 	tst	x22, #0xfffe000000000000
-	b.eq	LBB449_10
+	b.eq	LBB452_10
 ; %bb.7:                                ; %B4
 	cmp	x21, x8
-	b.lo	LBB449_10
+	b.lo	LBB452_10
 ; %bb.8:                                ; %B14
 	ubfx	x8, x22, #52, #11
 	cmp	x8, #1053
-	b.gt	LBB449_10
+	b.gt	LBB452_10
 ; %bb.9:                                ; %B15
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	add	x8, x22, x8
 	fmov	d0, x8
 	fcvtzs	w8, d0
-	b	LBB449_5
-LBB449_10:                              ; %B25
+	b	LBB452_5
+LBB452_10:                              ; %B25
 	mov	x8, x20
 	mov	x0, x24
 	mov	x1, x22
@@ -16270,7 +16436,7 @@ LBB449_10:                              ; %B25
 	str	x8, [x23, #48]
 	bl	_prim_js_binary_logic_slow_gc
 	cmp	x0, #130
-	b.eq	LBB449_12
+	b.eq	LBB452_12
 ; %bb.11:                               ; %B27
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #8
@@ -16278,7 +16444,7 @@ LBB449_10:                              ; %B25
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB449_12:                              ; %B26
+LBB452_12:                              ; %B26
 	b	l_exception_spill_top1_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function or_1_asm_h
@@ -16288,20 +16454,20 @@ l_or_1_asm_h:                           ; @or_1_asm_h
 	ldur	x22, [x20, #-8]
 	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
 	cmp	x22, x8
-	b.hi	LBB450_10
+	b.hi	LBB453_10
 ; %bb.1:                                ; %B28
 	cmp	x21, x8
-	b.hi	LBB450_10
+	b.hi	LBB453_10
 ; %bb.2:                                ; %B2
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x22, x8
-	b.lo	LBB450_6
+	b.lo	LBB453_6
 ; %bb.3:                                ; %B19
 	cmp	x21, x8
-	b.lo	LBB450_10
+	b.lo	LBB453_10
 ; %bb.4:                                ; %B24
 	mov	w8, w22
-LBB450_5:                               ; %B16
+LBB453_5:                               ; %B16
 	ldrb	w9, [x19], #1
 	sub	x20, x20, #8
 	orr	w8, w8, w21
@@ -16309,23 +16475,23 @@ LBB450_5:                               ; %B16
 	orr	x22, x8, #0xfffe000000000000
 	ldr	x1, [x25, w9, uxtw #3]
 	br	x1
-LBB450_6:                               ; %B4
+LBB453_6:                               ; %B4
 	tst	x22, #0xfffe000000000000
-	b.eq	LBB450_10
+	b.eq	LBB453_10
 ; %bb.7:                                ; %B4
 	cmp	x21, x8
-	b.lo	LBB450_10
+	b.lo	LBB453_10
 ; %bb.8:                                ; %B14
 	ubfx	x8, x22, #52, #11
 	cmp	x8, #1053
-	b.gt	LBB450_10
+	b.gt	LBB453_10
 ; %bb.9:                                ; %B15
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	add	x8, x22, x8
 	fmov	d0, x8
 	fcvtzs	w8, d0
-	b	LBB450_5
-LBB450_10:                              ; %B25
+	b	LBB453_5
+LBB453_10:                              ; %B25
 	mov	x8, x20
 	mov	x0, x24
 	mov	x1, x22
@@ -16335,7 +16501,7 @@ LBB450_10:                              ; %B25
 	str	x8, [x23, #48]
 	bl	_prim_js_binary_logic_slow_gc
 	cmp	x0, #130
-	b.eq	LBB450_12
+	b.eq	LBB453_12
 ; %bb.11:                               ; %B27
 	ldrb	w8, [x19], #1
 	sub	x20, x20, #8
@@ -16343,7 +16509,7 @@ LBB450_10:                              ; %B25
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB450_12:                              ; %B26
+LBB453_12:                              ; %B26
 	b	l_exception_spill_top1_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function nop_1_asm_h
@@ -16473,7 +16639,7 @@ l_push_const8_1_asm_h:                  ; @push_const8_1_asm_h
 	ldrb	w9, [x19]
 	ldr	w10, [x24, #328]
 	ldr	x1, [x8, x9, lsl #3]
-	cbz	w10, LBB463_2
+	cbz	w10, LBB466_2
 ; %bb.1:                                ; %B4
 	mov	x8, x20
 	mov	x0, x24
@@ -16483,7 +16649,7 @@ l_push_const8_1_asm_h:                  ; @push_const8_1_asm_h
 	str	x1, [sp, #8]                    ; 8-byte Folded Spill
 	bl	_DebuggerPause
 	ldr	x1, [sp, #8]                    ; 8-byte Folded Reload
-LBB463_2:                               ; %B1
+LBB466_2:                               ; %B1
 	ldrb	w8, [x19, #1]
 	add	x19, x19, #2
 	mov	x21, x1
@@ -16509,14 +16675,14 @@ l_push_empty_string_1_asm_h:            ; @push_empty_string_1_asm_h
 	str	x8, [x23, #48]
 	bl	___JS_AtomToValue_GC
 	cmp	x0, #130
-	b.eq	LBB465_2
+	b.eq	LBB468_2
 ; %bb.1:                                ; %B3
 	ldrb	w8, [x19], #1
 	mov	x21, x0
 	add	w8, w8, #486
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB465_2:                               ; %B2
+LBB468_2:                               ; %B2
 	b	l_exception_spill_top0_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function get_loc8_1_asm_h
@@ -16893,12 +17059,12 @@ l_get_length_1_asm_h:                   ; @get_length_1_asm_h
 	and	x8, x22, #0xffff000000000003
 	movk	x9, #1, lsl #48
 	cmp	x8, x9
-	b.eq	LBB505_2
+	b.eq	LBB508_2
 ; %bb.1:                                ; %B27
 	mov	x9, #-281474976710653           ; =0xffff000000000003
 	cmp	x8, x9
-	b.ne	LBB505_3
-LBB505_2:                               ; %B28
+	b.ne	LBB508_3
+LBB508_2:                               ; %B28
 	and	x8, x22, #0xfffffffffffc
 	ldrb	w9, [x19], #1
 	ldr	w8, [x8, #4]
@@ -16908,17 +17074,17 @@ LBB505_2:                               ; %B28
 	ldr	x1, [x25, w9, uxtw #3]
 	mov	x22, x10
 	br	x1
-LBB505_3:                               ; %B21
+LBB508_3:                               ; %B21
 	mov	x8, #2                          ; =0x2
 	movk	x8, #65535, lsl #48
 	tst	x22, x8
-	b.ne	LBB505_13
+	b.ne	LBB508_13
 ; %bb.4:                                ; %B22
 	mov	x9, x22
 	mov	w8, #18                         ; =0x12
-LBB505_5:                               ; %B19
+LBB508_5:                               ; %B19
                                         ; =>This Loop Header: Depth=1
-                                        ;     Child Loop BB505_6 Depth 2
+                                        ;     Child Loop BB508_6 Depth 2
 	ldr	x10, [x9, #8]
 	ldr	w11, [x10, #12]
 	add	x13, x10, #64
@@ -16927,47 +17093,47 @@ LBB505_5:                               ; %B19
 	ldr	w10, [x13, w10, uxtw #2]
 	add	w11, w12, #4
 	add	x11, x13, x11
-	cbz	w10, LBB505_8
-LBB505_6:                               ; %B1
-                                        ;   Parent Loop BB505_5 Depth=1
+	cbz	w10, LBB508_8
+LBB508_6:                               ; %B1
+                                        ;   Parent Loop BB508_5 Depth=1
                                         ; =>  This Inner Loop Header: Depth=2
 	lsl	w12, w10, #3
 	sub	w12, w12, #8
 	add	x12, x11, x12
 	ldp	w12, w13, [x12]
 	cmp	w13, #48
-	b.eq	LBB505_10
+	b.eq	LBB508_10
 ; %bb.7:                                ; %B9
-                                        ;   in Loop: Header=BB505_6 Depth=2
+                                        ;   in Loop: Header=BB508_6 Depth=2
 	and	w10, w12, #0x3ffffff
-	cbnz	w10, LBB505_6
-LBB505_8:                               ; %B14
-                                        ;   in Loop: Header=BB505_5 Depth=1
+	cbnz	w10, LBB508_6
+LBB508_8:                               ; %B14
+                                        ;   in Loop: Header=BB508_5 Depth=1
 	ldr	w10, [x9, #4]
 	ubfx	w10, w10, #10, #1
 	cmp	w10, #1
-	b.eq	LBB505_13
+	b.eq	LBB508_13
 ; %bb.9:                                ; %B17
-                                        ;   in Loop: Header=BB505_5 Depth=1
+                                        ;   in Loop: Header=BB508_5 Depth=1
 	ldr	x9, [x9, #8]
 	ldr	x9, [x9, #32]
-	cbnz	x9, LBB505_5
-	b	LBB505_12
-LBB505_10:                              ; %B3
+	cbnz	x9, LBB508_5
+	b	LBB508_12
+LBB508_10:                              ; %B3
 	lsr	w8, w12, #26
 	tst	w8, #0x30
-	b.ne	LBB505_13
+	b.ne	LBB508_13
 ; %bb.11:                               ; %B4
 	ldr	x8, [x9, #16]
 	sub	w9, w10, #1
 	ldr	x8, [x8, w9, sxtw #3]
-LBB505_12:                              ; %B6
+LBB508_12:                              ; %B6
 	ldrb	w9, [x19], #1
 	mov	x22, x8
 	add	w9, w9, #243
 	ldr	x1, [x25, w9, uxtw #3]
 	br	x1
-LBB505_13:                              ; %B24
+LBB508_13:                              ; %B24
 	mov	x8, x20
 	mov	x0, x24
 	mov	x1, x22
@@ -16978,155 +17144,196 @@ LBB505_13:                              ; %B24
 	str	x8, [x23, #48]
 	bl	_JS_GetPropertyInternalImpl_GC
 	cmp	x0, #130
-	b.eq	LBB505_15
+	b.eq	LBB508_15
 ; %bb.14:                               ; %B26
 	ldrb	w8, [x19], #1
 	mov	x22, x0
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB505_15:                              ; %B25
+LBB508_15:                              ; %B25
 	b	l_exception_spill_top0_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function if_false8_1_asm_h
 l_if_false8_1_asm_h:                    ; @if_false8_1_asm_h
-; %bb.0:                                ; %B23
+; %bb.0:                                ; %B29
 	cmp	x22, #5
-	b.le	LBB506_4
-; %bb.1:                                ; %B23
+	b.le	LBB509_4
+; %bb.1:                                ; %B29
 	cmp	x22, #6
-	b.eq	LBB506_6
-; %bb.2:                                ; %B23
+	b.eq	LBB509_6
+; %bb.2:                                ; %B29
 	cmp	x22, #7
-	b.eq	LBB506_9
-; %bb.3:                                ; %B23
+	b.eq	LBB509_10
+; %bb.3:                                ; %B29
 	cmp	x22, #18
-	b.eq	LBB506_6
-	b	LBB506_7
-LBB506_4:                               ; %B23
+	b.eq	LBB509_6
+	b	LBB509_8
+LBB509_4:                               ; %B29
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x22, x8
-	b.eq	LBB506_6
-; %bb.5:                                ; %B23
+	b.eq	LBB509_6
+; %bb.5:                                ; %B29
 	cmp	x22, #2
-	b.ne	LBB506_7
-LBB506_6:                               ; %B3
+	b.ne	LBB509_8
+LBB509_6:                               ; %B8
 	ldrsb	x8, [x19]
 	add	x19, x19, x8
+	tbnz	x8, #63, LBB509_11
+LBB509_7:                               ; %B10
 	ldrb	w8, [x19], #1
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB506_7:                               ; %B9
+LBB509_8:                               ; %B15
 	mov	x8, #-281474976710656           ; =0xffff000000000000
 	cmp	x22, x8
-	b.hs	LBB506_13
-; %bb.8:                                ; %B11
+	b.hs	LBB509_16
+; %bb.9:                                ; %B17
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x22, x8
-	b.lo	LBB506_10
-LBB506_9:                               ; %B19
+	b.lo	LBB509_13
+LBB509_10:                              ; %B25
 	ldrb	w8, [x19, #1]
 	add	x19, x19, #2
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB506_10:                              ; %B13
+LBB509_11:                              ; %B5
+	ldr	w8, [x24, #232]
+	subs	w8, w8, #1
+	str	w8, [x24, #232]
+	b.pl	LBB509_7
+; %bb.12:                               ; %B6
+	add	x19, x19, #1
+	b	l_PollInterrupts_asm_h
+LBB509_13:                              ; %B19
 	tst	x22, #0xfffe000000000000
-	b.eq	LBB506_13
-; %bb.11:                               ; %B17
+	b.eq	LBB509_16
+; %bb.14:                               ; %B23
 	add	x8, x22, x8
 	fmov	d0, x8
 	fcmp	d0, d0
 	cset	w8, vc
 	fcmp	d0, #0.0
-	b.eq	LBB506_6
-	b.vs	LBB506_6
-; %bb.12:                               ; %B17
-	tbnz	w8, #0, LBB506_9
-	b	LBB506_6
-LBB506_13:                              ; %B15
+	b.eq	LBB509_6
+	b.vs	LBB509_6
+; %bb.15:                               ; %B23
+	tbnz	w8, #0, LBB509_10
+	b	LBB509_6
+LBB509_16:                              ; %B21
 	str	x22, [x20], #8
 	mov	x0, x22
 	b	l_SlowToBoolean_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function if_true8_1_asm_h
 l_if_true8_1_asm_h:                     ; @if_true8_1_asm_h
-; %bb.0:                                ; %B23
+; %bb.0:                                ; %B29
 	cmp	x22, #5
-	b.le	LBB507_4
-; %bb.1:                                ; %B23
+	b.le	LBB510_4
+; %bb.1:                                ; %B29
 	cmp	x22, #6
-	b.eq	LBB507_6
-; %bb.2:                                ; %B23
+	b.eq	LBB510_6
+; %bb.2:                                ; %B29
 	cmp	x22, #7
-	b.eq	LBB507_9
-; %bb.3:                                ; %B23
+	b.eq	LBB510_9
+; %bb.3:                                ; %B29
 	cmp	x22, #18
-	b.eq	LBB507_6
-	b	LBB507_7
-LBB507_4:                               ; %B23
+	b.eq	LBB510_6
+	b	LBB510_7
+LBB510_4:                               ; %B29
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x22, x8
-	b.eq	LBB507_6
-; %bb.5:                                ; %B23
+	b.eq	LBB510_6
+; %bb.5:                                ; %B29
 	cmp	x22, #2
-	b.ne	LBB507_7
-LBB507_6:                               ; %B3
+	b.ne	LBB510_7
+LBB510_6:                               ; %B3
 	ldrb	w8, [x19, #1]
 	add	x19, x19, #2
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB507_7:                               ; %B9
+LBB510_7:                               ; %B9
 	mov	x8, #-281474976710656           ; =0xffff000000000000
 	cmp	x22, x8
-	b.hs	LBB507_13
+	b.hs	LBB510_16
 ; %bb.8:                                ; %B11
-	mov	x8, #-562949953421312           ; =0xfffe000000000000
+	mov	x8, #-562949953421313           ; =0xfffdffffffffffff
 	cmp	x22, x8
-	b.lo	LBB507_10
-LBB507_9:                               ; %B19
+	b.ls	LBB510_13
+LBB510_9:                               ; %B23
 	ldrsb	x8, [x19]
 	add	x19, x19, x8
+	tbnz	x8, #63, LBB510_11
+LBB510_10:                              ; %B25
 	ldrb	w8, [x19], #1
 	ldr	x1, [x25, x8, lsl #3]
 	br	x1
-LBB507_10:                              ; %B13
+LBB510_11:                              ; %B20
+	ldr	w8, [x24, #232]
+	subs	w8, w8, #1
+	str	w8, [x24, #232]
+	b.pl	LBB510_10
+; %bb.12:                               ; %B21
+	add	x19, x19, #1
+	b	l_PollInterrupts_asm_h
+LBB510_13:                              ; %B13
 	tst	x22, #0xfffe000000000000
-	b.eq	LBB507_13
-; %bb.11:                               ; %B17
+	b.eq	LBB510_16
+; %bb.14:                               ; %B17
+	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	add	x8, x22, x8
 	fmov	d0, x8
 	fcmp	d0, d0
 	cset	w8, vc
 	fcmp	d0, #0.0
-	b.eq	LBB507_6
-	b.vs	LBB507_6
-; %bb.12:                               ; %B17
-	tbnz	w8, #0, LBB507_9
-	b	LBB507_6
-LBB507_13:                              ; %B15
+	b.eq	LBB510_6
+	b.vs	LBB510_6
+; %bb.15:                               ; %B17
+	tbnz	w8, #0, LBB510_9
+	b	LBB510_6
+LBB510_16:                              ; %B15
 	str	x22, [x20], #8
 	mov	x0, x22
 	b	l_SlowToBoolean_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function goto8_1_asm_h
 l_goto8_1_asm_h:                        ; @goto8_1_asm_h
-; %bb.0:                                ; %B0
+; %bb.0:                                ; %B5
 	ldrsb	x8, [x19]
 	add	x19, x19, x8
+	tbnz	x8, #63, LBB511_2
+LBB511_1:                               ; %B7
 	ldrb	w8, [x19], #1
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
+LBB511_2:                               ; %B2
+	ldr	w8, [x24, #232]
+	subs	w8, w8, #1
+	str	w8, [x24, #232]
+	b.pl	LBB511_1
+; %bb.3:                                ; %B3
+	add	x19, x19, #1
+	b	l_PollInterrupts_spill_top0_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function goto16_1_asm_h
 l_goto16_1_asm_h:                       ; @goto16_1_asm_h
-; %bb.0:                                ; %B0
+; %bb.0:                                ; %B5
 	ldrsh	x8, [x19]
 	add	x19, x19, x8
+	tbnz	x8, #63, LBB512_2
+LBB512_1:                               ; %B7
 	ldrb	w8, [x19], #1
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
+LBB512_2:                               ; %B2
+	ldr	w8, [x24, #232]
+	subs	w8, w8, #1
+	str	w8, [x24, #232]
+	b.pl	LBB512_1
+; %bb.3:                                ; %B3
+	add	x19, x19, #1
+	b	l_PollInterrupts_spill_top0_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function call0_1_asm_h
 l_call0_1_asm_h:                        ; @call0_1_asm_h
@@ -17156,14 +17363,14 @@ l_call3_1_asm_h:                        ; @call3_1_asm_h
 l_is_undefined_1_asm_h:                 ; @is_undefined_1_asm_h
 ; %bb.0:                                ; %B2
 	cmp	x22, #18
-	b.ne	LBB514_2
+	b.ne	LBB517_2
 ; %bb.1:                                ; %B3
 	mov	w22, #7                         ; =0x7
 	ldrb	w8, [x19], #1
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB514_2:                               ; %B5
+LBB517_2:                               ; %B5
 	mov	w22, #6                         ; =0x6
 	ldrb	w8, [x19], #1
 	add	w8, w8, #243
@@ -17174,14 +17381,14 @@ LBB514_2:                               ; %B5
 l_is_null_1_asm_h:                      ; @is_null_1_asm_h
 ; %bb.0:                                ; %B2
 	cmp	x22, #2
-	b.ne	LBB515_2
+	b.ne	LBB518_2
 ; %bb.1:                                ; %B3
 	mov	w22, #7                         ; =0x7
 	ldrb	w8, [x19], #1
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB515_2:                               ; %B5
+LBB518_2:                               ; %B5
 	mov	w22, #6                         ; =0x6
 	ldrb	w8, [x19], #1
 	add	w8, w8, #243
@@ -17195,14 +17402,14 @@ l_is_function_1_asm_h:                  ; @is_function_1_asm_h
 	mov	x1, x22
 	bl	_js_operator_typeof_gc
 	cmp	w0, #27
-	b.ne	LBB516_2
+	b.ne	LBB519_2
 ; %bb.1:                                ; %B2
 	mov	w22, #7                         ; =0x7
 	ldrb	w8, [x19], #1
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB516_2:                               ; %B5
+LBB519_2:                               ; %B5
 	mov	w22, #6                         ; =0x6
 	ldrb	w8, [x19], #1
 	add	w8, w8, #243
@@ -17256,7 +17463,7 @@ l_push_const_2_asm_h:                   ; @push_const_2_asm_h
 	ldrsw	x9, [x19]
 	ldr	w10, [x24, #328]
 	ldr	x1, [x8, x9, lsl #3]
-	cbz	w10, LBB520_2
+	cbz	w10, LBB523_2
 ; %bb.1:                                ; %B4
 	mov	x8, x20
 	mov	x0, x24
@@ -17266,7 +17473,7 @@ l_push_const_2_asm_h:                   ; @push_const_2_asm_h
 	str	x1, [sp, #8]                    ; 8-byte Folded Spill
 	bl	_DebuggerPause
 	ldr	x1, [sp, #8]                    ; 8-byte Folded Reload
-LBB520_2:                               ; %B1
+LBB523_2:                               ; %B1
 	ldrb	w8, [x19, #4]
 	add	x19, x19, #5
 	mov	x22, x21
@@ -17289,19 +17496,19 @@ l_push_atom_value_2_asm_h:              ; @push_atom_value_2_asm_h
 ; %bb.0:                                ; %B13
 	str	x22, [x20], #8
 	ldr	w1, [x19]
-	tbnz	w1, #31, LBB522_5
+	tbnz	w1, #31, LBB525_5
 ; %bb.1:                                ; %B1
 	ldr	x8, [x24, #8]
 	ldr	x8, [x8, #64]
 	ldr	x8, [x8, w1, sxtw #3]
 	ldrb	w9, [x8, #7]
-	tbnz	w9, #6, LBB522_4
+	tbnz	w9, #6, LBB525_4
 ; %bb.2:                                ; %B9
 	ldr	w9, [x8, #8]
 	asr	w9, w9, #30
 	cmp	w9, #1
-	b.ne	LBB522_5
-LBB522_3:                               ; %B7
+	b.ne	LBB525_5
+LBB525_3:                               ; %B7
 	ldrb	w9, [x19, #4]
 	add	x19, x19, #5
 	mov	x22, x21
@@ -17311,13 +17518,13 @@ LBB522_3:                               ; %B7
 	movk	x9, #1, lsl #48
 	orr	x21, x8, x9
 	br	x1
-LBB522_4:                               ; %B2
+LBB525_4:                               ; %B2
 	ldr	x9, [x8, #8]
 	ldr	w9, [x9]
 	asr	w9, w9, #30
 	cmp	w9, #1
-	b.eq	LBB522_3
-LBB522_5:                               ; %B10
+	b.eq	LBB525_3
+LBB525_5:                               ; %B10
 	mov	x8, x20
 	mov	x0, x24
 	mov	w2, wzr
@@ -17325,7 +17532,7 @@ LBB522_5:                               ; %B10
 	str	x8, [x23, #48]
 	bl	___JS_AtomToValue_GC
 	cmp	x0, #130
-	b.eq	LBB522_7
+	b.eq	LBB525_7
 ; %bb.6:                                ; %B12
 	ldrb	w8, [x19, #4]
 	add	x19, x19, #5
@@ -17334,7 +17541,7 @@ LBB522_5:                               ; %B10
 	add	w8, w8, #486
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB522_7:                               ; %B11
+LBB525_7:                               ; %B11
 	b	l_exception_spill_top1_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function private_symbol_2_asm_h
@@ -17373,23 +17580,23 @@ l_push_this_2_asm_h:                    ; @push_this_2_asm_h
 	str	x22, [x20], #8
 	ldr	w8, [x23, #44]
 	ldr	x1, [x23, #88]
-	tbnz	w8, #0, LBB526_2
+	tbnz	w8, #0, LBB529_2
 ; %bb.1:                                ; %B12
 	ldr	x8, [x23, #88]
 	and	x9, x8, #0xfffffffffffffffe
 	and	x9, x9, #0xffff000000000003
-	cbnz	x9, LBB526_3
-LBB526_2:                               ; %B3
+	cbnz	x9, LBB529_3
+LBB529_2:                               ; %B3
 	ldrb	w8, [x19], #1
 	mov	x22, x21
 	mov	x21, x1
 	add	w8, w8, #486
 	ldr	x2, [x25, w8, uxtw #3]
 	br	x2
-LBB526_3:                               ; %B6
+LBB529_3:                               ; %B6
 	orr	x8, x8, #0x10
 	cmp	x8, #18
-	b.ne	LBB526_5
+	b.ne	LBB529_5
 ; %bb.4:                                ; %B7
 	ldrb	w8, [x19], #1
 	ldr	x9, [x24, #208]
@@ -17398,14 +17605,14 @@ LBB526_3:                               ; %B6
 	mov	x21, x9
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB526_5:                               ; %B9
+LBB529_5:                               ; %B9
 	mov	x8, x20
 	mov	x0, x24
 	str	x21, [x8], #8
 	str	x8, [x23, #48]
 	bl	_JS_ToObject_GC
 	cmp	x0, #130
-	b.eq	LBB526_7
+	b.eq	LBB529_7
 ; %bb.6:                                ; %B11
 	ldrb	w8, [x19], #1
 	mov	x22, x21
@@ -17413,7 +17620,7 @@ LBB526_5:                               ; %B9
 	add	w8, w8, #486
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB526_7:                               ; %B10
+LBB529_7:                               ; %B10
 	b	l_exception_spill_top1_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function push_false_2_asm_h
@@ -17445,10 +17652,10 @@ l_object_2_asm_h:                       ; @object_2_asm_h
 	str	x22, [x20], #8
 	ldrb	w8, [x24, #363]
 	str	x19, [sp, #8]                   ; 8-byte Folded Spill
-	cbnz	w8, LBB529_5
+	cbnz	w8, LBB532_5
 ; %bb.1:                                ; %B1
 	ldr	x19, [x24, #400]
-	cbz	x19, LBB529_5
+	cbz	x19, LBB532_5
 ; %bb.2:                                ; %B5
 	mov	x8, x20
 	mov	x0, x24
@@ -17458,7 +17665,7 @@ l_object_2_asm_h:                       ; @object_2_asm_h
 	str	x8, [x23, #48]
 	bl	_prim_try_malloc_gc
 	mov	x9, x0
-	cbz	x9, LBB529_5
+	cbz	x9, LBB532_5
 ; %bb.3:                                ; %B7
 	ldr	w8, [x19]
 	add	w8, w8, #1
@@ -17470,8 +17677,8 @@ l_object_2_asm_h:                       ; @object_2_asm_h
 	add	x8, x9, #8
 	stlr	x19, [x8]
 	ldrb	w8, [x24, #384]
-	cbnz	w8, LBB529_7
-LBB529_4:                               ; %B9
+	cbnz	w8, LBB532_7
+LBB532_4:                               ; %B9
 	add	x8, x9, #32
 	ldr	x19, [sp, #8]                   ; 8-byte Folded Reload
 	mov	x22, x21
@@ -17482,14 +17689,14 @@ LBB529_4:                               ; %B9
 	ldr	x1, [x25, w8, uxtw #3]
 	add	sp, sp, #16
 	br	x1
-LBB529_5:                               ; %B13
+LBB532_5:                               ; %B13
 	mov	x8, x20
 	mov	x0, x24
 	str	x21, [x8], #8
 	str	x8, [x23, #48]
 	bl	_PRIM_JS_NewObject_GC
 	cmp	x0, #130
-	b.eq	LBB529_8
+	b.eq	LBB532_8
 ; %bb.6:                                ; %B15
 	ldr	x19, [sp, #8]                   ; 8-byte Folded Reload
 	mov	x22, x21
@@ -17499,15 +17706,15 @@ LBB529_5:                               ; %B13
 	ldr	x1, [x25, w8, uxtw #3]
 	add	sp, sp, #16
 	br	x1
-LBB529_7:                               ; %B11
+LBB532_7:                               ; %B11
 	mov	x8, #-844424930131968           ; =0xfffd000000000000
 	mov	x1, x24
 	orr	x0, x19, x8
 	mov	x19, x9
 	bl	_prim_WriteBarrierNoStore
 	mov	x9, x19
-	b	LBB529_4
-LBB529_8:                               ; %B14
+	b	LBB532_4
+LBB532_8:                               ; %B14
 	ldr	x19, [sp, #8]                   ; 8-byte Folded Reload
 	add	sp, sp, #16
 	b	l_exception_spill_top1_asm_h
@@ -17933,26 +18140,26 @@ l_get_var_undef_2_asm_h:                ; @get_var_undef_2_asm_h
 	ldr	w11, [x10, w11, sxtw #2]
 	add	w12, w12, #4
 	add	x10, x10, x12
-	cbz	w11, LBB573_3
-LBB573_1:                               ; %B5
+	cbz	w11, LBB576_3
+LBB576_1:                               ; %B5
                                         ; =>This Inner Loop Header: Depth=1
 	lsl	w12, w11, #3
 	sub	w12, w12, #8
 	add	x12, x10, x12
 	ldr	w13, [x12, #4]
 	cmp	w13, w9
-	b.eq	LBB573_10
+	b.eq	LBB576_10
 ; %bb.2:                                ; %B8
-                                        ;   in Loop: Header=BB573_1 Depth=1
+                                        ;   in Loop: Header=BB576_1 Depth=1
 	ldr	w11, [x12]
 	and	w11, w11, #0x3ffffff
-	cbnz	w11, LBB573_1
-LBB573_3:                               ; %B11
+	cbnz	w11, LBB576_1
+LBB576_3:                               ; %B11
 	ldr	x8, [x24, #208]
 	mov	w10, #18                        ; =0x12
-LBB573_4:                               ; %B33
+LBB576_4:                               ; %B33
                                         ; =>This Loop Header: Depth=1
-                                        ;     Child Loop BB573_5 Depth 2
+                                        ;     Child Loop BB576_5 Depth 2
 	ldr	x11, [x8, #8]
 	ldr	w12, [x11, #12]
 	add	x14, x11, #64
@@ -17961,43 +18168,43 @@ LBB573_4:                               ; %B33
 	ldr	w11, [x14, w11, sxtw #2]
 	add	w12, w13, #4
 	add	x12, x14, x12
-	cbz	w11, LBB573_7
-LBB573_5:                               ; %B22
-                                        ;   Parent Loop BB573_4 Depth=1
+	cbz	w11, LBB576_7
+LBB576_5:                               ; %B22
+                                        ;   Parent Loop BB576_4 Depth=1
                                         ; =>  This Inner Loop Header: Depth=2
 	lsl	w13, w11, #3
 	sub	w13, w13, #8
 	add	x13, x12, x13
 	ldp	w13, w14, [x13]
 	cmp	w14, w9
-	b.eq	LBB573_9
+	b.eq	LBB576_9
 ; %bb.6:                                ; %B24
-                                        ;   in Loop: Header=BB573_5 Depth=2
+                                        ;   in Loop: Header=BB576_5 Depth=2
 	and	w11, w13, #0x3ffffff
-	cbnz	w11, LBB573_5
-LBB573_7:                               ; %B27
-                                        ;   in Loop: Header=BB573_4 Depth=1
+	cbnz	w11, LBB576_5
+LBB576_7:                               ; %B27
+                                        ;   in Loop: Header=BB576_4 Depth=1
 	ldr	w11, [x8, #4]
 	ubfx	w11, w11, #10, #1
 	cmp	w11, #1
-	b.eq	LBB573_13
+	b.eq	LBB576_13
 ; %bb.8:                                ; %B30
-                                        ;   in Loop: Header=BB573_4 Depth=1
+                                        ;   in Loop: Header=BB576_4 Depth=1
 	ldr	x8, [x8, #8]
 	ldr	x8, [x8, #32]
-	cbnz	x8, LBB573_4
-	b	LBB573_11
-LBB573_9:                               ; %B12
+	cbnz	x8, LBB576_4
+	b	LBB576_11
+LBB576_9:                               ; %B12
 	lsr	w9, w13, #26
 	tst	w9, #0x30
-	b.ne	LBB573_13
-LBB573_10:                              ; %B7.sink.split
+	b.ne	LBB576_13
+LBB576_10:                              ; %B7.sink.split
 	ldr	x8, [x8, #16]
 	sub	w9, w11, #1
 	ldr	x10, [x8, w9, sxtw #3]
-LBB573_11:                              ; %B7
+LBB576_11:                              ; %B7
 	cmp	x10, #34
-	b.eq	LBB573_15
+	b.eq	LBB576_15
 ; %bb.12:                               ; %B4
 	ldrb	w8, [x19, #4]
 	add	x19, x19, #5
@@ -18006,7 +18213,7 @@ LBB573_11:                              ; %B7
 	add	w8, w8, #486
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB573_13:                              ; %B17
+LBB576_13:                              ; %B17
 	ldr	w1, [x19]
 	mov	x8, x20
 	mov	x0, x24
@@ -18015,7 +18222,7 @@ LBB573_13:                              ; %B17
 	str	x8, [x23, #48]
 	bl	_JS_GetGlobalVarImpl_GC
 	cmp	x0, #130
-	b.eq	LBB573_16
+	b.eq	LBB576_16
 ; %bb.14:                               ; %B19
 	ldrb	w8, [x19, #4]
 	add	x19, x19, #5
@@ -18024,10 +18231,10 @@ LBB573_13:                              ; %B17
 	add	w8, w8, #486
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB573_15:                              ; %B3
+LBB576_15:                              ; %B3
 	str	x21, [x20], #8
 	b	l_ThrowReferenceErrorUninitialized_asm_h
-LBB573_16:                              ; %B18
+LBB576_16:                              ; %B18
 	b	l_exception_spill_top1_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function get_var_2_asm_h
@@ -18044,25 +18251,25 @@ l_get_var_2_asm_h:                      ; @get_var_2_asm_h
 	ldr	w10, [x13, w10, sxtw #2]
 	add	w11, w12, #4
 	add	x11, x13, x11
-	cbz	w10, LBB574_3
-LBB574_1:                               ; %B5
+	cbz	w10, LBB577_3
+LBB577_1:                               ; %B5
                                         ; =>This Inner Loop Header: Depth=1
 	lsl	w12, w10, #3
 	sub	w12, w12, #8
 	add	x12, x11, x12
 	ldr	w13, [x12, #4]
 	cmp	w13, w9
-	b.eq	LBB574_10
+	b.eq	LBB577_10
 ; %bb.2:                                ; %B8
-                                        ;   in Loop: Header=BB574_1 Depth=1
+                                        ;   in Loop: Header=BB577_1 Depth=1
 	ldr	w10, [x12]
 	and	w10, w10, #0x3ffffff
-	cbnz	w10, LBB574_1
-LBB574_3:                               ; %B11
+	cbnz	w10, LBB577_1
+LBB577_3:                               ; %B11
 	ldr	x8, [x24, #208]
-LBB574_4:                               ; %B32
+LBB577_4:                               ; %B32
                                         ; =>This Loop Header: Depth=1
-                                        ;     Child Loop BB574_5 Depth 2
+                                        ;     Child Loop BB577_5 Depth 2
 	ldr	x10, [x8, #8]
 	ldr	w11, [x10, #12]
 	add	x13, x10, #64
@@ -18071,42 +18278,42 @@ LBB574_4:                               ; %B32
 	ldr	w10, [x13, w10, sxtw #2]
 	add	w11, w12, #4
 	add	x11, x13, x11
-	cbz	w10, LBB574_7
-LBB574_5:                               ; %B21
-                                        ;   Parent Loop BB574_4 Depth=1
+	cbz	w10, LBB577_7
+LBB577_5:                               ; %B21
+                                        ;   Parent Loop BB577_4 Depth=1
                                         ; =>  This Inner Loop Header: Depth=2
 	lsl	w12, w10, #3
 	sub	w12, w12, #8
 	add	x12, x11, x12
 	ldp	w12, w13, [x12]
 	cmp	w13, w9
-	b.eq	LBB574_9
+	b.eq	LBB577_9
 ; %bb.6:                                ; %B23
-                                        ;   in Loop: Header=BB574_5 Depth=2
+                                        ;   in Loop: Header=BB577_5 Depth=2
 	and	w10, w12, #0x3ffffff
-	cbnz	w10, LBB574_5
-LBB574_7:                               ; %B26
-                                        ;   in Loop: Header=BB574_4 Depth=1
+	cbnz	w10, LBB577_5
+LBB577_7:                               ; %B26
+                                        ;   in Loop: Header=BB577_4 Depth=1
 	ldr	w10, [x8, #4]
 	ubfx	w10, w10, #10, #1
 	cmp	w10, #1
-	b.eq	LBB574_12
+	b.eq	LBB577_12
 ; %bb.8:                                ; %B29
-                                        ;   in Loop: Header=BB574_4 Depth=1
+                                        ;   in Loop: Header=BB577_4 Depth=1
 	ldr	x8, [x8, #8]
 	ldr	x8, [x8, #32]
-	cbnz	x8, LBB574_4
-	b	LBB574_12
-LBB574_9:                               ; %B12
+	cbnz	x8, LBB577_4
+	b	LBB577_12
+LBB577_9:                               ; %B12
 	lsr	w9, w12, #26
 	tst	w9, #0x30
-	b.ne	LBB574_12
-LBB574_10:                              ; %B7
+	b.ne	LBB577_12
+LBB577_10:                              ; %B7
 	ldr	x8, [x8, #16]
 	sub	w9, w10, #1
 	ldr	x8, [x8, w9, sxtw #3]
 	cmp	x8, #34
-	b.eq	LBB574_14
+	b.eq	LBB577_14
 ; %bb.11:                               ; %B4
 	ldrb	w9, [x19, #4]
 	add	x19, x19, #5
@@ -18115,7 +18322,7 @@ LBB574_10:                              ; %B7
 	add	w9, w9, #486
 	ldr	x1, [x25, w9, uxtw #3]
 	br	x1
-LBB574_12:                              ; %B16
+LBB577_12:                              ; %B16
 	ldr	w1, [x19]
 	mov	x8, x20
 	mov	x0, x24
@@ -18124,7 +18331,7 @@ LBB574_12:                              ; %B16
 	str	x8, [x23, #48]
 	bl	_JS_GetGlobalVarImpl_GC
 	cmp	x0, #130
-	b.eq	LBB574_15
+	b.eq	LBB577_15
 ; %bb.13:                               ; %B18
 	ldrb	w8, [x19, #4]
 	add	x19, x19, #5
@@ -18133,10 +18340,10 @@ LBB574_12:                              ; %B16
 	add	w8, w8, #486
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB574_14:                              ; %B3
+LBB577_14:                              ; %B3
 	str	x21, [x20], #8
 	b	l_ThrowReferenceErrorUninitialized_asm_h
-LBB574_15:                              ; %B17
+LBB577_15:                              ; %B17
 	b	l_exception_spill_top1_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function put_var_2_asm_h
@@ -18152,20 +18359,20 @@ l_put_var_2_asm_h:                      ; @put_var_2_asm_h
 	ldr	w9, [x12, w9, sxtw #2]
 	add	w10, w11, #4
 	add	x10, x12, x10
-	cbz	w9, LBB575_3
-LBB575_1:                               ; %B1
+	cbz	w9, LBB578_3
+LBB578_1:                               ; %B1
                                         ; =>This Inner Loop Header: Depth=1
 	lsl	w11, w9, #3
 	sub	w11, w11, #8
 	add	x11, x10, x11
 	ldp	w11, w12, [x11]
 	cmp	w12, w1
-	b.eq	LBB575_6
+	b.eq	LBB578_6
 ; %bb.2:                                ; %B16
-                                        ;   in Loop: Header=BB575_1 Depth=1
+                                        ;   in Loop: Header=BB578_1 Depth=1
 	and	w9, w11, #0x3ffffff
-	cbnz	w9, LBB575_1
-LBB575_3:                               ; %B19
+	cbnz	w9, LBB578_1
+LBB578_3:                               ; %B19
 	ldr	x8, [x24, #208]
 	ldr	x9, [x8, #8]
 	ldr	w10, [x9, #12]
@@ -18175,53 +18382,53 @@ LBB575_3:                               ; %B19
 	ldr	w9, [x12, w9, sxtw #2]
 	add	w10, w11, #4
 	add	x10, x12, x10
-	cbz	w9, LBB575_13
-LBB575_4:                               ; %B26
+	cbz	w9, LBB578_13
+LBB578_4:                               ; %B26
                                         ; =>This Inner Loop Header: Depth=1
 	lsl	w11, w9, #3
 	sub	w11, w11, #8
 	add	x11, x10, x11
 	ldp	w11, w12, [x11]
 	cmp	w12, w1
-	b.eq	LBB575_10
+	b.eq	LBB578_10
 ; %bb.5:                                ; %B31
-                                        ;   in Loop: Header=BB575_4 Depth=1
+                                        ;   in Loop: Header=BB578_4 Depth=1
 	and	w9, w11, #0x3ffffff
-	cbnz	w9, LBB575_4
-	b	LBB575_13
-LBB575_6:                               ; %B13
+	cbnz	w9, LBB578_4
+	b	LBB578_13
+LBB578_6:                               ; %B13
 	mov	w10, #58                        ; =0x3a
 	and	w10, w10, w11, lsr #26
 	cmp	w10, #2
-	b.ne	LBB575_13
+	b.ne	LBB578_13
 ; %bb.7:                                ; %B3
 	ldr	x8, [x8, #16]
 	sub	w9, w9, #1
 	ldr	x10, [x8, w9, sxtw #3]
 	cmp	x10, #34
-	b.eq	LBB575_13
+	b.eq	LBB578_13
 ; %bb.8:                                ; %B20
 	str	x21, [x8, w9, sxtw #3]
 	ldrb	w8, [x24, #384]
-	cbnz	w8, LBB575_12
-LBB575_9:                               ; %B8
+	cbnz	w8, LBB578_12
+LBB578_9:                               ; %B8
 	ldrb	w8, [x19, #4]
 	add	x19, x19, #5
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB575_10:                              ; %B28
+LBB578_10:                              ; %B28
 	mov	w10, #58                        ; =0x3a
 	and	w10, w10, w11, lsr #26
 	cmp	w10, #2
-	b.ne	LBB575_13
+	b.ne	LBB578_13
 ; %bb.11:                               ; %B20
 	ldr	x8, [x8, #16]
 	sub	w9, w9, #1
 	str	x21, [x8, w9, sxtw #3]
 	ldrb	w8, [x24, #384]
-	cbz	w8, LBB575_9
-LBB575_12:
+	cbz	w8, LBB578_9
+LBB578_12:
 	mov	x1, x24
 	mov	x0, x21
 	bl	_prim_WriteBarrierNoStore
@@ -18230,7 +18437,7 @@ LBB575_12:
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB575_13:                              ; %B34
+LBB578_13:                              ; %B34
 	add	x8, x20, #16
 	mov	x0, x24
 	mov	x2, x21
@@ -18238,7 +18445,7 @@ LBB575_13:                              ; %B34
 	stp	x22, x21, [x20]
 	str	x8, [x23, #48]
 	bl	_JS_SetGlobalVar_GC
-	tbz	w0, #31, LBB575_9
+	tbz	w0, #31, LBB578_9
 ; %bb.14:                               ; %B35
 	b	l_exception_spill_top0_top1_asm_h
                                         ; -- End function
@@ -18305,13 +18512,13 @@ l_get_field_2_asm_h:                    ; @get_field_2_asm_h
 	ldr	w2, [x19]
 	movk	x8, #65535, lsl #48
 	tst	x21, x8
-	b.ne	LBB583_10
+	b.ne	LBB586_10
 ; %bb.1:                                ; %B25
 	mov	x9, x21
 	mov	w8, #18                         ; =0x12
-LBB583_2:                               ; %B19
+LBB586_2:                               ; %B19
                                         ; =>This Loop Header: Depth=1
-                                        ;     Child Loop BB583_3 Depth 2
+                                        ;     Child Loop BB586_3 Depth 2
 	ldr	x10, [x9, #8]
 	ldr	w11, [x10, #12]
 	add	x13, x10, #64
@@ -18320,48 +18527,48 @@ LBB583_2:                               ; %B19
 	ldr	w10, [x13, w10, sxtw #2]
 	add	w11, w12, #4
 	add	x11, x13, x11
-	cbz	w10, LBB583_5
-LBB583_3:                               ; %B1
-                                        ;   Parent Loop BB583_2 Depth=1
+	cbz	w10, LBB586_5
+LBB586_3:                               ; %B1
+                                        ;   Parent Loop BB586_2 Depth=1
                                         ; =>  This Inner Loop Header: Depth=2
 	lsl	w12, w10, #3
 	sub	w12, w12, #8
 	add	x12, x11, x12
 	ldp	w12, w13, [x12]
 	cmp	w13, w2
-	b.eq	LBB583_7
+	b.eq	LBB586_7
 ; %bb.4:                                ; %B9
-                                        ;   in Loop: Header=BB583_3 Depth=2
+                                        ;   in Loop: Header=BB586_3 Depth=2
 	and	w10, w12, #0x3ffffff
-	cbnz	w10, LBB583_3
-LBB583_5:                               ; %B14
-                                        ;   in Loop: Header=BB583_2 Depth=1
+	cbnz	w10, LBB586_3
+LBB586_5:                               ; %B14
+                                        ;   in Loop: Header=BB586_2 Depth=1
 	ldr	w10, [x9, #4]
 	ubfx	w10, w10, #10, #1
 	cmp	w10, #1
-	b.eq	LBB583_10
+	b.eq	LBB586_10
 ; %bb.6:                                ; %B17
-                                        ;   in Loop: Header=BB583_2 Depth=1
+                                        ;   in Loop: Header=BB586_2 Depth=1
 	ldr	x9, [x9, #8]
 	ldr	x9, [x9, #32]
-	cbnz	x9, LBB583_2
-	b	LBB583_9
-LBB583_7:                               ; %B3
+	cbnz	x9, LBB586_2
+	b	LBB586_9
+LBB586_7:                               ; %B3
 	lsr	w8, w12, #26
 	tst	w8, #0x30
-	b.ne	LBB583_10
+	b.ne	LBB586_10
 ; %bb.8:                                ; %B4
 	ldr	x8, [x9, #16]
 	sub	w9, w10, #1
 	ldr	x8, [x8, w9, sxtw #3]
-LBB583_9:                               ; %B6
+LBB586_9:                               ; %B6
 	ldrb	w9, [x19, #4]
 	add	x19, x19, #5
 	mov	x21, x8
 	add	w9, w9, #486
 	ldr	x1, [x25, w9, uxtw #3]
 	br	x1
-LBB583_10:                              ; %B21
+LBB586_10:                              ; %B21
 	add	x8, x20, #16
 	mov	x0, x24
 	mov	x1, x21
@@ -18371,7 +18578,7 @@ LBB583_10:                              ; %B21
 	str	x8, [x23, #48]
 	bl	_JS_GetPropertyInternalImpl_GC
 	cmp	x0, #130
-	b.eq	LBB583_12
+	b.eq	LBB586_12
 ; %bb.11:                               ; %B23
 	ldrb	w8, [x19, #4]
 	add	x19, x19, #5
@@ -18379,7 +18586,7 @@ LBB583_10:                              ; %B21
 	add	w8, w8, #486
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB583_12:                              ; %B22
+LBB586_12:                              ; %B22
 	b	l_exception_spill_top0_top1_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function get_field2_2_asm_h
@@ -18390,13 +18597,13 @@ l_get_field2_2_asm_h:                   ; @get_field2_2_asm_h
 	movk	x8, #65535, lsl #48
 	ldr	w2, [x19]
 	tst	x21, x8
-	b.ne	LBB584_10
+	b.ne	LBB587_10
 ; %bb.1:                                ; %B25
 	mov	x9, x21
 	mov	w8, #18                         ; =0x12
-LBB584_2:                               ; %B19
+LBB587_2:                               ; %B19
                                         ; =>This Loop Header: Depth=1
-                                        ;     Child Loop BB584_3 Depth 2
+                                        ;     Child Loop BB587_3 Depth 2
 	ldr	x10, [x9, #8]
 	ldr	w11, [x10, #12]
 	add	x13, x10, #64
@@ -18405,41 +18612,41 @@ LBB584_2:                               ; %B19
 	ldr	w10, [x13, w10, sxtw #2]
 	add	w11, w12, #4
 	add	x11, x13, x11
-	cbz	w10, LBB584_5
-LBB584_3:                               ; %B1
-                                        ;   Parent Loop BB584_2 Depth=1
+	cbz	w10, LBB587_5
+LBB587_3:                               ; %B1
+                                        ;   Parent Loop BB587_2 Depth=1
                                         ; =>  This Inner Loop Header: Depth=2
 	lsl	w12, w10, #3
 	sub	w12, w12, #8
 	add	x12, x11, x12
 	ldp	w12, w13, [x12]
 	cmp	w13, w2
-	b.eq	LBB584_7
+	b.eq	LBB587_7
 ; %bb.4:                                ; %B9
-                                        ;   in Loop: Header=BB584_3 Depth=2
+                                        ;   in Loop: Header=BB587_3 Depth=2
 	and	w10, w12, #0x3ffffff
-	cbnz	w10, LBB584_3
-LBB584_5:                               ; %B14
-                                        ;   in Loop: Header=BB584_2 Depth=1
+	cbnz	w10, LBB587_3
+LBB587_5:                               ; %B14
+                                        ;   in Loop: Header=BB587_2 Depth=1
 	ldr	w10, [x9, #4]
 	ubfx	w10, w10, #10, #1
 	cmp	w10, #1
-	b.eq	LBB584_10
+	b.eq	LBB587_10
 ; %bb.6:                                ; %B17
-                                        ;   in Loop: Header=BB584_2 Depth=1
+                                        ;   in Loop: Header=BB587_2 Depth=1
 	ldr	x9, [x9, #8]
 	ldr	x9, [x9, #32]
-	cbnz	x9, LBB584_2
-	b	LBB584_9
-LBB584_7:                               ; %B3
+	cbnz	x9, LBB587_2
+	b	LBB587_9
+LBB587_7:                               ; %B3
 	lsr	w8, w12, #26
 	tst	w8, #0x30
-	b.ne	LBB584_10
+	b.ne	LBB587_10
 ; %bb.8:                                ; %B4
 	ldr	x8, [x9, #16]
 	sub	w9, w10, #1
 	ldr	x8, [x8, w9, sxtw #3]
-LBB584_9:                               ; %B6
+LBB587_9:                               ; %B6
 	ldrb	w9, [x19, #4]
 	add	x19, x19, #5
 	mov	x22, x21
@@ -18447,7 +18654,7 @@ LBB584_9:                               ; %B6
 	add	w9, w9, #486
 	ldr	x1, [x25, w9, uxtw #3]
 	br	x1
-LBB584_10:                              ; %B21
+LBB587_10:                              ; %B21
 	mov	x8, x20
 	mov	x0, x24
 	mov	x1, x21
@@ -18457,7 +18664,7 @@ LBB584_10:                              ; %B21
 	str	x8, [x23, #48]
 	bl	_JS_GetPropertyInternalImpl_GC
 	cmp	x0, #130
-	b.eq	LBB584_12
+	b.eq	LBB587_12
 ; %bb.11:                               ; %B23
 	ldrb	w8, [x19, #4]
 	add	x19, x19, #5
@@ -18466,7 +18673,7 @@ LBB584_10:                              ; %B21
 	add	w8, w8, #486
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB584_12:                              ; %B22
+LBB587_12:                              ; %B22
 	b	l_exception_spill_top1_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function put_field_2_asm_h
@@ -18477,7 +18684,7 @@ l_put_field_2_asm_h:                    ; @put_field_2_asm_h
 	ldr	w2, [x19]
 	movk	x8, #65535, lsl #48
 	tst	x22, x8
-	b.ne	LBB585_18
+	b.ne	LBB588_18
 ; %bb.1:                                ; %B56
 	ldr	x8, [x22, #8]
 	ldr	w9, [x8, #12]
@@ -18487,24 +18694,24 @@ l_put_field_2_asm_h:                    ; @put_field_2_asm_h
 	ldr	w8, [x11, w8, sxtw #2]
 	add	w9, w10, #4
 	add	x9, x11, x9
-	cbz	w8, LBB585_4
-LBB585_2:                               ; %B1
+	cbz	w8, LBB588_4
+LBB588_2:                               ; %B1
                                         ; =>This Inner Loop Header: Depth=1
 	lsl	w10, w8, #3
 	sub	w10, w10, #8
 	add	x10, x9, x10
 	ldp	w10, w11, [x10]
 	cmp	w11, w2
-	b.eq	LBB585_10
+	b.eq	LBB588_10
 ; %bb.3:                                ; %B12
-                                        ;   in Loop: Header=BB585_2 Depth=1
+                                        ;   in Loop: Header=BB588_2 Depth=1
 	and	w8, w10, #0x3ffffff
-	cbnz	w8, LBB585_2
-LBB585_4:                               ; %B17.preheader
+	cbnz	w8, LBB588_2
+LBB588_4:                               ; %B17.preheader
 	mov	x8, x22
-LBB585_5:                               ; %B17
+LBB588_5:                               ; %B17
                                         ; =>This Loop Header: Depth=1
-                                        ;     Child Loop BB585_6 Depth 2
+                                        ;     Child Loop BB588_6 Depth 2
 	ldr	x9, [x8, #8]
 	ldr	w10, [x9, #12]
 	add	x9, x9, #64
@@ -18513,65 +18720,65 @@ LBB585_5:                               ; %B17
 	ldr	w10, [x9, w10, sxtw #2]
 	add	w11, w11, #4
 	add	x9, x9, x11
-	cbz	w10, LBB585_8
-LBB585_6:                               ; %B18
-                                        ;   Parent Loop BB585_5 Depth=1
+	cbz	w10, LBB588_8
+LBB588_6:                               ; %B18
+                                        ;   Parent Loop BB588_5 Depth=1
                                         ; =>  This Inner Loop Header: Depth=2
 	lsl	w10, w10, #3
 	sub	w10, w10, #8
 	add	x10, x9, x10
 	ldp	w10, w11, [x10]
 	cmp	w11, w2
-	b.eq	LBB585_13
+	b.eq	LBB588_13
 ; %bb.7:                                ; %B34
-                                        ;   in Loop: Header=BB585_6 Depth=2
+                                        ;   in Loop: Header=BB588_6 Depth=2
 	and	w10, w10, #0x3ffffff
-	cbnz	w10, LBB585_6
-LBB585_8:                               ; %B41
-                                        ;   in Loop: Header=BB585_5 Depth=1
+	cbnz	w10, LBB588_6
+LBB588_8:                               ; %B41
+                                        ;   in Loop: Header=BB588_5 Depth=1
 	ldr	w9, [x8, #4]
 	ubfx	w9, w9, #10, #1
 	cmp	w9, #1
-	b.eq	LBB585_18
+	b.eq	LBB588_18
 ; %bb.9:                                ; %B38
-                                        ;   in Loop: Header=BB585_5 Depth=1
+                                        ;   in Loop: Header=BB588_5 Depth=1
 	ldr	x8, [x8, #8]
 	ldr	x8, [x8, #32]
-	cbnz	x8, LBB585_5
-	b	LBB585_14
-LBB585_10:                              ; %B3
+	cbnz	x8, LBB588_5
+	b	LBB588_14
+LBB588_10:                              ; %B3
 	mov	w9, #58                         ; =0x3a
 	and	w9, w9, w10, lsr #26
 	cmp	w9, #2
-	b.ne	LBB585_18
+	b.ne	LBB588_18
 ; %bb.11:                               ; %B7
 	ldr	x9, [x22, #16]
 	sub	w8, w8, #1
 	str	x21, [x9, w8, sxtw #3]
 	ldrb	w8, [x24, #384]
-	cbnz	w8, LBB585_19
-LBB585_12:                              ; %B54
+	cbnz	w8, LBB588_19
+LBB588_12:                              ; %B54
 	ldrb	w8, [x19, #4]
 	add	x19, x19, #5
 	ldr	x1, [x25, x8, lsl #3]
 	add	sp, sp, #16
 	br	x1
-LBB585_13:                              ; %B20
+LBB588_13:                              ; %B20
 	mov	w8, #58                         ; =0x3a
 	and	w8, w8, w10, lsr #26
 	cmp	w8, #2
-	b.ne	LBB585_18
-LBB585_14:                              ; %B23
+	b.ne	LBB588_18
+LBB588_14:                              ; %B23
 	ldr	w8, [x22, #4]
 	ubfx	w8, w8, #8, #1
 	cmp	w8, #1
-	b.ne	LBB585_18
+	b.ne	LBB588_18
 ; %bb.15:                               ; %B25
 	ldrh	w8, [x22, #6]
 	cmp	w8, #1
-	b.ne	LBB585_20
+	b.ne	LBB588_20
 ; %bb.16:                               ; %B25
-	tbnz	w2, #31, LBB585_20
+	tbnz	w2, #31, LBB588_20
 ; %bb.17:                               ; %B31
 	mov	x8, x20
 	add	x20, x20, #16
@@ -18579,7 +18786,7 @@ LBB585_14:                              ; %B23
 	stp	x22, x21, [x8]
 	add	sp, sp, #16
 	b	l_FastAddNamedProperty_asm_h
-LBB585_18:                              ; %B52
+LBB588_18:                              ; %B52
 	add	x8, x20, #16
 	mov	x0, x24
 	mov	x1, x22
@@ -18589,9 +18796,9 @@ LBB585_18:                              ; %B52
 	str	x8, [x23, #48]
                                         ; kill: def $w2 killed $w2 killed $x2
 	bl	_JS_SetPropertyInternalImpl_GC
-	tbz	w0, #31, LBB585_12
-	b	LBB585_25
-LBB585_19:                              ; %B9
+	tbz	w0, #31, LBB588_12
+	b	LBB588_25
+LBB588_19:                              ; %B9
 	mov	x0, x21
 	mov	x1, x24
 	bl	_prim_WriteBarrierNoStore
@@ -18600,7 +18807,7 @@ LBB585_19:                              ; %B9
 	ldr	x1, [x25, x8, lsl #3]
 	add	sp, sp, #16
 	br	x1
-LBB585_20:                              ; %B45
+LBB588_20:                              ; %B45
 	add	x8, x20, #16
 	mov	x0, x24
 	mov	x1, x22
@@ -18610,25 +18817,25 @@ LBB585_20:                              ; %B45
 	str	x20, [sp, #8]                   ; 8-byte Folded Spill
 	str	x8, [x23, #48]
 	bl	_add_property_gc
-	cbz	x0, LBB585_24
+	cbz	x0, LBB588_24
 ; %bb.21:                               ; %B49
 	str	x21, [x0]
 	ldrb	w8, [x24, #384]
-	cbz	w8, LBB585_23
+	cbz	w8, LBB588_23
 ; %bb.22:                               ; %B51
 	mov	x0, x21
 	mov	x1, x24
 	bl	_prim_WriteBarrierNoStore
-LBB585_23:                              ; %B48
+LBB588_23:                              ; %B48
 	ldrb	w8, [x19, #4]
 	ldr	x20, [sp, #8]                   ; 8-byte Folded Reload
 	add	x19, x19, #5
 	ldr	x1, [x25, x8, lsl #3]
 	add	sp, sp, #16
 	br	x1
-LBB585_24:                              ; %B46
+LBB588_24:                              ; %B46
 	ldr	x20, [sp, #8]                   ; 8-byte Folded Reload
-LBB585_25:                              ; %B53
+LBB588_25:                              ; %B53
 	add	sp, sp, #16
 	b	l_exception_spill_top0_top1_asm_h
                                         ; -- End function
@@ -18663,19 +18870,19 @@ l_get_array_el_2_asm_h:                 ; @get_array_el_2_asm_h
 	mov	x8, #2                          ; =0x2
 	movk	x8, #65535, lsl #48
 	tst	x22, x8
-	b.ne	LBB589_12
+	b.ne	LBB592_12
 ; %bb.1:                                ; %B73
 	mov	w9, #65534                      ; =0xfffe
 	ldrh	w8, [x22, #6]
 	cmp	x9, x21, lsr #48
-	b.ne	LBB589_5
+	b.ne	LBB592_5
 ; %bb.2:                                ; %B1
 	cmp	w8, #2
-	b.ne	LBB589_10
+	b.ne	LBB592_10
 ; %bb.3:                                ; %B3
 	ldr	w8, [x22, #48]
 	cmp	w21, w8
-	b.hs	LBB589_14
+	b.hs	LBB592_14
 ; %bb.4:                                ; %B4
 	ldrb	w8, [x19], #1
 	ldr	x9, [x22, #40]
@@ -18684,36 +18891,36 @@ l_get_array_el_2_asm_h:                 ; @get_array_el_2_asm_h
 	ldr	x1, [x25, w8, uxtw #3]
 	add	sp, sp, #16
 	br	x1
-LBB589_5:                               ; %B33
+LBB592_5:                               ; %B33
 	cmp	w8, #1
-	b.ne	LBB589_12
+	b.ne	LBB592_12
 ; %bb.6:                                ; %B36
 	ldr	w8, [x22, #4]
 	ubfx	w8, w8, #10, #1
 	cmp	w8, #1
-	b.eq	LBB589_12
+	b.eq	LBB592_12
 ; %bb.7:                                ; %B36
 	mov	x9, #2                          ; =0x2
 	and	x8, x21, #0xffff000000000003
 	movk	x9, #1, lsl #48
 	cmp	x8, x9
-	b.ne	LBB589_12
+	b.ne	LBB592_12
 ; %bb.8:                                ; %B65
 	and	x8, x21, #0xfffffffffffc
 	str	x20, [sp, #8]                   ; 8-byte Folded Spill
 	ldrb	w9, [x8, #7]
-	tbnz	w9, #6, LBB589_24
+	tbnz	w9, #6, LBB592_24
 ; %bb.9:                                ; %B68
 	ldr	w8, [x8, #8]
-	b	LBB589_25
-LBB589_10:                              ; %B30
+	b	LBB592_25
+LBB592_10:                              ; %B30
 	sxth	w8, w8
 	cmp	w8, #21
-	b.lt	LBB589_12
+	b.lt	LBB592_12
 ; %bb.11:                               ; %B30
 	cmp	w8, #29
-	b.le	LBB589_33
-LBB589_12:                              ; %B70
+	b.le	LBB592_33
+LBB592_12:                              ; %B70
 	add	x8, x20, #16
 	mov	x0, x24
 	mov	x1, x22
@@ -18723,7 +18930,7 @@ LBB589_12:                              ; %B70
 	str	x8, [x23, #48]
 	bl	_JS_GetPropertyValue_GC
 	cmp	x0, #130
-	b.eq	LBB589_34
+	b.eq	LBB592_34
 ; %bb.13:                               ; %B72
 	ldrb	w8, [x19], #1
 	ldr	x20, [sp, #8]                   ; 8-byte Folded Reload
@@ -18732,15 +18939,15 @@ LBB589_12:                              ; %B70
 	ldr	x1, [x25, w8, uxtw #3]
 	add	sp, sp, #16
 	br	x1
-LBB589_14:                              ; %B7
-	tbnz	w21, #31, LBB589_12
+LBB592_14:                              ; %B7
+	tbnz	w21, #31, LBB592_12
 ; %bb.15:                               ; %B9.preheader
 	mov	x15, x20
 	mov	x9, x22
 	mov	w8, #18                         ; =0x12
-LBB589_16:                              ; %B9
+LBB592_16:                              ; %B9
                                         ; =>This Loop Header: Depth=1
-                                        ;     Child Loop BB589_17 Depth 2
+                                        ;     Child Loop BB592_17 Depth 2
 	ldr	x11, [x9, #8]
 	orr	w10, w21, #0x80000000
 	ldr	w12, [x11, #12]
@@ -18750,43 +18957,43 @@ LBB589_16:                              ; %B9
 	ldr	w11, [x14, w11, sxtw #2]
 	add	w12, w13, #4
 	add	x12, x14, x12
-	cbz	w11, LBB589_19
-LBB589_17:                              ; %B10
-                                        ;   Parent Loop BB589_16 Depth=1
+	cbz	w11, LBB592_19
+LBB592_17:                              ; %B10
+                                        ;   Parent Loop BB592_16 Depth=1
                                         ; =>  This Inner Loop Header: Depth=2
 	lsl	w13, w11, #3
 	sub	w13, w13, #8
 	add	x13, x12, x13
 	ldp	w13, w14, [x13]
 	cmp	w14, w10
-	b.eq	LBB589_21
+	b.eq	LBB592_21
 ; %bb.18:                               ; %B17
-                                        ;   in Loop: Header=BB589_17 Depth=2
+                                        ;   in Loop: Header=BB592_17 Depth=2
 	and	w11, w13, #0x3ffffff
-	cbnz	w11, LBB589_17
-LBB589_19:                              ; %B24
-                                        ;   in Loop: Header=BB589_16 Depth=1
+	cbnz	w11, LBB592_17
+LBB592_19:                              ; %B24
+                                        ;   in Loop: Header=BB592_16 Depth=1
 	ldr	w10, [x9, #4]
 	mov	x20, x15
 	ubfx	w10, w10, #10, #1
 	cmp	w10, #1
-	b.eq	LBB589_12
+	b.eq	LBB592_12
 ; %bb.20:                               ; %B21
-                                        ;   in Loop: Header=BB589_16 Depth=1
+                                        ;   in Loop: Header=BB592_16 Depth=1
 	ldr	x9, [x9, #8]
 	ldr	x9, [x9, #32]
-	cbnz	x9, LBB589_16
-	b	LBB589_23
-LBB589_21:                              ; %B12
+	cbnz	x9, LBB592_16
+	b	LBB592_23
+LBB592_21:                              ; %B12
 	lsr	w8, w13, #26
 	mov	x20, x15
 	tst	w8, #0x30
-	b.ne	LBB589_12
+	b.ne	LBB592_12
 ; %bb.22:                               ; %B13
 	ldr	x8, [x9, #16]
 	sub	w9, w11, #1
 	ldr	x8, [x8, w9, sxtw #3]
-LBB589_23:                              ; %B14
+LBB592_23:                              ; %B14
 	ldrb	w9, [x19], #1
 	mov	x20, x15
 	add	w9, w9, #243
@@ -18794,26 +19001,26 @@ LBB589_23:                              ; %B14
 	mov	x22, x8
 	add	sp, sp, #16
 	br	x1
-LBB589_24:                              ; %B66
+LBB592_24:                              ; %B66
 	ldr	x8, [x8, #8]
 	ldr	w8, [x8]
-LBB589_25:                              ; %B62
+LBB592_25:                              ; %B62
 	asr	w8, w8, #30
 	ldr	x20, [sp, #8]                   ; 8-byte Folded Reload
 	cmp	w8, #1
-	b.ne	LBB589_12
+	b.ne	LBB592_12
 ; %bb.26:                               ; %B41
 	ldr	x0, [x24, #8]
 	and	x1, x21, #0xfffffffffffc
 	bl	_prim_get_interned_non_index_atom
-	cbz	w0, LBB589_12
+	cbz	w0, LBB592_12
 ; %bb.27:                               ; %B44.preheader
 	ldr	x20, [sp, #8]                   ; 8-byte Folded Reload
 	mov	x9, x22
 	mov	w8, #18                         ; =0x12
-LBB589_28:                              ; %B44
+LBB592_28:                              ; %B44
                                         ; =>This Loop Header: Depth=1
-                                        ;     Child Loop BB589_29 Depth 2
+                                        ;     Child Loop BB592_29 Depth 2
 	ldr	x10, [x9, #8]
 	ldr	w11, [x10, #12]
 	add	x13, x10, #64
@@ -18822,53 +19029,53 @@ LBB589_28:                              ; %B44
 	ldr	w10, [x13, w10, sxtw #2]
 	add	w11, w12, #4
 	add	x11, x13, x11
-	cbz	w10, LBB589_31
-LBB589_29:                              ; %B47
-                                        ;   Parent Loop BB589_28 Depth=1
+	cbz	w10, LBB592_31
+LBB592_29:                              ; %B47
+                                        ;   Parent Loop BB592_28 Depth=1
                                         ; =>  This Inner Loop Header: Depth=2
 	lsl	w12, w10, #3
 	sub	w12, w12, #8
 	add	x12, x11, x12
 	ldp	w12, w13, [x12]
 	cmp	w13, w0
-	b.eq	LBB589_35
+	b.eq	LBB592_35
 ; %bb.30:                               ; %B53
-                                        ;   in Loop: Header=BB589_29 Depth=2
+                                        ;   in Loop: Header=BB592_29 Depth=2
 	and	w10, w12, #0x3ffffff
-	cbnz	w10, LBB589_29
-LBB589_31:                              ; %B58
-                                        ;   in Loop: Header=BB589_28 Depth=1
+	cbnz	w10, LBB592_29
+LBB592_31:                              ; %B58
+                                        ;   in Loop: Header=BB592_28 Depth=1
 	ldr	w10, [x9, #4]
 	ubfx	w10, w10, #10, #1
 	cmp	w10, #1
-	b.eq	LBB589_12
+	b.eq	LBB592_12
 ; %bb.32:                               ; %B55
-                                        ;   in Loop: Header=BB589_28 Depth=1
+                                        ;   in Loop: Header=BB592_28 Depth=1
 	ldr	x9, [x9, #8]
 	ldr	x9, [x9, #32]
-	cbnz	x9, LBB589_28
-	b	LBB589_37
-LBB589_33:                              ; %B31
+	cbnz	x9, LBB592_28
+	b	LBB592_37
+LBB592_33:                              ; %B31
 	mov	x8, x20
 	add	x20, x20, #16
 	mov	x0, xzr
 	stp	x22, x21, [x8]
 	add	sp, sp, #16
 	b	l_FastTypedArrayGet_asm_h
-LBB589_34:                              ; %B71
+LBB592_34:                              ; %B71
 	ldr	x20, [sp, #8]                   ; 8-byte Folded Reload
 	add	sp, sp, #16
 	b	l_exception_spill_top0_top1_asm_h
-LBB589_35:                              ; %B49
+LBB592_35:                              ; %B49
 	lsr	w8, w12, #26
 	ldr	x20, [sp, #8]                   ; 8-byte Folded Reload
 	tst	w8, #0x30
-	b.ne	LBB589_12
+	b.ne	LBB592_12
 ; %bb.36:                               ; %B50
 	ldr	x8, [x9, #16]
 	sub	w9, w10, #1
 	ldr	x8, [x8, w9, sxtw #3]
-LBB589_37:                              ; %B51
+LBB592_37:                              ; %B51
 	ldrb	w9, [x19], #1
 	ldr	x20, [sp, #8]                   ; 8-byte Folded Reload
 	add	w9, w9, #243
@@ -18884,19 +19091,19 @@ l_get_array_el2_2_asm_h:                ; @get_array_el2_2_asm_h
 	mov	x8, #2                          ; =0x2
 	movk	x8, #65535, lsl #48
 	tst	x22, x8
-	b.ne	LBB590_12
+	b.ne	LBB593_12
 ; %bb.1:                                ; %B73
 	mov	w9, #65534                      ; =0xfffe
 	ldrh	w8, [x22, #6]
 	cmp	x9, x21, lsr #48
-	b.ne	LBB590_5
+	b.ne	LBB593_5
 ; %bb.2:                                ; %B1
 	cmp	w8, #2
-	b.ne	LBB590_10
+	b.ne	LBB593_10
 ; %bb.3:                                ; %B3
 	ldr	w8, [x22, #48]
 	cmp	w21, w8
-	b.hs	LBB590_14
+	b.hs	LBB593_14
 ; %bb.4:                                ; %B4
 	ldrb	w8, [x19], #1
 	ldr	x9, [x22, #40]
@@ -18905,36 +19112,36 @@ l_get_array_el2_2_asm_h:                ; @get_array_el2_2_asm_h
 	ldr	x1, [x25, w8, uxtw #3]
 	add	sp, sp, #16
 	br	x1
-LBB590_5:                               ; %B33
+LBB593_5:                               ; %B33
 	cmp	w8, #1
-	b.ne	LBB590_12
+	b.ne	LBB593_12
 ; %bb.6:                                ; %B36
 	ldr	w8, [x22, #4]
 	ubfx	w8, w8, #10, #1
 	cmp	w8, #1
-	b.eq	LBB590_12
+	b.eq	LBB593_12
 ; %bb.7:                                ; %B36
 	mov	x9, #2                          ; =0x2
 	and	x8, x21, #0xffff000000000003
 	movk	x9, #1, lsl #48
 	cmp	x8, x9
-	b.ne	LBB590_12
+	b.ne	LBB593_12
 ; %bb.8:                                ; %B65
 	and	x1, x21, #0xfffffffffffc
 	str	x20, [sp, #8]                   ; 8-byte Folded Spill
 	ldrb	w8, [x1, #7]
-	tbnz	w8, #6, LBB590_24
+	tbnz	w8, #6, LBB593_24
 ; %bb.9:                                ; %B68
 	ldr	w8, [x1, #8]
-	b	LBB590_25
-LBB590_10:                              ; %B30
+	b	LBB593_25
+LBB593_10:                              ; %B30
 	sxth	w8, w8
 	cmp	w8, #21
-	b.lt	LBB590_12
+	b.lt	LBB593_12
 ; %bb.11:                               ; %B30
 	cmp	w8, #29
-	b.le	LBB590_33
-LBB590_12:                              ; %B70
+	b.le	LBB593_33
+LBB593_12:                              ; %B70
 	add	x8, x20, #16
 	mov	x0, x24
 	mov	x1, x22
@@ -18944,7 +19151,7 @@ LBB590_12:                              ; %B70
 	str	x8, [x23, #48]
 	bl	_JS_GetPropertyValue_GC
 	cmp	x0, #130
-	b.eq	LBB590_34
+	b.eq	LBB593_34
 ; %bb.13:                               ; %B72
 	ldrb	w8, [x19], #1
 	ldr	x20, [sp, #8]                   ; 8-byte Folded Reload
@@ -18953,15 +19160,15 @@ LBB590_12:                              ; %B70
 	ldr	x1, [x25, w8, uxtw #3]
 	add	sp, sp, #16
 	br	x1
-LBB590_14:                              ; %B7
-	tbnz	w21, #31, LBB590_12
+LBB593_14:                              ; %B7
+	tbnz	w21, #31, LBB593_12
 ; %bb.15:                               ; %B9.preheader
 	mov	x15, x20
 	mov	x9, x22
 	mov	w8, #18                         ; =0x12
-LBB590_16:                              ; %B9
+LBB593_16:                              ; %B9
                                         ; =>This Loop Header: Depth=1
-                                        ;     Child Loop BB590_17 Depth 2
+                                        ;     Child Loop BB593_17 Depth 2
 	ldr	x11, [x9, #8]
 	orr	w10, w21, #0x80000000
 	ldr	w12, [x11, #12]
@@ -18971,43 +19178,43 @@ LBB590_16:                              ; %B9
 	ldr	w11, [x14, w11, sxtw #2]
 	add	w12, w13, #4
 	add	x12, x14, x12
-	cbz	w11, LBB590_19
-LBB590_17:                              ; %B10
-                                        ;   Parent Loop BB590_16 Depth=1
+	cbz	w11, LBB593_19
+LBB593_17:                              ; %B10
+                                        ;   Parent Loop BB593_16 Depth=1
                                         ; =>  This Inner Loop Header: Depth=2
 	lsl	w13, w11, #3
 	sub	w13, w13, #8
 	add	x13, x12, x13
 	ldp	w13, w14, [x13]
 	cmp	w14, w10
-	b.eq	LBB590_21
+	b.eq	LBB593_21
 ; %bb.18:                               ; %B17
-                                        ;   in Loop: Header=BB590_17 Depth=2
+                                        ;   in Loop: Header=BB593_17 Depth=2
 	and	w11, w13, #0x3ffffff
-	cbnz	w11, LBB590_17
-LBB590_19:                              ; %B24
-                                        ;   in Loop: Header=BB590_16 Depth=1
+	cbnz	w11, LBB593_17
+LBB593_19:                              ; %B24
+                                        ;   in Loop: Header=BB593_16 Depth=1
 	ldr	w10, [x9, #4]
 	mov	x20, x15
 	ubfx	w10, w10, #10, #1
 	cmp	w10, #1
-	b.eq	LBB590_12
+	b.eq	LBB593_12
 ; %bb.20:                               ; %B21
-                                        ;   in Loop: Header=BB590_16 Depth=1
+                                        ;   in Loop: Header=BB593_16 Depth=1
 	ldr	x9, [x9, #8]
 	ldr	x9, [x9, #32]
-	cbnz	x9, LBB590_16
-	b	LBB590_23
-LBB590_21:                              ; %B12
+	cbnz	x9, LBB593_16
+	b	LBB593_23
+LBB593_21:                              ; %B12
 	lsr	w8, w13, #26
 	mov	x20, x15
 	tst	w8, #0x30
-	b.ne	LBB590_12
+	b.ne	LBB593_12
 ; %bb.22:                               ; %B13
 	ldr	x8, [x9, #16]
 	sub	w9, w11, #1
 	ldr	x8, [x8, w9, sxtw #3]
-LBB590_23:                              ; %B14
+LBB593_23:                              ; %B14
 	ldrb	w9, [x19], #1
 	mov	x20, x15
 	add	w9, w9, #486
@@ -19015,25 +19222,25 @@ LBB590_23:                              ; %B14
 	mov	x21, x8
 	add	sp, sp, #16
 	br	x1
-LBB590_24:                              ; %B66
+LBB593_24:                              ; %B66
 	ldr	x8, [x1, #8]
 	ldr	w8, [x8]
-LBB590_25:                              ; %B62
+LBB593_25:                              ; %B62
 	asr	w8, w8, #30
 	ldr	x20, [sp, #8]                   ; 8-byte Folded Reload
 	cmp	w8, #1
-	b.ne	LBB590_12
+	b.ne	LBB593_12
 ; %bb.26:                               ; %B41
 	ldr	x0, [x24, #8]
 	bl	_prim_get_interned_non_index_atom
-	cbz	w0, LBB590_12
+	cbz	w0, LBB593_12
 ; %bb.27:                               ; %B44.preheader
 	ldr	x20, [sp, #8]                   ; 8-byte Folded Reload
 	mov	x9, x22
 	mov	w8, #18                         ; =0x12
-LBB590_28:                              ; %B44
+LBB593_28:                              ; %B44
                                         ; =>This Loop Header: Depth=1
-                                        ;     Child Loop BB590_29 Depth 2
+                                        ;     Child Loop BB593_29 Depth 2
 	ldr	x10, [x9, #8]
 	ldr	w11, [x10, #12]
 	add	x13, x10, #64
@@ -19042,53 +19249,53 @@ LBB590_28:                              ; %B44
 	ldr	w10, [x13, w10, sxtw #2]
 	add	w11, w12, #4
 	add	x11, x13, x11
-	cbz	w10, LBB590_31
-LBB590_29:                              ; %B47
-                                        ;   Parent Loop BB590_28 Depth=1
+	cbz	w10, LBB593_31
+LBB593_29:                              ; %B47
+                                        ;   Parent Loop BB593_28 Depth=1
                                         ; =>  This Inner Loop Header: Depth=2
 	lsl	w12, w10, #3
 	sub	w12, w12, #8
 	add	x12, x11, x12
 	ldp	w12, w13, [x12]
 	cmp	w13, w0
-	b.eq	LBB590_35
+	b.eq	LBB593_35
 ; %bb.30:                               ; %B53
-                                        ;   in Loop: Header=BB590_29 Depth=2
+                                        ;   in Loop: Header=BB593_29 Depth=2
 	and	w10, w12, #0x3ffffff
-	cbnz	w10, LBB590_29
-LBB590_31:                              ; %B58
-                                        ;   in Loop: Header=BB590_28 Depth=1
+	cbnz	w10, LBB593_29
+LBB593_31:                              ; %B58
+                                        ;   in Loop: Header=BB593_28 Depth=1
 	ldr	w10, [x9, #4]
 	ubfx	w10, w10, #10, #1
 	cmp	w10, #1
-	b.eq	LBB590_12
+	b.eq	LBB593_12
 ; %bb.32:                               ; %B55
-                                        ;   in Loop: Header=BB590_28 Depth=1
+                                        ;   in Loop: Header=BB593_28 Depth=1
 	ldr	x9, [x9, #8]
 	ldr	x9, [x9, #32]
-	cbnz	x9, LBB590_28
-	b	LBB590_37
-LBB590_33:                              ; %B31
+	cbnz	x9, LBB593_28
+	b	LBB593_37
+LBB593_33:                              ; %B31
 	mov	x8, x20
 	add	x20, x20, #16
 	mov	w0, #1                          ; =0x1
 	stp	x22, x21, [x8]
 	add	sp, sp, #16
 	b	l_FastTypedArrayGet_asm_h
-LBB590_34:                              ; %B71
+LBB593_34:                              ; %B71
 	ldr	x20, [sp, #8]                   ; 8-byte Folded Reload
 	add	sp, sp, #16
 	b	l_exception_spill_top0_top1_asm_h
-LBB590_35:                              ; %B49
+LBB593_35:                              ; %B49
 	lsr	w8, w12, #26
 	ldr	x20, [sp, #8]                   ; 8-byte Folded Reload
 	tst	w8, #0x30
-	b.ne	LBB590_12
+	b.ne	LBB593_12
 ; %bb.36:                               ; %B50
 	ldr	x8, [x9, #16]
 	sub	w9, w10, #1
 	ldr	x8, [x8, w9, sxtw #3]
-LBB590_37:                              ; %B51
+LBB593_37:                              ; %B51
 	ldrb	w9, [x19], #1
 	ldr	x20, [sp, #8]                   ; 8-byte Folded Reload
 	add	w9, w9, #486
@@ -19106,111 +19313,111 @@ l_put_array_el_2_asm_h:                 ; @put_array_el_2_asm_h
 	mov	x8, #2                          ; =0x2
 	movk	x8, #65535, lsl #48
 	tst	x20, x8
-	b.ne	LBB591_45
+	b.ne	LBB594_45
 ; %bb.1:                                ; %B1
 	mov	w9, #65534                      ; =0xfffe
 	ldrh	w8, [x20, #6]
 	cmp	x9, x22, lsr #48
-	b.ne	LBB591_7
+	b.ne	LBB594_7
 ; %bb.2:                                ; %B3
 	cmp	w8, #2
-	b.ne	LBB591_12
+	b.ne	LBB594_12
 ; %bb.3:                                ; %B5
 	mov	w8, #65534                      ; =0xfffe
 	cmp	x8, x22, lsr #48
-	b.ne	LBB591_45
+	b.ne	LBB594_45
 ; %bb.4:                                ; %B50
 	ldr	w8, [x20, #48]
 	cmp	w22, w8
-	b.hs	LBB591_15
+	b.hs	LBB594_15
 ; %bb.5:                                ; %B7
 	ldr	x8, [x20, #40]
 	str	x21, [x8, w22, sxtw #3]
 	ldrb	w8, [x24, #384]
-	cbnz	w8, LBB591_24
+	cbnz	w8, LBB594_24
 ; %bb.6:                                ; %B9
 	ldrb	w8, [x19], #1
 	sub	x20, x10, #8
 	ldr	x1, [x25, x8, lsl #3]
 	add	sp, sp, #16
 	br	x1
-LBB591_7:                               ; %B59
+LBB594_7:                               ; %B59
 	cmp	w8, #1
-	b.ne	LBB591_45
+	b.ne	LBB594_45
 ; %bb.8:                                ; %B107
 	ldr	w8, [x20, #4]
 	ubfx	w8, w8, #10, #1
 	cmp	w8, #1
-	b.eq	LBB591_45
+	b.eq	LBB594_45
 ; %bb.9:                                ; %B107
 	mov	x9, #2                          ; =0x2
 	and	x8, x22, #0xffff000000000003
 	movk	x9, #1, lsl #48
 	cmp	x8, x9
-	b.ne	LBB591_45
+	b.ne	LBB594_45
 ; %bb.10:                               ; %B62
 	and	x8, x22, #0xfffffffffffc
 	str	x10, [sp, #8]                   ; 8-byte Folded Spill
 	ldrb	w9, [x8, #7]
-	tbnz	w9, #6, LBB591_25
+	tbnz	w9, #6, LBB594_25
 ; %bb.11:                               ; %B106
 	ldr	w8, [x8, #8]
-	b	LBB591_26
-LBB591_12:                              ; %B55
+	b	LBB594_26
+LBB594_12:                              ; %B55
 	sxth	w8, w8
 	cmp	w8, #21
-	b.lt	LBB591_45
+	b.lt	LBB594_45
 ; %bb.13:                               ; %B55
 	cmp	w8, #29
-	b.gt	LBB591_45
+	b.gt	LBB594_45
 ; %bb.14:                               ; %B56
 	add	x20, x10, #16
 	stp	x22, x21, [x10]
 	add	sp, sp, #16
 	b	l_FastTypedArraySet_asm_h
-LBB591_15:                              ; %B12
+LBB594_15:                              ; %B12
 	str	x10, [sp, #8]                   ; 8-byte Folded Spill
-	b.ne	LBB591_37
+	b.ne	LBB594_37
 ; %bb.16:                               ; %B40
 	ldr	w9, [x20, #4]
 	ubfx	w10, w9, #11, #1
 	cmp	w10, #1
 	ldr	x10, [sp, #8]                   ; 8-byte Folded Reload
-	b.ne	LBB591_45
+	b.ne	LBB594_45
 ; %bb.17:                               ; %B40
 	ubfx	w9, w9, #8, #1
-	cbz	w9, LBB591_45
+	cbz	w9, LBB594_45
 ; %bb.18:                               ; %B14
 	ldr	x9, [x20, #8]
 	ldr	x9, [x9, #32]
-	cbz	x9, LBB591_20
+	cbz	x9, LBB594_20
 ; %bb.19:                               ; %B36
 	ldr	w9, [x9, #4]
 	ubfx	w9, w9, #13, #1
 	cmp	w9, #1
-	b.ne	LBB591_45
-LBB591_20:                              ; %B32
+	b.ne	LBB594_45
+LBB594_20:                              ; %B32
 	ldr	x9, [x20, #16]
 	ldr	x10, [x9]
 	mov	w9, #65534                      ; =0xfffe
 	cmp	x9, x10, lsr #48
 	add	w9, w8, #1
-	b.ne	LBB591_22
+	b.ne	LBB594_22
 ; %bb.21:                               ; %B32
 	cmp	w9, w10
-	b.hi	LBB591_39
-LBB591_22:                              ; %B29
+	b.hi	LBB594_39
+LBB594_22:                              ; %B29
 	ldr	w10, [x20, #32]
 	cmp	w9, w10
-	b.hi	LBB591_39
+	b.hi	LBB594_39
 ; %bb.23:                               ; %B25
 	ldr	x10, [x20, #40]
 	str	w9, [x20, #48]
 	str	x21, [x10, w8, sxtw #3]
 	ldrb	w8, [x24, #384]
-	cbz	w8, LBB591_46
-	b	LBB591_42
-LBB591_24:                              ; %B11
+	cbz	w8, LBB594_46
+	b	LBB594_42
+LBB594_24:                              ; %B11
 	mov	x0, x21
 	mov	x1, x24
 	mov	x20, x10
@@ -19220,20 +19427,20 @@ LBB591_24:                              ; %B11
 	ldr	x1, [x25, x8, lsl #3]
 	add	sp, sp, #16
 	br	x1
-LBB591_25:                              ; %B63
+LBB594_25:                              ; %B63
 	ldr	x8, [x8, #8]
 	ldr	w8, [x8]
-LBB591_26:                              ; %B102
+LBB594_26:                              ; %B102
 	asr	w8, w8, #30
 	ldr	x10, [sp, #8]                   ; 8-byte Folded Reload
 	cmp	w8, #1
-	b.ne	LBB591_45
+	b.ne	LBB594_45
 ; %bb.27:                               ; %B64
 	ldr	x0, [x24, #8]
 	and	x1, x22, #0xfffffffffffc
 	bl	_prim_get_interned_non_index_atom
 	ldr	x10, [sp, #8]                   ; 8-byte Folded Reload
-	cbz	w0, LBB591_45
+	cbz	w0, LBB594_45
 ; %bb.28:                               ; %B66
 	ldr	x8, [x20, #8]
 	ldr	w9, [x8, #12]
@@ -19243,24 +19450,24 @@ LBB591_26:                              ; %B102
 	ldr	w8, [x11, w8, sxtw #2]
 	add	w9, w10, #4
 	add	x9, x11, x9
-	cbz	w8, LBB591_31
-LBB591_29:                              ; %B69
+	cbz	w8, LBB594_31
+LBB594_29:                              ; %B69
                                         ; =>This Inner Loop Header: Depth=1
 	lsl	w10, w8, #3
 	sub	w10, w10, #8
 	add	x10, x9, x10
 	ldp	w10, w11, [x10]
 	cmp	w11, w0
-	b.eq	LBB591_40
+	b.eq	LBB594_40
 ; %bb.30:                               ; %B78
-                                        ;   in Loop: Header=BB591_29 Depth=1
+                                        ;   in Loop: Header=BB594_29 Depth=1
 	and	w8, w10, #0x3ffffff
-	cbnz	w8, LBB591_29
-LBB591_31:                              ; %B80.preheader
+	cbnz	w8, LBB594_29
+LBB594_31:                              ; %B80.preheader
 	mov	x8, x20
-LBB591_32:                              ; %B80
+LBB594_32:                              ; %B80
                                         ; =>This Loop Header: Depth=1
-                                        ;     Child Loop BB591_33 Depth 2
+                                        ;     Child Loop BB594_33 Depth 2
 	ldr	x9, [x8, #8]
 	ldr	w10, [x9, #12]
 	add	x9, x9, #64
@@ -19269,36 +19476,36 @@ LBB591_32:                              ; %B80
 	ldr	w10, [x9, w10, sxtw #2]
 	add	w11, w11, #4
 	add	x9, x9, x11
-	cbz	w10, LBB591_35
-LBB591_33:                              ; %B93
-                                        ;   Parent Loop BB591_32 Depth=1
+	cbz	w10, LBB594_35
+LBB594_33:                              ; %B93
+                                        ;   Parent Loop BB594_32 Depth=1
                                         ; =>  This Inner Loop Header: Depth=2
 	lsl	w10, w10, #3
 	sub	w10, w10, #8
 	add	x10, x9, x10
 	ldp	w10, w11, [x10]
 	cmp	w11, w0
-	b.eq	LBB591_43
+	b.eq	LBB594_43
 ; %bb.34:                               ; %B98
-                                        ;   in Loop: Header=BB591_33 Depth=2
+                                        ;   in Loop: Header=BB594_33 Depth=2
 	and	w10, w10, #0x3ffffff
-	cbnz	w10, LBB591_33
-LBB591_35:                              ; %B81
-                                        ;   in Loop: Header=BB591_32 Depth=1
+	cbnz	w10, LBB594_33
+LBB594_35:                              ; %B81
+                                        ;   in Loop: Header=BB594_32 Depth=1
 	ldr	w9, [x8, #4]
 	ldr	x10, [sp, #8]                   ; 8-byte Folded Reload
 	ubfx	w9, w9, #10, #1
 	cmp	w9, #1
-	b.eq	LBB591_45
+	b.eq	LBB594_45
 ; %bb.36:                               ; %B87
-                                        ;   in Loop: Header=BB591_32 Depth=1
+                                        ;   in Loop: Header=BB594_32 Depth=1
 	ldr	x8, [x8, #8]
 	ldr	x8, [x8, #32]
-	cbnz	x8, LBB591_32
-	b	LBB591_44
-LBB591_37:                              ; %B44
+	cbnz	x8, LBB594_32
+	b	LBB594_44
+LBB594_37:                              ; %B44
 	ldr	x10, [sp, #8]                   ; 8-byte Folded Reload
-	tbnz	w22, #31, LBB591_45
+	tbnz	w22, #31, LBB594_45
 ; %bb.38:                               ; %B46
 	add	x8, x10, #16
 	mov	x0, x24
@@ -19309,9 +19516,9 @@ LBB591_37:                              ; %B44
 	stp	x22, x21, [x10]
 	str	x8, [x23, #48]
 	bl	_JS_SetArrayIntPropertyValue_GC
-	tbz	w0, #31, LBB591_46
-	b	LBB591_48
-LBB591_39:                              ; %B20
+	tbz	w0, #31, LBB594_46
+	b	LBB594_48
+LBB594_39:                              ; %B20
 	ldr	x9, [sp, #8]                    ; 8-byte Folded Reload
 	mov	x0, x24
 	mov	x1, x20
@@ -19321,21 +19528,21 @@ LBB591_39:                              ; %B20
 	stp	x22, x21, [x9]
 	str	x8, [x23, #48]
 	bl	_add_fast_array_element_gc
-	tbz	w0, #31, LBB591_46
-	b	LBB591_48
-LBB591_40:                              ; %B71
+	tbz	w0, #31, LBB594_46
+	b	LBB594_48
+LBB594_40:                              ; %B71
 	mov	w9, #58                         ; =0x3a
 	and	w9, w9, w10, lsr #26
 	ldr	x10, [sp, #8]                   ; 8-byte Folded Reload
 	cmp	w9, #2
-	b.ne	LBB591_45
+	b.ne	LBB594_45
 ; %bb.41:                               ; %B74
 	ldr	x9, [x20, #16]
 	sub	w8, w8, #1
 	str	x21, [x9, w8, sxtw #3]
 	ldrb	w8, [x24, #384]
-	cbz	w8, LBB591_46
-LBB591_42:                              ; %B76
+	cbz	w8, LBB594_46
+LBB594_42:                              ; %B76
 	mov	x0, x21
 	mov	x1, x24
 	bl	_prim_WriteBarrierNoStore
@@ -19345,18 +19552,18 @@ LBB591_42:                              ; %B76
 	sub	x20, x8, #8
 	add	sp, sp, #16
 	br	x1
-LBB591_43:                              ; %B95
+LBB594_43:                              ; %B95
 	mov	w8, #58                         ; =0x3a
 	and	w8, w8, w10, lsr #26
 	ldr	x10, [sp, #8]                   ; 8-byte Folded Reload
 	cmp	w8, #2
-	b.ne	LBB591_45
-LBB591_44:                              ; %B84
+	b.ne	LBB594_45
+LBB594_44:                              ; %B84
 	ldr	w8, [x20, #4]
 	ubfx	w8, w8, #8, #1
 	cmp	w8, #1
-	b.eq	LBB591_47
-LBB591_45:                              ; %B113
+	b.eq	LBB594_47
+LBB594_45:                              ; %B113
 	add	x8, x10, #16
 	mov	x0, x24
 	mov	x1, x20
@@ -19367,21 +19574,21 @@ LBB591_45:                              ; %B113
 	str	x10, [sp, #8]                   ; 8-byte Folded Spill
 	str	x8, [x23, #48]
 	bl	_JS_SetPropertyValue_GC
-	tbnz	w0, #31, LBB591_48
-LBB591_46:                              ; %B73
+	tbnz	w0, #31, LBB594_48
+LBB594_46:                              ; %B73
 	ldrb	w8, [x19], #1
 	ldr	x1, [x25, x8, lsl #3]
 	ldr	x8, [sp, #8]                    ; 8-byte Folded Reload
 	sub	x20, x8, #8
 	add	sp, sp, #16
 	br	x1
-LBB591_47:                              ; %B85
+LBB594_47:                              ; %B85
 	add	x20, x10, #16
 	stp	x22, x21, [x10]
 	mov	w0, w0
 	add	sp, sp, #16
 	b	l_FastAddNamedProperty_asm_h
-LBB591_48:                              ; %B47
+LBB594_48:                              ; %B47
 	ldr	x20, [sp, #8]                   ; 8-byte Folded Reload
 	add	sp, sp, #16
 	b	l_exception_spill_top0_top1_asm_h
@@ -19621,7 +19828,7 @@ l_get_loc_check_2_asm_h:                ; @get_loc_check_2_asm_h
 	ldrh	w8, [x19]
 	ldr	x8, [x27, x8, lsl #3]
 	cmp	x8, #34
-	b.eq	LBB615_2
+	b.eq	LBB618_2
 ; %bb.1:                                ; %B4
 	ldrb	w9, [x19, #2]
 	add	x19, x19, #3
@@ -19630,7 +19837,7 @@ l_get_loc_check_2_asm_h:                ; @get_loc_check_2_asm_h
 	add	w9, w9, #486
 	ldr	x1, [x25, w9, uxtw #3]
 	br	x1
-LBB615_2:                               ; %B3
+LBB618_2:                               ; %B3
 	str	x21, [x20], #8
 	b	l_ThrowReferenceErrorUninitialized_asm_h
                                         ; -- End function
@@ -19640,7 +19847,7 @@ l_put_loc_check_2_asm_h:                ; @put_loc_check_2_asm_h
 	ldrh	w8, [x19]
 	ldr	x9, [x27, x8, lsl #3]
 	cmp	x9, #34
-	b.eq	LBB616_2
+	b.eq	LBB619_2
 ; %bb.1:                                ; %B4
 	str	x21, [x27, w8, uxtw #3]
 	ldrb	w8, [x19, #2]
@@ -19648,7 +19855,7 @@ l_put_loc_check_2_asm_h:                ; @put_loc_check_2_asm_h
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB616_2:                               ; %B3
+LBB619_2:                               ; %B3
 	mov	x8, x20
 	add	x20, x20, #16
 	stp	x22, x21, [x8]
@@ -19660,7 +19867,7 @@ l_put_loc_check_init_2_asm_h:           ; @put_loc_check_init_2_asm_h
 	ldrh	w8, [x19]
 	ldr	x9, [x27, x8, lsl #3]
 	cmp	x9, #34
-	b.ne	LBB617_2
+	b.ne	LBB620_2
 ; %bb.1:                                ; %B4
 	str	x21, [x27, w8, uxtw #3]
 	ldrb	w8, [x19, #2]
@@ -19668,7 +19875,7 @@ l_put_loc_check_init_2_asm_h:           ; @put_loc_check_init_2_asm_h
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB617_2:                               ; %B3
+LBB620_2:                               ; %B3
 	mov	x8, x20
 	add	x20, x20, #16
 	stp	x22, x21, [x8]
@@ -19683,7 +19890,7 @@ l_get_var_ref_check_2_asm_h:            ; @get_var_ref_check_2_asm_h
 	ldr	x8, [x8]
 	ldr	x8, [x8]
 	cmp	x8, #34
-	b.eq	LBB618_2
+	b.eq	LBB621_2
 ; %bb.1:                                ; %B4
 	ldrb	w9, [x19, #2]
 	add	x19, x19, #3
@@ -19692,7 +19899,7 @@ l_get_var_ref_check_2_asm_h:            ; @get_var_ref_check_2_asm_h
 	add	w9, w9, #486
 	ldr	x1, [x25, w9, uxtw #3]
 	br	x1
-LBB618_2:                               ; %B3
+LBB621_2:                               ; %B3
 	str	x21, [x20], #8
 	b	l_ThrowReferenceErrorUninitialized_asm_h
                                         ; -- End function
@@ -19704,7 +19911,7 @@ l_put_var_ref_check_2_asm_h:            ; @put_var_ref_check_2_asm_h
 	ldr	x8, [x8]
 	ldr	x9, [x8]
 	cmp	x9, #34
-	b.eq	LBB619_2
+	b.eq	LBB622_2
 ; %bb.1:                                ; %B4
 	str	x21, [x8]
 	ldrb	w8, [x19, #2]
@@ -19712,7 +19919,7 @@ l_put_var_ref_check_2_asm_h:            ; @put_var_ref_check_2_asm_h
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB619_2:                               ; %B3
+LBB622_2:                               ; %B3
 	mov	x8, x20
 	add	x20, x20, #16
 	stp	x22, x21, [x8]
@@ -19726,7 +19933,7 @@ l_put_var_ref_check_init_2_asm_h:       ; @put_var_ref_check_init_2_asm_h
 	ldr	x8, [x8]
 	ldr	x9, [x8]
 	cmp	x9, #34
-	b.ne	LBB620_2
+	b.ne	LBB623_2
 ; %bb.1:                                ; %B4
 	str	x21, [x8]
 	ldrb	w8, [x19, #2]
@@ -19734,7 +19941,7 @@ l_put_var_ref_check_init_2_asm_h:       ; @put_var_ref_check_init_2_asm_h
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB620_2:                               ; %B3
+LBB623_2:                               ; %B3
 	mov	x8, x20
 	add	x20, x20, #16
 	stp	x22, x21, [x8]
@@ -19755,62 +19962,72 @@ l_close_loc_2_asm_h:                    ; @close_loc_2_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function if_false_2_asm_h
 l_if_false_2_asm_h:                     ; @if_false_2_asm_h
-; %bb.0:                                ; %B23
+; %bb.0:                                ; %B29
 	cmp	x21, #5
-	b.le	LBB622_4
-; %bb.1:                                ; %B23
+	b.le	LBB625_4
+; %bb.1:                                ; %B29
 	cmp	x21, #6
-	b.eq	LBB622_6
-; %bb.2:                                ; %B23
+	b.eq	LBB625_6
+; %bb.2:                                ; %B29
 	cmp	x21, #7
-	b.eq	LBB622_9
-; %bb.3:                                ; %B23
+	b.eq	LBB625_10
+; %bb.3:                                ; %B29
 	cmp	x21, #18
-	b.eq	LBB622_6
-	b	LBB622_7
-LBB622_4:                               ; %B23
+	b.eq	LBB625_6
+	b	LBB625_8
+LBB625_4:                               ; %B29
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x21, x8
-	b.eq	LBB622_6
-; %bb.5:                                ; %B23
+	b.eq	LBB625_6
+; %bb.5:                                ; %B29
 	cmp	x21, #2
-	b.ne	LBB622_7
-LBB622_6:                               ; %B3
+	b.ne	LBB625_8
+LBB625_6:                               ; %B8
 	ldrsw	x8, [x19]
 	add	x19, x19, x8
+	tbnz	x8, #63, LBB625_11
+LBB625_7:                               ; %B10
 	ldrb	w8, [x19], #1
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB622_7:                               ; %B9
+LBB625_8:                               ; %B15
 	mov	x8, #-281474976710656           ; =0xffff000000000000
 	cmp	x21, x8
-	b.hs	LBB622_13
-; %bb.8:                                ; %B11
+	b.hs	LBB625_16
+; %bb.9:                                ; %B17
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x21, x8
-	b.lo	LBB622_10
-LBB622_9:                               ; %B19
+	b.lo	LBB625_13
+LBB625_10:                              ; %B25
 	ldrb	w8, [x19, #4]
 	add	x19, x19, #5
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB622_10:                              ; %B13
+LBB625_11:                              ; %B5
+	ldr	w8, [x24, #232]
+	subs	w8, w8, #1
+	str	w8, [x24, #232]
+	b.pl	LBB625_7
+; %bb.12:                               ; %B6
+	add	x19, x19, #1
+	b	l_PollInterrupts_spill_top0_asm_h
+LBB625_13:                              ; %B19
 	tst	x21, #0xfffe000000000000
-	b.eq	LBB622_13
-; %bb.11:                               ; %B17
+	b.eq	LBB625_16
+; %bb.14:                               ; %B23
 	add	x8, x21, x8
 	fmov	d0, x8
 	fcmp	d0, d0
 	cset	w8, vc
 	fcmp	d0, #0.0
-	b.eq	LBB622_6
-	b.vs	LBB622_6
-; %bb.12:                               ; %B17
-	tbnz	w8, #0, LBB622_9
-	b	LBB622_6
-LBB622_13:                              ; %B15
+	b.eq	LBB625_6
+	b.vs	LBB625_6
+; %bb.15:                               ; %B23
+	tbnz	w8, #0, LBB625_10
+	b	LBB625_6
+LBB625_16:                              ; %B21
 	mov	x8, x20
 	add	x20, x20, #16
 	mov	x0, x21
@@ -19819,62 +20036,73 @@ LBB622_13:                              ; %B15
                                         ; -- End function
 	.p2align	2                               ; -- Begin function if_true_2_asm_h
 l_if_true_2_asm_h:                      ; @if_true_2_asm_h
-; %bb.0:                                ; %B23
+; %bb.0:                                ; %B29
 	cmp	x21, #5
-	b.le	LBB623_4
-; %bb.1:                                ; %B23
+	b.le	LBB626_4
+; %bb.1:                                ; %B29
 	cmp	x21, #6
-	b.eq	LBB623_6
-; %bb.2:                                ; %B23
+	b.eq	LBB626_6
+; %bb.2:                                ; %B29
 	cmp	x21, #7
-	b.eq	LBB623_9
-; %bb.3:                                ; %B23
+	b.eq	LBB626_9
+; %bb.3:                                ; %B29
 	cmp	x21, #18
-	b.eq	LBB623_6
-	b	LBB623_7
-LBB623_4:                               ; %B23
+	b.eq	LBB626_6
+	b	LBB626_7
+LBB626_4:                               ; %B29
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x21, x8
-	b.eq	LBB623_6
-; %bb.5:                                ; %B23
+	b.eq	LBB626_6
+; %bb.5:                                ; %B29
 	cmp	x21, #2
-	b.ne	LBB623_7
-LBB623_6:                               ; %B3
+	b.ne	LBB626_7
+LBB626_6:                               ; %B3
 	ldrb	w8, [x19, #4]
 	add	x19, x19, #5
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB623_7:                               ; %B9
+LBB626_7:                               ; %B9
 	mov	x8, #-281474976710656           ; =0xffff000000000000
 	cmp	x21, x8
-	b.hs	LBB623_13
+	b.hs	LBB626_16
 ; %bb.8:                                ; %B11
-	mov	x8, #-562949953421312           ; =0xfffe000000000000
+	mov	x8, #-562949953421313           ; =0xfffdffffffffffff
 	cmp	x21, x8
-	b.lo	LBB623_10
-LBB623_9:                               ; %B19
+	b.ls	LBB626_13
+LBB626_9:                               ; %B23
 	ldrsw	x8, [x19]
 	add	x19, x19, x8
+	tbnz	x8, #63, LBB626_11
+LBB626_10:                              ; %B25
 	ldrb	w8, [x19], #1
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB623_10:                              ; %B13
+LBB626_11:                              ; %B20
+	ldr	w8, [x24, #232]
+	subs	w8, w8, #1
+	str	w8, [x24, #232]
+	b.pl	LBB626_10
+; %bb.12:                               ; %B21
+	add	x19, x19, #1
+	b	l_PollInterrupts_spill_top0_asm_h
+LBB626_13:                              ; %B13
 	tst	x21, #0xfffe000000000000
-	b.eq	LBB623_13
-; %bb.11:                               ; %B17
+	b.eq	LBB626_16
+; %bb.14:                               ; %B17
+	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	add	x8, x21, x8
 	fmov	d0, x8
 	fcmp	d0, d0
 	cset	w8, vc
 	fcmp	d0, #0.0
-	b.eq	LBB623_6
-	b.vs	LBB623_6
-; %bb.12:                               ; %B17
-	tbnz	w8, #0, LBB623_9
-	b	LBB623_6
-LBB623_13:                              ; %B15
+	b.eq	LBB626_6
+	b.vs	LBB626_6
+; %bb.15:                               ; %B17
+	tbnz	w8, #0, LBB626_9
+	b	LBB626_6
+LBB626_16:                              ; %B15
 	mov	x8, x20
 	add	x20, x20, #16
 	mov	x0, x21
@@ -19883,13 +20111,23 @@ LBB623_13:                              ; %B15
                                         ; -- End function
 	.p2align	2                               ; -- Begin function goto_2_asm_h
 l_goto_2_asm_h:                         ; @goto_2_asm_h
-; %bb.0:                                ; %B0
+; %bb.0:                                ; %B5
 	ldrsw	x8, [x19]
 	add	x19, x19, x8
+	tbnz	x8, #63, LBB627_2
+LBB627_1:                               ; %B7
 	ldrb	w8, [x19], #1
 	add	w8, w8, #486
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
+LBB627_2:                               ; %B2
+	ldr	w8, [x24, #232]
+	subs	w8, w8, #1
+	str	w8, [x24, #232]
+	b.pl	LBB627_1
+; %bb.3:                                ; %B3
+	add	x19, x19, #1
+	b	l_PollInterrupts_spill_top0_top1_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function catch_2_asm_h
 l_catch_2_asm_h:                        ; @catch_2_asm_h
@@ -19928,27 +20166,27 @@ l_to_propkey_2_asm_h:                   ; @to_propkey_2_asm_h
 ; %bb.0:                                ; %B15
 	mov	w8, #65534                      ; =0xfffe
 	cmp	x8, x21, lsr #48
-	b.eq	LBB629_4
+	b.eq	LBB632_4
 ; %bb.1:                                ; %B15
 	mov	x9, #1                          ; =0x1
 	and	x8, x21, #0xffff000000000003
 	movk	x9, #1, lsl #48
 	add	x10, x9, #1
 	cmp	x8, x10
-	b.eq	LBB629_4
+	b.eq	LBB632_4
 ; %bb.2:                                ; %B15
 	cmp	x8, x9
-	b.eq	LBB629_4
+	b.eq	LBB632_4
 ; %bb.3:                                ; %B15
 	mov	x9, #-281474976710653           ; =0xffff000000000003
 	cmp	x8, x9
-	b.ne	LBB629_5
-LBB629_4:                               ; %B3
+	b.ne	LBB632_5
+LBB632_4:                               ; %B3
 	ldrb	w8, [x19], #1
 	add	w8, w8, #486
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB629_5:                               ; %B12
+LBB632_5:                               ; %B12
 	add	x8, x20, #16
 	mov	x0, x24
 	mov	x1, x21
@@ -19956,14 +20194,14 @@ LBB629_5:                               ; %B12
 	str	x8, [x23, #48]
 	bl	_JS_ToPropertyKey_GC
 	cmp	x0, #130
-	b.eq	LBB629_7
+	b.eq	LBB632_7
 ; %bb.6:                                ; %B14
 	ldrb	w8, [x19], #1
 	mov	x21, x0
 	add	w8, w8, #486
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB629_7:                               ; %B13
+LBB632_7:                               ; %B13
 	b	l_exception_spill_top0_top1_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function to_propkey2_2_asm_h
@@ -19971,7 +20209,7 @@ l_to_propkey2_2_asm_h:                  ; @to_propkey2_2_asm_h
 ; %bb.0:                                ; %B18
 	orr	x8, x22, #0x10
 	cmp	x8, #18
-	b.ne	LBB630_3
+	b.ne	LBB633_3
 ; %bb.1:                                ; %B19
 	add	x8, x20, #16
 Lloh26:
@@ -19982,32 +20220,32 @@ Lloh27:
 	stp	x22, x21, [x20]
 	str	x8, [x23, #48]
 	bl	_LEPUS_ThrowTypeError
-LBB630_2:                               ; %B16
+LBB633_2:                               ; %B16
 	b	l_exception_spill_top0_top1_asm_h
-LBB630_3:                               ; %B2
+LBB633_3:                               ; %B2
 	mov	w8, #65534                      ; =0xfffe
 	cmp	x8, x21, lsr #48
-	b.eq	LBB630_7
+	b.eq	LBB633_7
 ; %bb.4:                                ; %B2
 	mov	x9, #1                          ; =0x1
 	and	x8, x21, #0xffff000000000003
 	movk	x9, #1, lsl #48
 	add	x10, x9, #1
 	cmp	x8, x10
-	b.eq	LBB630_7
+	b.eq	LBB633_7
 ; %bb.5:                                ; %B2
 	cmp	x8, x9
-	b.eq	LBB630_7
+	b.eq	LBB633_7
 ; %bb.6:                                ; %B2
 	mov	x9, #-281474976710653           ; =0xffff000000000003
 	cmp	x8, x9
-	b.ne	LBB630_8
-LBB630_7:                               ; %B4
+	b.ne	LBB633_8
+LBB633_7:                               ; %B4
 	ldrb	w8, [x19], #1
 	add	w8, w8, #486
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB630_8:                               ; %B15
+LBB633_8:                               ; %B15
 	add	x8, x20, #16
 	mov	x0, x24
 	mov	x1, x21
@@ -20015,7 +20253,7 @@ LBB630_8:                               ; %B15
 	str	x8, [x23, #48]
 	bl	_JS_ToPropertyKey_GC
 	cmp	x0, #130
-	b.eq	LBB630_2
+	b.eq	LBB633_2
 ; %bb.9:                                ; %B17
 	ldrb	w8, [x19], #1
 	mov	x21, x0
@@ -20245,17 +20483,17 @@ l_neg_2_asm_h:                          ; @neg_2_asm_h
 ; %bb.0:                                ; %B19
 	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
 	cmp	x21, x8
-	b.hi	LBB658_3
+	b.hi	LBB661_3
 ; %bb.1:                                ; %B1
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x21, x8
-	b.lo	LBB658_6
+	b.lo	LBB661_6
 ; %bb.2:                                ; %B13
 	orr	w8, w21, #0x80000000
 	mov	w9, #-2147483648                ; =0x80000000
 	cmp	w8, w9
-	b.ne	LBB658_5
-LBB658_3:                               ; %B16
+	b.ne	LBB661_5
+LBB661_3:                               ; %B16
 	add	x8, x20, #16
 	mov	x0, x24
 	mov	x1, x21
@@ -20264,23 +20502,23 @@ LBB658_3:                               ; %B16
 	str	x8, [x23, #48]
 	bl	_prim_js_unary_arith_slow_gc
 	cmp	x0, #130
-	b.eq	LBB658_8
+	b.eq	LBB661_8
 ; %bb.4:                                ; %B18
 	ldrb	w8, [x19], #1
 	mov	x21, x0
 	add	w8, w8, #486
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB658_5:                               ; %B15
+LBB661_5:                               ; %B15
 	ldrb	w8, [x19], #1
 	add	w8, w8, #486
 	ldr	x1, [x25, w8, uxtw #3]
 	neg	w8, w21
 	orr	x21, x8, #0xfffe000000000000
 	br	x1
-LBB658_6:                               ; %B3
+LBB661_6:                               ; %B3
 	tst	x21, #0xfffe000000000000
-	b.eq	LBB658_3
+	b.eq	LBB661_3
 ; %bb.7:                                ; %B7
 	movi	d0, #0000000000000000
 	add	x8, x21, x8
@@ -20296,7 +20534,7 @@ LBB658_6:                               ; %B3
 	add	x9, x9, x10
 	csel	x21, x9, x8, vc
 	br	x1
-LBB658_8:                               ; %B17
+LBB661_8:                               ; %B17
 	b	l_exception_spill_top0_top1_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function plus_2_asm_h
@@ -20304,20 +20542,20 @@ l_plus_2_asm_h:                         ; @plus_2_asm_h
 ; %bb.0:                                ; %B13
 	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
 	cmp	x21, x8
-	b.hi	LBB659_4
+	b.hi	LBB662_4
 ; %bb.1:                                ; %B1
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x21, x8
-	b.lo	LBB659_3
-LBB659_2:                               ; %B7
+	b.lo	LBB662_3
+LBB662_2:                               ; %B7
 	ldrb	w8, [x19], #1
 	add	w8, w8, #486
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB659_3:                               ; %B3
+LBB662_3:                               ; %B3
 	tst	x21, #0xfffe000000000000
-	b.ne	LBB659_2
-LBB659_4:                               ; %B10
+	b.ne	LBB662_2
+LBB662_4:                               ; %B10
 	add	x8, x20, #16
 	mov	x0, x24
 	mov	x1, x21
@@ -20326,14 +20564,14 @@ LBB659_4:                               ; %B10
 	str	x8, [x23, #48]
 	bl	_prim_js_unary_arith_slow_gc
 	cmp	x0, #130
-	b.eq	LBB659_6
+	b.eq	LBB662_6
 ; %bb.5:                                ; %B12
 	mov	x21, x0
 	ldrb	w8, [x19], #1
 	add	w8, w8, #486
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB659_6:                               ; %B11
+LBB662_6:                               ; %B11
 	b	l_exception_spill_top0_top1_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function dec_2_asm_h
@@ -20341,23 +20579,23 @@ l_dec_2_asm_h:                          ; @dec_2_asm_h
 ; %bb.0:                                ; %B19
 	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
 	cmp	x21, x8
-	b.hi	LBB660_6
+	b.hi	LBB663_6
 ; %bb.1:                                ; %B1
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x21, x8
-	b.lo	LBB660_4
+	b.lo	LBB663_4
 ; %bb.2:                                ; %B13
 	subs	w8, w21, #1
-	b.vs	LBB660_6
+	b.vs	LBB663_6
 ; %bb.3:                                ; %B15
 	ldrb	w9, [x19], #1
 	orr	x21, x8, #0xfffe000000000000
 	add	w9, w9, #486
 	ldr	x1, [x25, w9, uxtw #3]
 	br	x1
-LBB660_4:                               ; %B3
+LBB663_4:                               ; %B3
 	tst	x21, #0xfffe000000000000
-	b.eq	LBB660_6
+	b.eq	LBB663_6
 ; %bb.5:                                ; %B7
 	add	x8, x21, x8
 	fmov	d0, #-1.00000000
@@ -20373,7 +20611,7 @@ LBB660_4:                               ; %B3
 	add	x9, x9, x10
 	csel	x21, x9, x8, vc
 	br	x1
-LBB660_6:                               ; %B16
+LBB663_6:                               ; %B16
 	add	x8, x20, #16
 	mov	x0, x24
 	mov	x1, x21
@@ -20382,14 +20620,14 @@ LBB660_6:                               ; %B16
 	str	x8, [x23, #48]
 	bl	_prim_js_unary_arith_slow_gc
 	cmp	x0, #130
-	b.eq	LBB660_8
+	b.eq	LBB663_8
 ; %bb.7:                                ; %B18
 	ldrb	w8, [x19], #1
 	mov	x21, x0
 	add	w8, w8, #486
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB660_8:                               ; %B17
+LBB663_8:                               ; %B17
 	b	l_exception_spill_top0_top1_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function inc_2_asm_h
@@ -20397,23 +20635,23 @@ l_inc_2_asm_h:                          ; @inc_2_asm_h
 ; %bb.0:                                ; %B19
 	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
 	cmp	x21, x8
-	b.hi	LBB661_6
+	b.hi	LBB664_6
 ; %bb.1:                                ; %B1
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x21, x8
-	b.lo	LBB661_4
+	b.lo	LBB664_4
 ; %bb.2:                                ; %B13
 	adds	w8, w21, #1
-	b.vs	LBB661_6
+	b.vs	LBB664_6
 ; %bb.3:                                ; %B15
 	ldrb	w9, [x19], #1
 	orr	x21, x8, #0xfffe000000000000
 	add	w9, w9, #486
 	ldr	x1, [x25, w9, uxtw #3]
 	br	x1
-LBB661_4:                               ; %B3
+LBB664_4:                               ; %B3
 	tst	x21, #0xfffe000000000000
-	b.eq	LBB661_6
+	b.eq	LBB664_6
 ; %bb.5:                                ; %B7
 	add	x8, x21, x8
 	fmov	d0, #1.00000000
@@ -20429,7 +20667,7 @@ LBB661_4:                               ; %B3
 	add	x9, x9, x10
 	csel	x21, x9, x8, vc
 	br	x1
-LBB661_6:                               ; %B16
+LBB664_6:                               ; %B16
 	add	x8, x20, #16
 	mov	x0, x24
 	mov	x1, x21
@@ -20438,14 +20676,14 @@ LBB661_6:                               ; %B16
 	str	x8, [x23, #48]
 	bl	_prim_js_unary_arith_slow_gc
 	cmp	x0, #130
-	b.eq	LBB661_8
+	b.eq	LBB664_8
 ; %bb.7:                                ; %B18
 	ldrb	w8, [x19], #1
 	mov	x21, x0
 	add	w8, w8, #486
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB661_8:                               ; %B17
+LBB664_8:                               ; %B17
 	b	l_exception_spill_top0_top1_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function post_dec_2_asm_h
@@ -20454,14 +20692,14 @@ l_post_dec_2_asm_h:                     ; @post_dec_2_asm_h
 	mov	x8, #-281474976710656           ; =0xffff000000000000
 	str	x22, [x20], #8
 	cmp	x21, x8
-	b.hs	LBB662_6
+	b.hs	LBB665_6
 ; %bb.1:                                ; %B1
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x21, x8
-	b.lo	LBB662_4
+	b.lo	LBB665_4
 ; %bb.2:                                ; %B13
 	subs	w8, w21, #1
-	b.vs	LBB662_6
+	b.vs	LBB665_6
 ; %bb.3:                                ; %B15
 	ldrb	w9, [x19], #1
 	mov	x22, x21
@@ -20469,9 +20707,9 @@ l_post_dec_2_asm_h:                     ; @post_dec_2_asm_h
 	add	w9, w9, #486
 	ldr	x1, [x25, w9, uxtw #3]
 	br	x1
-LBB662_4:                               ; %B3
+LBB665_4:                               ; %B3
 	tst	x21, #0xfffe000000000000
-	b.eq	LBB662_6
+	b.eq	LBB665_6
 ; %bb.5:                                ; %B8
 	add	x8, x21, x8
 	fmov	d0, #-1.00000000
@@ -20489,7 +20727,7 @@ LBB662_4:                               ; %B3
 	csel	x8, x9, x10, vc
 	mov	x21, x8
 	br	x1
-LBB662_6:                               ; %B5
+LBB665_6:                               ; %B5
 	str	x21, [x20], #8
 	mov	w0, #144                        ; =0x90
 	b	l_SlowJSPostInc_asm_h
@@ -20500,14 +20738,14 @@ l_post_inc_2_asm_h:                     ; @post_inc_2_asm_h
 	mov	x8, #-281474976710656           ; =0xffff000000000000
 	str	x22, [x20], #8
 	cmp	x21, x8
-	b.hs	LBB663_6
+	b.hs	LBB666_6
 ; %bb.1:                                ; %B1
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x21, x8
-	b.lo	LBB663_4
+	b.lo	LBB666_4
 ; %bb.2:                                ; %B13
 	adds	w8, w21, #1
-	b.vs	LBB663_6
+	b.vs	LBB666_6
 ; %bb.3:                                ; %B15
 	ldrb	w9, [x19], #1
 	mov	x22, x21
@@ -20515,9 +20753,9 @@ l_post_inc_2_asm_h:                     ; @post_inc_2_asm_h
 	add	w9, w9, #486
 	ldr	x1, [x25, w9, uxtw #3]
 	br	x1
-LBB663_4:                               ; %B3
+LBB666_4:                               ; %B3
 	tst	x21, #0xfffe000000000000
-	b.eq	LBB663_6
+	b.eq	LBB666_6
 ; %bb.5:                                ; %B8
 	add	x8, x21, x8
 	fmov	d0, #1.00000000
@@ -20535,7 +20773,7 @@ LBB663_4:                               ; %B3
 	csel	x8, x9, x10, vc
 	mov	x21, x8
 	br	x1
-LBB663_6:                               ; %B5
+LBB666_6:                               ; %B5
 	str	x21, [x20], #8
 	mov	w0, #145                        ; =0x91
 	b	l_SlowJSPostInc_asm_h
@@ -20547,14 +20785,14 @@ l_dec_loc_2_asm_h:                      ; @dec_loc_2_asm_h
 	mov	x9, #-281474976710657           ; =0xfffeffffffffffff
 	ldr	x1, [x27, x8, lsl #3]
 	cmp	x1, x9
-	b.hi	LBB664_6
+	b.hi	LBB667_6
 ; %bb.1:                                ; %B2
 	mov	x9, #-562949953421312           ; =0xfffe000000000000
 	cmp	x1, x9
-	b.lo	LBB664_4
+	b.lo	LBB667_4
 ; %bb.2:                                ; %B13
 	subs	w9, w1, #1
-	b.vs	LBB664_6
+	b.vs	LBB667_6
 ; %bb.3:                                ; %B15
 	orr	x9, x9, #0xfffe000000000000
 	str	x9, [x27, w8, uxtw #3]
@@ -20563,9 +20801,9 @@ l_dec_loc_2_asm_h:                      ; @dec_loc_2_asm_h
 	add	w8, w8, #486
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB664_4:                               ; %B4
+LBB667_4:                               ; %B4
 	tst	x1, #0xfffe000000000000
-	b.eq	LBB664_6
+	b.eq	LBB667_6
 ; %bb.5:                                ; %B8
 	add	x9, x1, x9
 	fmov	d0, #-1.00000000
@@ -20583,7 +20821,7 @@ LBB664_4:                               ; %B4
 	add	w8, w8, #486
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB664_6:                               ; %B16
+LBB667_6:                               ; %B16
 	add	x8, x20, #16
 	mov	x0, x24
 	mov	w2, #142                        ; =0x8e
@@ -20591,7 +20829,7 @@ LBB664_6:                               ; %B16
 	str	x8, [x23, #48]
 	bl	_prim_js_unary_arith_slow_gc
 	cmp	x0, #130
-	b.eq	LBB664_8
+	b.eq	LBB667_8
 ; %bb.7:                                ; %B18
 	ldrb	w8, [x19]
 	str	x0, [x27, x8, lsl #3]
@@ -20600,7 +20838,7 @@ LBB664_6:                               ; %B16
 	add	w8, w8, #486
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB664_8:                               ; %B17
+LBB667_8:                               ; %B17
 	b	l_exception_spill_top0_top1_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function inc_loc_2_asm_h
@@ -20610,14 +20848,14 @@ l_inc_loc_2_asm_h:                      ; @inc_loc_2_asm_h
 	mov	x9, #-281474976710657           ; =0xfffeffffffffffff
 	ldr	x1, [x27, x8, lsl #3]
 	cmp	x1, x9
-	b.hi	LBB665_6
+	b.hi	LBB668_6
 ; %bb.1:                                ; %B2
 	mov	x9, #-562949953421312           ; =0xfffe000000000000
 	cmp	x1, x9
-	b.lo	LBB665_4
+	b.lo	LBB668_4
 ; %bb.2:                                ; %B13
 	adds	w9, w1, #1
-	b.vs	LBB665_6
+	b.vs	LBB668_6
 ; %bb.3:                                ; %B15
 	orr	x9, x9, #0xfffe000000000000
 	str	x9, [x27, w8, uxtw #3]
@@ -20626,9 +20864,9 @@ l_inc_loc_2_asm_h:                      ; @inc_loc_2_asm_h
 	add	w8, w8, #486
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB665_4:                               ; %B4
+LBB668_4:                               ; %B4
 	tst	x1, #0xfffe000000000000
-	b.eq	LBB665_6
+	b.eq	LBB668_6
 ; %bb.5:                                ; %B8
 	add	x9, x1, x9
 	fmov	d0, #1.00000000
@@ -20646,7 +20884,7 @@ LBB665_4:                               ; %B4
 	add	w8, w8, #486
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB665_6:                               ; %B16
+LBB668_6:                               ; %B16
 	add	x8, x20, #16
 	mov	x0, x24
 	mov	w2, #143                        ; =0x8f
@@ -20654,7 +20892,7 @@ LBB665_6:                               ; %B16
 	str	x8, [x23, #48]
 	bl	_prim_js_unary_arith_slow_gc
 	cmp	x0, #130
-	b.eq	LBB665_8
+	b.eq	LBB668_8
 ; %bb.7:                                ; %B18
 	ldrb	w8, [x19]
 	str	x0, [x27, x8, lsl #3]
@@ -20663,7 +20901,7 @@ LBB665_6:                               ; %B16
 	add	w8, w8, #486
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB665_8:                               ; %B17
+LBB668_8:                               ; %B17
 	b	l_exception_spill_top0_top1_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function add_loc_2_asm_h
@@ -20675,20 +20913,20 @@ l_add_loc_2_asm_h:                      ; @add_loc_2_asm_h
 	ldr	x1, [x27, x8, lsl #3]
 	cmp	x1, x9
 	ccmp	x21, x9, #2, ls
-	b.hi	LBB666_17
+	b.hi	LBB669_17
 ; %bb.1:                                ; %B2
 	mov	x9, #-562949953421312           ; =0xfffe000000000000
 	cmp	x1, x9
-	b.lo	LBB666_6
+	b.lo	LBB669_6
 ; %bb.2:                                ; %B26
 	cmp	x21, x9
-	b.lo	LBB666_9
+	b.lo	LBB669_9
 ; %bb.3:                                ; %B36
 	adds	w9, w1, w21
-	b.vs	LBB666_12
+	b.vs	LBB669_12
 ; %bb.4:                                ; %B42
 	orr	x9, x9, #0xfffe000000000000
-LBB666_5:                               ; %B42
+LBB669_5:                               ; %B42
 	str	x9, [x27, w8, uxtw #3]
 	ldrb	w8, [x19, #1]
 	add	x19, x19, #2
@@ -20696,49 +20934,49 @@ LBB666_5:                               ; %B42
 	ldr	x1, [x25, w8, uxtw #3]
 	add	sp, sp, #16
 	br	x1
-LBB666_6:                               ; %B4
+LBB669_6:                               ; %B4
 	tst	x1, #0xfffe000000000000
-	b.eq	LBB666_17
+	b.eq	LBB669_17
 ; %bb.7:                                ; %B11
 	cmp	x21, x9
-	b.lo	LBB666_15
+	b.lo	LBB669_15
 ; %bb.8:                                ; %B21
 	scvtf	d0, w21
 	add	x9, x1, x9
 	fmov	d1, x9
 	fadd	d0, d1, d0
-	b	LBB666_14
-LBB666_9:                               ; %B28
+	b	LBB669_14
+LBB669_9:                               ; %B28
 	tst	x21, #0xfffe000000000000
-	b.eq	LBB666_17
+	b.eq	LBB669_17
 ; %bb.10:                               ; %B31
 	scvtf	d0, w1
 	add	x9, x21, x9
-LBB666_11:                              ; %B31
+LBB669_11:                              ; %B31
 	fmov	d1, x9
-	b	LBB666_13
-LBB666_12:                              ; %B38
+	b	LBB669_13
+LBB669_12:                              ; %B38
 	scvtf	d0, w1
 	scvtf	d1, w21
-LBB666_13:                              ; %B31
+LBB669_13:                              ; %B31
 	fadd	d0, d0, d1
-LBB666_14:                              ; %B31
+LBB669_14:                              ; %B31
 	fmov	x9, d0
 	fcmp	d0, d0
 	mov	x10, #562949953421312           ; =0x2000000000000
 	add	x9, x9, x10
 	mov	x10, #9221683186994511872       ; =0x7ffa000000000000
 	csel	x9, x9, x10, vc
-	b	LBB666_5
-LBB666_15:                              ; %B13
+	b	LBB669_5
+LBB669_15:                              ; %B13
 	tst	x21, #0xfffe000000000000
-	b.eq	LBB666_17
+	b.eq	LBB669_17
 ; %bb.16:                               ; %B16
 	add	x10, x1, x9
 	add	x9, x21, x9
 	fmov	d0, x10
-	b	LBB666_11
-LBB666_17:                              ; %B7
+	b	LBB669_11
+LBB669_17:                              ; %B7
 	and	x8, x21, #0xffff000000000003
 	mov	x9, #-281474976710653           ; =0xffff000000000003
 	mov	x10, #2                         ; =0x2
@@ -20752,7 +20990,7 @@ LBB666_17:                              ; %B7
 	cmp	x11, x10
 	ccmp	x11, x9, #4, ne
 	ccmp	w8, #0, #4, eq
-	b.ne	LBB666_20
+	b.ne	LBB669_20
 ; %bb.18:                               ; %B43
 	ldr	x8, [sp, #8]                    ; 8-byte Folded Reload
 	mov	x0, x24
@@ -20761,7 +20999,7 @@ LBB666_17:                              ; %B7
 	str	x20, [x23, #48]
 	bl	_prim_js_add_slow_gc
 	cmp	x0, #130
-	b.eq	LBB666_21
+	b.eq	LBB669_21
 ; %bb.19:                               ; %B45
 	ldrb	w8, [x19]
 	ldr	x20, [sp, #8]                   ; 8-byte Folded Reload
@@ -20772,13 +21010,13 @@ LBB666_17:                              ; %B7
 	ldr	x1, [x25, w8, uxtw #3]
 	add	sp, sp, #16
 	br	x1
-LBB666_20:                              ; %B8
+LBB669_20:                              ; %B8
 	ldr	x8, [sp, #8]                    ; 8-byte Folded Reload
 	mov	w0, #1                          ; =0x1
 	stp	x22, x21, [x8]
 	add	sp, sp, #16
 	b	l_FastJSConcatString_asm_h
-LBB666_21:                              ; %B44
+LBB669_21:                              ; %B44
 	ldr	x20, [sp, #8]                   ; 8-byte Folded Reload
 	add	sp, sp, #16
 	b	l_exception_spill_top0_top1_asm_h
@@ -20788,7 +21026,7 @@ l_not_2_asm_h:                          ; @not_2_asm_h
 ; %bb.0:                                ; %B2
 	mov	w8, #65534                      ; =0xfffe
 	cmp	x8, x21, lsr #48
-	b.ne	LBB667_2
+	b.ne	LBB670_2
 ; %bb.1:                                ; %B3
 	ldrb	w8, [x19], #1
 	add	w8, w8, #486
@@ -20796,7 +21034,7 @@ l_not_2_asm_h:                          ; @not_2_asm_h
 	mvn	w8, w21
 	orr	x21, x8, #0xfffe000000000000
 	br	x1
-LBB667_2:                               ; %B4
+LBB670_2:                               ; %B4
 	mov	x8, x20
 	add	x20, x20, #16
 	mov	x0, x21
@@ -20807,41 +21045,41 @@ LBB667_2:                               ; %B4
 l_lnot_2_asm_h:                         ; @lnot_2_asm_h
 ; %bb.0:                                ; %B14
 	cmp	x21, #5
-	b.le	LBB668_4
+	b.le	LBB671_4
 ; %bb.1:                                ; %B14
 	cmp	x21, #6
-	b.eq	LBB668_6
+	b.eq	LBB671_6
 ; %bb.2:                                ; %B14
 	cmp	x21, #7
-	b.eq	LBB668_8
+	b.eq	LBB671_8
 ; %bb.3:                                ; %B14
 	cmp	x21, #18
-	b.eq	LBB668_6
-	b	LBB668_7
-LBB668_4:                               ; %B14
+	b.eq	LBB671_6
+	b	LBB671_7
+LBB671_4:                               ; %B14
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x21, x8
-	b.eq	LBB668_6
+	b.eq	LBB671_6
 ; %bb.5:                                ; %B14
 	cmp	x21, #2
-	b.ne	LBB668_7
-LBB668_6:                               ; %B3
+	b.ne	LBB671_7
+LBB671_6:                               ; %B3
 	mov	w21, #7                         ; =0x7
 	ldrb	w8, [x19], #1
 	add	w8, w8, #486
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB668_7:                               ; %B10
+LBB671_7:                               ; %B10
 	mov	w8, #65534                      ; =0xfffe
 	cmp	x8, x21, lsr #48
-	b.ne	LBB668_9
-LBB668_8:                               ; %B12
+	b.ne	LBB671_9
+LBB671_8:                               ; %B12
 	mov	w21, #6                         ; =0x6
 	ldrb	w8, [x19], #1
 	add	w8, w8, #486
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB668_9:                               ; %B13
+LBB671_9:                               ; %B13
 	mov	x8, x20
 	add	x20, x20, #16
 	mov	x0, x21
@@ -20862,14 +21100,14 @@ l_typeof_2_asm_h:                       ; @typeof_2_asm_h
 	str	x8, [x23, #48]
 	bl	___JS_AtomToValue_GC
 	cmp	x0, #130
-	b.eq	LBB669_2
+	b.eq	LBB672_2
 ; %bb.1:                                ; %B3
 	ldrb	w8, [x19], #1
 	mov	x21, x0
 	add	w8, w8, #486
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB669_2:                               ; %B2
+LBB672_2:                               ; %B2
 	b	l_exception_spill_top0_top1_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function delete_2_asm_h
@@ -20893,60 +21131,60 @@ l_mul_2_asm_h:                          ; @mul_2_asm_h
 ; %bb.0:                                ; %B51
 	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
 	cmp	x22, x8
-	b.hi	LBB672_20
+	b.hi	LBB675_20
 ; %bb.1:                                ; %B51
 	cmp	x21, x8
-	b.hi	LBB672_20
+	b.hi	LBB675_20
 ; %bb.2:                                ; %B1
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x22, x8
-	b.lo	LBB672_8
+	b.lo	LBB675_8
 ; %bb.3:                                ; %B23
 	cmp	x21, x8
-	b.lo	LBB672_11
+	b.lo	LBB675_11
 ; %bb.4:                                ; %B33
 	smull	x8, w22, w21
 	cmp	x8, w8, sxtw
-	b.ne	LBB672_14
+	b.ne	LBB675_14
 ; %bb.5:                                ; %B40
-	cbnz	w8, LBB672_7
+	cbnz	w8, LBB675_7
 ; %bb.6:                                ; %B40
 	orr	w9, w22, w21
-	tbnz	w9, #31, LBB672_17
-LBB672_7:                               ; %B47
+	tbnz	w9, #31, LBB675_17
+LBB675_7:                               ; %B47
 	mov	w8, w8
 	orr	x22, x8, #0xfffe000000000000
 	ldrb	w8, [x19], #1
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB672_8:                               ; %B3
+LBB675_8:                               ; %B3
 	tst	x22, #0xfffe000000000000
-	b.eq	LBB672_20
+	b.eq	LBB675_20
 ; %bb.9:                                ; %B7
 	cmp	x21, x8
-	b.lo	LBB672_18
+	b.lo	LBB675_18
 ; %bb.10:                               ; %B18
 	scvtf	d0, w21
 	add	x8, x22, x8
 	fmov	d1, x8
 	fmul	d0, d1, d0
-	b	LBB672_16
-LBB672_11:                              ; %B25
+	b	LBB675_16
+LBB675_11:                              ; %B25
 	tst	x21, #0xfffe000000000000
-	b.eq	LBB672_20
+	b.eq	LBB675_20
 ; %bb.12:                               ; %B28
 	scvtf	d0, w22
 	add	x8, x21, x8
-LBB672_13:                              ; %B28
+LBB675_13:                              ; %B28
 	fmov	d1, x8
-	b	LBB672_15
-LBB672_14:                              ; %B35
+	b	LBB675_15
+LBB675_14:                              ; %B35
 	scvtf	d0, w22
 	scvtf	d1, w21
-LBB672_15:                              ; %B28
+LBB675_15:                              ; %B28
 	fmul	d0, d0, d1
-LBB672_16:                              ; %B28
+LBB675_16:                              ; %B28
 	ldrb	w8, [x19], #1
 	fmov	x9, d0
 	fcmp	d0, d0
@@ -20957,21 +21195,21 @@ LBB672_16:                              ; %B28
 	mov	x8, #9221683186994511872        ; =0x7ffa000000000000
 	csel	x22, x9, x8, vc
 	br	x1
-LBB672_17:                              ; %B44
+LBB675_17:                              ; %B44
 	mov	x22, #-9222809086901354496      ; =0x8002000000000000
 	ldrb	w8, [x19], #1
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB672_18:                              ; %B9
+LBB675_18:                              ; %B9
 	tst	x21, #0xfffe000000000000
-	b.eq	LBB672_20
+	b.eq	LBB675_20
 ; %bb.19:                               ; %B12
 	add	x9, x22, x8
 	add	x8, x21, x8
 	fmov	d0, x9
-	b	LBB672_13
-LBB672_20:                              ; %B48
+	b	LBB675_13
+LBB675_20:                              ; %B48
 	add	x8, x20, #16
 	mov	x0, x24
 	mov	x1, x22
@@ -20981,14 +21219,14 @@ LBB672_20:                              ; %B48
 	str	x8, [x23, #48]
 	bl	_prim_js_binary_arith_slow_gc
 	cmp	x0, #130
-	b.eq	LBB672_22
+	b.eq	LBB675_22
 ; %bb.21:                               ; %B50
 	ldrb	w8, [x19], #1
 	mov	x22, x0
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB672_22:                              ; %B49
+LBB675_22:                              ; %B49
 	b	l_exception_spill_top0_top1_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function div_2_asm_h
@@ -20996,17 +21234,17 @@ l_div_2_asm_h:                          ; @div_2_asm_h
 ; %bb.0:                                ; %B44
 	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
 	cmp	x22, x8
-	b.hi	LBB673_14
+	b.hi	LBB676_14
 ; %bb.1:                                ; %B44
 	cmp	x21, x8
-	b.hi	LBB673_14
+	b.hi	LBB676_14
 ; %bb.2:                                ; %B1
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x22, x8
-	b.lo	LBB673_5
+	b.lo	LBB676_5
 ; %bb.3:                                ; %B23
 	cmp	x21, x8
-	b.lo	LBB673_8
+	b.lo	LBB676_8
 ; %bb.4:                                ; %B33
 	scvtf	d0, w22
 	scvtf	d1, w21
@@ -21025,28 +21263,28 @@ l_div_2_asm_h:                          ; @div_2_asm_h
 	orr	x8, x8, #0xfffe000000000000
 	csel	x22, x10, x8, ne
 	br	x1
-LBB673_5:                               ; %B3
+LBB676_5:                               ; %B3
 	tst	x22, #0xfffe000000000000
-	b.eq	LBB673_14
+	b.eq	LBB676_14
 ; %bb.6:                                ; %B7
 	cmp	x21, x8
-	b.lo	LBB673_12
+	b.lo	LBB676_12
 ; %bb.7:                                ; %B18
 	scvtf	d0, w21
 	add	x8, x22, x8
 	fmov	d1, x8
 	fdiv	d0, d1, d0
-	b	LBB673_11
-LBB673_8:                               ; %B25
+	b	LBB676_11
+LBB676_8:                               ; %B25
 	tst	x21, #0xfffe000000000000
-	b.eq	LBB673_14
+	b.eq	LBB676_14
 ; %bb.9:                                ; %B28
 	scvtf	d0, w22
 	add	x8, x21, x8
-LBB673_10:                              ; %B28
+LBB676_10:                              ; %B28
 	fmov	d1, x8
 	fdiv	d0, d0, d1
-LBB673_11:                              ; %B28
+LBB676_11:                              ; %B28
 	ldrb	w8, [x19], #1
 	fmov	x9, d0
 	fcmp	d0, d0
@@ -21057,15 +21295,15 @@ LBB673_11:                              ; %B28
 	mov	x8, #9221683186994511872        ; =0x7ffa000000000000
 	csel	x22, x9, x8, vc
 	br	x1
-LBB673_12:                              ; %B9
+LBB676_12:                              ; %B9
 	tst	x21, #0xfffe000000000000
-	b.eq	LBB673_14
+	b.eq	LBB676_14
 ; %bb.13:                               ; %B12
 	add	x9, x22, x8
 	add	x8, x21, x8
 	fmov	d0, x9
-	b	LBB673_10
-LBB673_14:                              ; %B41
+	b	LBB676_10
+LBB676_14:                              ; %B41
 	add	x8, x20, #16
 	mov	x0, x24
 	mov	x1, x22
@@ -21075,14 +21313,14 @@ LBB673_14:                              ; %B41
 	str	x8, [x23, #48]
 	bl	_prim_js_binary_arith_slow_gc
 	cmp	x0, #130
-	b.eq	LBB673_16
+	b.eq	LBB676_16
 ; %bb.15:                               ; %B43
 	ldrb	w8, [x19], #1
 	mov	x22, x0
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB673_16:                              ; %B42
+LBB676_16:                              ; %B42
 	b	l_exception_spill_top0_top1_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function mod_2_asm_h
@@ -21090,22 +21328,22 @@ l_mod_2_asm_h:                          ; @mod_2_asm_h
 ; %bb.0:                                ; %B39
 	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
 	cmp	x22, x8
-	b.hi	LBB674_16
+	b.hi	LBB677_16
 ; %bb.1:                                ; %B39
 	cmp	x21, x8
-	b.hi	LBB674_16
+	b.hi	LBB677_16
 ; %bb.2:                                ; %B1
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x22, x8
-	b.lo	LBB674_7
+	b.lo	LBB677_7
 ; %bb.3:                                ; %B23
 	cmp	x21, x8
-	b.lo	LBB674_10
+	b.lo	LBB677_10
 ; %bb.4:                                ; %B33
-	tbnz	w22, #31, LBB674_16
+	tbnz	w22, #31, LBB677_16
 ; %bb.5:                                ; %B33
 	cmp	w21, #1
-	b.lt	LBB674_16
+	b.lt	LBB677_16
 ; %bb.6:                                ; %B35
 	sdiv	w8, w22, w21
 	ldrb	w9, [x19], #1
@@ -21114,26 +21352,26 @@ l_mod_2_asm_h:                          ; @mod_2_asm_h
 	msub	w8, w8, w21, w22
 	orr	x22, x8, #0xfffe000000000000
 	br	x1
-LBB674_7:                               ; %B3
+LBB677_7:                               ; %B3
 	tst	x22, #0xfffe000000000000
-	b.eq	LBB674_16
+	b.eq	LBB677_16
 ; %bb.8:                                ; %B7
 	cmp	x21, x8
-	b.lo	LBB674_14
+	b.lo	LBB677_14
 ; %bb.9:                                ; %B18
 	add	x8, x22, x8
 	scvtf	d1, w21
 	fmov	d0, x8
-	b	LBB674_13
-LBB674_10:                              ; %B25
+	b	LBB677_13
+LBB677_10:                              ; %B25
 	tst	x21, #0xfffe000000000000
-	b.eq	LBB674_16
+	b.eq	LBB677_16
 ; %bb.11:                               ; %B28
 	scvtf	d0, w22
 	add	x8, x21, x8
-LBB674_12:                              ; %B28
+LBB677_12:                              ; %B28
 	fmov	d1, x8
-LBB674_13:                              ; %B28
+LBB677_13:                              ; %B28
 	bl	_fmod
 	ldrb	w8, [x19], #1
 	fmov	x9, d0
@@ -21145,15 +21383,15 @@ LBB674_13:                              ; %B28
 	mov	x8, #9221683186994511872        ; =0x7ffa000000000000
 	csel	x22, x9, x8, vc
 	br	x1
-LBB674_14:                              ; %B9
+LBB677_14:                              ; %B9
 	tst	x21, #0xfffe000000000000
-	b.eq	LBB674_16
+	b.eq	LBB677_16
 ; %bb.15:                               ; %B12
 	add	x9, x22, x8
 	add	x8, x21, x8
 	fmov	d0, x9
-	b	LBB674_12
-LBB674_16:                              ; %B36
+	b	LBB677_12
+LBB677_16:                              ; %B36
 	add	x8, x20, #16
 	mov	x0, x24
 	mov	x1, x22
@@ -21163,14 +21401,14 @@ LBB674_16:                              ; %B36
 	str	x8, [x23, #48]
 	bl	_prim_js_binary_arith_slow_gc
 	cmp	x0, #130
-	b.eq	LBB674_18
+	b.eq	LBB677_18
 ; %bb.17:                               ; %B38
 	ldrb	w8, [x19], #1
 	mov	x22, x0
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB674_18:                              ; %B37
+LBB677_18:                              ; %B37
 	b	l_exception_spill_top0_top1_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function add_2_asm_h
@@ -21179,20 +21417,20 @@ l_add_2_asm_h:                          ; @add_2_asm_h
 	sub	sp, sp, #16
 	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
 	cmp	x22, x8
-	b.hi	LBB675_17
+	b.hi	LBB678_17
 ; %bb.1:                                ; %B46
 	cmp	x21, x8
-	b.hi	LBB675_17
+	b.hi	LBB678_17
 ; %bb.2:                                ; %B1
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x22, x8
-	b.lo	LBB675_6
+	b.lo	LBB678_6
 ; %bb.3:                                ; %B26
 	cmp	x21, x8
-	b.lo	LBB675_9
+	b.lo	LBB678_9
 ; %bb.4:                                ; %B36
 	adds	w8, w22, w21
-	b.vs	LBB675_12
+	b.vs	LBB678_12
 ; %bb.5:                                ; %B42
 	ldrb	w9, [x19], #1
 	orr	x22, x8, #0xfffe000000000000
@@ -21200,33 +21438,33 @@ l_add_2_asm_h:                          ; @add_2_asm_h
 	ldr	x1, [x25, w9, uxtw #3]
 	add	sp, sp, #16
 	br	x1
-LBB675_6:                               ; %B3
+LBB678_6:                               ; %B3
 	tst	x22, #0xfffe000000000000
-	b.eq	LBB675_17
+	b.eq	LBB678_17
 ; %bb.7:                                ; %B11
 	cmp	x21, x8
-	b.lo	LBB675_15
+	b.lo	LBB678_15
 ; %bb.8:                                ; %B21
 	scvtf	d0, w21
 	add	x8, x22, x8
 	fmov	d1, x8
 	fadd	d0, d1, d0
-	b	LBB675_14
-LBB675_9:                               ; %B28
+	b	LBB678_14
+LBB678_9:                               ; %B28
 	tst	x21, #0xfffe000000000000
-	b.eq	LBB675_17
+	b.eq	LBB678_17
 ; %bb.10:                               ; %B31
 	scvtf	d0, w22
 	add	x8, x21, x8
-LBB675_11:                              ; %B31
+LBB678_11:                              ; %B31
 	fmov	d1, x8
-	b	LBB675_13
-LBB675_12:                              ; %B38
+	b	LBB678_13
+LBB678_12:                              ; %B38
 	scvtf	d0, w22
 	scvtf	d1, w21
-LBB675_13:                              ; %B31
+LBB678_13:                              ; %B31
 	fadd	d0, d0, d1
-LBB675_14:                              ; %B31
+LBB678_14:                              ; %B31
 	ldrb	w8, [x19], #1
 	fmov	x9, d0
 	fcmp	d0, d0
@@ -21238,15 +21476,15 @@ LBB675_14:                              ; %B31
 	csel	x22, x9, x8, vc
 	add	sp, sp, #16
 	br	x1
-LBB675_15:                              ; %B13
+LBB678_15:                              ; %B13
 	tst	x21, #0xfffe000000000000
-	b.eq	LBB675_17
+	b.eq	LBB678_17
 ; %bb.16:                               ; %B16
 	add	x9, x22, x8
 	add	x8, x21, x8
 	fmov	d0, x9
-	b	LBB675_11
-LBB675_17:                              ; %B7
+	b	LBB678_11
+LBB678_17:                              ; %B7
 	and	x8, x21, #0xffff000000000003
 	mov	x9, #-281474976710653           ; =0xffff000000000003
 	mov	x10, #2                         ; =0x2
@@ -21259,16 +21497,16 @@ LBB675_17:                              ; %B7
 	cset	w8, eq
 	cmp	x11, x10
 	ccmp	x11, x9, #4, ne
-	b.ne	LBB675_20
+	b.ne	LBB678_20
 ; %bb.18:                               ; %B7
-	cbz	w8, LBB675_20
+	cbz	w8, LBB678_20
 ; %bb.19:                               ; %B8
 	ldr	x8, [sp, #8]                    ; 8-byte Folded Reload
 	mov	x0, xzr
 	stp	x22, x21, [x8]
 	add	sp, sp, #16
 	b	l_FastJSConcatString_asm_h
-LBB675_20:                              ; %B43
+LBB678_20:                              ; %B43
 	ldr	x8, [sp, #8]                    ; 8-byte Folded Reload
 	mov	x0, x24
 	mov	x1, x22
@@ -21277,7 +21515,7 @@ LBB675_20:                              ; %B43
 	str	x20, [x23, #48]
 	bl	_prim_js_add_slow_gc
 	cmp	x0, #130
-	b.eq	LBB675_22
+	b.eq	LBB678_22
 ; %bb.21:                               ; %B45
 	ldrb	w8, [x19], #1
 	ldr	x20, [sp, #8]                   ; 8-byte Folded Reload
@@ -21286,7 +21524,7 @@ LBB675_20:                              ; %B43
 	ldr	x1, [x25, w8, uxtw #3]
 	add	sp, sp, #16
 	br	x1
-LBB675_22:                              ; %B44
+LBB678_22:                              ; %B44
 	ldr	x20, [sp, #8]                   ; 8-byte Folded Reload
 	add	sp, sp, #16
 	b	l_exception_spill_top0_top1_asm_h
@@ -21296,53 +21534,53 @@ l_sub_2_asm_h:                          ; @sub_2_asm_h
 ; %bb.0:                                ; %B43
 	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
 	cmp	x22, x8
-	b.hi	LBB676_17
+	b.hi	LBB679_17
 ; %bb.1:                                ; %B43
 	cmp	x21, x8
-	b.hi	LBB676_17
+	b.hi	LBB679_17
 ; %bb.2:                                ; %B1
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x22, x8
-	b.lo	LBB676_6
+	b.lo	LBB679_6
 ; %bb.3:                                ; %B23
 	cmp	x21, x8
-	b.lo	LBB676_9
+	b.lo	LBB679_9
 ; %bb.4:                                ; %B33
 	subs	w8, w22, w21
-	b.vs	LBB676_12
+	b.vs	LBB679_12
 ; %bb.5:                                ; %B39
 	ldrb	w9, [x19], #1
 	orr	x22, x8, #0xfffe000000000000
 	add	w9, w9, #243
 	ldr	x1, [x25, w9, uxtw #3]
 	br	x1
-LBB676_6:                               ; %B3
+LBB679_6:                               ; %B3
 	tst	x22, #0xfffe000000000000
-	b.eq	LBB676_17
+	b.eq	LBB679_17
 ; %bb.7:                                ; %B7
 	cmp	x21, x8
-	b.lo	LBB676_15
+	b.lo	LBB679_15
 ; %bb.8:                                ; %B18
 	scvtf	d0, w21
 	add	x8, x22, x8
 	fmov	d1, x8
 	fsub	d0, d1, d0
-	b	LBB676_14
-LBB676_9:                               ; %B25
+	b	LBB679_14
+LBB679_9:                               ; %B25
 	tst	x21, #0xfffe000000000000
-	b.eq	LBB676_17
+	b.eq	LBB679_17
 ; %bb.10:                               ; %B28
 	scvtf	d0, w22
 	add	x8, x21, x8
-LBB676_11:                              ; %B28
+LBB679_11:                              ; %B28
 	fmov	d1, x8
-	b	LBB676_13
-LBB676_12:                              ; %B35
+	b	LBB679_13
+LBB679_12:                              ; %B35
 	scvtf	d0, w22
 	scvtf	d1, w21
-LBB676_13:                              ; %B28
+LBB679_13:                              ; %B28
 	fsub	d0, d0, d1
-LBB676_14:                              ; %B28
+LBB679_14:                              ; %B28
 	ldrb	w8, [x19], #1
 	fmov	x9, d0
 	fcmp	d0, d0
@@ -21353,15 +21591,15 @@ LBB676_14:                              ; %B28
 	mov	x8, #9221683186994511872        ; =0x7ffa000000000000
 	csel	x22, x9, x8, vc
 	br	x1
-LBB676_15:                              ; %B9
+LBB679_15:                              ; %B9
 	tst	x21, #0xfffe000000000000
-	b.eq	LBB676_17
+	b.eq	LBB679_17
 ; %bb.16:                               ; %B12
 	add	x9, x22, x8
 	add	x8, x21, x8
 	fmov	d0, x9
-	b	LBB676_11
-LBB676_17:                              ; %B40
+	b	LBB679_11
+LBB679_17:                              ; %B40
 	add	x8, x20, #16
 	mov	x0, x24
 	mov	x1, x22
@@ -21371,14 +21609,14 @@ LBB676_17:                              ; %B40
 	str	x8, [x23, #48]
 	bl	_prim_js_binary_arith_slow_gc
 	cmp	x0, #130
-	b.eq	LBB676_19
+	b.eq	LBB679_19
 ; %bb.18:                               ; %B42
 	ldrb	w8, [x19], #1
 	mov	x22, x0
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB676_19:                              ; %B41
+LBB679_19:                              ; %B41
 	b	l_exception_spill_top0_top1_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function pow_2_asm_h
@@ -21393,14 +21631,14 @@ l_pow_2_asm_h:                          ; @pow_2_asm_h
 	str	x8, [x23, #48]
 	bl	_prim_js_binary_arith_slow_gc
 	cmp	x0, #130
-	b.eq	LBB677_2
+	b.eq	LBB680_2
 ; %bb.1:                                ; %B3
 	ldrb	w8, [x19], #1
 	mov	x22, x0
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB677_2:                               ; %B2
+LBB680_2:                               ; %B2
 	b	l_exception_spill_top0_top1_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function shl_2_asm_h
@@ -21408,17 +21646,17 @@ l_shl_2_asm_h:                          ; @shl_2_asm_h
 ; %bb.0:                                ; %B28
 	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
 	cmp	x22, x8
-	b.hi	LBB678_9
+	b.hi	LBB681_9
 ; %bb.1:                                ; %B28
 	cmp	x21, x8
-	b.hi	LBB678_9
+	b.hi	LBB681_9
 ; %bb.2:                                ; %B2
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x22, x8
-	b.lo	LBB678_5
+	b.lo	LBB681_5
 ; %bb.3:                                ; %B19
 	cmp	x21, x8
-	b.lo	LBB678_9
+	b.lo	LBB681_9
 ; %bb.4:                                ; %B24
 	mov	w8, w22
 	ldrb	w9, [x19], #1
@@ -21427,16 +21665,16 @@ l_shl_2_asm_h:                          ; @shl_2_asm_h
 	orr	x22, x8, #0xfffe000000000000
 	ldr	x1, [x25, w9, uxtw #3]
 	br	x1
-LBB678_5:                               ; %B4
+LBB681_5:                               ; %B4
 	tst	x22, #0xfffe000000000000
-	b.eq	LBB678_9
+	b.eq	LBB681_9
 ; %bb.6:                                ; %B4
 	cmp	x21, x8
-	b.lo	LBB678_9
+	b.lo	LBB681_9
 ; %bb.7:                                ; %B14
 	ubfx	x8, x22, #52, #11
 	cmp	x8, #1053
-	b.gt	LBB678_9
+	b.gt	LBB681_9
 ; %bb.8:                                ; %B15
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	add	x8, x22, x8
@@ -21448,7 +21686,7 @@ LBB678_5:                               ; %B4
 	orr	x22, x8, #0xfffe000000000000
 	ldr	x1, [x25, w9, uxtw #3]
 	br	x1
-LBB678_9:                               ; %B25
+LBB681_9:                               ; %B25
 	add	x8, x20, #16
 	mov	x0, x24
 	mov	x1, x22
@@ -21458,14 +21696,14 @@ LBB678_9:                               ; %B25
 	str	x8, [x23, #48]
 	bl	_prim_js_binary_logic_slow_gc
 	cmp	x0, #130
-	b.eq	LBB678_11
+	b.eq	LBB681_11
 ; %bb.10:                               ; %B27
 	ldrb	w8, [x19], #1
 	mov	x22, x0
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB678_11:                              ; %B26
+LBB681_11:                              ; %B26
 	b	l_exception_spill_top0_top1_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function sar_2_asm_h
@@ -21473,17 +21711,17 @@ l_sar_2_asm_h:                          ; @sar_2_asm_h
 ; %bb.0:                                ; %B28
 	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
 	cmp	x22, x8
-	b.hi	LBB679_9
+	b.hi	LBB682_9
 ; %bb.1:                                ; %B28
 	cmp	x21, x8
-	b.hi	LBB679_9
+	b.hi	LBB682_9
 ; %bb.2:                                ; %B2
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x22, x8
-	b.lo	LBB679_5
+	b.lo	LBB682_5
 ; %bb.3:                                ; %B19
 	cmp	x21, x8
-	b.lo	LBB679_9
+	b.lo	LBB682_9
 ; %bb.4:                                ; %B24
 	mov	w8, w22
 	ldrb	w9, [x19], #1
@@ -21492,16 +21730,16 @@ l_sar_2_asm_h:                          ; @sar_2_asm_h
 	orr	x22, x8, #0xfffe000000000000
 	ldr	x1, [x25, w9, uxtw #3]
 	br	x1
-LBB679_5:                               ; %B4
+LBB682_5:                               ; %B4
 	tst	x22, #0xfffe000000000000
-	b.eq	LBB679_9
+	b.eq	LBB682_9
 ; %bb.6:                                ; %B4
 	cmp	x21, x8
-	b.lo	LBB679_9
+	b.lo	LBB682_9
 ; %bb.7:                                ; %B14
 	ubfx	x8, x22, #52, #11
 	cmp	x8, #1053
-	b.gt	LBB679_9
+	b.gt	LBB682_9
 ; %bb.8:                                ; %B15
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	add	x8, x22, x8
@@ -21513,7 +21751,7 @@ LBB679_5:                               ; %B4
 	orr	x22, x8, #0xfffe000000000000
 	ldr	x1, [x25, w9, uxtw #3]
 	br	x1
-LBB679_9:                               ; %B25
+LBB682_9:                               ; %B25
 	add	x8, x20, #16
 	mov	x0, x24
 	mov	x1, x22
@@ -21523,14 +21761,14 @@ LBB679_9:                               ; %B25
 	str	x8, [x23, #48]
 	bl	_prim_js_binary_logic_slow_gc
 	cmp	x0, #130
-	b.eq	LBB679_11
+	b.eq	LBB682_11
 ; %bb.10:                               ; %B27
 	ldrb	w8, [x19], #1
 	mov	x22, x0
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB679_11:                              ; %B26
+LBB682_11:                              ; %B26
 	b	l_exception_spill_top0_top1_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function shr_2_asm_h
@@ -21538,46 +21776,46 @@ l_shr_2_asm_h:                          ; @shr_2_asm_h
 ; %bb.0:                                ; %B36
 	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
 	cmp	x22, x8
-	b.hi	LBB680_11
+	b.hi	LBB683_11
 ; %bb.1:                                ; %B36
 	cmp	x21, x8
-	b.hi	LBB680_11
+	b.hi	LBB683_11
 ; %bb.2:                                ; %B10
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x22, x8
-	b.lo	LBB680_6
+	b.lo	LBB683_6
 ; %bb.3:                                ; %B27
 	cmp	x21, x8
-	b.lo	LBB680_11
+	b.lo	LBB683_11
 ; %bb.4:                                ; %B32
 	mov	w8, w22
 	lsr	w8, w8, w21
-	tbnz	w8, #31, LBB680_10
-LBB680_5:                               ; %B2
+	tbnz	w8, #31, LBB683_10
+LBB683_5:                               ; %B2
 	orr	x8, x8, #0xfffe000000000000
 	ldrb	w9, [x19], #1
 	mov	x22, x8
 	add	w9, w9, #243
 	ldr	x1, [x25, w9, uxtw #3]
 	br	x1
-LBB680_6:                               ; %B12
+LBB683_6:                               ; %B12
 	tst	x22, #0xfffe000000000000
-	b.eq	LBB680_11
+	b.eq	LBB683_11
 ; %bb.7:                                ; %B12
 	cmp	x21, x8
-	b.lo	LBB680_11
+	b.lo	LBB683_11
 ; %bb.8:                                ; %B22
 	ubfx	x8, x22, #52, #11
 	cmp	x8, #1053
-	b.gt	LBB680_11
+	b.gt	LBB683_11
 ; %bb.9:                                ; %B23
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	add	x8, x22, x8
 	fmov	d0, x8
 	fcvtzs	w8, d0
 	lsr	w8, w8, w21
-	tbz	w8, #31, LBB680_5
-LBB680_10:                              ; %B6
+	tbz	w8, #31, LBB683_5
+LBB683_10:                              ; %B6
 	ucvtf	d0, w8
 	mov	x9, #562949953421312            ; =0x2000000000000
 	fmov	x8, d0
@@ -21590,7 +21828,7 @@ LBB680_10:                              ; %B6
 	add	w9, w9, #243
 	ldr	x1, [x25, w9, uxtw #3]
 	br	x1
-LBB680_11:                              ; %B33
+LBB683_11:                              ; %B33
 	add	x8, x20, #16
 	mov	x0, x24
 	mov	x1, x22
@@ -21599,288 +21837,18 @@ LBB680_11:                              ; %B33
 	str	x8, [x23, #48]
 	bl	_prim_js_shr_slow_gc
 	cmp	x0, #130
-	b.eq	LBB680_13
+	b.eq	LBB683_13
 ; %bb.12:                               ; %B35
 	ldrb	w8, [x19], #1
 	mov	x22, x0
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB680_13:                              ; %B34
+LBB683_13:                              ; %B34
 	b	l_exception_spill_top0_top1_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function lt_2_asm_h
 l_lt_2_asm_h:                           ; @lt_2_asm_h
-; %bb.0:                                ; %B24
-	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
-	cmp	x22, x8
-	b.hi	LBB681_12
-; %bb.1:                                ; %B24
-	cmp	x21, x8
-	b.hi	LBB681_12
-; %bb.2:                                ; %B1
-	mov	x8, #-562949953421312           ; =0xfffe000000000000
-	cmp	x22, x8
-	b.lo	LBB681_5
-; %bb.3:                                ; %B15
-	cmp	x21, x8
-	b.lo	LBB681_8
-; %bb.4:                                ; %B20
-	ldrb	w8, [x19], #1
-	cmp	w22, w21
-	add	w8, w8, #243
-	ldr	x1, [x25, w8, uxtw #3]
-	mov	w8, #6                          ; =0x6
-	cinc	x22, x8, lt
-	br	x1
-LBB681_5:                               ; %B3
-	tst	x22, #0xfffe000000000000
-	b.eq	LBB681_12
-; %bb.6:                                ; %B7
-	cmp	x21, x8
-	b.lo	LBB681_10
-; %bb.7:                                ; %B13
-	scvtf	d0, w21
-	add	x8, x22, x8
-	fmov	d1, x8
-	ldrb	w9, [x19], #1
-	fcmp	d1, d0
-	add	w8, w9, #243
-	ldr	x1, [x25, w8, uxtw #3]
-	mov	w8, #6                          ; =0x6
-	cinc	x22, x8, mi
-	br	x1
-LBB681_8:                               ; %B17
-	tst	x21, #0xfffe000000000000
-	b.eq	LBB681_12
-; %bb.9:                                ; %B19
-	scvtf	d0, w22
-	add	x8, x21, x8
-	fmov	d1, x8
-	ldrb	w9, [x19], #1
-	fcmp	d0, d1
-	add	w8, w9, #243
-	ldr	x1, [x25, w8, uxtw #3]
-	mov	w8, #6                          ; =0x6
-	cinc	x22, x8, mi
-	br	x1
-LBB681_10:                              ; %B9
-	tst	x21, #0xfffe000000000000
-	b.eq	LBB681_12
-; %bb.11:                               ; %B11
-	add	x9, x22, x8
-	add	x8, x21, x8
-	fmov	d0, x9
-	fmov	d1, x8
-	ldrb	w10, [x19], #1
-	fcmp	d0, d1
-	add	w8, w10, #243
-	ldr	x1, [x25, w8, uxtw #3]
-	mov	w8, #6                          ; =0x6
-	cinc	x22, x8, mi
-	br	x1
-LBB681_12:                              ; %B21
-	add	x8, x20, #16
-	mov	x0, x24
-	mov	x1, x22
-	mov	x2, x21
-	mov	w3, #163                        ; =0xa3
-	stp	x22, x21, [x20]
-	str	x8, [x23, #48]
-	bl	_prim_js_relation_slow_gc
-	cmp	x0, #130
-	b.eq	LBB681_14
-; %bb.13:                               ; %B23
-	ldrb	w8, [x19], #1
-	mov	x22, x0
-	add	w8, w8, #243
-	ldr	x1, [x25, w8, uxtw #3]
-	br	x1
-LBB681_14:                              ; %B22
-	b	l_exception_spill_top0_top1_asm_h
-                                        ; -- End function
-	.p2align	2                               ; -- Begin function lte_2_asm_h
-l_lte_2_asm_h:                          ; @lte_2_asm_h
-; %bb.0:                                ; %B24
-	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
-	cmp	x22, x8
-	b.hi	LBB682_12
-; %bb.1:                                ; %B24
-	cmp	x21, x8
-	b.hi	LBB682_12
-; %bb.2:                                ; %B1
-	mov	x8, #-562949953421312           ; =0xfffe000000000000
-	cmp	x22, x8
-	b.lo	LBB682_5
-; %bb.3:                                ; %B15
-	cmp	x21, x8
-	b.lo	LBB682_8
-; %bb.4:                                ; %B20
-	ldrb	w8, [x19], #1
-	cmp	w22, w21
-	add	w8, w8, #243
-	ldr	x1, [x25, w8, uxtw #3]
-	mov	w8, #6                          ; =0x6
-	cinc	x22, x8, le
-	br	x1
-LBB682_5:                               ; %B3
-	tst	x22, #0xfffe000000000000
-	b.eq	LBB682_12
-; %bb.6:                                ; %B7
-	cmp	x21, x8
-	b.lo	LBB682_10
-; %bb.7:                                ; %B13
-	scvtf	d0, w21
-	add	x8, x22, x8
-	fmov	d1, x8
-	ldrb	w9, [x19], #1
-	fcmp	d1, d0
-	add	w8, w9, #243
-	ldr	x1, [x25, w8, uxtw #3]
-	mov	w8, #6                          ; =0x6
-	cinc	x22, x8, ls
-	br	x1
-LBB682_8:                               ; %B17
-	tst	x21, #0xfffe000000000000
-	b.eq	LBB682_12
-; %bb.9:                                ; %B19
-	scvtf	d0, w22
-	add	x8, x21, x8
-	fmov	d1, x8
-	ldrb	w9, [x19], #1
-	fcmp	d0, d1
-	add	w8, w9, #243
-	ldr	x1, [x25, w8, uxtw #3]
-	mov	w8, #6                          ; =0x6
-	cinc	x22, x8, ls
-	br	x1
-LBB682_10:                              ; %B9
-	tst	x21, #0xfffe000000000000
-	b.eq	LBB682_12
-; %bb.11:                               ; %B11
-	add	x9, x22, x8
-	add	x8, x21, x8
-	fmov	d0, x9
-	fmov	d1, x8
-	ldrb	w10, [x19], #1
-	fcmp	d0, d1
-	add	w8, w10, #243
-	ldr	x1, [x25, w8, uxtw #3]
-	mov	w8, #6                          ; =0x6
-	cinc	x22, x8, ls
-	br	x1
-LBB682_12:                              ; %B21
-	add	x8, x20, #16
-	mov	x0, x24
-	mov	x1, x22
-	mov	x2, x21
-	mov	w3, #164                        ; =0xa4
-	stp	x22, x21, [x20]
-	str	x8, [x23, #48]
-	bl	_prim_js_relation_slow_gc
-	cmp	x0, #130
-	b.eq	LBB682_14
-; %bb.13:                               ; %B23
-	ldrb	w8, [x19], #1
-	mov	x22, x0
-	add	w8, w8, #243
-	ldr	x1, [x25, w8, uxtw #3]
-	br	x1
-LBB682_14:                              ; %B22
-	b	l_exception_spill_top0_top1_asm_h
-                                        ; -- End function
-	.p2align	2                               ; -- Begin function gt_2_asm_h
-l_gt_2_asm_h:                           ; @gt_2_asm_h
-; %bb.0:                                ; %B24
-	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
-	cmp	x22, x8
-	b.hi	LBB683_12
-; %bb.1:                                ; %B24
-	cmp	x21, x8
-	b.hi	LBB683_12
-; %bb.2:                                ; %B1
-	mov	x8, #-562949953421312           ; =0xfffe000000000000
-	cmp	x22, x8
-	b.lo	LBB683_5
-; %bb.3:                                ; %B15
-	cmp	x21, x8
-	b.lo	LBB683_8
-; %bb.4:                                ; %B20
-	ldrb	w8, [x19], #1
-	cmp	w22, w21
-	add	w8, w8, #243
-	ldr	x1, [x25, w8, uxtw #3]
-	mov	w8, #6                          ; =0x6
-	cinc	x22, x8, gt
-	br	x1
-LBB683_5:                               ; %B3
-	tst	x22, #0xfffe000000000000
-	b.eq	LBB683_12
-; %bb.6:                                ; %B7
-	cmp	x21, x8
-	b.lo	LBB683_10
-; %bb.7:                                ; %B13
-	scvtf	d0, w21
-	add	x8, x22, x8
-	fmov	d1, x8
-	ldrb	w9, [x19], #1
-	fcmp	d1, d0
-	add	w8, w9, #243
-	ldr	x1, [x25, w8, uxtw #3]
-	mov	w8, #6                          ; =0x6
-	cinc	x22, x8, gt
-	br	x1
-LBB683_8:                               ; %B17
-	tst	x21, #0xfffe000000000000
-	b.eq	LBB683_12
-; %bb.9:                                ; %B19
-	scvtf	d0, w22
-	add	x8, x21, x8
-	fmov	d1, x8
-	ldrb	w9, [x19], #1
-	fcmp	d0, d1
-	add	w8, w9, #243
-	ldr	x1, [x25, w8, uxtw #3]
-	mov	w8, #6                          ; =0x6
-	cinc	x22, x8, gt
-	br	x1
-LBB683_10:                              ; %B9
-	tst	x21, #0xfffe000000000000
-	b.eq	LBB683_12
-; %bb.11:                               ; %B11
-	add	x9, x22, x8
-	add	x8, x21, x8
-	fmov	d0, x9
-	fmov	d1, x8
-	ldrb	w10, [x19], #1
-	fcmp	d0, d1
-	add	w8, w10, #243
-	ldr	x1, [x25, w8, uxtw #3]
-	mov	w8, #6                          ; =0x6
-	cinc	x22, x8, gt
-	br	x1
-LBB683_12:                              ; %B21
-	add	x8, x20, #16
-	mov	x0, x24
-	mov	x1, x22
-	mov	x2, x21
-	mov	w3, #165                        ; =0xa5
-	stp	x22, x21, [x20]
-	str	x8, [x23, #48]
-	bl	_prim_js_relation_slow_gc
-	cmp	x0, #130
-	b.eq	LBB683_14
-; %bb.13:                               ; %B23
-	ldrb	w8, [x19], #1
-	mov	x22, x0
-	add	w8, w8, #243
-	ldr	x1, [x25, w8, uxtw #3]
-	br	x1
-LBB683_14:                              ; %B22
-	b	l_exception_spill_top0_top1_asm_h
-                                        ; -- End function
-	.p2align	2                               ; -- Begin function gte_2_asm_h
-l_gte_2_asm_h:                          ; @gte_2_asm_h
 ; %bb.0:                                ; %B24
 	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
 	cmp	x22, x8
@@ -21901,7 +21869,7 @@ l_gte_2_asm_h:                          ; @gte_2_asm_h
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	mov	w8, #6                          ; =0x6
-	cinc	x22, x8, ge
+	cinc	x22, x8, lt
 	br	x1
 LBB684_5:                               ; %B3
 	tst	x22, #0xfffe000000000000
@@ -21918,7 +21886,7 @@ LBB684_5:                               ; %B3
 	add	w8, w9, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	mov	w8, #6                          ; =0x6
-	cinc	x22, x8, ge
+	cinc	x22, x8, mi
 	br	x1
 LBB684_8:                               ; %B17
 	tst	x21, #0xfffe000000000000
@@ -21932,7 +21900,7 @@ LBB684_8:                               ; %B17
 	add	w8, w9, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	mov	w8, #6                          ; =0x6
-	cinc	x22, x8, ge
+	cinc	x22, x8, mi
 	br	x1
 LBB684_10:                              ; %B9
 	tst	x21, #0xfffe000000000000
@@ -21947,14 +21915,14 @@ LBB684_10:                              ; %B9
 	add	w8, w10, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	mov	w8, #6                          ; =0x6
-	cinc	x22, x8, ge
+	cinc	x22, x8, mi
 	br	x1
 LBB684_12:                              ; %B21
 	add	x8, x20, #16
 	mov	x0, x24
 	mov	x1, x22
 	mov	x2, x21
-	mov	w3, #166                        ; =0xa6
+	mov	w3, #163                        ; =0xa3
 	stp	x22, x21, [x20]
 	str	x8, [x23, #48]
 	bl	_prim_js_relation_slow_gc
@@ -21969,6 +21937,276 @@ LBB684_12:                              ; %B21
 LBB684_14:                              ; %B22
 	b	l_exception_spill_top0_top1_asm_h
                                         ; -- End function
+	.p2align	2                               ; -- Begin function lte_2_asm_h
+l_lte_2_asm_h:                          ; @lte_2_asm_h
+; %bb.0:                                ; %B24
+	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
+	cmp	x22, x8
+	b.hi	LBB685_12
+; %bb.1:                                ; %B24
+	cmp	x21, x8
+	b.hi	LBB685_12
+; %bb.2:                                ; %B1
+	mov	x8, #-562949953421312           ; =0xfffe000000000000
+	cmp	x22, x8
+	b.lo	LBB685_5
+; %bb.3:                                ; %B15
+	cmp	x21, x8
+	b.lo	LBB685_8
+; %bb.4:                                ; %B20
+	ldrb	w8, [x19], #1
+	cmp	w22, w21
+	add	w8, w8, #243
+	ldr	x1, [x25, w8, uxtw #3]
+	mov	w8, #6                          ; =0x6
+	cinc	x22, x8, le
+	br	x1
+LBB685_5:                               ; %B3
+	tst	x22, #0xfffe000000000000
+	b.eq	LBB685_12
+; %bb.6:                                ; %B7
+	cmp	x21, x8
+	b.lo	LBB685_10
+; %bb.7:                                ; %B13
+	scvtf	d0, w21
+	add	x8, x22, x8
+	fmov	d1, x8
+	ldrb	w9, [x19], #1
+	fcmp	d1, d0
+	add	w8, w9, #243
+	ldr	x1, [x25, w8, uxtw #3]
+	mov	w8, #6                          ; =0x6
+	cinc	x22, x8, ls
+	br	x1
+LBB685_8:                               ; %B17
+	tst	x21, #0xfffe000000000000
+	b.eq	LBB685_12
+; %bb.9:                                ; %B19
+	scvtf	d0, w22
+	add	x8, x21, x8
+	fmov	d1, x8
+	ldrb	w9, [x19], #1
+	fcmp	d0, d1
+	add	w8, w9, #243
+	ldr	x1, [x25, w8, uxtw #3]
+	mov	w8, #6                          ; =0x6
+	cinc	x22, x8, ls
+	br	x1
+LBB685_10:                              ; %B9
+	tst	x21, #0xfffe000000000000
+	b.eq	LBB685_12
+; %bb.11:                               ; %B11
+	add	x9, x22, x8
+	add	x8, x21, x8
+	fmov	d0, x9
+	fmov	d1, x8
+	ldrb	w10, [x19], #1
+	fcmp	d0, d1
+	add	w8, w10, #243
+	ldr	x1, [x25, w8, uxtw #3]
+	mov	w8, #6                          ; =0x6
+	cinc	x22, x8, ls
+	br	x1
+LBB685_12:                              ; %B21
+	add	x8, x20, #16
+	mov	x0, x24
+	mov	x1, x22
+	mov	x2, x21
+	mov	w3, #164                        ; =0xa4
+	stp	x22, x21, [x20]
+	str	x8, [x23, #48]
+	bl	_prim_js_relation_slow_gc
+	cmp	x0, #130
+	b.eq	LBB685_14
+; %bb.13:                               ; %B23
+	ldrb	w8, [x19], #1
+	mov	x22, x0
+	add	w8, w8, #243
+	ldr	x1, [x25, w8, uxtw #3]
+	br	x1
+LBB685_14:                              ; %B22
+	b	l_exception_spill_top0_top1_asm_h
+                                        ; -- End function
+	.p2align	2                               ; -- Begin function gt_2_asm_h
+l_gt_2_asm_h:                           ; @gt_2_asm_h
+; %bb.0:                                ; %B24
+	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
+	cmp	x22, x8
+	b.hi	LBB686_12
+; %bb.1:                                ; %B24
+	cmp	x21, x8
+	b.hi	LBB686_12
+; %bb.2:                                ; %B1
+	mov	x8, #-562949953421312           ; =0xfffe000000000000
+	cmp	x22, x8
+	b.lo	LBB686_5
+; %bb.3:                                ; %B15
+	cmp	x21, x8
+	b.lo	LBB686_8
+; %bb.4:                                ; %B20
+	ldrb	w8, [x19], #1
+	cmp	w22, w21
+	add	w8, w8, #243
+	ldr	x1, [x25, w8, uxtw #3]
+	mov	w8, #6                          ; =0x6
+	cinc	x22, x8, gt
+	br	x1
+LBB686_5:                               ; %B3
+	tst	x22, #0xfffe000000000000
+	b.eq	LBB686_12
+; %bb.6:                                ; %B7
+	cmp	x21, x8
+	b.lo	LBB686_10
+; %bb.7:                                ; %B13
+	scvtf	d0, w21
+	add	x8, x22, x8
+	fmov	d1, x8
+	ldrb	w9, [x19], #1
+	fcmp	d1, d0
+	add	w8, w9, #243
+	ldr	x1, [x25, w8, uxtw #3]
+	mov	w8, #6                          ; =0x6
+	cinc	x22, x8, gt
+	br	x1
+LBB686_8:                               ; %B17
+	tst	x21, #0xfffe000000000000
+	b.eq	LBB686_12
+; %bb.9:                                ; %B19
+	scvtf	d0, w22
+	add	x8, x21, x8
+	fmov	d1, x8
+	ldrb	w9, [x19], #1
+	fcmp	d0, d1
+	add	w8, w9, #243
+	ldr	x1, [x25, w8, uxtw #3]
+	mov	w8, #6                          ; =0x6
+	cinc	x22, x8, gt
+	br	x1
+LBB686_10:                              ; %B9
+	tst	x21, #0xfffe000000000000
+	b.eq	LBB686_12
+; %bb.11:                               ; %B11
+	add	x9, x22, x8
+	add	x8, x21, x8
+	fmov	d0, x9
+	fmov	d1, x8
+	ldrb	w10, [x19], #1
+	fcmp	d0, d1
+	add	w8, w10, #243
+	ldr	x1, [x25, w8, uxtw #3]
+	mov	w8, #6                          ; =0x6
+	cinc	x22, x8, gt
+	br	x1
+LBB686_12:                              ; %B21
+	add	x8, x20, #16
+	mov	x0, x24
+	mov	x1, x22
+	mov	x2, x21
+	mov	w3, #165                        ; =0xa5
+	stp	x22, x21, [x20]
+	str	x8, [x23, #48]
+	bl	_prim_js_relation_slow_gc
+	cmp	x0, #130
+	b.eq	LBB686_14
+; %bb.13:                               ; %B23
+	ldrb	w8, [x19], #1
+	mov	x22, x0
+	add	w8, w8, #243
+	ldr	x1, [x25, w8, uxtw #3]
+	br	x1
+LBB686_14:                              ; %B22
+	b	l_exception_spill_top0_top1_asm_h
+                                        ; -- End function
+	.p2align	2                               ; -- Begin function gte_2_asm_h
+l_gte_2_asm_h:                          ; @gte_2_asm_h
+; %bb.0:                                ; %B24
+	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
+	cmp	x22, x8
+	b.hi	LBB687_12
+; %bb.1:                                ; %B24
+	cmp	x21, x8
+	b.hi	LBB687_12
+; %bb.2:                                ; %B1
+	mov	x8, #-562949953421312           ; =0xfffe000000000000
+	cmp	x22, x8
+	b.lo	LBB687_5
+; %bb.3:                                ; %B15
+	cmp	x21, x8
+	b.lo	LBB687_8
+; %bb.4:                                ; %B20
+	ldrb	w8, [x19], #1
+	cmp	w22, w21
+	add	w8, w8, #243
+	ldr	x1, [x25, w8, uxtw #3]
+	mov	w8, #6                          ; =0x6
+	cinc	x22, x8, ge
+	br	x1
+LBB687_5:                               ; %B3
+	tst	x22, #0xfffe000000000000
+	b.eq	LBB687_12
+; %bb.6:                                ; %B7
+	cmp	x21, x8
+	b.lo	LBB687_10
+; %bb.7:                                ; %B13
+	scvtf	d0, w21
+	add	x8, x22, x8
+	fmov	d1, x8
+	ldrb	w9, [x19], #1
+	fcmp	d1, d0
+	add	w8, w9, #243
+	ldr	x1, [x25, w8, uxtw #3]
+	mov	w8, #6                          ; =0x6
+	cinc	x22, x8, ge
+	br	x1
+LBB687_8:                               ; %B17
+	tst	x21, #0xfffe000000000000
+	b.eq	LBB687_12
+; %bb.9:                                ; %B19
+	scvtf	d0, w22
+	add	x8, x21, x8
+	fmov	d1, x8
+	ldrb	w9, [x19], #1
+	fcmp	d0, d1
+	add	w8, w9, #243
+	ldr	x1, [x25, w8, uxtw #3]
+	mov	w8, #6                          ; =0x6
+	cinc	x22, x8, ge
+	br	x1
+LBB687_10:                              ; %B9
+	tst	x21, #0xfffe000000000000
+	b.eq	LBB687_12
+; %bb.11:                               ; %B11
+	add	x9, x22, x8
+	add	x8, x21, x8
+	fmov	d0, x9
+	fmov	d1, x8
+	ldrb	w10, [x19], #1
+	fcmp	d0, d1
+	add	w8, w10, #243
+	ldr	x1, [x25, w8, uxtw #3]
+	mov	w8, #6                          ; =0x6
+	cinc	x22, x8, ge
+	br	x1
+LBB687_12:                              ; %B21
+	add	x8, x20, #16
+	mov	x0, x24
+	mov	x1, x22
+	mov	x2, x21
+	mov	w3, #166                        ; =0xa6
+	stp	x22, x21, [x20]
+	str	x8, [x23, #48]
+	bl	_prim_js_relation_slow_gc
+	cmp	x0, #130
+	b.eq	LBB687_14
+; %bb.13:                               ; %B23
+	ldrb	w8, [x19], #1
+	mov	x22, x0
+	add	w8, w8, #243
+	ldr	x1, [x25, w8, uxtw #3]
+	br	x1
+LBB687_14:                              ; %B22
+	b	l_exception_spill_top0_top1_asm_h
+                                        ; -- End function
 	.p2align	2                               ; -- Begin function instanceof_2_asm_h
 l_instanceof_2_asm_h:                   ; @instanceof_2_asm_h
 ; %bb.0:                                ; %B1
@@ -21980,14 +22218,14 @@ l_instanceof_2_asm_h:                   ; @instanceof_2_asm_h
 	str	x8, [x23, #48]
 	bl	_prim_js_operator_instanceof_gc
 	cmp	x0, #130
-	b.eq	LBB685_2
+	b.eq	LBB688_2
 ; %bb.1:                                ; %B3
 	ldrb	w8, [x19], #1
 	mov	x22, x0
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB685_2:                               ; %B2
+LBB688_2:                               ; %B2
 	b	l_exception_spill_top0_top1_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function in_2_asm_h
@@ -22001,14 +22239,14 @@ l_in_2_asm_h:                           ; @in_2_asm_h
 	str	x8, [x23, #48]
 	bl	_prim_js_operator_in_gc
 	cmp	x0, #130
-	b.eq	LBB686_2
+	b.eq	LBB689_2
 ; %bb.1:                                ; %B3
 	ldrb	w8, [x19], #1
 	mov	x22, x0
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB686_2:                               ; %B2
+LBB689_2:                               ; %B2
 	b	l_exception_spill_top0_top1_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function eq_2_asm_h
@@ -22016,17 +22254,17 @@ l_eq_2_asm_h:                           ; @eq_2_asm_h
 ; %bb.0:                                ; %B44
 	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
 	cmp	x22, x8
-	b.hi	LBB687_13
+	b.hi	LBB690_13
 ; %bb.1:                                ; %B44
 	cmp	x21, x8
-	b.hi	LBB687_13
+	b.hi	LBB690_13
 ; %bb.2:                                ; %B1
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x22, x8
-	b.lo	LBB687_5
+	b.lo	LBB690_5
 ; %bb.3:                                ; %B35
 	cmp	x21, x8
-	b.lo	LBB687_8
+	b.lo	LBB690_8
 ; %bb.4:                                ; %B40
 	ldrb	w8, [x19], #1
 	cmp	w22, w21
@@ -22035,12 +22273,12 @@ l_eq_2_asm_h:                           ; @eq_2_asm_h
 	mov	w8, #6                          ; =0x6
 	cinc	x22, x8, eq
 	br	x1
-LBB687_5:                               ; %B3
+LBB690_5:                               ; %B3
 	tst	x22, #0xfffe000000000000
-	b.eq	LBB687_13
+	b.eq	LBB690_13
 ; %bb.6:                                ; %B28
 	cmp	x21, x8
-	b.lo	LBB687_11
+	b.lo	LBB690_11
 ; %bb.7:                                ; %B33
 	scvtf	d0, w21
 	add	x8, x22, x8
@@ -22054,13 +22292,13 @@ LBB687_5:                               ; %B3
 	csel	w8, wzr, w9, vs
 	orr	x22, x8, #0x6
 	br	x1
-LBB687_8:                               ; %B37
+LBB690_8:                               ; %B37
 	tst	x21, #0xfffe000000000000
-	b.eq	LBB687_13
+	b.eq	LBB690_13
 ; %bb.9:                                ; %B39
 	scvtf	d0, w22
 	add	x8, x21, x8
-LBB687_10:                              ; %B39
+LBB690_10:                              ; %B39
 	fmov	d1, x8
 	ldrb	w8, [x19], #1
 	fcmp	d0, d1
@@ -22071,51 +22309,51 @@ LBB687_10:                              ; %B39
 	csel	w8, wzr, w9, vs
 	orr	x22, x8, #0x6
 	br	x1
-LBB687_11:                              ; %B30
+LBB690_11:                              ; %B30
 	tst	x21, #0xfffe000000000000
-	b.eq	LBB687_13
+	b.eq	LBB690_13
 ; %bb.12:                               ; %B32
 	add	x9, x22, x8
 	add	x8, x21, x8
 	fmov	d0, x9
-	b	LBB687_10
-LBB687_13:                              ; %B7
+	b	LBB690_10
+LBB690_13:                              ; %B7
 	cmp	x22, x21
-	b.ne	LBB687_15
-LBB687_14:                              ; %B8
+	b.ne	LBB690_15
+LBB690_14:                              ; %B8
 	ldrb	w8, [x19], #1
 	mov	w22, #7                         ; =0x7
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB687_15:                              ; %B10
+LBB690_15:                              ; %B10
 	orr	x8, x21, #0x10
 	cmp	x8, #18
-	b.ne	LBB687_17
+	b.ne	LBB690_17
 ; %bb.16:                               ; %B12
 	orr	x8, x22, #0x10
 	cmp	x8, #18
-	b.eq	LBB687_14
-	b	LBB687_20
-LBB687_17:                              ; %B17
+	b.eq	LBB690_14
+	b	LBB690_20
+LBB690_17:                              ; %B17
 	orr	x8, x22, #0x10
 	cmp	x8, #18
-	b.eq	LBB687_20
+	b.eq	LBB690_20
 ; %bb.18:                               ; %B20
 	sub	x8, x21, #6
 	cmp	x8, #1
-	b.hi	LBB687_21
+	b.hi	LBB690_21
 ; %bb.19:                               ; %B20
 	sub	x8, x22, #6
 	cmp	x8, #2
-	b.hs	LBB687_21
-LBB687_20:                              ; %B15
+	b.hs	LBB690_21
+LBB690_20:                              ; %B15
 	ldrb	w8, [x19], #1
 	mov	w22, #6                         ; =0x6
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB687_21:                              ; %B41
+LBB690_21:                              ; %B41
 	add	x8, x20, #16
 	mov	x0, x24
 	mov	x1, x22
@@ -22125,14 +22363,14 @@ LBB687_21:                              ; %B41
 	str	x8, [x23, #48]
 	bl	_prim_js_eq_slow_gc
 	cmp	x0, #130
-	b.eq	LBB687_23
+	b.eq	LBB690_23
 ; %bb.22:                               ; %B43
 	ldrb	w8, [x19], #1
 	mov	x22, x0
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB687_23:                              ; %B42
+LBB690_23:                              ; %B42
 	b	l_exception_spill_top0_top1_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function neq_2_asm_h
@@ -22140,17 +22378,17 @@ l_neq_2_asm_h:                          ; @neq_2_asm_h
 ; %bb.0:                                ; %B44
 	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
 	cmp	x22, x8
-	b.hi	LBB688_13
+	b.hi	LBB691_13
 ; %bb.1:                                ; %B44
 	cmp	x21, x8
-	b.hi	LBB688_13
+	b.hi	LBB691_13
 ; %bb.2:                                ; %B1
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x22, x8
-	b.lo	LBB688_5
+	b.lo	LBB691_5
 ; %bb.3:                                ; %B35
 	cmp	x21, x8
-	b.lo	LBB688_8
+	b.lo	LBB691_8
 ; %bb.4:                                ; %B40
 	ldrb	w8, [x19], #1
 	cmp	w22, w21
@@ -22159,12 +22397,12 @@ l_neq_2_asm_h:                          ; @neq_2_asm_h
 	mov	w8, #6                          ; =0x6
 	cinc	x22, x8, ne
 	br	x1
-LBB688_5:                               ; %B3
+LBB691_5:                               ; %B3
 	tst	x22, #0xfffe000000000000
-	b.eq	LBB688_13
+	b.eq	LBB691_13
 ; %bb.6:                                ; %B28
 	cmp	x21, x8
-	b.lo	LBB688_11
+	b.lo	LBB691_11
 ; %bb.7:                                ; %B33
 	scvtf	d0, w21
 	add	x8, x22, x8
@@ -22178,13 +22416,13 @@ LBB688_5:                               ; %B3
 	csinc	w8, w9, wzr, vc
 	orr	x22, x8, #0x6
 	br	x1
-LBB688_8:                               ; %B37
+LBB691_8:                               ; %B37
 	tst	x21, #0xfffe000000000000
-	b.eq	LBB688_13
+	b.eq	LBB691_13
 ; %bb.9:                                ; %B39
 	scvtf	d0, w22
 	add	x8, x21, x8
-LBB688_10:                              ; %B39
+LBB691_10:                              ; %B39
 	fmov	d1, x8
 	ldrb	w8, [x19], #1
 	fcmp	d0, d1
@@ -22195,51 +22433,51 @@ LBB688_10:                              ; %B39
 	csinc	w8, w9, wzr, vc
 	orr	x22, x8, #0x6
 	br	x1
-LBB688_11:                              ; %B30
+LBB691_11:                              ; %B30
 	tst	x21, #0xfffe000000000000
-	b.eq	LBB688_13
+	b.eq	LBB691_13
 ; %bb.12:                               ; %B32
 	add	x9, x22, x8
 	add	x8, x21, x8
 	fmov	d0, x9
-	b	LBB688_10
-LBB688_13:                              ; %B7
+	b	LBB691_10
+LBB691_13:                              ; %B7
 	cmp	x22, x21
-	b.ne	LBB688_15
-LBB688_14:                              ; %B8
+	b.ne	LBB691_15
+LBB691_14:                              ; %B8
 	ldrb	w8, [x19], #1
 	mov	w22, #6                         ; =0x6
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB688_15:                              ; %B10
+LBB691_15:                              ; %B10
 	orr	x8, x21, #0x10
 	cmp	x8, #18
-	b.ne	LBB688_17
+	b.ne	LBB691_17
 ; %bb.16:                               ; %B12
 	orr	x8, x22, #0x10
 	cmp	x8, #18
-	b.eq	LBB688_14
-	b	LBB688_20
-LBB688_17:                              ; %B17
+	b.eq	LBB691_14
+	b	LBB691_20
+LBB691_17:                              ; %B17
 	orr	x8, x22, #0x10
 	cmp	x8, #18
-	b.eq	LBB688_20
+	b.eq	LBB691_20
 ; %bb.18:                               ; %B20
 	sub	x8, x21, #6
 	cmp	x8, #1
-	b.hi	LBB688_21
+	b.hi	LBB691_21
 ; %bb.19:                               ; %B20
 	sub	x8, x22, #6
 	cmp	x8, #2
-	b.hs	LBB688_21
-LBB688_20:                              ; %B15
+	b.hs	LBB691_21
+LBB691_20:                              ; %B15
 	ldrb	w8, [x19], #1
 	mov	w22, #7                         ; =0x7
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB688_21:                              ; %B41
+LBB691_21:                              ; %B41
 	add	x8, x20, #16
 	mov	x0, x24
 	mov	x1, x22
@@ -22249,14 +22487,14 @@ LBB688_21:                              ; %B41
 	str	x8, [x23, #48]
 	bl	_prim_js_eq_slow_gc
 	cmp	x0, #130
-	b.eq	LBB688_23
+	b.eq	LBB691_23
 ; %bb.22:                               ; %B43
 	ldrb	w8, [x19], #1
 	mov	x22, x0
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB688_23:                              ; %B42
+LBB691_23:                              ; %B42
 	b	l_exception_spill_top0_top1_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function strict_eq_2_asm_h
@@ -22264,17 +22502,17 @@ l_strict_eq_2_asm_h:                    ; @strict_eq_2_asm_h
 ; %bb.0:                                ; %B39
 	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
 	cmp	x22, x8
-	b.hi	LBB689_13
+	b.hi	LBB692_13
 ; %bb.1:                                ; %B39
 	cmp	x21, x8
-	b.hi	LBB689_13
+	b.hi	LBB692_13
 ; %bb.2:                                ; %B1
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x22, x8
-	b.lo	LBB689_5
+	b.lo	LBB692_5
 ; %bb.3:                                ; %B30
 	cmp	x21, x8
-	b.lo	LBB689_8
+	b.lo	LBB692_8
 ; %bb.4:                                ; %B35
 	ldrb	w8, [x19], #1
 	cmp	w22, w21
@@ -22283,12 +22521,12 @@ l_strict_eq_2_asm_h:                    ; @strict_eq_2_asm_h
 	mov	w8, #6                          ; =0x6
 	cinc	x22, x8, eq
 	br	x1
-LBB689_5:                               ; %B3
+LBB692_5:                               ; %B3
 	tst	x22, #0xfffe000000000000
-	b.eq	LBB689_13
+	b.eq	LBB692_13
 ; %bb.6:                                ; %B23
 	cmp	x21, x8
-	b.lo	LBB689_11
+	b.lo	LBB692_11
 ; %bb.7:                                ; %B28
 	scvtf	d0, w21
 	add	x8, x22, x8
@@ -22302,13 +22540,13 @@ LBB689_5:                               ; %B3
 	csel	w8, wzr, w9, vs
 	orr	x22, x8, #0x6
 	br	x1
-LBB689_8:                               ; %B32
+LBB692_8:                               ; %B32
 	tst	x21, #0xfffe000000000000
-	b.eq	LBB689_13
+	b.eq	LBB692_13
 ; %bb.9:                                ; %B34
 	scvtf	d0, w22
 	add	x8, x21, x8
-LBB689_10:                              ; %B34
+LBB692_10:                              ; %B34
 	fmov	d1, x8
 	ldrb	w8, [x19], #1
 	fcmp	d0, d1
@@ -22319,24 +22557,24 @@ LBB689_10:                              ; %B34
 	csel	w8, wzr, w9, vs
 	orr	x22, x8, #0x6
 	br	x1
-LBB689_11:                              ; %B25
+LBB692_11:                              ; %B25
 	tst	x21, #0xfffe000000000000
-	b.eq	LBB689_13
+	b.eq	LBB692_13
 ; %bb.12:                               ; %B27
 	add	x9, x22, x8
 	add	x8, x21, x8
 	fmov	d0, x9
-	b	LBB689_10
-LBB689_13:                              ; %B10
+	b	LBB692_10
+LBB692_13:                              ; %B10
 	cmp	x22, x21
-	b.ne	LBB689_15
-LBB689_14:                              ; %B11
+	b.ne	LBB692_15
+LBB692_14:                              ; %B11
 	ldrb	w8, [x19], #1
 	mov	w22, #7                         ; =0x7
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB689_15:                              ; %B13
+LBB692_15:                              ; %B13
 	and	x8, x22, #0xffff000000000003
 	mov	x11, #-281474976710653          ; =0xffff000000000003
 	mov	x12, #2                         ; =0x2
@@ -22349,10 +22587,10 @@ LBB689_15:                              ; %B13
 	ccmp	x10, x12, #4, ne
 	cset	w11, eq
 	cmp	w9, #1
-	b.ne	LBB689_17
+	b.ne	LBB692_17
 ; %bb.16:                               ; %B13
-	cbnz	w11, LBB689_22
-LBB689_17:                              ; %B16
+	cbnz	w11, LBB692_22
+LBB692_17:                              ; %B16
 	mov	x12, #2                         ; =0x2
 	movk	x12, #65535, lsl #48
 	cmp	x8, x12
@@ -22360,31 +22598,31 @@ LBB689_17:                              ; %B16
 	cmp	x10, x12
 	bic	w9, w8, w9
 	csinc	w8, w11, wzr, ne
-	tbnz	w9, #0, LBB689_19
+	tbnz	w9, #0, LBB692_19
 ; %bb.18:                               ; %B16
-	tbnz	w8, #0, LBB689_23
-LBB689_19:                              ; %B19
+	tbnz	w8, #0, LBB692_23
+LBB692_19:                              ; %B19
 	and	x9, x22, #0xffff000000000003
 	mov	x8, #-281474976710656           ; =0xffff000000000000
 	cmp	x9, x8
-	b.ne	LBB689_21
+	b.ne	LBB692_21
 ; %bb.20:                               ; %B19
 	and	x9, x21, #0xffff000000000003
 	cmp	x9, x8
-	b.eq	LBB689_25
-LBB689_21:                              ; %B21
+	b.eq	LBB692_25
+LBB692_21:                              ; %B21
 	ldrb	w8, [x19], #1
 	mov	w22, #6                         ; =0x6
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB689_22:                              ; %B14
+LBB692_22:                              ; %B14
 	mov	x8, x20
 	add	x20, x20, #16
 	mov	x0, xzr
 	stp	x22, x21, [x8]
 	b	l_FastStringEqual_asm_h
-LBB689_23:                              ; %B36
+LBB692_23:                              ; %B36
 	add	x8, x20, #16
 	mov	x0, x24
 	mov	x1, x22
@@ -22394,27 +22632,27 @@ LBB689_23:                              ; %B36
 	str	x8, [x23, #48]
 	bl	_prim_js_strict_eq_slow_gc
 	cmp	x0, #130
-	b.eq	LBB689_27
+	b.eq	LBB692_27
 ; %bb.24:                               ; %B38
 	ldrb	w8, [x19], #1
 	mov	x22, x0
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB689_25:                              ; %B7
+LBB692_25:                              ; %B7
 	and	x8, x22, #0xfffffffffffc
 	and	x9, x21, #0xfffffffffffc
 	ldr	x8, [x8, #8]
 	ldr	x9, [x9, #8]
 	cmp	x8, x9
-	b.eq	LBB689_14
+	b.eq	LBB692_14
 ; %bb.26:                               ; %B9
 	ldrb	w8, [x19], #1
 	mov	w22, #6                         ; =0x6
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB689_27:                              ; %B37
+LBB692_27:                              ; %B37
 	b	l_exception_spill_top0_top1_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function strict_neq_2_asm_h
@@ -22422,17 +22660,17 @@ l_strict_neq_2_asm_h:                   ; @strict_neq_2_asm_h
 ; %bb.0:                                ; %B39
 	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
 	cmp	x22, x8
-	b.hi	LBB690_13
+	b.hi	LBB693_13
 ; %bb.1:                                ; %B39
 	cmp	x21, x8
-	b.hi	LBB690_13
+	b.hi	LBB693_13
 ; %bb.2:                                ; %B1
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x22, x8
-	b.lo	LBB690_5
+	b.lo	LBB693_5
 ; %bb.3:                                ; %B30
 	cmp	x21, x8
-	b.lo	LBB690_8
+	b.lo	LBB693_8
 ; %bb.4:                                ; %B35
 	ldrb	w8, [x19], #1
 	cmp	w22, w21
@@ -22441,12 +22679,12 @@ l_strict_neq_2_asm_h:                   ; @strict_neq_2_asm_h
 	mov	w8, #6                          ; =0x6
 	cinc	x22, x8, ne
 	br	x1
-LBB690_5:                               ; %B3
+LBB693_5:                               ; %B3
 	tst	x22, #0xfffe000000000000
-	b.eq	LBB690_13
+	b.eq	LBB693_13
 ; %bb.6:                                ; %B23
 	cmp	x21, x8
-	b.lo	LBB690_11
+	b.lo	LBB693_11
 ; %bb.7:                                ; %B28
 	scvtf	d0, w21
 	add	x8, x22, x8
@@ -22460,13 +22698,13 @@ LBB690_5:                               ; %B3
 	csinc	w8, w9, wzr, vc
 	orr	x22, x8, #0x6
 	br	x1
-LBB690_8:                               ; %B32
+LBB693_8:                               ; %B32
 	tst	x21, #0xfffe000000000000
-	b.eq	LBB690_13
+	b.eq	LBB693_13
 ; %bb.9:                                ; %B34
 	scvtf	d0, w22
 	add	x8, x21, x8
-LBB690_10:                              ; %B34
+LBB693_10:                              ; %B34
 	fmov	d1, x8
 	ldrb	w8, [x19], #1
 	fcmp	d0, d1
@@ -22477,24 +22715,24 @@ LBB690_10:                              ; %B34
 	csinc	w8, w9, wzr, vc
 	orr	x22, x8, #0x6
 	br	x1
-LBB690_11:                              ; %B25
+LBB693_11:                              ; %B25
 	tst	x21, #0xfffe000000000000
-	b.eq	LBB690_13
+	b.eq	LBB693_13
 ; %bb.12:                               ; %B27
 	add	x9, x22, x8
 	add	x8, x21, x8
 	fmov	d0, x9
-	b	LBB690_10
-LBB690_13:                              ; %B10
+	b	LBB693_10
+LBB693_13:                              ; %B10
 	cmp	x22, x21
-	b.ne	LBB690_15
-LBB690_14:                              ; %B11
+	b.ne	LBB693_15
+LBB693_14:                              ; %B11
 	ldrb	w8, [x19], #1
 	mov	w22, #6                         ; =0x6
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB690_15:                              ; %B13
+LBB693_15:                              ; %B13
 	and	x8, x22, #0xffff000000000003
 	mov	x11, #-281474976710653          ; =0xffff000000000003
 	mov	x12, #2                         ; =0x2
@@ -22507,10 +22745,10 @@ LBB690_15:                              ; %B13
 	ccmp	x10, x12, #4, ne
 	cset	w11, eq
 	cmp	w9, #1
-	b.ne	LBB690_17
+	b.ne	LBB693_17
 ; %bb.16:                               ; %B13
-	cbnz	w11, LBB690_22
-LBB690_17:                              ; %B16
+	cbnz	w11, LBB693_22
+LBB693_17:                              ; %B16
 	mov	x12, #2                         ; =0x2
 	movk	x12, #65535, lsl #48
 	cmp	x8, x12
@@ -22518,31 +22756,31 @@ LBB690_17:                              ; %B16
 	cmp	x10, x12
 	bic	w9, w8, w9
 	csinc	w8, w11, wzr, ne
-	tbnz	w9, #0, LBB690_19
+	tbnz	w9, #0, LBB693_19
 ; %bb.18:                               ; %B16
-	tbnz	w8, #0, LBB690_23
-LBB690_19:                              ; %B19
+	tbnz	w8, #0, LBB693_23
+LBB693_19:                              ; %B19
 	and	x9, x22, #0xffff000000000003
 	mov	x8, #-281474976710656           ; =0xffff000000000000
 	cmp	x9, x8
-	b.ne	LBB690_21
+	b.ne	LBB693_21
 ; %bb.20:                               ; %B19
 	and	x9, x21, #0xffff000000000003
 	cmp	x9, x8
-	b.eq	LBB690_25
-LBB690_21:                              ; %B21
+	b.eq	LBB693_25
+LBB693_21:                              ; %B21
 	ldrb	w8, [x19], #1
 	mov	w22, #7                         ; =0x7
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB690_22:                              ; %B14
+LBB693_22:                              ; %B14
 	mov	x8, x20
 	add	x20, x20, #16
 	mov	w0, #1                          ; =0x1
 	stp	x22, x21, [x8]
 	b	l_FastStringEqual_asm_h
-LBB690_23:                              ; %B36
+LBB693_23:                              ; %B36
 	add	x8, x20, #16
 	mov	x0, x24
 	mov	x1, x22
@@ -22552,27 +22790,27 @@ LBB690_23:                              ; %B36
 	str	x8, [x23, #48]
 	bl	_prim_js_strict_eq_slow_gc
 	cmp	x0, #130
-	b.eq	LBB690_27
+	b.eq	LBB693_27
 ; %bb.24:                               ; %B38
 	ldrb	w8, [x19], #1
 	mov	x22, x0
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB690_25:                              ; %B7
+LBB693_25:                              ; %B7
 	and	x8, x22, #0xfffffffffffc
 	and	x9, x21, #0xfffffffffffc
 	ldr	x8, [x8, #8]
 	ldr	x9, [x9, #8]
 	cmp	x8, x9
-	b.eq	LBB690_14
+	b.eq	LBB693_14
 ; %bb.26:                               ; %B9
 	ldrb	w8, [x19], #1
 	mov	w22, #7                         ; =0x7
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB690_27:                              ; %B37
+LBB693_27:                              ; %B37
 	b	l_exception_spill_top0_top1_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function and_2_asm_h
@@ -22580,17 +22818,17 @@ l_and_2_asm_h:                          ; @and_2_asm_h
 ; %bb.0:                                ; %B28
 	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
 	cmp	x22, x8
-	b.hi	LBB691_9
+	b.hi	LBB694_9
 ; %bb.1:                                ; %B28
 	cmp	x21, x8
-	b.hi	LBB691_9
+	b.hi	LBB694_9
 ; %bb.2:                                ; %B2
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x22, x8
-	b.lo	LBB691_5
+	b.lo	LBB694_5
 ; %bb.3:                                ; %B19
 	cmp	x21, x8
-	b.lo	LBB691_9
+	b.lo	LBB694_9
 ; %bb.4:                                ; %B24
 	mov	w8, w22
 	ldrb	w9, [x19], #1
@@ -22599,16 +22837,16 @@ l_and_2_asm_h:                          ; @and_2_asm_h
 	add	w9, w9, #243
 	ldr	x1, [x25, w9, uxtw #3]
 	br	x1
-LBB691_5:                               ; %B4
+LBB694_5:                               ; %B4
 	tst	x22, #0xfffe000000000000
-	b.eq	LBB691_9
+	b.eq	LBB694_9
 ; %bb.6:                                ; %B4
 	cmp	x21, x8
-	b.lo	LBB691_9
+	b.lo	LBB694_9
 ; %bb.7:                                ; %B14
 	ubfx	x8, x22, #52, #11
 	cmp	x8, #1053
-	b.gt	LBB691_9
+	b.gt	LBB694_9
 ; %bb.8:                                ; %B15
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	add	x8, x22, x8
@@ -22620,7 +22858,7 @@ LBB691_5:                               ; %B4
 	add	w9, w9, #243
 	ldr	x1, [x25, w9, uxtw #3]
 	br	x1
-LBB691_9:                               ; %B25
+LBB694_9:                               ; %B25
 	add	x8, x20, #16
 	mov	x0, x24
 	mov	x1, x22
@@ -22630,14 +22868,14 @@ LBB691_9:                               ; %B25
 	str	x8, [x23, #48]
 	bl	_prim_js_binary_logic_slow_gc
 	cmp	x0, #130
-	b.eq	LBB691_11
+	b.eq	LBB694_11
 ; %bb.10:                               ; %B27
 	ldrb	w8, [x19], #1
 	mov	x22, x0
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB691_11:                              ; %B26
+LBB694_11:                              ; %B26
 	b	l_exception_spill_top0_top1_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function xor_2_asm_h
@@ -22645,17 +22883,17 @@ l_xor_2_asm_h:                          ; @xor_2_asm_h
 ; %bb.0:                                ; %B28
 	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
 	cmp	x22, x8
-	b.hi	LBB692_9
+	b.hi	LBB695_9
 ; %bb.1:                                ; %B28
 	cmp	x21, x8
-	b.hi	LBB692_9
+	b.hi	LBB695_9
 ; %bb.2:                                ; %B2
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x22, x8
-	b.lo	LBB692_5
+	b.lo	LBB695_5
 ; %bb.3:                                ; %B19
 	cmp	x21, x8
-	b.lo	LBB692_9
+	b.lo	LBB695_9
 ; %bb.4:                                ; %B24
 	mov	w8, w22
 	ldrb	w9, [x19], #1
@@ -22664,16 +22902,16 @@ l_xor_2_asm_h:                          ; @xor_2_asm_h
 	add	w9, w9, #243
 	ldr	x1, [x25, w9, uxtw #3]
 	br	x1
-LBB692_5:                               ; %B4
+LBB695_5:                               ; %B4
 	tst	x22, #0xfffe000000000000
-	b.eq	LBB692_9
+	b.eq	LBB695_9
 ; %bb.6:                                ; %B4
 	cmp	x21, x8
-	b.lo	LBB692_9
+	b.lo	LBB695_9
 ; %bb.7:                                ; %B14
 	ubfx	x8, x22, #52, #11
 	cmp	x8, #1053
-	b.gt	LBB692_9
+	b.gt	LBB695_9
 ; %bb.8:                                ; %B15
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	add	x8, x22, x8
@@ -22685,7 +22923,7 @@ LBB692_5:                               ; %B4
 	add	w9, w9, #243
 	ldr	x1, [x25, w9, uxtw #3]
 	br	x1
-LBB692_9:                               ; %B25
+LBB695_9:                               ; %B25
 	add	x8, x20, #16
 	mov	x0, x24
 	mov	x1, x22
@@ -22695,14 +22933,14 @@ LBB692_9:                               ; %B25
 	str	x8, [x23, #48]
 	bl	_prim_js_binary_logic_slow_gc
 	cmp	x0, #130
-	b.eq	LBB692_11
+	b.eq	LBB695_11
 ; %bb.10:                               ; %B27
 	ldrb	w8, [x19], #1
 	mov	x22, x0
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB692_11:                              ; %B26
+LBB695_11:                              ; %B26
 	b	l_exception_spill_top0_top1_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function or_2_asm_h
@@ -22710,17 +22948,17 @@ l_or_2_asm_h:                           ; @or_2_asm_h
 ; %bb.0:                                ; %B28
 	mov	x8, #-281474976710657           ; =0xfffeffffffffffff
 	cmp	x22, x8
-	b.hi	LBB693_9
+	b.hi	LBB696_9
 ; %bb.1:                                ; %B28
 	cmp	x21, x8
-	b.hi	LBB693_9
+	b.hi	LBB696_9
 ; %bb.2:                                ; %B2
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x22, x8
-	b.lo	LBB693_5
+	b.lo	LBB696_5
 ; %bb.3:                                ; %B19
 	cmp	x21, x8
-	b.lo	LBB693_9
+	b.lo	LBB696_9
 ; %bb.4:                                ; %B24
 	mov	w8, w22
 	ldrb	w9, [x19], #1
@@ -22729,16 +22967,16 @@ l_or_2_asm_h:                           ; @or_2_asm_h
 	add	w9, w9, #243
 	ldr	x1, [x25, w9, uxtw #3]
 	br	x1
-LBB693_5:                               ; %B4
+LBB696_5:                               ; %B4
 	tst	x22, #0xfffe000000000000
-	b.eq	LBB693_9
+	b.eq	LBB696_9
 ; %bb.6:                                ; %B4
 	cmp	x21, x8
-	b.lo	LBB693_9
+	b.lo	LBB696_9
 ; %bb.7:                                ; %B14
 	ubfx	x8, x22, #52, #11
 	cmp	x8, #1053
-	b.gt	LBB693_9
+	b.gt	LBB696_9
 ; %bb.8:                                ; %B15
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	add	x8, x22, x8
@@ -22750,7 +22988,7 @@ LBB693_5:                               ; %B4
 	add	w9, w9, #243
 	ldr	x1, [x25, w9, uxtw #3]
 	br	x1
-LBB693_9:                               ; %B25
+LBB696_9:                               ; %B25
 	add	x8, x20, #16
 	mov	x0, x24
 	mov	x1, x22
@@ -22760,14 +22998,14 @@ LBB693_9:                               ; %B25
 	str	x8, [x23, #48]
 	bl	_prim_js_binary_logic_slow_gc
 	cmp	x0, #130
-	b.eq	LBB693_11
+	b.eq	LBB696_11
 ; %bb.10:                               ; %B27
 	ldrb	w8, [x19], #1
 	mov	x22, x0
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB693_11:                              ; %B26
+LBB696_11:                              ; %B26
 	b	l_exception_spill_top0_top1_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function nop_2_asm_h
@@ -22920,7 +23158,7 @@ l_push_const8_2_asm_h:                  ; @push_const8_2_asm_h
 	ldrb	w9, [x19]
 	ldr	w10, [x24, #328]
 	ldr	x1, [x8, x9, lsl #3]
-	cbz	w10, LBB706_2
+	cbz	w10, LBB709_2
 ; %bb.1:                                ; %B4
 	mov	x8, x20
 	mov	x0, x24
@@ -22930,7 +23168,7 @@ l_push_const8_2_asm_h:                  ; @push_const8_2_asm_h
 	str	x1, [sp, #8]                    ; 8-byte Folded Spill
 	bl	_DebuggerPause
 	ldr	x1, [sp, #8]                    ; 8-byte Folded Reload
-LBB706_2:                               ; %B1
+LBB709_2:                               ; %B1
 	ldrb	w8, [x19, #1]
 	add	x19, x19, #2
 	mov	x22, x21
@@ -22960,7 +23198,7 @@ l_push_empty_string_2_asm_h:            ; @push_empty_string_2_asm_h
 	str	x8, [x23, #48]
 	bl	___JS_AtomToValue_GC
 	cmp	x0, #130
-	b.eq	LBB708_2
+	b.eq	LBB711_2
 ; %bb.1:                                ; %B3
 	ldrb	w8, [x19], #1
 	mov	x22, x21
@@ -22968,7 +23206,7 @@ l_push_empty_string_2_asm_h:            ; @push_empty_string_2_asm_h
 	add	w8, w8, #486
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB708_2:                               ; %B2
+LBB711_2:                               ; %B2
 	b	l_exception_spill_top1_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function get_loc8_2_asm_h
@@ -23397,12 +23635,12 @@ l_get_length_2_asm_h:                   ; @get_length_2_asm_h
 	and	x8, x21, #0xffff000000000003
 	movk	x9, #1, lsl #48
 	cmp	x8, x9
-	b.eq	LBB748_2
+	b.eq	LBB751_2
 ; %bb.1:                                ; %B27
 	mov	x9, #-281474976710653           ; =0xffff000000000003
 	cmp	x8, x9
-	b.ne	LBB748_3
-LBB748_2:                               ; %B28
+	b.ne	LBB751_3
+LBB751_2:                               ; %B28
 	and	x8, x21, #0xfffffffffffc
 	ldrb	w9, [x19], #1
 	ldr	w8, [x8, #4]
@@ -23412,17 +23650,17 @@ LBB748_2:                               ; %B28
 	ldr	x1, [x25, w9, uxtw #3]
 	mov	x21, x10
 	br	x1
-LBB748_3:                               ; %B21
+LBB751_3:                               ; %B21
 	mov	x8, #2                          ; =0x2
 	movk	x8, #65535, lsl #48
 	tst	x21, x8
-	b.ne	LBB748_13
+	b.ne	LBB751_13
 ; %bb.4:                                ; %B22
 	mov	x9, x21
 	mov	w8, #18                         ; =0x12
-LBB748_5:                               ; %B19
+LBB751_5:                               ; %B19
                                         ; =>This Loop Header: Depth=1
-                                        ;     Child Loop BB748_6 Depth 2
+                                        ;     Child Loop BB751_6 Depth 2
 	ldr	x10, [x9, #8]
 	ldr	w11, [x10, #12]
 	add	x13, x10, #64
@@ -23431,47 +23669,47 @@ LBB748_5:                               ; %B19
 	ldr	w10, [x13, w10, uxtw #2]
 	add	w11, w12, #4
 	add	x11, x13, x11
-	cbz	w10, LBB748_8
-LBB748_6:                               ; %B1
-                                        ;   Parent Loop BB748_5 Depth=1
+	cbz	w10, LBB751_8
+LBB751_6:                               ; %B1
+                                        ;   Parent Loop BB751_5 Depth=1
                                         ; =>  This Inner Loop Header: Depth=2
 	lsl	w12, w10, #3
 	sub	w12, w12, #8
 	add	x12, x11, x12
 	ldp	w12, w13, [x12]
 	cmp	w13, #48
-	b.eq	LBB748_10
+	b.eq	LBB751_10
 ; %bb.7:                                ; %B9
-                                        ;   in Loop: Header=BB748_6 Depth=2
+                                        ;   in Loop: Header=BB751_6 Depth=2
 	and	w10, w12, #0x3ffffff
-	cbnz	w10, LBB748_6
-LBB748_8:                               ; %B14
-                                        ;   in Loop: Header=BB748_5 Depth=1
+	cbnz	w10, LBB751_6
+LBB751_8:                               ; %B14
+                                        ;   in Loop: Header=BB751_5 Depth=1
 	ldr	w10, [x9, #4]
 	ubfx	w10, w10, #10, #1
 	cmp	w10, #1
-	b.eq	LBB748_13
+	b.eq	LBB751_13
 ; %bb.9:                                ; %B17
-                                        ;   in Loop: Header=BB748_5 Depth=1
+                                        ;   in Loop: Header=BB751_5 Depth=1
 	ldr	x9, [x9, #8]
 	ldr	x9, [x9, #32]
-	cbnz	x9, LBB748_5
-	b	LBB748_12
-LBB748_10:                              ; %B3
+	cbnz	x9, LBB751_5
+	b	LBB751_12
+LBB751_10:                              ; %B3
 	lsr	w8, w12, #26
 	tst	w8, #0x30
-	b.ne	LBB748_13
+	b.ne	LBB751_13
 ; %bb.11:                               ; %B4
 	ldr	x8, [x9, #16]
 	sub	w9, w10, #1
 	ldr	x8, [x8, w9, sxtw #3]
-LBB748_12:                              ; %B6
+LBB751_12:                              ; %B6
 	ldrb	w9, [x19], #1
 	mov	x21, x8
 	add	w9, w9, #486
 	ldr	x1, [x25, w9, uxtw #3]
 	br	x1
-LBB748_13:                              ; %B24
+LBB751_13:                              ; %B24
 	add	x8, x20, #16
 	mov	x0, x24
 	mov	x1, x21
@@ -23482,74 +23720,84 @@ LBB748_13:                              ; %B24
 	str	x8, [x23, #48]
 	bl	_JS_GetPropertyInternalImpl_GC
 	cmp	x0, #130
-	b.eq	LBB748_15
+	b.eq	LBB751_15
 ; %bb.14:                               ; %B26
 	ldrb	w8, [x19], #1
 	mov	x21, x0
 	add	w8, w8, #486
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB748_15:                              ; %B25
+LBB751_15:                              ; %B25
 	b	l_exception_spill_top0_top1_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function if_false8_2_asm_h
 l_if_false8_2_asm_h:                    ; @if_false8_2_asm_h
-; %bb.0:                                ; %B23
+; %bb.0:                                ; %B29
 	cmp	x21, #5
-	b.le	LBB749_4
-; %bb.1:                                ; %B23
+	b.le	LBB752_4
+; %bb.1:                                ; %B29
 	cmp	x21, #6
-	b.eq	LBB749_6
-; %bb.2:                                ; %B23
+	b.eq	LBB752_6
+; %bb.2:                                ; %B29
 	cmp	x21, #7
-	b.eq	LBB749_9
-; %bb.3:                                ; %B23
+	b.eq	LBB752_10
+; %bb.3:                                ; %B29
 	cmp	x21, #18
-	b.eq	LBB749_6
-	b	LBB749_7
-LBB749_4:                               ; %B23
+	b.eq	LBB752_6
+	b	LBB752_8
+LBB752_4:                               ; %B29
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x21, x8
-	b.eq	LBB749_6
-; %bb.5:                                ; %B23
+	b.eq	LBB752_6
+; %bb.5:                                ; %B29
 	cmp	x21, #2
-	b.ne	LBB749_7
-LBB749_6:                               ; %B3
+	b.ne	LBB752_8
+LBB752_6:                               ; %B8
 	ldrsb	x8, [x19]
 	add	x19, x19, x8
+	tbnz	x8, #63, LBB752_11
+LBB752_7:                               ; %B10
 	ldrb	w8, [x19], #1
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB749_7:                               ; %B9
+LBB752_8:                               ; %B15
 	mov	x8, #-281474976710656           ; =0xffff000000000000
 	cmp	x21, x8
-	b.hs	LBB749_13
-; %bb.8:                                ; %B11
+	b.hs	LBB752_16
+; %bb.9:                                ; %B17
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x21, x8
-	b.lo	LBB749_10
-LBB749_9:                               ; %B19
+	b.lo	LBB752_13
+LBB752_10:                              ; %B25
 	ldrb	w8, [x19, #1]
 	add	x19, x19, #2
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB749_10:                              ; %B13
+LBB752_11:                              ; %B5
+	ldr	w8, [x24, #232]
+	subs	w8, w8, #1
+	str	w8, [x24, #232]
+	b.pl	LBB752_7
+; %bb.12:                               ; %B6
+	add	x19, x19, #1
+	b	l_PollInterrupts_spill_top0_asm_h
+LBB752_13:                              ; %B19
 	tst	x21, #0xfffe000000000000
-	b.eq	LBB749_13
-; %bb.11:                               ; %B17
+	b.eq	LBB752_16
+; %bb.14:                               ; %B23
 	add	x8, x21, x8
 	fmov	d0, x8
 	fcmp	d0, d0
 	cset	w8, vc
 	fcmp	d0, #0.0
-	b.eq	LBB749_6
-	b.vs	LBB749_6
-; %bb.12:                               ; %B17
-	tbnz	w8, #0, LBB749_9
-	b	LBB749_6
-LBB749_13:                              ; %B15
+	b.eq	LBB752_6
+	b.vs	LBB752_6
+; %bb.15:                               ; %B23
+	tbnz	w8, #0, LBB752_10
+	b	LBB752_6
+LBB752_16:                              ; %B21
 	mov	x8, x20
 	add	x20, x20, #16
 	mov	x0, x21
@@ -23558,62 +23806,73 @@ LBB749_13:                              ; %B15
                                         ; -- End function
 	.p2align	2                               ; -- Begin function if_true8_2_asm_h
 l_if_true8_2_asm_h:                     ; @if_true8_2_asm_h
-; %bb.0:                                ; %B23
+; %bb.0:                                ; %B29
 	cmp	x21, #5
-	b.le	LBB750_4
-; %bb.1:                                ; %B23
+	b.le	LBB753_4
+; %bb.1:                                ; %B29
 	cmp	x21, #6
-	b.eq	LBB750_6
-; %bb.2:                                ; %B23
+	b.eq	LBB753_6
+; %bb.2:                                ; %B29
 	cmp	x21, #7
-	b.eq	LBB750_9
-; %bb.3:                                ; %B23
+	b.eq	LBB753_9
+; %bb.3:                                ; %B29
 	cmp	x21, #18
-	b.eq	LBB750_6
-	b	LBB750_7
-LBB750_4:                               ; %B23
+	b.eq	LBB753_6
+	b	LBB753_7
+LBB753_4:                               ; %B29
 	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	cmp	x21, x8
-	b.eq	LBB750_6
-; %bb.5:                                ; %B23
+	b.eq	LBB753_6
+; %bb.5:                                ; %B29
 	cmp	x21, #2
-	b.ne	LBB750_7
-LBB750_6:                               ; %B3
+	b.ne	LBB753_7
+LBB753_6:                               ; %B3
 	ldrb	w8, [x19, #1]
 	add	x19, x19, #2
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB750_7:                               ; %B9
+LBB753_7:                               ; %B9
 	mov	x8, #-281474976710656           ; =0xffff000000000000
 	cmp	x21, x8
-	b.hs	LBB750_13
+	b.hs	LBB753_16
 ; %bb.8:                                ; %B11
-	mov	x8, #-562949953421312           ; =0xfffe000000000000
+	mov	x8, #-562949953421313           ; =0xfffdffffffffffff
 	cmp	x21, x8
-	b.lo	LBB750_10
-LBB750_9:                               ; %B19
+	b.ls	LBB753_13
+LBB753_9:                               ; %B23
 	ldrsb	x8, [x19]
 	add	x19, x19, x8
+	tbnz	x8, #63, LBB753_11
+LBB753_10:                              ; %B25
 	ldrb	w8, [x19], #1
 	add	w8, w8, #243
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB750_10:                              ; %B13
+LBB753_11:                              ; %B20
+	ldr	w8, [x24, #232]
+	subs	w8, w8, #1
+	str	w8, [x24, #232]
+	b.pl	LBB753_10
+; %bb.12:                               ; %B21
+	add	x19, x19, #1
+	b	l_PollInterrupts_spill_top0_asm_h
+LBB753_13:                              ; %B13
 	tst	x21, #0xfffe000000000000
-	b.eq	LBB750_13
-; %bb.11:                               ; %B17
+	b.eq	LBB753_16
+; %bb.14:                               ; %B17
+	mov	x8, #-562949953421312           ; =0xfffe000000000000
 	add	x8, x21, x8
 	fmov	d0, x8
 	fcmp	d0, d0
 	cset	w8, vc
 	fcmp	d0, #0.0
-	b.eq	LBB750_6
-	b.vs	LBB750_6
-; %bb.12:                               ; %B17
-	tbnz	w8, #0, LBB750_9
-	b	LBB750_6
-LBB750_13:                              ; %B15
+	b.eq	LBB753_6
+	b.vs	LBB753_6
+; %bb.15:                               ; %B17
+	tbnz	w8, #0, LBB753_9
+	b	LBB753_6
+LBB753_16:                              ; %B15
 	mov	x8, x20
 	add	x20, x20, #16
 	mov	x0, x21
@@ -23622,23 +23881,43 @@ LBB750_13:                              ; %B15
                                         ; -- End function
 	.p2align	2                               ; -- Begin function goto8_2_asm_h
 l_goto8_2_asm_h:                        ; @goto8_2_asm_h
-; %bb.0:                                ; %B0
+; %bb.0:                                ; %B5
 	ldrsb	x8, [x19]
 	add	x19, x19, x8
+	tbnz	x8, #63, LBB754_2
+LBB754_1:                               ; %B7
 	ldrb	w8, [x19], #1
 	add	w8, w8, #486
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
+LBB754_2:                               ; %B2
+	ldr	w8, [x24, #232]
+	subs	w8, w8, #1
+	str	w8, [x24, #232]
+	b.pl	LBB754_1
+; %bb.3:                                ; %B3
+	add	x19, x19, #1
+	b	l_PollInterrupts_spill_top0_top1_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function goto16_2_asm_h
 l_goto16_2_asm_h:                       ; @goto16_2_asm_h
-; %bb.0:                                ; %B0
+; %bb.0:                                ; %B5
 	ldrsh	x8, [x19]
 	add	x19, x19, x8
+	tbnz	x8, #63, LBB755_2
+LBB755_1:                               ; %B7
 	ldrb	w8, [x19], #1
 	add	w8, w8, #486
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
+LBB755_2:                               ; %B2
+	ldr	w8, [x24, #232]
+	subs	w8, w8, #1
+	str	w8, [x24, #232]
+	b.pl	LBB755_1
+; %bb.3:                                ; %B3
+	add	x19, x19, #1
+	b	l_PollInterrupts_spill_top0_top1_asm_h
                                         ; -- End function
 	.p2align	2                               ; -- Begin function call0_2_asm_h
 l_call0_2_asm_h:                        ; @call0_2_asm_h
@@ -23676,14 +23955,14 @@ l_call3_2_asm_h:                        ; @call3_2_asm_h
 l_is_undefined_2_asm_h:                 ; @is_undefined_2_asm_h
 ; %bb.0:                                ; %B2
 	cmp	x21, #18
-	b.ne	LBB757_2
+	b.ne	LBB760_2
 ; %bb.1:                                ; %B3
 	mov	w21, #7                         ; =0x7
 	ldrb	w8, [x19], #1
 	add	w8, w8, #486
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB757_2:                               ; %B5
+LBB760_2:                               ; %B5
 	mov	w21, #6                         ; =0x6
 	ldrb	w8, [x19], #1
 	add	w8, w8, #486
@@ -23694,14 +23973,14 @@ LBB757_2:                               ; %B5
 l_is_null_2_asm_h:                      ; @is_null_2_asm_h
 ; %bb.0:                                ; %B2
 	cmp	x21, #2
-	b.ne	LBB758_2
+	b.ne	LBB761_2
 ; %bb.1:                                ; %B3
 	mov	w21, #7                         ; =0x7
 	ldrb	w8, [x19], #1
 	add	w8, w8, #486
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB758_2:                               ; %B5
+LBB761_2:                               ; %B5
 	mov	w21, #6                         ; =0x6
 	ldrb	w8, [x19], #1
 	add	w8, w8, #486
@@ -23715,14 +23994,14 @@ l_is_function_2_asm_h:                  ; @is_function_2_asm_h
 	mov	x1, x21
 	bl	_js_operator_typeof_gc
 	cmp	w0, #27
-	b.ne	LBB759_2
+	b.ne	LBB762_2
 ; %bb.1:                                ; %B2
 	mov	w21, #7                         ; =0x7
 	ldrb	w8, [x19], #1
 	add	w8, w8, #486
 	ldr	x1, [x25, w8, uxtw #3]
 	br	x1
-LBB759_2:                               ; %B5
+LBB762_2:                               ; %B5
 	mov	w21, #6                         ; =0x6
 	ldrb	w8, [x19], #1
 	add	w8, w8, #486
