@@ -82,6 +82,12 @@ The harness triggers collection on each backend and checks callback counts
 before destroying its runtime. Receiver mutation, integer conversion boundaries
 and JSC reference/finalizer ordering assertions remain in the suite.
 
+Native `AdapterTsfn*` cases cover release after the entire environment is freed,
+release from an environment cleanup hook, and a closing call returning only its
+caller's acquisition while queued payloads are discarded. They check statuses
+and exactly-once finalization; ASan builds also check that the final release
+frees the native handle. The original JavaScript cases remain unchanged.
+
 ## Known JSC failures
 
 The existing JSC adapter does not pass the full imported suite. These findings
