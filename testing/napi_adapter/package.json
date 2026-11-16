@@ -1,0 +1,15 @@
+{
+  "dependencies": {
+    "assert": "^2.1.0"
+  },
+  "devDependencies": {
+    "browserify": "^17.0.0"
+  },
+  "scripts": {
+    "bootstrap-deps": "npm install --prefix ../../packages/weak-node-api && npm run bootstrap --prefix ../../packages/weak-node-api",
+    "build:js": "python3 build_js.py",
+    "test": "python3 run_tests.py",
+    "test:gc": "python3 run_tests.py --gc"
+  },
+  "packageManager": "pnpm@9.12.0"
+}
