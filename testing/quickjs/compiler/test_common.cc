@@ -4493,4 +4493,28 @@ TEST_F(CommonQjsTest, ApplyArgumentsDoNotGrowHandleTable) {
   EXPECT_LT(rt_->ptr_handles->GetHandleSize(), 1 << 16);
 }
 
+// Detaching an ArrayBuffer releases its backing store, so the finalizer must
+// not release it a second time.
+TEST(ArrayBufferTest, DetachedBufferIsReleasedOnce) {
+  static uint8_t data[8];
+  int release_count = 0;
+  LEPUSRuntime* rt = LEPUS_NewRuntime();
+  LEPUSContext* ctx = LEPUS_NewContext(rt);
+  {
+    LEPUSValue buffer = LEPUS_NewArrayBuffer(
+        ctx, data, sizeof(data),
+        [](LEPUSRuntime*, void* opaque, void*) {
+          ++*static_cast<int*>(opaque);
+        },
+        &release_count, false);
+    EXPECT_FALSE(LEPUS_IsException(buffer));
+    LEPUS_DetachArrayBuffer(ctx, buffer);
+    EXPECT_EQ(release_count, 1);
+    if (!ctx->gc_enable) LEPUS_FreeValue(ctx, buffer);
+  }
+  LEPUS_FreeContext(ctx);
+  LEPUS_FreeRuntime(rt);
+  EXPECT_EQ(release_count, 1);
+}
+
 }  // namespace common_qjs_test

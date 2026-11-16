@@ -1089,9 +1089,9 @@ int js_bigint_float64_cmp(LEPUSContext *ctx, const JSBigInt *a, double b) {
     a_mant = js_bigint_get_mant_exp(ctx, &f, a);
     if (f != e) {
       if (f < e)
-        return -1;
+        return 2 * a_sign - 1;
       else
-        return 1;
+        return 1 - 2 * a_sign;
     } else {
       mant = (mant | ((uint64_t)1 << 52)) << 11; /* align to a_mant */
       if (a_mant < mant)
@@ -1350,7 +1350,9 @@ LEPUSValue js_atof(LEPUSContext *ctx, const char *str, const char **pp,
           to_digit((uint8_t)p[1]) < radix)) {
     p++;
   }
-  if (!(flags & ATOD_INT_ONLY)) {
+  /* only decimal literals have a fraction or an exponent: "0x1.a" is a member
+     access on 0x1 */
+  if (!(flags & ATOD_INT_ONLY) && radix == 10) {
     if (*p == '.' && (p > p_start || to_digit((uint8_t)p[1]) < radix)) {
       is_float = TRUE;
       p++;
@@ -1359,9 +1361,7 @@ LEPUSValue js_atof(LEPUSContext *ctx, const char *str, const char **pp,
              (*p == sep && to_digit((uint8_t)p[1]) < radix))
         p++;
     }
-    if (p > p_start && (((*p == 'e' || *p == 'E') && radix == 10) ||
-                        ((*p == 'p' || *p == 'P') &&
-                         (radix == 2 || radix == 8 || radix == 16)))) {
+    if (p > p_start && (*p == 'e' || *p == 'E')) {
       const char *p1 = p + 1;
       is_float = TRUE;
       if (*p1 == '+') {
@@ -1396,17 +1396,9 @@ LEPUSValue js_atof(LEPUSContext *ctx, const char *str, const char **pp,
   }
   buf[j] = '\0';
 
-  if (flags & ATOD_ACCEPT_SUFFIX) {
-    if (*p == 'n') {
-      p++;
-      atod_type = ATOD_TYPE_BIG_INT;
-    } else {
-      if (is_float && radix != 10) goto fail;
-    }
-  } else {
-    if (atod_type == ATOD_TYPE_FLOAT64) {
-      if (is_float && radix != 10) goto fail;
-    }
+  if ((flags & ATOD_ACCEPT_SUFFIX) && *p == 'n') {
+    p++;
+    atod_type = ATOD_TYPE_BIG_INT;
   }
 
   switch (atod_type) {

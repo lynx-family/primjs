@@ -3778,9 +3778,11 @@ static int JS_AutoInitProperty(LEPUSContext *ctx, LEPUSObject *p, JSAtom prop,
   /* 'func' shall not modify the object properties 'pr' */
   val = func(ctx, p, prop, opaque);
   HandleScope func_scope(ctx, &val, HANDLE_TYPE_LEPUS_VALUE);
+  /* on failure, the property is left uninitialized so that the next access
+     retries instead of reading undefined */
+  if (LEPUS_IsException(val)) return -1;
   prs->flags &= ~LEPUS_PROP_TMASK;
   pr->u.value = LEPUS_UNDEFINED;
-  if (LEPUS_IsException(val)) return -1;
   HeapObjStore(ctx, &pr->u.value, val);
   return 0;
 }
@@ -5062,12 +5064,12 @@ static int expand_fast_array(LEPUSContext *ctx, LEPUSObject *p,
 }
 
 /* Preconditions: 'p' must be of class JS_CLASS_ARRAY, p->fast_array =
-   TRUE and p->extensible = TRUE */
+   TRUE, p->extensible = TRUE and p->u.array.count < 2^31 - 1 */
 int add_fast_array_element_gc(LEPUSContext *ctx, LEPUSObject *p, LEPUSValue val,
                               int flags) {
   uint32_t new_len, array_len;
+  BOOL update_len = FALSE;
   /* extend the array by one */
-  /* XXX: convert to slow array if new_len > 2^31-1 elements */
   new_len = p->u.array.count + 1;
   /* update the length if necessary. We assume that if the length is
      not an integer, then if it >= 2^31.  */
@@ -5077,12 +5079,14 @@ int add_fast_array_element_gc(LEPUSContext *ctx, LEPUSObject *p, LEPUSValue val,
       if (unlikely(!(get_shape_prop(p->shape)->flags & LEPUS_PROP_WRITABLE))) {
         return JS_ThrowTypeErrorReadOnly(ctx, flags, JS_ATOM_length);
       }
-      p->gc_prop[0].u.value = LEPUS_NewInt32(ctx, new_len);
+      update_len = TRUE;
     }
   }
   if (unlikely(new_len > p->u.array.u1.size)) {
     if (unlikely(expand_fast_array(ctx, p, new_len))) return -1;
   }
+  /* the length is only updated once the allocation has succeeded */
+  if (update_len) p->gc_prop[0].u.value = LEPUS_NewInt32(ctx, new_len);
   HeapObjStore(ctx, &p->u.array.u.values[new_len - 1], val);
   p->u.array.count = new_len;
   return TRUE;
@@ -5508,7 +5512,7 @@ retry:
     if (p->class_id == JS_CLASS_ARRAY && p->fast_array &&
         __JS_AtomIsTaggedInt(prop)) {
       uint32_t idx = __JS_AtomToUInt32(prop);
-      if (idx == p->u.array.count) {
+      if (idx == p->u.array.count && idx != INT32_MAX) {
         /* fast case */
         return add_fast_array_element_gc(ctx, p, val, flags);
       } else {
@@ -5551,8 +5555,8 @@ int JS_SetPropertyValue_GC(LEPUSContext *ctx, LEPUSValueConst this_obj,
           JSShape *sh1;
 
           /* fast path to add an element to the array */
-          if (idx != (uint32_t)p->u.array.count || !p->fast_array ||
-              !p->extensible)
+          if (idx != (uint32_t)p->u.array.count || idx == INT32_MAX ||
+              !p->fast_array || !p->extensible)
             goto slow_path;
           /* check if prototype chain has a numeric property */
           p1 = p->shape->proto;
@@ -5709,6 +5713,7 @@ static int JS_CreateProperty(LEPUSContext *ctx, LEPUSObject *p, JSAtom prop,
           idx = __JS_AtomToUInt32(prop);
           if (idx == p->u.array.count) {
             if (!p->extensible) goto not_extensible;
+            if (idx == INT32_MAX) goto convert_to_array;
             if (flags & (LEPUS_PROP_HAS_GET | LEPUS_PROP_HAS_SET))
               goto convert_to_array;
             prop_flags = get_prop_flags(flags, 0);
@@ -5728,6 +5733,7 @@ static int JS_CreateProperty(LEPUSContext *ctx, LEPUSObject *p, JSAtom prop,
         JSShapeProperty *pslen;
       generic_array:
         /* update the length field */
+        if (!p->extensible) goto not_extensible;
         plen = &p->gc_prop[0];
         JS_ToInt32_GC(ctx, reinterpret_cast<int32_t *>(&len), plen->u.value);
         if ((idx + 1) > len) {
@@ -6171,7 +6177,8 @@ int JS_DefinePropertyValueValue_GC(LEPUSContext *ctx, LEPUSValueConst this_obj,
   if (likely(LEPUS_VALUE_IS_OBJECT(this_obj))) {
     LEPUSObject *p = LEPUS_VALUE_GET_OBJ(this_obj);
     if (likely(p->class_id == JS_CLASS_ARRAY && p->fast_array &&
-               p->extensible && p->u.array.count < p->u.array.u1.size)) {
+               p->extensible && p->u.array.count < p->u.array.u1.size &&
+               p->u.array.count != INT32_MAX)) {
       uint32_t count = p->u.array.count;
       if (likely(LEPUS_VALUE_IS_INT(prop))) {
         int32_t idx = LEPUS_VALUE_GET_INT(prop);
@@ -6947,7 +6954,13 @@ static int JS_ToInt32Clamp(LEPUSContext *ctx, int *pres, LEPUSValueConst val,
   return res;
 }
 
-static int JS_ToInt64SatFree(LEPUSContext *ctx, int64_t *pres, LEPUSValue val) {
+#define JS_TO_INT64_SAT_INF 1 /* the value was +/-Infinity */
+#define JS_TO_INT64_SAT_NAN 2 /* the value was NaN */
+
+/* if ret_flags is true, a JS_TO_INT64_SAT_x flag may be returned instead of
+   0 */
+static int JS_ToInt64SatFree(LEPUSContext *ctx, int64_t *pres, LEPUSValue val,
+                             BOOL ret_flags = FALSE) {
   int64_t tag;
 
 redo:
@@ -6960,26 +6973,32 @@ redo:
       *pres = LEPUS_VALUE_GET_BOOL(val);
       return 0;
     case LEPUS_TAG_NULL:
-    case LEPUS_TAG_UNDEFINED:
       *pres = 0;
       return 0;
+    case LEPUS_TAG_UNDEFINED:
+      *pres = 0;
+      return ret_flags ? JS_TO_INT64_SAT_NAN : 0;
     case LEPUS_TAG_EXCEPTION:
       *pres = 0;
       return -1;
     case LEPUS_TAG_FLOAT64: {
       double d = LEPUS_VALUE_GET_FLOAT64(val);
+      int ret = 0;
       if (isnan(d)) {
         *pres = 0;
+        ret = JS_TO_INT64_SAT_NAN;
+      } else if (d < INT64_MIN) {
+        *pres = INT64_MIN;
+        if (!isfinite(d)) ret = JS_TO_INT64_SAT_INF;
+      } else if (d >= 0x1p63) {
+        /* INT64_MAX cannot be exactly represented as a double */
+        *pres = INT64_MAX;
+        if (!isfinite(d)) ret = JS_TO_INT64_SAT_INF;
       } else {
-        if (d < INT64_MIN)
-          *pres = INT64_MIN;
-        else if (d > INT64_MAX)
-          *pres = INT64_MAX;
-        else
-          *pres = (int64_t)d;
+        *pres = (int64_t)d;
       }
+      return ret_flags ? ret : 0;
     }
-      return 0;
     default:
       val = JS_ToNumberFree(ctx, val);
       if (LEPUS_IsException(val)) {
@@ -6993,6 +7012,12 @@ redo:
 static int JS_ToInt64Sat(LEPUSContext *ctx, int64_t *pres,
                          LEPUSValueConst val) {
   return JS_ToInt64SatFree(ctx, pres, val);
+}
+
+/* same as JS_ToInt64Sat, but returns the JS_TO_INT64_SAT_x flags */
+static int JS_ToInt64SatF(LEPUSContext *ctx, int64_t *pres,
+                          LEPUSValueConst val) {
+  return JS_ToInt64SatFree(ctx, pres, val, TRUE);
 }
 
 static int JS_ToInt64Clamp(LEPUSContext *ctx, int64_t *pres,
@@ -8550,7 +8575,12 @@ __exception int js_append_enumerate_gc(LEPUSContext *ctx, LEPUSValue *sp) {
   is_array_iterator =
       JS_IsCFunction(ctx, iterator, ft.generic, JS_ITERATOR_KIND_VALUE);
 
-  enumobj = JS_GetIterator(ctx, sp[-1], FALSE);
+  /* reuse the method read above: @@iterator must be read only once */
+  if (!LEPUS_IsFunction(ctx, iterator)) {
+    LEPUS_ThrowTypeError(ctx, "value is not iterable");
+    return -1;
+  }
+  enumobj = JS_GetIterator2(ctx, sp[-1], iterator);
   if (LEPUS_IsException(enumobj)) return -1;
   method = JS_GetPropertyInternal_GC(ctx, enumobj, JS_ATOM_next, enumobj, 0);
   if (LEPUS_IsException(method)) {
@@ -8596,13 +8626,16 @@ exception:
 
 static __exception int JS_CopyDataProperties(LEPUSContext *ctx,
                                              LEPUSValueConst target,
-                                             LEPUSValueConst source,
+                                             LEPUSValueConst source0,
                                              LEPUSValueConst excluded,
                                              BOOL setprop) {
   LEPUSPropertyEnum *tab_atom = nullptr;
   HandleScope func_scope(ctx, &tab_atom, HANDLE_TYPE_HEAP_OBJ);
   LEPUSValue val = LEPUS_UNDEFINED;
   func_scope.PushHandle(&val, HANDLE_TYPE_LEPUS_VALUE);
+  /* a primitive source is replaced by its wrapper object */
+  LEPUSValue source = source0;
+  func_scope.PushHandle(&source, HANDLE_TYPE_LEPUS_VALUE);
   uint32_t i, tab_atom_count;
   LEPUSObject *p;
   LEPUSObject *pexcl = NULL;
@@ -8619,7 +8652,11 @@ static __exception int JS_CopyDataProperties(LEPUSContext *ctx,
 #endif
   // <Primjs end>
 
-  if (LEPUS_VALUE_IS_NOT_OBJECT(source)) return 0;
+  if (LEPUS_VALUE_IS_NOT_OBJECT(source)) {
+    if (LEPUS_IsNull(source) || LEPUS_IsUndefined(source)) return 0;
+    source = JS_ToObject_GC(ctx, source);
+    if (LEPUS_IsException(source)) return -1;
+  }
 
   p = LEPUS_VALUE_GET_OBJ(source);
   if (JS_GetOwnPropertyNamesInternal(
@@ -10165,8 +10202,12 @@ int __exception js_parse_property_name_GC(JSParseState *s, JSAtom *pname,
       /* get x(), set x() */
       name = s->token.u.ident.atom;
       if (next_token(s)) goto fail1;
+      /* in a class body, "get" or "set" followed by '=', ';' or '*' (after
+         a line terminator) is a field name */
       if (s->token.val == ':' || s->token.val == ',' || s->token.val == '}' ||
-          s->token.val == '(')
+          s->token.val == '(' ||
+          (allow_private &&
+           (s->token.val == '=' || s->token.val == ';' || s->token.val == '*')))
         goto done;
       prop_type = PROP_TYPE_GET + (name == JS_ATOM_set);
     } else if (s->token.val == '*') {
@@ -11786,6 +11827,8 @@ static __exception int js_parse_for_in_of(JSParseState *s, int label_name,
       return -1;
     }
     if (var_name != JS_ATOM_NULL) {
+      /* an anonymous function or class initializer takes the variable name */
+      set_object_name(s, var_name);
       emit_op(s, OP_scope_put_var);
       emit_atom(s, var_name);
       emit_u16(s, fd->scope_level);
@@ -11843,7 +11886,7 @@ static __exception int js_parse_for_in_of(JSParseState *s, int label_name,
     int chunk_size = pos_expr - pos_next;
     int offset = bc->size - pos_next;
     int i;
-    dbuf_realloc(bc, bc->size + chunk_size);
+    if (dbuf_realloc(bc, bc->size + chunk_size)) return -1;
     dbuf_put(bc, bc->buf + pos_next, chunk_size);
     memset(bc->buf + pos_next, OP_nop, chunk_size);
     /* `next` part ends with a goto */
@@ -12212,7 +12255,7 @@ static __exception int js_parse_statement_or_decl(JSParseState *s,
         int chunk_size = pos_body - pos_cont;
         int offset = bc->size - pos_cont;
         int i;
-        dbuf_realloc(bc, bc->size + chunk_size);
+        if (dbuf_realloc(bc, bc->size + chunk_size)) goto fail;
         dbuf_put(bc, bc->buf + pos_cont, chunk_size);
         memset(bc->buf + pos_cont, OP_nop, chunk_size);
         /* increment part ends with a goto */
@@ -12340,7 +12383,6 @@ static __exception int js_parse_statement_or_decl(JSParseState *s,
       JSAtom name;
       BlockEnv block_env;
 
-      set_eval_ret_undefined(s);
       if (next_token(s)) goto fail;
       label_catch = new_label(s);
       label_catch2 = new_label(s);
@@ -12352,6 +12394,7 @@ static __exception int js_parse_statement_or_decl(JSParseState *s,
       push_break_entry(s->cur_func, &block_env, JS_ATOM_NULL, -1, -1, 1);
       block_env.label_finally = label_finally;
 
+      set_eval_ret_undefined(s);
       if (js_parse_block(s)) goto fail;
 
       pop_break_entry(s->cur_func);
@@ -12412,6 +12455,8 @@ static __exception int js_parse_statement_or_decl(JSParseState *s,
         push_break_entry(s->cur_func, &block_env, JS_ATOM_NULL, -1, -1, 1);
         block_env.label_finally = label_finally;
 
+        /* the completion value of an empty catch block is undefined */
+        set_eval_ret_undefined(s);
         if (js_parse_block(s)) goto fail;
 
         pop_break_entry(s->cur_func);
@@ -12745,20 +12790,15 @@ __exception int js_parse_function_decl2_GC(
           static_cast<JSFunctionKindEnum>(func_kind | JS_FUNC_GENERATOR);
     }
 
-    if (s->token.val == TOK_IDENT) {
-      if (s->token.u.ident.is_reserved ||
-          (s->token.u.ident.atom == JS_ATOM_yield &&
-           func_type == JS_PARSE_FUNC_EXPR &&
-           (func_kind & JS_FUNC_GENERATOR)) ||
-          (s->token.u.ident.atom == JS_ATOM_await &&
-           func_type == JS_PARSE_FUNC_EXPR && (func_kind & JS_FUNC_ASYNC))) {
-        return js_parse_error_reserved_identifier(s);
-      }
+    if (func_type == JS_PARSE_FUNC_EXPR) {
+      /* the name of a function expression is parsed in the context of the
+         function itself */
+      reparse_ident_token(s, func_kind);
     }
-    if (s->token.val == TOK_IDENT ||
-        (((s->token.val == TOK_YIELD && !(fd->js_mode & JS_MODE_STRICT)) ||
-          (s->token.val == TOK_AWAIT && !s->is_module)) &&
-         func_type == JS_PARSE_FUNC_EXPR)) {
+
+    if (s->token.val == TOK_IDENT) {
+      if (s->token.u.ident.is_reserved)
+        return js_parse_error_reserved_identifier(s);
       func_name = s->token.u.ident.atom;
       func_scope.PushLEPUSAtom(func_name);
       if (next_token(s)) {
@@ -12881,6 +12921,12 @@ __exception int js_parse_function_decl2_GC(
   fd->has_simple_parameter_list = TRUE;
   fd->has_parameter_expressions = FALSE;
   has_opt_arg = FALSE;
+
+  if (func_type == JS_PARSE_FUNC_ARROW) {
+    /* reparse the possible first parameter in the function context */
+    reparse_ident_token(s);
+  }
+
   if (func_type == JS_PARSE_FUNC_ARROW && s->token.val == TOK_IDENT) {
     JSAtom name;
     if (s->token.u.ident.is_reserved) {
@@ -14102,11 +14148,13 @@ static __exception int JS_DefinePropertyDesc(LEPUSContext *ctx,
 static __exception int JS_ObjectDefineProperties(LEPUSContext *ctx,
                                                  LEPUSValueConst obj,
                                                  LEPUSValueConst properties) {
-  LEPUSValue props, desc;
+  LEPUSValue props, desc, descs;
   LEPUSObject *p;
   LEPUSPropertyEnum *atoms = nullptr;
   HandleScope func_scope(ctx, &atoms, HANDLE_TYPE_HEAP_OBJ);
-  uint32_t len, i;
+  LEPUSPropertyDescriptor d;
+  func_scope.PushLEPUSPropertyDescriptor(&d);
+  uint32_t len, i, desc_count = 0;
   int ret = -1;
 
   if (!LEPUS_IsObject(obj)) {
@@ -14115,20 +14163,57 @@ static __exception int JS_ObjectDefineProperties(LEPUSContext *ctx,
   }
   desc = LEPUS_UNDEFINED;
   func_scope.PushHandle(&desc, HANDLE_TYPE_LEPUS_VALUE);
+  descs = LEPUS_UNDEFINED;
+  func_scope.PushHandle(&descs, HANDLE_TYPE_LEPUS_VALUE);
   props = JS_ToObject_GC(ctx, properties);
   if (LEPUS_IsException(props)) return -1;
   func_scope.PushHandle(&props, HANDLE_TYPE_LEPUS_VALUE);
   p = LEPUS_VALUE_GET_OBJ(props);
   if (JS_GetOwnPropertyNamesInternal(
-          ctx, &atoms, &len, p,
-          LEPUS_GPN_ENUM_ONLY | LEPUS_GPN_STRING_MASK | LEPUS_GPN_SYMBOL_MASK) <
+          ctx, &atoms, &len, p, LEPUS_GPN_STRING_MASK | LEPUS_GPN_SYMBOL_MASK) <
       0)
     goto exception;
+  /* All the descriptors are read and converted before the first property is
+     defined, so an invalid descriptor leaves the object unchanged. Each one
+     is kept as four elements (flags, value, getter, setter) of an array
+     object so that the GC can see them. */
+  descs = JS_NewArray_GC(ctx);
+  if (LEPUS_IsException(descs)) goto exception;
   for (i = 0; i < len; i++) {
-    desc = JS_GetPropertyInternal_GC(ctx, props, atoms[i].atom, props, 0);
-    if (LEPUS_IsException(desc)) goto exception;
-    if (JS_DefinePropertyDesc(ctx, obj, atoms[i].atom, desc, LEPUS_PROP_THROW) <
-        0)
+    LEPUSPropertyDescriptor prop_desc;
+    int res;
+    /* the enumerability is tested just before reading each descriptor */
+    res = JS_GetOwnPropertyInternal(ctx, &prop_desc, p, atoms[i].atom);
+    if (res < 0) goto exception;
+    atoms[i].is_enumerable =
+        res && (prop_desc.flags & LEPUS_PROP_ENUMERABLE) != 0;
+    if (atoms[i].is_enumerable) {
+      const int flags = LEPUS_PROP_C_W_E | LEPUS_PROP_THROW;
+      desc = JS_GetPropertyInternal_GC(ctx, props, atoms[i].atom, props, 0);
+      if (LEPUS_IsException(desc)) goto exception;
+      if (js_obj_to_desc(ctx, &d, desc) < 0) goto exception;
+      if (JS_DefinePropertyValueUint32_GC(ctx, descs, desc_count++,
+                                          LEPUS_NewInt32(ctx, d.flags),
+                                          flags) < 0 ||
+          JS_DefinePropertyValueUint32_GC(ctx, descs, desc_count++, d.value,
+                                          flags) < 0 ||
+          JS_DefinePropertyValueUint32_GC(ctx, descs, desc_count++, d.getter,
+                                          flags) < 0 ||
+          JS_DefinePropertyValueUint32_GC(ctx, descs, desc_count++, d.setter,
+                                          flags) < 0)
+        goto exception;
+    }
+  }
+  desc_count = 0;
+  for (i = 0; i < len; i++) {
+    if (!atoms[i].is_enumerable) continue;
+    desc = JS_GetPropertyUint32_GC(ctx, descs, desc_count++);
+    d.flags = LEPUS_VALUE_GET_INT(desc);
+    d.value = JS_GetPropertyUint32_GC(ctx, descs, desc_count++);
+    d.getter = JS_GetPropertyUint32_GC(ctx, descs, desc_count++);
+    d.setter = JS_GetPropertyUint32_GC(ctx, descs, desc_count++);
+    if (JS_DefineProperty_GC(ctx, obj, atoms[i].atom, d.value, d.getter,
+                             d.setter, d.flags | LEPUS_PROP_THROW) < 0)
       goto exception;
   }
   ret = 0;
@@ -15582,8 +15667,9 @@ static LEPUSValue js_function_bind(LEPUSContext *ctx, LEPUSValueConst this_val,
     }
   }
 
-  JS_DefinePropertyValue_GC(ctx, func_obj, JS_ATOM_length, len_val,
-                            LEPUS_PROP_CONFIGURABLE);
+  if (JS_DefinePropertyValue_GC(ctx, func_obj, JS_ATOM_length, len_val,
+                                LEPUS_PROP_CONFIGURABLE) < 0)
+    goto exception;
 
   name1 = JS_GetPropertyInternal_GC(ctx, this_val, JS_ATOM_name, this_val, 0);
   if (LEPUS_IsException(name1)) goto exception;
@@ -15592,8 +15678,9 @@ static LEPUSValue js_function_bind(LEPUSContext *ctx, LEPUSValueConst this_val,
   }
   name1 = JS_ConcatString3(ctx, "bound ", name1, "");
   if (LEPUS_IsException(name1)) goto exception;
-  JS_DefinePropertyValue_GC(ctx, func_obj, JS_ATOM_name, name1,
-                            LEPUS_PROP_CONFIGURABLE);
+  if (JS_DefinePropertyValue_GC(ctx, func_obj, JS_ATOM_name, name1,
+                                LEPUS_PROP_CONFIGURABLE) < 0)
+    goto exception;
   return func_obj;
 exception:
   return LEPUS_EXCEPTION;
@@ -15749,7 +15836,8 @@ static int JS_CopySubArray(LEPUSContext *ctx, LEPUSValueConst obj,
                        p->u.array.u.values[from + j]);
         }
       }
-      i += l;
+      /* the loop increments i once more */
+      i += l - 1;
     } else {
       fromPresent = JS_TryGetPropertyInt64(ctx, obj, from, &val);
       if (fromPresent < 0) goto exception;
@@ -16833,6 +16921,24 @@ exception:
   return LEPUS_EXCEPTION;
 }
 
+/* Return TRUE if 'obj' is a fast array holding exactly 'len' elements that
+   splice can update in place, moving the deleted elements to the empty fast
+   array 'arr'. 'grows' is true if the splice adds elements. */
+static BOOL js_can_splice_in_place(LEPUSContext *ctx, LEPUSValueConst obj,
+                                   LEPUSValueConst arr, int64_t len,
+                                   int64_t new_len, BOOL grows) {
+  if (!js_is_fast_array(ctx, obj) || !js_is_fast_array(ctx, arr)) return FALSE;
+  LEPUSObject *p = LEPUS_VALUE_GET_OBJ(obj);
+  LEPUSObject *pa = LEPUS_VALUE_GET_OBJ(arr);
+  return pa != p && p->u.array.count == len && new_len <= INT32_MAX &&
+         LEPUS_VALUE_IS_INT(p->gc_prop[0].u.value) &&
+         LEPUS_VALUE_GET_INT(p->gc_prop[0].u.value) == len && p->extensible &&
+         (get_shape_prop(p->shape)->flags & LEPUS_PROP_WRITABLE) &&
+         (!grows || can_extend_fast_array(p)) && pa->u.array.count == 0 &&
+         pa->u.array.u.values == nullptr && pa->extensible &&
+         (get_shape_prop(pa->shape)->flags & LEPUS_PROP_WRITABLE);
+}
+
 static LEPUSValue js_array_slice(LEPUSContext *ctx, LEPUSValueConst this_val,
                                  int argc, LEPUSValueConst *argv, int splice) {
   LEPUSValue obj, arr;
@@ -16918,6 +17024,58 @@ static LEPUSValue js_array_slice(LEPUSContext *ctx, LEPUSValueConst this_val,
       arr_obj->u.array.u1.size = count;
       arr_obj->gc_prop[0].u.value = LEPUS_NewInt32(ctx, count);
       return arr;
+    }
+    new_len = len + item_count - del_count;
+    if (splice && js_can_splice_in_place(ctx, obj, arr, len, new_len,
+                                         item_count > del_count)) {
+      LEPUSObject *p = LEPUS_VALUE_GET_OBJ(obj);
+      LEPUSValue *new_values = nullptr;
+      /* Allocate everything first. An allocation can run a collection, and
+         a finalizer run by it can call back into JS and change either
+         array. */
+      if (new_len > p->u.array.u1.size) {
+        if (expand_fast_array(ctx, p, new_len)) goto exception;
+      }
+      if (del_count > 0) {
+        new_values = static_cast<LEPUSValue *>(lepus_malloc_gc(
+            ctx, sizeof(LEPUSValue) * del_count, ALLOC_TAG_JSValueArray));
+        if (unlikely(!new_values)) goto exception;
+      }
+      /* Check again after the allocations. Nothing allocates between this
+         check and the end of the move, so no other code runs. If the arrays
+         have changed, new_values is dropped and the generic path below reads
+         the current state. */
+      if (js_can_splice_in_place(ctx, obj, arr, len, new_len,
+                                 item_count > del_count) &&
+          new_len <= p->u.array.u1.size) {
+        uint32_t tail = len - final;
+        arr_obj = LEPUS_VALUE_GET_OBJ(arr);
+        arrp = p->u.array.u.values;
+        if (del_count > 0) {
+          /* the deleted elements are copied to the result */
+          for (int64_t index = 0; index < del_count; ++index) {
+            HeapObjStore(ctx, &new_values[index], arrp[start + index]);
+          }
+          HeapObjStore(ctx, &arr_obj->u.array.u.values, new_values);
+          arr_obj->u.array.count = del_count;
+          arr_obj->u.array.u1.size = del_count;
+        }
+        arr_obj->gc_prop[0].u.value = LEPUS_NewInt32(ctx, del_count);
+        if (item_count < del_count) {
+          for (i = 0; i < tail; i++)
+            HeapObjStore(ctx, &arrp[start + item_count + i], arrp[final + i]);
+          /* do not keep the moved elements alive through the unused slots */
+          for (i = new_len; i < len; i++) arrp[i] = LEPUS_UNDEFINED;
+        } else if (item_count > del_count) {
+          for (i = tail; i-- > 0;)
+            HeapObjStore(ctx, &arrp[start + item_count + i], arrp[final + i]);
+        }
+        for (i = 0; i < item_count; i++)
+          HeapObjStore(ctx, &arrp[start + i], argv[i + 2]);
+        p->u.array.count = new_len;
+        p->gc_prop[0].u.value = LEPUS_NewInt32(ctx, new_len);
+        return arr;
+      }
     }
     /* Destination writes can run finalizers that resize or convert obj.
        Refresh the source storage before each read. */
@@ -17104,10 +17262,6 @@ static int js_array_cmp_generic(const void *a, const void *b, void *opaque) {
   if (psc->exception) return 0;
 
   if (psc->has_method) {
-    /* custom sort function is specified as returning 0 for identical
-     * objects: avoid method call overhead.
-     */
-    if (!memcmp(&ap->val, &bp->val, sizeof(ap->val))) goto cmp_same;
     LEPUSValueConst argv[2] = {ap->val, bp->val};
     LEPUSValue res = JS_Call_GC(ctx, psc->method, LEPUS_UNDEFINED, 2, argv);
     if (LEPUS_IsException(res)) goto exception;
@@ -17137,7 +17291,6 @@ static int js_array_cmp_generic(const void *a, const void *b, void *opaque) {
     cmp = js_string_compare(ctx, ap->str, bp->str);
   }
   if (cmp != 0) return cmp;
-cmp_same:
   /* make sort stable: compare array offsets */
   return (ap->pos > bp->pos) - (ap->pos < bp->pos);
 
@@ -17212,12 +17365,10 @@ static LEPUSValue js_array_sort(LEPUSContext *ctx, LEPUSValueConst this_val,
 
   /* XXX: should special case fast arrays */
   while (n < pos) {
-    // if (array[n].str)
-    if (array[n].pos != n) {
-      if (JS_SetPropertyInt64_GC(ctx, obj, n, array[n].val) < 0) {
-        n++;
-        goto exception;
-      }
+    /* every element is written back, even when its position is unchanged */
+    if (JS_SetPropertyInt64_GC(ctx, obj, n, array[n].val) < 0) {
+      n++;
+      goto exception;
     }
     n++;
   }
@@ -17274,7 +17425,7 @@ static LEPUSValue js_array_iterator_next(LEPUSContext *ctx,
                                          LEPUSValueConst *argv, BOOL *pdone,
                                          int magic) {
   JSArrayIteratorData *it;
-  uint32_t len, idx;
+  int64_t len, idx;
   LEPUSValue val = LEPUS_UNDEFINED, obj = LEPUS_UNDEFINED;
   HandleScope func_scope(ctx, &val, HANDLE_TYPE_LEPUS_VALUE);
   func_scope.PushHandle(&obj, HANDLE_TYPE_LEPUS_VALUE);
@@ -17297,7 +17448,7 @@ static LEPUSValue js_array_iterator_next(LEPUSContext *ctx,
     /* An Array's length is always its first property. */
     len = LEPUS_VALUE_GET_INT(p->gc_prop[0].u.value);
   } else {
-    if (js_get_length32_gc(ctx, &len, it->obj)) {
+    if (js_get_length64(ctx, &len, it->obj)) {
     fail1:
       *pdone = FALSE;
       return LEPUS_EXCEPTION;
@@ -17313,10 +17464,11 @@ static LEPUSValue js_array_iterator_next(LEPUSContext *ctx,
   it->idx = idx + 1;
   *pdone = FALSE;
   if (it->kind == JS_ITERATOR_KIND_KEY) {
-    return JS_NewUint32(ctx, idx);
+    return LEPUS_NewInt64(ctx, idx);
   } else {
-    if (!js_try_get_fast_array_element(it->obj, idx, &val)) {
-      val = JS_GetPropertyUint32_GC(ctx, it->obj, idx);
+    if (idx > UINT32_MAX || !js_try_get_fast_array_element(
+                                it->obj, static_cast<uint32_t>(idx), &val)) {
+      val = JS_GetPropertyInt64(ctx, it->obj, idx);
       if (LEPUS_IsException(val)) return LEPUS_EXCEPTION;
     }
     if (it->kind == JS_ITERATOR_KIND_VALUE) {
@@ -17325,7 +17477,7 @@ static LEPUSValue js_array_iterator_next(LEPUSContext *ctx,
       HandleScope block_scope(ctx->rt);
       LEPUSValueConst args[2];
       LEPUSValue num;
-      num = JS_NewUint32(ctx, idx);
+      num = LEPUS_NewInt64(ctx, idx);
       args[0] = num;
       args[1] = val;
       block_scope.PushHandle(&args[0], HANDLE_TYPE_LEPUS_VALUE);
@@ -17913,8 +18065,9 @@ static LEPUSValue js_string_constructor(LEPUSContext *ctx,
     obj = js_create_from_ctor_GC(ctx, new_target, JS_CLASS_STRING);
     if (!LEPUS_IsException(obj)) {
       JS_SetObjectData(ctx, obj, val);
-      JS_DefinePropertyValue_GC(ctx, obj, JS_ATOM_length,
-                                LEPUS_NewInt32(ctx, p1->len), 0);
+      if (JS_DefinePropertyValue_GC(ctx, obj, JS_ATOM_length,
+                                    LEPUS_NewInt32(ctx, p1->len), 0) < 0)
+        return LEPUS_EXCEPTION;
     }
     return obj;
   } else {
@@ -18350,7 +18503,7 @@ static LEPUSValue js_string_match(LEPUSContext *ctx, LEPUSValueConst this_val,
   if (LEPUS_IsUndefined(O) || LEPUS_IsNull(O))
     return LEPUS_ThrowTypeError(ctx, "cannot convert to object");
 
-  if (!LEPUS_IsUndefined(regexp) && !LEPUS_IsNull(regexp)) {
+  if (LEPUS_IsObject(regexp)) {
     matcher = JS_GetPropertyInternal_GC(ctx, regexp, atom, regexp, 0);
     if (LEPUS_IsException(matcher)) return LEPUS_EXCEPTION;
     if (!LEPUS_IsUndefined(matcher) && !LEPUS_IsNull(matcher)) {
@@ -18511,7 +18664,7 @@ static LEPUSValue js_string_replace(LEPUSContext *ctx, LEPUSValueConst this_val,
   func_scope.PushHandle(&replaceValue_str, HANDLE_TYPE_LEPUS_VALUE);
   func_scope.PushHandle(&repl_str, HANDLE_TYPE_LEPUS_VALUE);
 
-  if (!LEPUS_IsUndefined(searchValue) && !LEPUS_IsNull(searchValue)) {
+  if (LEPUS_IsObject(searchValue)) {
     HandleScope block_scope(ctx->rt);
     LEPUSValue replacer;
     replacer = JS_GetPropertyInternal_GC(
@@ -18586,7 +18739,7 @@ static LEPUSValue js_string_split(LEPUSContext *ctx, LEPUSValueConst this_val,
   if (LEPUS_IsUndefined(O) || LEPUS_IsNull(O))
     return LEPUS_ThrowTypeError(ctx, "cannot convert to object");
 
-  if (!LEPUS_IsUndefined(separator) && !LEPUS_IsNull(separator)) {
+  if (LEPUS_IsObject(separator)) {
     LEPUSValue splitter;
     splitter = JS_GetPropertyInternal_GC(ctx, separator, JS_ATOM_Symbol_split,
                                          separator, 0);
@@ -18793,24 +18946,26 @@ static LEPUSValue js_string_repeat(LEPUSContext *ctx, LEPUSValueConst this_val,
   StringBuffer *b = &b_s;
   JSString *p;
   int64_t val;
-  int n, len;
+  int n, len, ret;
 
   str = JS_ToStringCheckObject(ctx, this_val);
   if (LEPUS_IsException(str)) goto fail;
   func_scope.PushHandle(&str, HANDLE_TYPE_LEPUS_VALUE);
-  if (JS_ToInt64Sat(ctx, &val, argv[0])) goto fail;
-  if (val < 0 || val > 2147483647) {
+  ret = JS_ToInt64SatF(ctx, &val, argv[0]);
+  if (ret < 0) goto fail;
+  if (val < 0 || ret == JS_TO_INT64_SAT_INF) {
     LEPUS_ThrowRangeError(ctx, "invalid repeat count");
     goto fail;
   }
-  n = val;
   p = LEPUS_VALUE_GET_STRING(str);
   len = p->len;
-  if (len == 0 || n == 1) return str;
-  if (val * len > JS_STRING_LEN_MAX) {
+  /* any finite count is valid for the empty string */
+  if (len == 0 || val == 1) return str;
+  if (val > INT32_MAX || val * len > JS_STRING_LEN_MAX) {
     LEPUS_ThrowInternalError(ctx, "string too long");
     goto fail;
   }
+  n = val;
   if (string_buffer_init_raw_gc(ctx, &b_s, n * len, p->is_wide_char)) goto fail;
   if (len == 1) {
     string_buffer_fill(b, string_get(p, 0), n);
@@ -19063,7 +19218,7 @@ static LEPUSValue js_string_iterator_next(LEPUSContext *ctx,
   }
   if (LEPUS_IsUndefined(it->obj)) goto done;
   p = LEPUS_VALUE_GET_STRING(it->obj);
-  idx = it->idx;
+  idx = static_cast<uint32_t>(it->idx);
   if (idx >= p->len) {
     it->obj = LEPUS_UNDEFINED;
   done:
@@ -20660,9 +20815,8 @@ static LEPUSValue js_regexp_Symbol_replace(LEPUSContext *ctx,
   GCRawStringBuffer b_s(ctx);
   StringBuffer *b = &b_s;
   ValueBuffer v_b, *results = &v_b;
-  int nextSourcePosition, n, j, functionalReplace, is_global, fullUnicode;
-  uint32_t nCaptures;
-  int64_t position;
+  int nextSourcePosition, j, functionalReplace, is_global, fullUnicode;
+  int64_t nCaptures, n, position;
 
   if (!LEPUS_IsObject(rx)) return JS_ThrowTypeErrorNotAnObject(ctx);
 
@@ -20751,7 +20905,7 @@ static LEPUSValue js_regexp_Symbol_replace(LEPUSContext *ctx,
     LEPUSValueConst result;
     result = results->arr[j];
     block_scope.PushHandle(&result, HANDLE_TYPE_LEPUS_VALUE);
-    if (js_get_length32_gc(ctx, &nCaptures, result) < 0) goto exception;
+    if (js_get_length64(ctx, &nCaptures, result) < 0) goto exception;
     matched = JS_ToStringFree(ctx, JS_GetPropertyInt64(ctx, result, 0));
     if (LEPUS_IsException(matched)) goto exception;
     if (JS_ToLengthFree(
@@ -22272,33 +22426,67 @@ static LEPUSValue js_create_desc(LEPUSContext *ctx, LEPUSValueConst val,
   if (LEPUS_IsException(ret)) return ret;
   HandleScope func_scope(ctx, &ret, HANDLE_TYPE_LEPUS_VALUE);
   if (flags & LEPUS_PROP_HAS_GET) {
-    JS_DefinePropertyValue_GC(ctx, ret, JS_ATOM_get, getter, LEPUS_PROP_C_W_E);
+    if (JS_DefinePropertyValue_GC(ctx, ret, JS_ATOM_get, getter,
+                                  LEPUS_PROP_C_W_E) < 0)
+      goto fail;
   }
   if (flags & LEPUS_PROP_HAS_SET) {
-    JS_DefinePropertyValue_GC(ctx, ret, JS_ATOM_set, setter, LEPUS_PROP_C_W_E);
+    if (JS_DefinePropertyValue_GC(ctx, ret, JS_ATOM_set, setter,
+                                  LEPUS_PROP_C_W_E) < 0)
+      goto fail;
   }
   if (flags & LEPUS_PROP_HAS_VALUE) {
-    JS_DefinePropertyValue_GC(ctx, ret, JS_ATOM_value, val, LEPUS_PROP_C_W_E);
+    if (JS_DefinePropertyValue_GC(ctx, ret, JS_ATOM_value, val,
+                                  LEPUS_PROP_C_W_E) < 0)
+      goto fail;
   }
   if (flags & LEPUS_PROP_HAS_WRITABLE) {
-    JS_DefinePropertyValue_GC(
-        ctx, ret, JS_ATOM_writable,
-        LEPUS_NewBool(ctx, (flags & LEPUS_PROP_WRITABLE) != 0),
-        LEPUS_PROP_C_W_E);
+    if (JS_DefinePropertyValue_GC(
+            ctx, ret, JS_ATOM_writable,
+            LEPUS_NewBool(ctx, (flags & LEPUS_PROP_WRITABLE) != 0),
+            LEPUS_PROP_C_W_E) < 0)
+      goto fail;
   }
   if (flags & LEPUS_PROP_HAS_ENUMERABLE) {
-    JS_DefinePropertyValue_GC(
-        ctx, ret, JS_ATOM_enumerable,
-        LEPUS_NewBool(ctx, (flags & LEPUS_PROP_ENUMERABLE) != 0),
-        LEPUS_PROP_C_W_E);
+    if (JS_DefinePropertyValue_GC(
+            ctx, ret, JS_ATOM_enumerable,
+            LEPUS_NewBool(ctx, (flags & LEPUS_PROP_ENUMERABLE) != 0),
+            LEPUS_PROP_C_W_E) < 0)
+      goto fail;
   }
   if (flags & LEPUS_PROP_HAS_CONFIGURABLE) {
-    JS_DefinePropertyValue_GC(
-        ctx, ret, JS_ATOM_configurable,
-        LEPUS_NewBool(ctx, (flags & LEPUS_PROP_CONFIGURABLE) != 0),
-        LEPUS_PROP_C_W_E);
+    if (JS_DefinePropertyValue_GC(
+            ctx, ret, JS_ATOM_configurable,
+            LEPUS_NewBool(ctx, (flags & LEPUS_PROP_CONFIGURABLE) != 0),
+            LEPUS_PROP_C_W_E) < 0)
+      goto fail;
   }
   return ret;
+fail:
+  return LEPUS_EXCEPTION;
+}
+
+/* Check the part that check_define_prop_flags() leaves out: the value of a
+   non configurable, non writable data property and the getter and setter of
+   a non configurable accessor cannot change. Return FALSE if not OK. */
+static BOOL check_define_prop_values(LEPUSContext *ctx,
+                                     const LEPUSPropertyDescriptor *desc,
+                                     LEPUSValueConst val,
+                                     LEPUSValueConst getter,
+                                     LEPUSValueConst setter, int flags) {
+  if (desc->flags & LEPUS_PROP_CONFIGURABLE) return TRUE;
+  if ((desc->flags & LEPUS_PROP_TMASK) == LEPUS_PROP_GETSET) {
+    if ((flags & LEPUS_PROP_HAS_GET) &&
+        !js_same_value(ctx, getter, desc->getter))
+      return FALSE;
+    if ((flags & LEPUS_PROP_HAS_SET) &&
+        !js_same_value(ctx, setter, desc->setter))
+      return FALSE;
+  } else if (!(desc->flags & LEPUS_PROP_WRITABLE)) {
+    if ((flags & LEPUS_PROP_HAS_VALUE) && !js_same_value(ctx, val, desc->value))
+      return FALSE;
+  }
+  return TRUE;
 }
 
 QJS_STATIC int js_proxy_get_own_property(LEPUSContext *ctx,
@@ -22313,6 +22501,7 @@ QJS_STATIC int js_proxy_get_own_property(LEPUSContext *ctx,
   func_scope.PushLEPUSValueArrayHandle(args, 2);
   LEPUSPropertyDescriptor desc, target_desc;
   func_scope.PushLEPUSPropertyDescriptor(&desc);
+  func_scope.PushLEPUSPropertyDescriptor(&target_desc);
 
   s = get_proxy_method(ctx, &method, obj, JS_ATOM_getOwnPropertyDescriptor);
   if (!s) return -1;
@@ -22347,6 +22536,9 @@ QJS_STATIC int js_proxy_get_own_property(LEPUSContext *ctx,
 
     res = js_obj_to_desc(ctx, &desc, ret1);
     if (res < 0) return -1;
+    /* convert the flags of the trap result to property flags */
+    if (desc.flags & (LEPUS_PROP_HAS_GET | LEPUS_PROP_HAS_SET))
+      desc.flags |= LEPUS_PROP_GETSET;
     if (target_res) {
       /* convert desc.flags to defineProperty flags */
       flags1 =
@@ -22355,9 +22547,10 @@ QJS_STATIC int js_proxy_get_own_property(LEPUSContext *ctx,
         flags1 |= LEPUS_PROP_HAS_GET | LEPUS_PROP_HAS_SET;
       else
         flags1 |= LEPUS_PROP_HAS_VALUE | LEPUS_PROP_HAS_WRITABLE;
-      /* XXX: not complete check: need to compare value &
-         getter/setter as in defineproperty */
-      if (!check_define_prop_flags(target_desc.flags, flags1)) goto fail1;
+      if (!check_define_prop_flags(target_desc.flags, flags1) ||
+          !check_define_prop_values(ctx, &target_desc, desc.value, desc.getter,
+                                    desc.setter, flags1))
+        goto fail1;
     } else {
       if (!p->extensible) goto fail1;
     }
@@ -22517,6 +22710,7 @@ static int js_proxy_get_own_property_names(LEPUSContext *ctx,
   LEPUSValue method = LEPUS_UNDEFINED, prop_array, val = LEPUS_UNDEFINED;
   HandleScope func_scope(ctx, &method, HANDLE_TYPE_LEPUS_VALUE);
   func_scope.PushHandle(&val, HANDLE_TYPE_LEPUS_VALUE);
+  int64_t len64;
   uint32_t len, i, len2;
   LEPUSPropertyEnum *tab = nullptr, *tab2 = nullptr;
   func_scope.PushHandle(&tab, HANDLE_TYPE_HEAP_OBJ);
@@ -22535,12 +22729,22 @@ static int js_proxy_get_own_property_names(LEPUSContext *ctx,
   prop_array = JS_CallFree_GC(ctx, method, s->handler, 1,
                               reinterpret_cast<LEPUSValueConst *>(&s->target));
   if (LEPUS_IsException(prop_array)) return -1;
+  /* CreateListFromArrayLike() requires an object */
+  if (!LEPUS_IsObject(prop_array)) {
+    LEPUS_ThrowTypeError(ctx, "proxy: ownKeys must return an object");
+    return -1;
+  }
   func_scope.PushHandle(&prop_array, HANDLE_TYPE_LEPUS_VALUE);
   tab = NULL;
   len = 0;
   tab2 = NULL;
   len2 = 0;
-  if (js_get_length32_gc(ctx, &len, prop_array)) goto fail;
+  if (js_get_length64(ctx, &len64, prop_array)) goto fail;
+  if (len64 > INT32_MAX) {
+    LEPUS_ThrowOutOfMemory(ctx);
+    goto fail;
+  }
+  len = static_cast<uint32_t>(len64);
   if (len > 0) {
     tab = static_cast<LEPUSPropertyEnum *>(lepus_mallocz(
         ctx, sizeof(tab[0]) * len, ALLOC_TAG_LEPUSPropertyEnumArray));
@@ -22770,11 +22974,11 @@ static LEPUSValue js_proxy_revocable(LEPUSContext *ctx,
   obj = JS_NewObject_GC(ctx);
   if (LEPUS_IsException(obj)) goto fail;
   func_scope.PushHandle(&obj, HANDLE_TYPE_LEPUS_VALUE);
-  // XXX: exceptions?
-  JS_DefinePropertyValue_GC(ctx, obj, JS_ATOM_proxy, proxy_obj,
-                            LEPUS_PROP_C_W_E);
-  JS_DefinePropertyValue_GC(ctx, obj, JS_ATOM_revoke, revoke_obj,
-                            LEPUS_PROP_C_W_E);
+  if (JS_DefinePropertyValue_GC(ctx, obj, JS_ATOM_proxy, proxy_obj,
+                                LEPUS_PROP_C_W_E) < 0 ||
+      JS_DefinePropertyValue_GC(ctx, obj, JS_ATOM_revoke, revoke_obj,
+                                LEPUS_PROP_C_W_E) < 0)
+    goto fail;
   return obj;
 fail:
   return LEPUS_EXCEPTION;
@@ -24447,8 +24651,10 @@ static LEPUSValue js_aggregate_error_constructor(LEPUSContext *ctx,
   HandleScope func_scope(ctx, &obj, HANDLE_TYPE_LEPUS_VALUE);
   JSAtom atom_errors = LEPUS_NewAtom(ctx, "errors");
   func_scope.PushLEPUSAtom(atom_errors);
-  JS_DefinePropertyValue_GC(ctx, obj, atom_errors, errors,
-                            LEPUS_PROP_WRITABLE | LEPUS_PROP_CONFIGURABLE);
+  if (JS_DefinePropertyValue_GC(ctx, obj, atom_errors, errors,
+                                LEPUS_PROP_WRITABLE | LEPUS_PROP_CONFIGURABLE) <
+      0)
+    return LEPUS_EXCEPTION;
   return obj;
 }
 
@@ -26890,8 +27096,13 @@ void JS_DetachArrayBuffer_GC(LEPUSContext *ctx, LEPUSValueConst obj) {
   struct list_head *el;
 
   if (!abuf || abuf->detached) return;
-  if (!abuf->from_js_heap && abuf->free_func)
+  if (!abuf->from_js_heap && abuf->free_func) {
     abuf->free_func(ctx->rt, abuf->opaque, abuf->data);
+    /* The backing data has been released: do not release it again when the
+       detached ArrayBuffer object is finalized. */
+    abuf->free_func = NULL;
+    abuf->opaque = NULL;
+  }
   abuf->data = NULL;
   abuf->byte_length = 0;
   abuf->detached = TRUE;
@@ -28148,23 +28359,21 @@ static LEPUSValue js_typed_array_sort(LEPUSContext *ctx,
       void *array_tmp;
       size_t i, j;
 
-      /* XXX: a stable sort would use less memory */
+      /* the comparison function may modify the array: sort a copy of it */
+      array_tmp = lepus_malloc_gc(ctx, len * elt_size, ALLOC_TAG_WITHOUT_PTR);
+      if (!array_tmp) return LEPUS_EXCEPTION;
+      block_scope.PushHandle(array_tmp, HANDLE_TYPE_DIR_HEAP_OBJ);
+      memcpy(array_tmp, array_ptr, len * elt_size);
+      /* array_idx is needed to have a stable sort */
       array_idx = static_cast<uint32_t *>(lepus_malloc_gc(
           ctx, len * sizeof(array_idx[0]), ALLOC_TAG_WITHOUT_PTR));
       if (!array_idx) return LEPUS_EXCEPTION;
       block_scope.PushHandle(array_idx, HANDLE_TYPE_DIR_HEAP_OBJ);
       for (i = 0; i < len; i++) array_idx[i] = i;
-      tsc.array_ptr = static_cast<uint8_t *>(array_ptr);
+      tsc.array_ptr = static_cast<uint8_t *>(array_tmp);
       tsc.elt_size = elt_size;
       rqsort(array_idx, len, sizeof(array_idx[0]), js_TA_cmp_generic, &tsc);
-      if (tsc.exception) goto fail;
-      array_tmp = lepus_malloc_gc(ctx, len * elt_size, ALLOC_TAG_WITHOUT_PTR);
-      if (!array_tmp) {
-      fail:
-        return LEPUS_EXCEPTION;
-      }
-      block_scope.PushHandle(array_tmp, HANDLE_TYPE_DIR_HEAP_OBJ);
-      memcpy(array_tmp, array_ptr, len * elt_size);
+      if (tsc.exception) return LEPUS_EXCEPTION;
       switch (elt_size) {
         case 1:
           for (i = 0; i < len; i++) {
@@ -28449,8 +28658,9 @@ fail:
 LEPUSValue js_typed_array_constructor_GC(LEPUSContext *ctx,
                                          LEPUSValueConst new_target, int argc,
                                          LEPUSValueConst *argv, int classid) {
-  LEPUSValue buffer = LEPUS_UNDEFINED, obj;
+  LEPUSValue buffer = LEPUS_UNDEFINED, obj = LEPUS_UNDEFINED;
   HandleScope func_scope(ctx, &buffer, HANDLE_TYPE_LEPUS_VALUE);
+  func_scope.PushHandle(&obj, HANDLE_TYPE_LEPUS_VALUE);
   JSArrayBuffer *abuf;
   int size_log2;
   uint64_t len, offset;
@@ -28458,6 +28668,8 @@ LEPUSValue js_typed_array_constructor_GC(LEPUSContext *ctx,
   size_log2 = typed_array_size_log2(classid);
   if (LEPUS_VALUE_IS_NOT_OBJECT(argv[0])) {
     if (JS_ToIndex_GC(ctx, &len, argv[0])) return LEPUS_EXCEPTION;
+    obj = js_create_from_ctor_GC(ctx, new_target, classid);
+    if (LEPUS_IsException(obj)) return LEPUS_EXCEPTION;
     buffer =
         js_array_buffer_constructor1(ctx, LEPUS_UNDEFINED, len << size_log2);
     if (LEPUS_IsException(buffer)) return LEPUS_EXCEPTION;
@@ -28466,12 +28678,18 @@ LEPUSValue js_typed_array_constructor_GC(LEPUSContext *ctx,
     LEPUSObject *p = LEPUS_VALUE_GET_OBJ(argv[0]);
     if (p->class_id == JS_CLASS_ARRAY_BUFFER ||
         p->class_id == JS_CLASS_SHARED_ARRAY_BUFFER) {
-      abuf = p->u.array_buffer;
+      /* the prototype is read from new_target before the offset and the
+         length are converted */
+      obj = js_create_from_ctor_GC(ctx, new_target, classid);
+      if (LEPUS_IsException(obj)) return LEPUS_EXCEPTION;
       if (JS_ToIndex_GC(ctx, &offset, argv[1])) return LEPUS_EXCEPTION;
-      if (abuf->detached) return JS_ThrowTypeErrorDetachedArrayBuffer(ctx);
-      if ((offset & ((1 << size_log2) - 1)) != 0 || offset > abuf->byte_length)
+      if ((offset & ((1 << size_log2) - 1)) != 0)
         return LEPUS_ThrowRangeError(ctx, "invalid offset");
+      abuf = p->u.array_buffer;
       if (LEPUS_IsUndefined(argv[2])) {
+        if (abuf->detached) return JS_ThrowTypeErrorDetachedArrayBuffer(ctx);
+        if (offset > abuf->byte_length)
+          return LEPUS_ThrowRangeError(ctx, "invalid offset");
         if ((abuf->byte_length & ((1 << size_log2) - 1)) != 0)
           goto invalid_length;
         len = (abuf->byte_length - offset) >> size_log2;
@@ -28495,11 +28713,6 @@ LEPUSValue js_typed_array_constructor_GC(LEPUSContext *ctx,
     }
   }
 
-  obj = js_create_from_ctor_GC(ctx, new_target, classid);
-  if (LEPUS_IsException(obj)) {
-    return LEPUS_EXCEPTION;
-  }
-  func_scope.PushHandle(&obj, HANDLE_TYPE_LEPUS_VALUE);
   if (typed_array_init(ctx, obj, buffer, offset, len)) {
     return LEPUS_EXCEPTION;
   }
