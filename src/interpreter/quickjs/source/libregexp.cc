@@ -496,9 +496,18 @@ int lre_parse_escape(const uint8_t **pp, int allow_utf16) {
     case 'v':
       c = '\v';
       break;
-    case 'x':
+    case 'x': {
+      /* exactly two hexadecimal digits: "\x{N}" is not valid */
+      int h0, h1;
+
+      h0 = from_hex(*p++);
+      if (h0 < 0) return -1;
+      h1 = from_hex(*p++);
+      if (h1 < 0) return -1;
+      c = (h0 << 4) | h1;
+    } break;
     case 'u': {
-      int h, n, i;
+      int h, i;
       uint32_t c1;
 
       if (*p == '{' && allow_utf16) {
@@ -513,14 +522,8 @@ int lre_parse_escape(const uint8_t **pp, int allow_utf16) {
         }
         p++;
       } else {
-        if (c == 'x') {
-          n = 2;
-        } else {
-          n = 4;
-        }
-
         c = 0;
-        for (i = 0; i < n; i++) {
+        for (i = 0; i < 4; i++) {
           h = from_hex(*p++);
           if (h < 0) {
             return -1;
