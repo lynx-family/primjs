@@ -75,6 +75,10 @@ NAPI_EXTERN napi_status napi_runtime_report_fatal_exception(napi_env env,
 NAPI_EXTERN napi_status napi_runtime_get_threadsafe_function_context(
     napi_threadsafe_function func, void** result);
 
+// Set the public context independently of the runner's callback adapter.
+NAPI_EXTERN void napi_runtime_set_threadsafe_function_context(
+    napi_threadsafe_function func, void* context);
+
 NAPI_EXTERN napi_status napi_runtime_call_threadsafe_function(
     napi_threadsafe_function func, void* data,
     napi_threadsafe_function_call_mode is_blocking);
