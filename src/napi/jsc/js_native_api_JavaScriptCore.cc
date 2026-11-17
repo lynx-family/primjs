@@ -17,6 +17,7 @@
 #include <functional>
 #include <mutex>
 #include <string>
+#include <type_traits>
 #include <vector>
 
 #include "basic/log/logging.h"
@@ -416,6 +417,10 @@ class RefBase : protected Finalizer, RefTracker {
   // the finalizer and _delete_self is set. In this case we
   // know we need to do the deletion so just do it.
   static inline void Delete(RefBase* reference) {
+    if (reference->_gc_finalize_pending || reference->_in_finalizer) {
+      reference->_delete_self = true;
+      return;
+    }
     if ((reference->RefCount() != 0) || (reference->_delete_self) ||
         (reference->_finalize_ran)) {
       delete reference;
@@ -437,7 +442,18 @@ class RefBase : protected Finalizer, RefTracker {
 
   inline uint32_t RefCount() { return _refcount; }
 
+  void FinalizeFromGC() override {
+    if (_gc_finalize_pending || _finalize_ran) return;
+    if (!_finalize_callback) {
+      Finalize(false);
+      return;
+    }
+    _gc_finalize_pending = true;
+    _env->ctx->EnqueueFinalizer(this);
+  }
+
   inline void Finalize(bool is_env_teardown = false) override {
+    _gc_finalize_pending = false;
     if (is_env_teardown && RefCount() > 0) _refcount = 0;
 
     // There are cases where we want to avoid the reentrance of Finalize (
@@ -459,7 +475,9 @@ class RefBase : protected Finalizer, RefTracker {
       // This ensures that we never call the finalizer twice.
       napi_finalize fini = _finalize_callback;
       _finalize_callback = nullptr;
+      _in_finalizer = true;
       _env->ctx->CallFinalizer(fini, _finalize_data, _finalize_hint);
+      _in_finalizer = false;
     }
 
     // this is safe because if a request to delete the reference
@@ -476,6 +494,8 @@ class RefBase : protected Finalizer, RefTracker {
   uint32_t _refcount;
   bool _delete_self;
   bool _is_self_destroying;
+  bool _gc_finalize_pending = false;
+  bool _in_finalizer = false;
 };
 
 class Reference : public RefBase {
@@ -505,7 +525,7 @@ class Reference : public RefBase {
 
   inline uint32_t Ref() {
     uint32_t refcount = RefBase::Ref();
-    if (refcount == 1) {
+    if (refcount == 1 && _persistent.Value() != nullptr) {
       _persistent.ClearWeak();
     }
     return refcount;
@@ -514,7 +534,7 @@ class Reference : public RefBase {
   inline uint32_t Unref() {
     uint32_t old_refcount = RefCount();
     uint32_t refcount = RefBase::Unref();
-    if (old_refcount == 1 && refcount == 0) {
+    if (old_refcount == 1 && refcount == 0 && _persistent.Value() != nullptr) {
       _persistent.SetWeak(this, FinalizeCallback);
     }
     return refcount;
@@ -526,7 +546,7 @@ class Reference : public RefBase {
   static void FinalizeCallback(void* data) {
     Reference* r = static_cast<Reference*>(data);
     r->_persistent.Reset();
-    r->Finalize();
+    r->FinalizeFromGC();
   }
 
   Persistent _persistent;
@@ -3041,8 +3061,122 @@ napi_status napi_get_instance_data(napi_env env, uint64_t key, void** data) {
   return napi_clear_last_error(env);
 }
 
+namespace {
+class FinalizerOutputs {
+ public:
+  explicit FinalizerOutputs(napi_env env) : context_(env->ctx->context) {}
+  ~FinalizerOutputs() {
+    for (auto value : values_) JSValueUnprotect(context_, value);
+  }
+  void Protect(napi_value* output) {
+    if (output && *output) {
+      auto value = ToJSValue(*output);
+      JSValueProtect(context_, value);
+      values_.push_back(value);
+    }
+  }
+  template <typename T>
+  void Protect(T) {}
+
+ private:
+  JSGlobalContextRef context_;
+  std::vector<JSValueRef> values_;
+};
+
+template <auto method>
+struct ProtectOutputs {
+  template <typename... Args>
+  static size_t BeforeCall(Args...) {
+    return 0;
+  }
+  template <typename... Args>
+  static void Run(FinalizerOutputs& outputs, size_t, Args... args) {
+    (outputs.Protect(args), ...);
+  }
+};
+
+template <>
+struct ProtectOutputs<napi_get_cb_info> {
+  static size_t BeforeCall(napi_callback_info, size_t* argc, napi_value* argv,
+                           napi_value*, void**) {
+    return argc && argv ? *argc : 0;
+  }
+  static void Run(FinalizerOutputs& outputs, size_t capacity,
+                  napi_callback_info, size_t*, napi_value* argv,
+                  napi_value* this_arg, void**) {
+    if (argv) {
+      // argc is overwritten with the actual JS argument count, which can be
+      // greater than the caller's argv buffer capacity captured before the API.
+      for (size_t i = 0; i < capacity; ++i) outputs.Protect(&argv[i]);
+    }
+    outputs.Protect(this_arg);
+  }
+};
+
+// These existing stubs return success without populating their output. Do not
+// inspect uninitialized caller storage while dispatching unrelated finalizers.
+template <>
+struct ProtectOutputs<napi_get_unhandled_rejection_exception> {
+  template <typename... Args>
+  static size_t BeforeCall(Args...) {
+    return 0;
+  }
+  template <typename... Args>
+  static void Run(FinalizerOutputs&, size_t, Args...) {}
+};
+#ifdef ENABLE_CODECACHE
+template <>
+struct ProtectOutputs<napi_run_code_cache> {
+  template <typename... Args>
+  static size_t BeforeCall(Args...) {
+    return 0;
+  }
+  template <typename... Args>
+  static void Run(FinalizerOutputs&, size_t, Args...) {}
+};
+#endif
+
+// Both APIs use these slots. Dispatch after the outermost engine operation has
+// finished using its input references, and keep newly returned values rooted
+// while callbacks may allocate or collect. Nested callback calls do not drain.
+// Explicit instance-data finalization and legacy-only status slots stay inline.
+template <auto method>
+struct EngineEntry;
+
+template <typename Result, typename... Args,
+          Result (*method)(napi_env, Args...)>
+struct EngineEntry<method> {
+  static Result Call(napi_env env, Args... args) {
+    auto* context = env->ctx;
+    struct DepthScope {
+      napi_context context;
+      explicit DepthScope(napi_context context) : context(context) {
+        ++context->napi_call_depth;
+      }
+      ~DepthScope() { --context->napi_call_depth; }
+    } scope(context);
+    size_t output_count = ProtectOutputs<method>::BeforeCall(args...);
+    Result result = method(env, args...);
+    if constexpr (std::is_same<Result, napi_status>::value) {
+      if (result == napi_ok && context->napi_call_depth == 1 &&
+          !context->last_exception && context->HasPendingFinalizers()) {
+        FinalizerOutputs outputs(env);
+        ProtectOutputs<method>::Run(outputs, output_count, args...);
+        auto last_error = env->state->last_error;
+        context->DrainFinalizers();
+        env->state->last_error = last_error;
+        if (context->last_exception) {
+          return napi_set_last_error(env, napi_pending_exception);
+        }
+      }
+    }
+    return result;
+  }
+};
+}  // namespace
+
 void napi_attach_jsc(napi_env env, JSGlobalContextRef global_ctx) {
-#define SET_METHOD(API) env->napi_##API = napi_##API;
+#define SET_METHOD(API) env->napi_##API = EngineEntry<napi_##API>::Call;
 
   FOR_EACH_NAPI_ENGINE_CALL(SET_METHOD)
 
