@@ -1,0 +1,17 @@
+# Copyright 2026 The Lynx Authors. All rights reserved.
+# Licensed under the Apache License Version 2.0 that can be found in the
+# LICENSE file in the root directory of this source tree.
+
+# Build this target explicitly; it is not part of the default test set.
+assert(target_os == "mac" || target_os == "ios")
+executable("napi_jsc_finalizer_regression") {
+  testonly = true
+  sources = [ "regression.cc" ]
+  deps = [
+    "../../../src/napi:napi_env",
+    "../../../src/napi:napi_runtime",
+    "../../../src/napi:napi_quickjs",
+    "../../../src/napi/adapter",
+    "../../../src/napi:napi_jsc",
+  ]
+}
