@@ -3030,6 +3030,10 @@ napi_status napi_set_instance_data_spec_compliant(napi_env env, uint64_t key,
   if (it != env->ctx->instance_data_registry.end()) {
     jscimpl::RefBase* idata = static_cast<jscimpl::RefBase*>(it->second);
     env->ctx->instance_data_registry.erase(it);
+    // Intentionally finalize superseded data for compatibility. Node-API does
+    // not call the old finalizer on overwrite, but existing callers rely on
+    // this cleanup to release resources owned by a previous setter. Removing
+    // it would change shipped ownership semantics and may leak those resources.
     idata->Finalize(false);
   }
 
