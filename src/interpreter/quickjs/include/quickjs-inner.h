@@ -553,6 +553,11 @@ struct LEPUSRuntime {
 #endif
   JSStrCacheOrphan *str_cache_orphans;
   bool uswap_in_progress;
+  /* FinalizationRegistry cleanups (JSJobEntry.link); they run only once
+     job_list is empty, like a task after the microtask checkpoint. */
+  struct list_head finrec_job_list;
+  int finalizer_depth; /* nesting of class finalizers, which must not run JS */
+  bool finalizer_js_call_reported;
 };
 
 // Temporarily attributes allocations to the Runtime-wide common memory slot.
@@ -1561,6 +1566,26 @@ typedef struct JSJobEntry {
   int argc;
   LEPUSValue argv[0];
 } JSJobEntry;
+
+/* Returns the queue holding the next job to run, or nullptr when idle. */
+inline struct list_head *JS_GetPendingJobList(LEPUSRuntime *rt) {
+  if (!list_empty(&rt->job_list)) return &rt->job_list;
+  if (!list_empty(&rt->finrec_job_list)) return &rt->finrec_job_list;
+  return nullptr;
+}
+
+QJS_HIDE LEPUSValue JS_FinalizationRegistryCleanupJob(LEPUSContext *ctx,
+                                                      int argc,
+                                                      LEPUSValueConst *argv);
+QJS_HIDE void JS_ReportJSCallInFinalizer(LEPUSRuntime *rt);
+
+inline void JS_CallClassFinalizer(LEPUSRuntime *rt,
+                                  LEPUSClassFinalizer *finalizer,
+                                  LEPUSValue obj) {
+  rt->finalizer_depth++;
+  finalizer(rt, obj);
+  rt->finalizer_depth--;
+}
 
 typedef enum {
   WEAK_REF_KIND_WEAK_MAP,

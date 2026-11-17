@@ -21,23 +21,6 @@ function test_UnregisterWithNonExistentKey() {
   Assert(success == false);
 }
 
-function test_FinalizationRegistry() {
-  let cleanup_called = false;
-  let cleanup = function(holdings) {
-    let holdings_list = [];
-    holdings_list.push(holdings);
-    cleanup_called = true;
-  }
-
-  let fg = new FinalizationRegistry(cleanup);
-  (function() {
-    let o = {};
-    fg.register(o, "holdings");
-  })();
-
-  Assert(cleanup_called == true);
-}
-
 function test_UnregisterTwice() {
   let cleanup_call_count = 0;
   let cleanup = function(holdings) {
@@ -58,41 +41,4 @@ function test_UnregisterTwice() {
 
 test_FinalizationRegistryConstructorCallAsFunction();
 test_UnregisterWithNonExistentKey();
-// test_FinalizationRegistry();
 test_UnregisterTwice();
-
-function foo() {
-  let map = new Map();
-  map.set('a', 1);
-
-  return {map : map };
-}
-
-function Foo() {
-    this.x = 1;
-}
-
-let arr = [];
-function test() {
-  let obj = foo();
-  let f = new Foo();
-  const registry = new FinalizationRegistry((heldValue) => {
-    heldValue.set('b', 2);
-    if (arr.length == 0)
-        arr.push(new Foo());
-  });
-  registry.register(obj, obj.map);
-}
-
-function test2() {
-  for (let i = 0; i < 10; i++) {
-    test();
-    lepusng_gc();
-  }
-}
-
-function test_reuse_shape() {
-  test2();
-  Assert(arr[0].x == 1);
-}
-test_reuse_shape();

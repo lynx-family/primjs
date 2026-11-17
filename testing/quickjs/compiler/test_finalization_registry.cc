@@ -16,6 +16,15 @@ extern "C" {
 
 namespace finalization_registry_test {
 
+// Runs queued jobs the way a host does once its call into JS returns.
+static LEPUSValue js_drain_jobs(LEPUSContext* ctx, LEPUSValueConst this_val,
+                                int argc, LEPUSValueConst* argv) {
+  LEPUSContext* job_ctx;
+  int ret = 1;
+  while (ret > 0) ret = LEPUS_ExecutePendingJob(ctx->rt, &job_ctx);
+  return ret < 0 ? LEPUS_EXCEPTION : LEPUS_UNDEFINED;
+}
+
 class FinalizationRegistryTest : public ::testing::Test {
  protected:
   FinalizationRegistryTest() = default;
@@ -24,6 +33,11 @@ class FinalizationRegistryTest : public ::testing::Test {
   void SetUp() override {
     rt_ = LEPUS_NewRuntime();
     ctx_ = LEPUS_NewContext(rt_);
+    LEPUSValue global = LEPUS_GetGlobalObject(ctx_);
+    LEPUS_SetPropertyStr(
+        ctx_, global, "drainJobs",
+        LEPUS_NewCFunction(ctx_, js_drain_jobs, "drainJobs", 0));
+    if (!LEPUS_IsGCMode(ctx_)) LEPUS_FreeValue(ctx_, global);
   }
 
   void TearDown() override {
@@ -157,6 +171,7 @@ TEST_F(FinalizationRegistryTest, ClearWeakRefsBeforeCycleCleanupCallback) {
   LEPUS_FreeValue(ctx_, result);
 
   LEPUS_RunGC(rt_);
+  js_drain_jobs(ctx_, LEPUS_UNDEFINED, 0, nullptr);
 
   const char* check = "cleanupCalled === true && cleanupResult === undefined";
   result =
@@ -211,6 +226,7 @@ TEST_F(CollectionCleanupTest, MapDeleteCommitsRecordBeforeCleanup) {
         map.set('victim', target);
       })();
       var deleted = map.delete('victim');
+      drainJobs();
       return deleted && calls === 1 && sawCommittedState && map.size === 1 &&
              map.get('added') === 42;
     })()
@@ -239,6 +255,7 @@ TEST_F(CollectionCleanupTest, MapClearCommitsAllRecordsBeforeCleanup) {
         map.set('second', 2);
       })();
       map.clear();
+      drainJobs();
       return calls === 1 && sawCommittedState && !nestedDeleteResult &&
              map.size === 1 && map.get('added') === 42;
     })()
@@ -265,6 +282,7 @@ TEST_F(CollectionCleanupTest, SetClearCommitsAllRecordsBeforeCleanup) {
         set.add(2);
       })();
       set.clear();
+      drainJobs();
       return calls === 1 && sawCommittedState && set.size === 1 &&
              set.has('added');
     })()
@@ -291,6 +309,7 @@ TEST_F(CollectionCleanupTest, WeakMapDeleteHidesRetiringValueFromCycleGC) {
         weakMap.set(key, target);
       })();
       var deleted = weakMap.delete(key);
+      drainJobs();
       return deleted && calls === 1 && sawCommittedState && weakMap.has(key) &&
              weakMap.get(key).replacement;
     })()
@@ -321,6 +340,7 @@ TEST_F(CollectionCleanupTest, MapClearKeepsIteratorRecordsAliveDuringCleanup) {
       iterator = map.values();
       iterator.next();
       map.clear();
+      drainJobs();
       return calls === 1 && sawCommittedState && iteratorDone &&
              map.size === 1 && map.get('added') === 42;
     })()
@@ -349,6 +369,7 @@ TEST_F(CollectionCleanupTest, MapIteratorExhaustionCommitsBeforeCleanup) {
         })();
         var result = iterator.next();
         var repeated = iterator.next();
+        drainJobs();
         return calls === 1 && nestedResult.done === true &&
                nestedResult.value === undefined && result.done === true &&
                result.value === undefined && repeated.done === true &&
@@ -379,6 +400,7 @@ TEST_F(CollectionCleanupTest, SetIteratorExhaustionCommitsBeforeCleanup) {
         })();
         var result = iterator.next();
         var repeated = iterator.next();
+        drainJobs();
         return calls === 1 && nestedResult.done === true &&
                nestedResult.value === undefined && result.done === true &&
                result.value === undefined && repeated.done === true &&
@@ -409,6 +431,7 @@ TEST_F(CollectionCleanupTest, ArrayIteratorExhaustionCommitsBeforeCleanup) {
         })();
         var result = iterator.next();
         var repeated = iterator.next();
+        drainJobs();
         return calls === 1 && nestedResult.done === true &&
                nestedResult.value === undefined && result.done === true &&
                result.value === undefined && repeated.done === true &&
@@ -450,8 +473,9 @@ TEST_F(FinalizationRegistryTest, DeletePropertyCommitsBeforeCleanup) {
             getter = null;
             setter = null;
           }
-          if (!delete receiver.slot || !consistent ||
-              calls !== (mode === 1 ? 2 : 1)) return false;
+          if (!delete receiver.slot || calls !== 0) return false;
+          drainJobs();
+          if (!consistent || calls !== (mode === 1 ? 2 : 1)) return false;
           var names = Object.getOwnPropertyNames(receiver);
           var descriptor = Object.getOwnPropertyDescriptor(receiver, 'slot');
           if (names.length !== 1 + calls * 64 + recreate || receiver.keep !== 17 ||
@@ -491,6 +515,7 @@ TEST_F(FinalizationRegistryTest, DefinePropertyCommitsFlagsBeforeCleanup) {
       Object.defineProperty(receiver, 'slot', {
         value: 42, writable: false, enumerable: false, configurable: false
       });
+      drainJobs();
       var descriptor = Object.getOwnPropertyDescriptor(receiver, 'slot');
       return calls === 1 && sawCommittedFlags && descriptor.value === 42 &&
              !descriptor.writable && !descriptor.enumerable &&
@@ -540,6 +565,7 @@ TEST_F(DefinePropertyCleanupTest, ReceiverMutationAfterCommit) {
         Object.defineProperty(receiver, 'slot', {
           value: 42, writable: false, enumerable: false, configurable: true
         });
+        drainJobs();
         if (calls !== 1 || !consistent || receiver.field63 !== 63) return false;
         if (action === 0 && receiver.slot !== 42) return false;
         if (action === 1 && Object.prototype.hasOwnProperty.call(receiver, 'slot'))
@@ -604,6 +630,7 @@ TEST_F(DefinePropertyCleanupTest, AccessorTransitions) {
           Object.defineProperty(receiver, 'slot', {
             get: newGet, set: newSet, enumerable: false
           });
+        drainJobs();
         var expectedCalls = mode === 1 || mode === 4 ? 2 : 1;
         if (!consistent || calls !== expectedCalls || receiver.slot !== 42)
           return false;
@@ -642,6 +669,7 @@ TEST_F(DefinePropertyCleanupTest, MappedArgumentsTransitions) {
           });
         else
           Object.defineProperty(receiver, '0', { get: newGet, enumerable: false });
+        drainJobs();
         if (calls !== 1 || !consistent || receiver[0] !== 42) return false;
       }
       return true;
@@ -660,6 +688,7 @@ TEST_F(DefinePropertyCleanupTest, SameValueRetainsOwnership) {
       Object.defineProperty(receiver, 'slot', { value: receiver.slot });
       if (calls !== 0) return false;
       delete receiver.slot;
+      drainJobs();
       if (calls !== 1) return false;
       Object.defineProperty(receiver, 'slot', {
         get: function() { return 42; }, configurable: true
@@ -670,6 +699,7 @@ TEST_F(DefinePropertyCleanupTest, SameValueRetainsOwnership) {
       getter = null;
       if (calls !== 1 || receiver.slot !== 42) return false;
       delete receiver.slot;
+      drainJobs();
       return calls === 2;
     })()
   )");
@@ -737,6 +767,7 @@ TEST_F(FinalizationRegistryTest, SetPrototypeCommitsBeforeCleanup) {
         registry.register(Object.getPrototypeOf(receiver), 0);
         var result = useReflect ? Reflect.setPrototypeOf(receiver, replacement) :
                                   Object.setPrototypeOf(receiver, replacement);
+        drainJobs();
         var expected = action === 2 ? nestedPrototype : replacement;
         if (result !== (useReflect ? true : receiver) || calls !== 1 ||
             !sawCommittedPrototype || Object.getPrototypeOf(receiver) !== expected)
@@ -789,8 +820,9 @@ TEST_F(DeletePropertyCleanupTest, CommitsBeforeCleanupGrowsReceiver) {
         else
           receiver.slot = value;
         value = null;
-        if (!(delete receiver.slot) || calls !== 1 || !committed ||
-            receiver.field63 !== 63) return false;
+        if (!(delete receiver.slot)) return false;
+        drainJobs();
+        if (calls !== 1 || !committed || receiver.field63 !== 63) return false;
         var names = Object.getOwnPropertyNames(receiver);
         var expected = mode === 2 ? 73 : undefined;
         if (receiver.slot !== expected ||
@@ -817,6 +849,7 @@ TEST_F(DeletePropertyCleanupTest, DyingObjectIsNotRevivedByWeakRef) {
         registry.register(dying.child, 0);
         weak = new WeakRef(dying);
       })();
+      drainJobs();
       return calls === 1 && revived === undefined && weak.deref() === undefined;
     })()
   )");
@@ -847,8 +880,9 @@ TEST_F(DeletePropertyCleanupTest, AccessorCleanupPreservesReaddedProperty) {
           get: getter, set: setter, configurable: true
         });
         getter = setter = null;
-        if (!Reflect.deleteProperty(receiver, 'slot') || !consistent ||
-            calls !== (mode === 0 ? 2 : 1) || receiver.slot !== 73 ||
+        if (!Reflect.deleteProperty(receiver, 'slot')) return false;
+        drainJobs();
+        if (!consistent || calls !== (mode === 0 ? 2 : 1) || receiver.slot !== 73 ||
             receiver.field63 !== 63 || Object.keys(receiver).length !== 65)
           return false;
       }
@@ -856,5 +890,92 @@ TEST_F(DeletePropertyCleanupTest, AccessorCleanupPreservesReaddedProperty) {
     })()
   )");
 }
+
+TEST_F(CollectionCleanupTest, CycleCollectedRegistryQueuesNoCleanup) {
+  if (LEPUS_IsGCMode(ctx_)) GTEST_SKIP();
+  // The sweep frees the callback regardless of refcount, so no job may keep it.
+  Check(R"(
+    (function() {
+      var calls = 0;
+      (function() {
+        var target = {};
+        var registry = new FinalizationRegistry(function() { calls++; });
+        target.registry = registry;
+        registry.target = target;
+        registry.register(target, {});
+      })();
+      forceGC();
+      drainJobs();
+      return calls === 0;
+    })()
+  )");
+}
+
+TEST_F(FinalizationRegistryTest, FreeingContextDropsItsQueuedCleanup) {
+  if (LEPUS_IsGCMode(ctx_)) GTEST_SKIP();
+  LEPUSContext* other = LEPUS_NewContext(rt_);
+  const char* source =
+      "var registry = new FinalizationRegistry(() => {}); "
+      "registry.register({}, 0);";
+  LEPUSValue result = LEPUS_Eval(other, source, strlen(source), "test.js",
+                                 LEPUS_EVAL_TYPE_GLOBAL);
+  ASSERT_FALSE(LEPUS_IsException(result));
+  LEPUS_FreeValue(other, result);
+  ASSERT_TRUE(LEPUS_IsJobPending(rt_));
+  LEPUS_FreeContext(other);
+  EXPECT_FALSE(LEPUS_IsJobPending(rt_));
+}
+
+TEST_F(CollectionCleanupTest, ThrowingCleanupKeepsJobQueueRunning) {
+  if (LEPUS_IsGCMode(ctx_)) GTEST_SKIP();
+  Check(R"(
+    (function() {
+      var calls = 0;
+      var registry = new FinalizationRegistry(function() {
+        calls++;
+        throw new Error('cleanup');
+      });
+      registry.register({}, 0);
+      registry.register({}, 1);
+      drainJobs();
+      return calls === 2;
+    })()
+  )");
+}
+
+#ifdef ENABLE_LEPUSNG
+TEST_F(FinalizationRegistryTest,
+       CycleCollectedLepusRefHeldValueQueuesNoCleanup) {
+  if (LEPUS_IsGCMode(ctx_)) GTEST_SKIP();
+  // The cleanup outlives the cycle; the target is created first so the sweep
+  // releases it before the registry.
+  const char* source =
+      "var cleanup = function() {};"
+      "(function(held) {"
+      "  var target = {};"
+      "  var registry = new FinalizationRegistry(cleanup);"
+      "  target.registry = registry;"
+      "  registry.target = target;"
+      "  registry.register(target, held);"
+      "})";
+  LEPUSValue register_in_cycle = LEPUS_Eval(ctx_, source, strlen(source),
+                                            "test.js", LEPUS_EVAL_TYPE_GLOBAL);
+  ASSERT_FALSE(LEPUS_IsException(register_in_cycle));
+
+  LEPUSValue held = LEPUS_NewLepusWrap(ctx_, nullptr, 0);
+  // The ToObject cache, as JSRef2Value fills it, dies with the cycle.
+  static_cast<LEPUSLepusRef*>(LEPUS_VALUE_GET_PTR(held))->lepus_val =
+      LEPUS_NewObject(ctx_);
+  LEPUSValue result =
+      LEPUS_Call(ctx_, register_in_cycle, LEPUS_UNDEFINED, 1, &held);
+  ASSERT_FALSE(LEPUS_IsException(result));
+  LEPUS_FreeValue(ctx_, result);
+  LEPUS_FreeValue(ctx_, register_in_cycle);
+  LEPUS_FreeValue(ctx_, held);
+
+  LEPUS_RunGC(rt_);
+  EXPECT_FALSE(LEPUS_IsJobPending(rt_));
+}
+#endif
 
 }  // namespace finalization_registry_test

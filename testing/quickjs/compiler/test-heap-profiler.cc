@@ -697,6 +697,34 @@ TEST(HeapProfiler, TracingGcJobListRoot) {
   }
 }
 
+TEST(HeapProfiler, FinalizationJobListRoot) {
+  ::TestQjsContext env;
+  LEPUSValue ret = env.CompileAndRun(R"(
+    var registry = new FinalizationRegistry(function() {});
+    (function() {
+      function FinalizationHeldValue() {}
+      registry.register({}, new FinalizationHeldValue());
+    })();
+  )");
+  if (!env.ctx->rt->gc_enable) LEPUS_FreeValue(env.ctx, ret);
+
+  // The snapshot's own GC collects the target, so its cleanup is still queued.
+  auto* snapshot = GetQjsHeapProfilerImplInstance().TakeHeapSnapshot(env.ctx);
+  ASSERT_TRUE(LEPUS_IsJobPending(env.rt));
+
+  ASSERT_TRUE(ValidateSnapshot(snapshot));
+  bool held_by_job = false;
+  for (auto& edge : snapshot->edges()) {
+    held_by_job |= edge.name() == "job.argv" &&
+                   edge.to()->name() == "FinalizationHeldValue";
+  }
+  EXPECT_TRUE(held_by_job);
+
+  LEPUSContext* job_ctx = nullptr;
+  while (LEPUS_ExecutePendingJob(env.rt, &job_ctx) > 0) {
+  }
+}
+
 TEST(HeapProfiler, TakeSnapshotTest) {
   ::TestQjsContext env;
   take_heap_snapshot_test(env.ctx);

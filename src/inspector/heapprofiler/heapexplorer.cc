@@ -1617,16 +1617,18 @@ void QjsHeapExplorer::ExtractRuntimeReference(LEPUSContext* ctx,
 void QjsHeapExplorer::ExtractJobListReference(LEPUSContext* ctx,
                                               HeapEntry* entry,
                                               LEPUSRuntime* rt) {
-  if (!rt->job_list.next || !rt->job_list.prev) return;
-  list_head *el, *el1;
-  list_for_each_safe(el, el1, &rt->job_list) {
-    auto* job = list_entry(el, JSJobEntry, link);
-    if (job->ctx) {
-      auto* job_ctx_entry = GetEntry(job->ctx, HeapObjPtr{job->ctx});
-      SetInternalReference(entry, "job.context", job_ctx_entry);
-    }
-    for (int i = 0; i < job->argc; ++i) {
-      SetAndExtractValue(ctx, entry, "job.argv", job->argv[i]);
+  for (list_head* jobs : {&rt->job_list, &rt->finrec_job_list}) {
+    if (!jobs->next || !jobs->prev) continue;
+    list_head *el, *el1;
+    list_for_each_safe(el, el1, jobs) {
+      auto* job = list_entry(el, JSJobEntry, link);
+      if (job->ctx) {
+        auto* job_ctx_entry = GetEntry(job->ctx, HeapObjPtr{job->ctx});
+        SetInternalReference(entry, "job.context", job_ctx_entry);
+      }
+      for (int i = 0; i < job->argc; ++i) {
+        SetAndExtractValue(ctx, entry, "job.argv", job->argv[i]);
+      }
     }
   }
 }

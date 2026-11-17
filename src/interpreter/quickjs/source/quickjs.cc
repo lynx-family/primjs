@@ -1110,6 +1110,7 @@ QJS_STATIC LEPUSRuntime *JS_NewRuntime_RC(const LEPUSMallocFunctions *mf,
   init_list_head(&rt->string_list);
 #endif
   init_list_head(&rt->job_list);
+  init_list_head(&rt->finrec_job_list);
   init_list_head(&rt->unhandled_rejections);
   init_list_head(&rt->async_func_sf);
   rt->ptr_handles = new PtrHandles(rt);
@@ -1760,7 +1761,71 @@ int LEPUS_EnqueueJob(LEPUSContext *ctx, LEPUSJobFunc *job_func, int argc,
   return 0;
 }
 
-BOOL LEPUS_IsJobPending(LEPUSRuntime *rt) { return !list_empty(&rt->job_list); }
+/* Cleanup errors are not failures of the host call draining the queue, so
+   they are dropped as the former synchronous call did. */
+LEPUSValue JS_FinalizationRegistryCleanupJob(LEPUSContext *ctx, int argc,
+                                             LEPUSValueConst *argv) {
+  LEPUSValue ret = LEPUS_Call(ctx, argv[0], LEPUS_UNDEFINED, 1, &argv[1]);
+  if (!LEPUS_IsException(ret)) return ret;
+  LEPUSValue error = LEPUS_GetException(ctx);
+  if (!ctx->gc_enable) LEPUS_FreeValue(ctx, error);
+  return LEPUS_UNDEFINED;
+}
+
+/* True for an object the running cycle collection frees regardless of its
+   refcount, so no job may keep a pointer to it, even through a LepusRef. */
+QJS_STATIC BOOL is_freed_by_cycle_gc(LEPUSRuntime *rt, LEPUSValueConst val) {
+  if (!rt->in_gc_sweep) return FALSE;
+#ifdef ENABLE_LEPUSNG
+  if (LEPUS_IsLepusRef(val)) {
+    val = static_cast<LEPUSLepusRef *>(LEPUS_VALUE_GET_PTR(val))->lepus_val;
+  }
+#endif
+  return LEPUS_VALUE_IS_OBJECT(val) &&
+         LEPUS_VALUE_GET_OBJ(val)->gc_header.mark == 3;
+}
+
+/* Releasing a target must never run JS, so its cleanup callback is queued.
+   It is dropped when out of memory or when the registry dies in the same
+   cycle, both of which the spec permits. */
+QJS_STATIC void enqueue_finrec_job(LEPUSRuntime *rt, LEPUSContext *ctx,
+                                   LEPUSValueConst cleanup,
+                                   LEPUSValueConst held_value) {
+  if (is_freed_by_cycle_gc(rt, cleanup) || is_freed_by_cycle_gc(rt, held_value))
+    return;
+  JSJobEntry *e = static_cast<JSJobEntry *>(
+      lepus_malloc_rt(rt, sizeof(*e) + 2 * sizeof(LEPUSValue)));
+  if (!e) return;
+  e->ctx = ctx;
+  e->job_func = JS_FinalizationRegistryCleanupJob;
+  e->argc = 2;
+  e->argv[0] = LEPUS_DupValueRT(rt, cleanup);
+  e->argv[1] = LEPUS_DupValueRT(rt, held_value);
+  list_add_tail(&e->link, &rt->finrec_job_list);
+}
+
+/* Drops the queued jobs of 'ctx', or every job when 'ctx' is NULL. */
+QJS_STATIC void free_pending_jobs(LEPUSRuntime *rt, struct list_head *jobs,
+                                  LEPUSContext *ctx) {
+  struct list_head *el, *el1, dropped;
+  init_list_head(&dropped);
+  list_for_each_safe(el, el1, jobs) {
+    JSJobEntry *e = list_entry(el, JSJobEntry, link);
+    if (ctx && e->ctx != ctx) continue;
+    list_del(&e->link);
+    list_add_tail(&e->link, &dropped);
+  }
+  /* Unlink first: releasing the arguments may queue new cleanup jobs. */
+  list_for_each_safe(el, el1, &dropped) {
+    JSJobEntry *e = list_entry(el, JSJobEntry, link);
+    for (int i = 0; i < e->argc; i++) LEPUS_FreeValueRT(rt, e->argv[i]);
+    lepus_free_rt(rt, e);
+  }
+}
+
+BOOL LEPUS_IsJobPending(LEPUSRuntime *rt) {
+  return JS_GetPendingJobList(rt) != nullptr;
+}
 
 /* return < 0 if exception, 0 if no job pending, 1 if a job was
    executed successfully. the context of the job is stored in '*pctx' */
@@ -1771,13 +1836,14 @@ int LEPUS_ExecutePendingJob(LEPUSRuntime *rt, LEPUSContext **pctx) {
   LEPUSValue res;
   int i, ret;
 
-  if (list_empty(&rt->job_list)) {
+  struct list_head *jobs = JS_GetPendingJobList(rt);
+  if (!jobs) {
     *pctx = NULL;
     return 0;
   }
 
   /* get the first pending job and execute it */
-  e = list_entry(rt->job_list.next, JSJobEntry, link);
+  e = list_entry(jobs->next, JSJobEntry, link);
   list_del(&e->link);
   ctx = e->ctx;
   res = e->job_func(e->ctx, e->argc, (LEPUSValueConst *)e->argv);
@@ -1956,12 +2022,8 @@ void LEPUS_FreeRuntime(LEPUSRuntime *rt) {
     LEPUS_FreeContext(ctx);
   }
 
-  list_for_each_safe(el, el1, &rt->job_list) {
-    JSJobEntry *e = list_entry(el, JSJobEntry, link);
-    for (i = 0; i < e->argc; i++) LEPUS_FreeValueRT(rt, e->argv[i]);
-    lepus_free_rt(rt, e);
-  }
-  init_list_head(&rt->job_list);
+  free_pending_jobs(rt, &rt->job_list, NULL);
+  free_pending_jobs(rt, &rt->finrec_job_list, NULL);
 
   list_for_each_safe(el, el1, &rt->unhandled_rejections) {
     JSUnhandledRejectionEntry *e =
@@ -2613,6 +2675,9 @@ void LEPUS_FreeContext(LEPUSContext *ctx) {
   JS_DumpShapes(ctx->rt);
 #endif
 
+  /* A dying context must not schedule cleanup callbacks. */
+  ctx->fg_ctx->ctx = nullptr;
+
   struct list_head *el, *el1;
   js_free_modules(ctx, JS_FREE_MODULE_ALL);
 
@@ -2653,7 +2718,9 @@ void LEPUS_FreeContext(LEPUSContext *ctx) {
     delete ctx->check_tools;
   }
 
-  ctx->fg_ctx->ctx = nullptr;
+  /* Queued jobs only hold a raw pointer to their context. */
+  free_pending_jobs(rt, &rt->job_list, ctx);
+  free_pending_jobs(rt, &rt->finrec_job_list, ctx);
   free_finalization_registry_context(ctx->rt, ctx->fg_ctx);
   LEPUS_NotifyContextFreed(ctx);
   lepus_free_rt(ctx->rt, ctx);
@@ -5987,7 +6054,9 @@ QJS_STATIC void free_object_struct(LEPUSRuntime *rt, LEPUSObject *p) {
   }
 
   finalizer = rt->class_array[p->class_id].finalizer;
-  if (finalizer) (*finalizer)(rt, LEPUS_MKPTR(LEPUS_TAG_OBJECT, p));
+  if (finalizer) {
+    JS_CallClassFinalizer(rt, finalizer, LEPUS_MKPTR(LEPUS_TAG_OBJECT, p));
+  }
 
   /* fail safe */
   p->class_id = 0;
@@ -17399,12 +17468,24 @@ exception:
   return ret_val;
 }
 
+/* JS run by a class finalizer can reenter code that holds raw pointers to the
+   object being released. Report it once per runtime before enforcing. */
+void JS_ReportJSCallInFinalizer(LEPUSRuntime *rt) {
+  if (rt->finalizer_js_call_reported) return;
+  rt->finalizer_js_call_reported = true;
+  MonitorEvent(MODULE_QUICK, rt->rt_info ? rt->rt_info : DEFAULT_BIZ_NAME,
+               "JSCallInFinalizer", MODULE_QUICK);
+}
+
 QJS_STATIC inline LEPUSValue JS_CallInternalTI(LEPUSContext *caller_ctx,
                                                LEPUSValue func_obj,
                                                LEPUSValue this_obj,
                                                LEPUSValue new_target, int argc,
                                                LEPUSValue *argv, int flags) {
   CheckObjectCtxIfEnabled(caller_ctx, func_obj);
+  if (unlikely(caller_ctx->rt->finalizer_depth)) {
+    JS_ReportJSCallInFinalizer(caller_ctx->rt);
+  }
 #ifdef ENABLE_PRIMJS_SNAPSHOT
   if (caller_ctx->rt->use_primjs) {
     js_init_thread_stack_state(caller_ctx);
@@ -46058,10 +46139,7 @@ QJS_STATIC void reset_weak_ref(LEPUSRuntime *rt, LEPUSObject *p) {
         FinalizationRegistryEntry *fin_node = wr->u.fin_node;
         FinalizationRegistryData *frd = fin_node->data;
         LEPUSContext *ctx = frd->fg_ctx->ctx;
-        if (ctx) {
-          LEPUS_FreeValueRT(rt, LEPUS_Call(ctx, frd->cbs, LEPUS_UNDEFINED, 1,
-                                           &fin_node->held_value));
-        }
+        if (ctx) enqueue_finrec_job(rt, ctx, frd->cbs, fin_node->held_value);
         LEPUS_FreeValueRT(rt, fin_node->held_value);
         LEPUS_FreeValueRT(rt, fin_node->token);
         lepus_free_rt(rt, fin_node);

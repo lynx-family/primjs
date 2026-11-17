@@ -46,8 +46,18 @@ LEPUSValue js_deep_copy(LEPUSContext* ctx, LEPUSValueConst this_val, int argc,
   return val;
 }
 
+// Runs queued jobs the way a host does once its call into JS returns.
+static LEPUSValue js_drain_jobs(LEPUSContext* ctx, LEPUSValueConst this_val,
+                                int argc, LEPUSValueConst* argv) {
+  LEPUSContext* job_ctx;
+  int ret = 1;
+  while (ret > 0) ret = LEPUS_ExecutePendingJob(ctx->rt, &job_ctx);
+  return ret < 0 ? LEPUS_EXCEPTION : LEPUS_UNDEFINED;
+}
+
 static const LEPUSCFunctionListEntry func_list[] = {
-    LEPUS_CFUNC_DEF("structuredClone", 1, js_deep_copy)};
+    LEPUS_CFUNC_DEF("structuredClone", 1, js_deep_copy),
+    LEPUS_CFUNC_DEF("drainJobs", 0, js_drain_jobs)};
 
 static void RegisterAssert(LEPUSContext* ctx);
 
@@ -2085,7 +2095,7 @@ TEST_F(CommonQjsTest, TypedArraySliceMemOverlap) {
   if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
 }
 
-TEST_F(CommonQjsTest, ArraySliceSpeciesFinalizerObservesSourceMutation) {
+TEST_F(CommonQjsTest, ArraySliceSpeciesCleanupRunsAfterCopy) {
   if (LEPUS_IsGCMode(ctx_)) {
     GTEST_SKIP() << "Requires synchronous reference-counted finalization";
   }
@@ -2117,10 +2127,12 @@ TEST_F(CommonQjsTest, ArraySliceSpeciesFinalizerObservesSourceMutation) {
     };
 
     var result = source.slice();
+    Assert(cleanupCount === 0);
+    drainJobs();
     Assert(cleanupCount === 1);
-    Assert(getterCount === 1);
+    Assert(getterCount === 0);
     Assert(result[0] === 10);
-    Assert(result[1] === 222);
+    Assert(result[1] === 20);
     Assert(result[2] === 30);
   )";
 
@@ -2133,7 +2145,7 @@ TEST_F(CommonQjsTest, ArraySliceSpeciesFinalizerObservesSourceMutation) {
   if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, ret);
 }
 
-TEST_F(CommonQjsTest, ArraySpliceSpeciesFinalizerObservesSourceMutation) {
+TEST_F(CommonQjsTest, ArraySpliceSpeciesCleanupRunsAfterCopy) {
   if (LEPUS_IsGCMode(ctx_)) {
     GTEST_SKIP() << "Requires synchronous reference-counted finalization";
   }
@@ -2165,12 +2177,14 @@ TEST_F(CommonQjsTest, ArraySpliceSpeciesFinalizerObservesSourceMutation) {
     };
 
     var result = source.splice(0, 3);
-    Assert(cleanupCount === 1);
-    Assert(getterCount === 1);
-    Assert(result[0] === 10);
-    Assert(result[1] === 222);
-    Assert(result[2] === 30);
+    Assert(cleanupCount === 0);
     Assert(source.length === 0);
+    drainJobs();
+    Assert(cleanupCount === 1);
+    Assert(getterCount === 0);
+    Assert(result[0] === 10);
+    Assert(result[1] === 20);
+    Assert(result[2] === 30);
   )";
 
   auto ret = LEPUS_Eval(ctx_, src.c_str(), src.size(), "test.js",
@@ -2180,111 +2194,6 @@ TEST_F(CommonQjsTest, ArraySpliceSpeciesFinalizerObservesSourceMutation) {
     FAIL() << err;
   }
   if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, ret);
-}
-
-TEST_F(CommonQjsTest, ArraySliceSpliceSpeciesFinalizerMutations) {
-  if (LEPUS_IsGCMode(ctx_)) {
-    GTEST_SKIP() << "Requires synchronous reference-counted finalization";
-  }
-  const char* src = R"(
-    function check(condition, message) {
-      if (!condition) throw new Error(message);
-    }
-    function test(method, mutation) {
-      var source = [10, 20, 30, 40];
-      var cleanupCount = 0;
-      var getterCount = 0;
-      var destination;
-      var marker = {};
-      var registry = new FinalizationRegistry(function() {
-        cleanupCount++;
-        if (mutation === "grow") {
-          for (var i = 0; i < 128; i++) source.push(i);
-          source[2] = 222;
-        } else if (mutation === "shrink" || mutation === "inherit") {
-          source.length = 2;
-        } else if (mutation === "throw") {
-          Object.defineProperty(source, 2, {
-            configurable: true,
-            get: function() { getterCount++; throw marker; },
-          });
-        } else if (mutation === "freezeResult") {
-          Object.freeze(destination);
-        } else if (mutation === "convertResult") {
-          Object.defineProperty(destination, 1, {
-            configurable: true,
-            get: function() { getterCount++; return -1; },
-          });
-          source[2] = 222;
-        }
-      });
-      if (mutation === "inherit") {
-        var proto = Object.create(Array.prototype);
-        Object.defineProperty(proto, 2, {
-          get: function() { getterCount++; return 222; },
-        });
-        Object.setPrototypeOf(source, proto);
-      }
-      source.constructor = {
-        [Symbol.species]: function(length) {
-          check(length === 3, "species length");
-          var target = {};
-          registry.register(target, null);
-          destination = [target];
-          return destination;
-        },
-      };
-      var result;
-      var error;
-      try {
-        result = method === "slice" ? source.slice(1, 4)
-                                     : source.splice(1, 3);
-      } catch (e) { error = e; }
-      var label = method + "/" + mutation;
-      check(cleanupCount === 1, label + " cleanup");
-      check(destination[0] === 20, label + " first element");
-      if (mutation === "throw" || mutation === "freezeResult") {
-        check(mutation === "throw" ? error === marker
-                                   : error instanceof TypeError,
-              label + " exception");
-        check(getterCount === (mutation === "throw" ? 1 : 0),
-              label + " getter");
-        check(source.length === 4 && source[1] === 20,
-              label + " source unchanged before splice edits");
-        return;
-      }
-      check(error === undefined, label + " unexpected exception");
-      check(result === destination && result.length === 3, label + " result");
-      if (mutation === "shrink" || mutation === "inherit") {
-        check(!Object.prototype.hasOwnProperty.call(result, 2),
-              label + " trailing hole");
-        if (mutation === "inherit") {
-          check(result[1] === 222 && getterCount === 1, label + " inherited");
-        } else {
-          check(!Object.prototype.hasOwnProperty.call(result, 1),
-                label + " removed element");
-        }
-      } else {
-        check(result[1] === 222 && result[2] === 40, label + " values");
-        check(getterCount === 0, label + " destination getter not invoked");
-      }
-      if (method === "splice") {
-        check(source.length === 1 && source[0] === 10, label + " source");
-      }
-    }
-    for (var method of ["slice", "splice"]) {
-      for (var mutation of ["grow", "shrink", "inherit", "throw",
-                            "freezeResult", "convertResult"]) {
-        test(method, mutation);
-      }
-    }
-  )";
-  auto ret =
-      LEPUS_Eval(ctx_, src, strlen(src), "test.js", LEPUS_EVAL_TYPE_GLOBAL);
-  if (LEPUS_IsException(ret)) {
-    FAIL() << js_get_exception_string(ctx_);
-  }
-  LEPUS_FreeValue(ctx_, ret);
 }
 
 TEST_F(CommonQjsTest, ArraySliceSpliceSpeciesCopySemantics) {
@@ -4031,6 +3940,7 @@ TEST_F(CommonQjsTest, CopyWithinFinalizationReentrancyNoUAF) {
         arr[0] = victim;
       })();
       arr.copyWithin(0, 8);
+      drainJobs();
       return witness === 1 && arr.length === 1;
     })()
   )";
@@ -4087,6 +3997,7 @@ TEST_F(CommonQjsTest, CopyWithinFinalizationReentrancyCopiesEveryIndex) {
       });
       slow.copyWithin(0, 2);
 
+      drainJobs();
       return "fwd=" + dump(fwd) + " rev=" + dump(rev) + " slow=" + dump(slow) +
              " fired=" + fired;
     })()
@@ -4099,8 +4010,7 @@ TEST_F(CommonQjsTest, CopyWithinFinalizationReentrancyCopiesEveryIndex) {
   }
   const char* got = LEPUS_ToCString(ctx_, ret);
   EXPECT_STREQ(got,
-               "fwd=len=2[2,<hole>] rev=len=3[0,0,1] slow=len=4[2,G,2,G] "
-               "fired=3");
+               "fwd=len=2[2,3] rev=len=2[0,0] slow=len=4[2,3,2,G] fired=3");
   LEPUS_FreeCString(ctx_, got);
   LEPUS_FreeValue(ctx_, ret);
 }

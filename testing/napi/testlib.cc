@@ -1294,6 +1294,23 @@ TEST_P(NAPITest, RunScriptWithLength) {
   EXPECT_EQ(ret.ToString().Utf8Value(), "123");
 }
 
+TEST_P(NAPITest, ThrowingFinalizationCleanupDoesNotFailCall) {
+  HandleScope hscope(env);
+  // Under reference counting the call's job draining runs the cleanup.
+  Napi::Function register_target =
+      env.RunScript(
+             "var registry = new FinalizationRegistry(function() {"
+             "  throw new Error('cleanup');"
+             "});"
+             "(function() { registry.register({}, 0); })")
+          .As<Napi::Function>();
+  napi_value result;
+  EXPECT_EQ(napi_ok,
+            NAPI_ENV_CALL(call_function, static_cast<napi_env>(env),
+                          env.Global(), register_target, 0, nullptr, &result));
+  EXPECT_FALSE(env.IsExceptionPending());
+}
+
 INSTANTIATE_TEST_SUITE_P(
     EngineTest, NAPITest, ::testing::ValuesIn(test::runtimeFactory),
     [](const testing::TestParamInfo<NAPITest::ParamType>& info) {
