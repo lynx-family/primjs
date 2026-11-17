@@ -993,19 +993,27 @@ napi_status napi_create_async_work_primjs(napi_env env,
                                           napi_async_execute_callback execute,
                                           napi_async_complete_callback complete,
                                           void* data, napi_async_work* result) {
+  CHECK_ENV(env);
+  CHECK_ARG(env, env->rt);
   return env->napi_create_async_work(env, async_resource, async_resource_name,
                                      execute, complete, data, result);
 }
 
 napi_status napi_delete_async_work_primjs(napi_env env, napi_async_work work) {
+  CHECK_ENV(env);
+  CHECK_ARG(env, env->rt);
   return env->napi_delete_async_work(env, work);
 }
 
 napi_status napi_queue_async_work_primjs(napi_env env, napi_async_work work) {
+  CHECK_ENV(env);
+  CHECK_ARG(env, env->rt);
   return env->napi_queue_async_work(env, work);
 }
 
 napi_status napi_cancel_async_work_primjs(napi_env env, napi_async_work work) {
+  CHECK_ENV(env);
+  CHECK_ARG(env, env->rt);
   return env->napi_cancel_async_work(env, work);
 }
 
