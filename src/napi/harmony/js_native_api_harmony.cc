@@ -1353,7 +1353,11 @@ static napi_status_legacy napi_set_instance_data(napi_env env, uint64_t key,
                                                  void *data,
                                                  napi_finalize finalize_cb,
                                                  void *finalize_hint) {
-  // TODO:@zhangyuping
+  // Preserve the shipped JSVM ownership policy: replacing the map entry does
+  // not remove the previous ExternalNativeInfo from finalizer_list_, so its
+  // finalizer still runs at context teardown. Node-API does not finalize the
+  // superseded data; suppressing this cleanup can leak resources belonging to
+  // another setter. This backend's timing also differs from the other engines.
   auto &map = env->ctx->instance_data_;
   map[key] = ExternalNativeInfo::Create(env, finalize_cb, data, finalize_hint);
   napi_clear_last_error(env);
