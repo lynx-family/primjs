@@ -860,7 +860,11 @@ napi_status napi_define_class_internal(
         }
         if (class_data->spec_compliant && !LEPUS_IsException(result) &&
             !LEPUS_IsObject(result)) {
-          return this_val;
+          // The callback scope owns this_val. Retain the returned instance and
+          // release the ignored primitive result before closing that scope.
+          auto instance_result = JS_DupValue_Comp(ctx, this_val);
+          JS_FreeValue_Comp(ctx, result);
+          return instance_result;
         }
         return result;
       },

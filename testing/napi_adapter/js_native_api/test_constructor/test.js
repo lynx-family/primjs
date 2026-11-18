@@ -60,3 +60,25 @@ assert.deepStrictEqual(TestConstructor.TestDefineClass(), {
   propertiesIsNull: 'Invalid argument',
   resultIsNull: 'Invalid argument'
 });
+
+// A native constructor may leave its result unset or return a primitive.
+// Both JavaScript `new` and native factories must retain the created instance.
+{
+  const Constructor = TestConstructor.createReturnValueConstructor();
+  const checkInstance = (instance) => {
+    assert.ok(instance instanceof Constructor);
+    assert.strictEqual(Object.getPrototypeOf(instance), Constructor.prototype);
+    assert.strictEqual(instance.nativeConstructor, Constructor);
+  };
+  checkInstance(new Constructor());
+  checkInstance(TestConstructor.constructWithReturnValue(Constructor));
+  for (const value of [undefined, null, false, 42, 'ignored', Symbol('ignored')]) {
+    checkInstance(new Constructor(value));
+    checkInstance(TestConstructor.constructWithReturnValue(Constructor, value));
+  }
+  for (const value of [{replacement: true}, function replacement() {}]) {
+    assert.strictEqual(new Constructor(value), value);
+    assert.strictEqual(
+      TestConstructor.constructWithReturnValue(Constructor, value), value);
+  }
+}
