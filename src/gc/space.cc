@@ -187,7 +187,7 @@ void Space::Extend(size_t deltaSize) {
 }
 
 address_t Space::Alloc(size_t reqSize, bool allowExtension, uint32_t &idx,
-                       int forceLevel) {
+                       size_t rosInternalSize) {
   address_t retAddress = 0U;
   if (ExceedsAllocatedPageLimit(reqSize)) {
     return retAddress;
@@ -200,10 +200,6 @@ address_t Space::Alloc(size_t reqSize, bool allowExtension, uint32_t &idx,
   }
 
   if (allowExtension) {
-    if ((forceLevel == kEagerLevelMin) &&
-        GetGCTracer()->TryTriggerConcurrentPhases()) {
-      return 0;
-    }
     Extend(reqSize);
     retAddress = GetChunk(reqSize, idx);
   }
