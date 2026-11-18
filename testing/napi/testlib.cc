@@ -4,11 +4,22 @@
 
 #include <array>
 #include <chrono>
+#include <future>
+#include <mutex>
+#include <queue>
 #include <thread>
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
 
 #include "napi/adapter/js_native_api_adapter.h"
+
+#ifdef __has_feature
+#if __has_feature(address_sanitizer)
+#include <sanitizer/asan_interface.h>
+#define NAPI_TEST_ASAN 1
+#endif
+#endif
 
 using namespace Napi;
 
@@ -1532,3 +1543,569 @@ TEST_P(NAPITest, NapiTypedArrayTest) {
     EXPECT_EQ(arrayBuffer, Napi::Value(env, ab));
   }
 }
+
+namespace {
+
+struct TSFNData {
+  napi_threadsafe_function function = nullptr;
+  std::vector<void*> delivered;
+  std::vector<void*> discarded;
+  int finalizers = 0;
+  bool release_in_finalizer = false;
+  napi_status finalizer_release = napi_generic_failure;
+};
+
+void CallJS(napi_env env, napi_value callback, void* context, void* data) {
+  auto* state = static_cast<TSFNData*>(context);
+  if (env) {
+    state->delivered.push_back(data);
+  } else {
+    EXPECT_EQ(callback, nullptr);
+    state->discarded.push_back(data);
+  }
+}
+
+void Finalize(napi_env env, void* data, void* context) {
+  auto* state = static_cast<TSFNData*>(data);
+  EXPECT_EQ(context, state);
+  ++state->finalizers;
+  if (state->release_in_finalizer) {
+    state->finalizer_release = napi_release_threadsafe_function_primjs(
+        state->function, napi_tsfn_release);
+  }
+}
+
+class NAPIThreadSafeFunctionTest : public ::testing::Test {
+ public:
+  NAPIThreadSafeFunctionTest()
+      : env_(napi_new_env()),
+        runtime_(LEPUS_NewRuntime()),
+        context_(LEPUS_NewContext(runtime_)) {
+    auto configuration = napi_create_runtime_configuration();
+    napi_runtime_config_foreground_handler(
+        configuration,
+        [](napi_foreground_cb callback, void* data, void* context) {
+          auto* test = static_cast<NAPIThreadSafeFunctionTest*>(context);
+          std::lock_guard<std::mutex> lock(test->mutex_);
+          test->tasks_.push({callback, data});
+        },
+        this);
+    napi_runtime_config_worker_handler(
+        configuration, nullptr,
+        [](void* context) {
+          auto* test = static_cast<NAPIThreadSafeFunctionTest*>(context);
+          if (test->worker_stop_function_) {
+            test->worker_stop_status_ = napi_runtime_call_threadsafe_function(
+                test->worker_stop_function_, test->worker_stop_data_,
+                napi_tsfn_nonblocking);
+          }
+        },
+        nullptr, this);
+    napi_attach_runtime_with_configuration(env_, configuration);
+    napi_delete_runtime_configuration(configuration);
+    napi_attach_quickjs(env_, context_);
+  }
+
+  ~NAPIThreadSafeFunctionTest() override {
+    CloseEnvironment();
+    RunTasks();
+  }
+
+ protected:
+  TSFNData* Create(size_t threads = 1, size_t queue_size = 0) {
+    states_.push_back(std::make_unique<TSFNData>());
+    auto* state = states_.back().get();
+    EXPECT_EQ(napi_create_threadsafe_function_primjs(
+                  env_, nullptr, nullptr, nullptr, queue_size, threads, state,
+                  Finalize, state, CallJS, &state->function),
+              napi_ok);
+    return state;
+  }
+
+  TSFNData* CreateLegacy() {
+    states_.push_back(std::make_unique<TSFNData>());
+    auto* state = states_.back().get();
+    EXPECT_EQ(env_->napi_create_threadsafe_function(
+                  env_, state, Finalize, state,
+                  [](napi_env env, void* context, void* data) {
+                    CallJS(env, nullptr, context, data);
+                  },
+                  &state->function),
+              napi_ok);
+    return state;
+  }
+
+  void CallDuringWorkerStop(napi_threadsafe_function function, void* data) {
+    worker_stop_function_ = function;
+    worker_stop_data_ = data;
+  }
+
+  napi_status WorkerStopStatus() const { return worker_stop_status_; }
+
+  void RunTasks() {
+    for (;;) {
+      std::pair<napi_foreground_cb, void*> task;
+      {
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (tasks_.empty()) return;
+        task = tasks_.front();
+        tasks_.pop();
+      }
+      task.first(task.second);
+    }
+  }
+
+  void DiscardTasks() {
+    std::lock_guard<std::mutex> lock(mutex_);
+    std::queue<std::pair<napi_foreground_cb, void*>> empty;
+    tasks_.swap(empty);
+  }
+
+  void CloseEnvironment() {
+    if (!env_) return;
+    napi_detach_runtime(env_);
+    napi_detach_quickjs(env_);
+    napi_free_env(env_);
+    LEPUS_FreeContext(context_);
+    LEPUS_FreeRuntime(runtime_);
+    env_ = nullptr;
+  }
+
+  napi_env env_;
+
+ private:
+  LEPUSRuntime* runtime_;
+  LEPUSContext* context_;
+  std::mutex mutex_;
+  std::queue<std::pair<napi_foreground_cb, void*>> tasks_;
+  std::vector<std::unique_ptr<TSFNData>> states_;
+  napi_threadsafe_function worker_stop_function_ = nullptr;
+  void* worker_stop_data_ = nullptr;
+  napi_status worker_stop_status_ = napi_generic_failure;
+};
+
+TEST_F(NAPIThreadSafeFunctionTest, ReleaseDrainsQueueAndFinalizesOnce) {
+  auto* state = Create();
+  int data[] = {1, 2, 3};
+  for (auto& value : data) {
+    EXPECT_EQ(napi_call_threadsafe_function_primjs(state->function, &value,
+                                                   napi_tsfn_nonblocking),
+              napi_ok);
+  }
+  EXPECT_EQ(napi_release_threadsafe_function_primjs(state->function,
+                                                    napi_tsfn_release),
+            napi_ok);
+  RunTasks();
+  EXPECT_EQ(state->delivered,
+            std::vector<void*>({&data[0], &data[1], &data[2]}));
+  EXPECT_TRUE(state->discarded.empty());
+  EXPECT_EQ(state->finalizers, 1);
+}
+
+#ifdef NAPI_TEST_ASAN
+TEST_F(NAPIThreadSafeFunctionTest, LastReleaseFreesNativeHandle) {
+  auto* state = Create();
+  void* allocation = state->function;
+  EXPECT_EQ(napi_release_threadsafe_function_primjs(state->function,
+                                                    napi_tsfn_release),
+            napi_ok);
+  RunTasks();
+  // Query the sanitizer's allocation state without dereferencing the handle.
+  EXPECT_NE(__asan_address_is_poisoned(allocation), 0);
+  EXPECT_EQ(state->finalizers, 1);
+}
+#endif
+
+TEST_F(NAPIThreadSafeFunctionTest, AbortPreservesRemainingAcquisition) {
+  auto* state = Create(2);
+  int payload = 1;
+  EXPECT_EQ(napi_call_threadsafe_function_primjs(state->function, &payload,
+                                                 napi_tsfn_nonblocking),
+            napi_ok);
+  EXPECT_EQ(
+      napi_release_threadsafe_function_primjs(state->function, napi_tsfn_abort),
+      napi_ok);
+  EXPECT_EQ(napi_acquire_threadsafe_function_primjs(state->function),
+            napi_closing);
+  RunTasks();
+  EXPECT_TRUE(state->delivered.empty());
+  EXPECT_EQ(state->discarded, std::vector<void*>({&payload}));
+  EXPECT_EQ(state->finalizers, 1);
+  void* context = nullptr;
+  EXPECT_EQ(
+      napi_get_threadsafe_function_context_primjs(state->function, &context),
+      napi_ok);
+  EXPECT_EQ(context, state);
+  EXPECT_EQ(napi_release_threadsafe_function_primjs(state->function,
+                                                    napi_tsfn_release),
+            napi_ok);
+}
+
+TEST_F(NAPIThreadSafeFunctionTest, ClosingCallReturnsItsAcquisition) {
+  auto* state = Create(2);
+  EXPECT_EQ(
+      napi_release_threadsafe_function_primjs(state->function, napi_tsfn_abort),
+      napi_ok);
+  EXPECT_EQ(napi_call_threadsafe_function_primjs(state->function, nullptr,
+                                                 napi_tsfn_nonblocking),
+            napi_closing);
+  RunTasks();
+  EXPECT_EQ(state->finalizers, 1);
+  EXPECT_TRUE(state->delivered.empty());
+  EXPECT_TRUE(state->discarded.empty());
+}
+
+TEST_F(NAPIThreadSafeFunctionTest, HoldersCanReleaseAfterEnvironmentIsGone) {
+  constexpr int kThreads = 8;
+  constexpr int kAcquisitions = 16;
+  auto* state = Create(kThreads * kAcquisitions);
+  CloseEnvironment();
+  EXPECT_EQ(state->finalizers, 1);
+  std::vector<std::thread> threads;
+  for (int i = 0; i < kThreads; ++i) {
+    threads.emplace_back([state] {
+      for (int j = 0; j < kAcquisitions; ++j) {
+        EXPECT_EQ(napi_release_threadsafe_function_primjs(state->function,
+                                                          napi_tsfn_release),
+                  napi_ok);
+      }
+    });
+  }
+  for (auto& thread : threads) thread.join();
+}
+
+TEST_F(NAPIThreadSafeFunctionTest, FinalizerCanReleaseLastAcquisition) {
+  auto* state = Create();
+  state->release_in_finalizer = true;
+  CloseEnvironment();
+  EXPECT_EQ(state->finalizers, 1);
+  EXPECT_EQ(state->finalizer_release, napi_ok);
+}
+
+TEST_F(NAPIThreadSafeFunctionTest, PendingTasksAreSafeAfterRuntimeTeardown) {
+  auto* state = Create();
+  int payload = 1;
+  EXPECT_EQ(napi_call_threadsafe_function_primjs(state->function, &payload,
+                                                 napi_tsfn_nonblocking),
+            napi_ok);
+  EXPECT_EQ(napi_release_threadsafe_function_primjs(state->function,
+                                                    napi_tsfn_release),
+            napi_ok);
+  CloseEnvironment();
+  EXPECT_EQ(state->discarded, std::vector<void*>({&payload}));
+  EXPECT_EQ(state->finalizers, 1);
+  RunTasks();
+  EXPECT_EQ(state->finalizers, 1);
+}
+
+TEST_F(NAPIThreadSafeFunctionTest, HostMayDiscardTasksAfterRuntimeTeardown) {
+  auto* state = Create();
+  int payload = 1;
+  EXPECT_EQ(napi_call_threadsafe_function_primjs(state->function, &payload,
+                                                 napi_tsfn_nonblocking),
+            napi_ok);
+  EXPECT_EQ(napi_release_threadsafe_function_primjs(state->function,
+                                                    napi_tsfn_release),
+            napi_ok);
+  CloseEnvironment();
+  DiscardTasks();
+  EXPECT_EQ(state->discarded, std::vector<void*>({&payload}));
+  EXPECT_EQ(state->finalizers, 1);
+}
+
+TEST_F(NAPIThreadSafeFunctionTest, BlockingCallWaitsForQueueCapacity) {
+  auto* state = Create(2, 1);
+  int data[] = {1, 2};
+  EXPECT_EQ(napi_call_threadsafe_function_primjs(state->function, &data[0],
+                                                 napi_tsfn_nonblocking),
+            napi_ok);
+  EXPECT_EQ(napi_call_threadsafe_function_primjs(state->function, &data[1],
+                                                 napi_tsfn_nonblocking),
+            napi_queue_full);
+  std::promise<void> started;
+  std::promise<napi_status> result;
+  auto future = result.get_future();
+  std::thread thread([&] {
+    started.set_value();
+    result.set_value(napi_call_threadsafe_function_primjs(
+        state->function, &data[1], napi_tsfn_blocking));
+    EXPECT_EQ(napi_release_threadsafe_function_primjs(state->function,
+                                                      napi_tsfn_release),
+              napi_ok);
+  });
+  started.get_future().wait();
+  EXPECT_EQ(future.wait_for(std::chrono::milliseconds(30)),
+            std::future_status::timeout);
+  RunTasks();
+  bool finished =
+      future.wait_for(std::chrono::seconds(5)) == std::future_status::ready;
+  EXPECT_TRUE(finished);
+  if (!finished) {
+    napi_release_threadsafe_function_primjs(state->function, napi_tsfn_abort);
+  }
+  thread.join();
+  EXPECT_EQ(future.get(), napi_ok);
+  if (finished) {
+    EXPECT_EQ(napi_release_threadsafe_function_primjs(state->function,
+                                                      napi_tsfn_release),
+              napi_ok);
+  }
+  RunTasks();
+  EXPECT_EQ(state->delivered, std::vector<void*>({&data[0], &data[1]}));
+  EXPECT_EQ(state->finalizers, 1);
+}
+
+TEST_F(NAPIThreadSafeFunctionTest, AbortWakesBlockedProducer) {
+  auto* state = Create(2, 1);
+  int data[] = {1, 2};
+  EXPECT_EQ(napi_call_threadsafe_function_primjs(state->function, &data[0],
+                                                 napi_tsfn_nonblocking),
+            napi_ok);
+  std::promise<void> started;
+  std::promise<napi_status> result;
+  auto future = result.get_future();
+  std::thread thread([&] {
+    started.set_value();
+    result.set_value(napi_call_threadsafe_function_primjs(
+        state->function, &data[1], napi_tsfn_blocking));
+  });
+  started.get_future().wait();
+  EXPECT_EQ(future.wait_for(std::chrono::milliseconds(30)),
+            std::future_status::timeout);
+  EXPECT_EQ(
+      napi_release_threadsafe_function_primjs(state->function, napi_tsfn_abort),
+      napi_ok);
+  bool finished =
+      future.wait_for(std::chrono::seconds(5)) == std::future_status::ready;
+  EXPECT_TRUE(finished);
+  if (!finished) RunTasks();
+  thread.join();
+  EXPECT_EQ(future.get(), napi_closing);
+  RunTasks();
+  EXPECT_EQ(state->discarded, std::vector<void*>({&data[0]}));
+  EXPECT_EQ(state->finalizers, 1);
+}
+
+TEST_F(NAPIThreadSafeFunctionTest, ContextMayBeNullAndZeroThreadsAreRejected) {
+  napi_threadsafe_function function = nullptr;
+  EXPECT_EQ(napi_create_threadsafe_function_primjs(
+                env_, nullptr, nullptr, nullptr, 0, 0, nullptr, nullptr,
+                nullptr, [](napi_env, napi_value, void*, void*) {}, &function),
+            napi_invalid_arg);
+  EXPECT_EQ(napi_create_threadsafe_function_primjs(
+                env_, nullptr, nullptr, nullptr, 0, 1, nullptr, nullptr,
+                nullptr, [](napi_env, napi_value, void*, void*) {}, &function),
+            napi_ok);
+  void* context = &function;
+  EXPECT_EQ(napi_get_threadsafe_function_context_primjs(function, &context),
+            napi_ok);
+  EXPECT_EQ(context, nullptr);
+  EXPECT_EQ(napi_get_threadsafe_function_context_primjs(function, nullptr),
+            napi_invalid_arg);
+  EXPECT_EQ(
+      napi_release_threadsafe_function_primjs(function, napi_tsfn_release),
+      napi_ok);
+  RunTasks();
+}
+
+TEST_F(NAPIThreadSafeFunctionTest, FailedCreationDoesNotCallUserFinalizer) {
+  TSFNData state;
+  auto create = env_->napi_create_threadsafe_function_spec_compliant;
+  env_->napi_create_threadsafe_function_spec_compliant =
+      [](napi_env, void*, napi_finalize, void*,
+         napi_threadsafe_function_call_js, size_t, size_t,
+         napi_threadsafe_function*) { return napi_generic_failure; };
+  napi_status status = napi_create_threadsafe_function_primjs(
+      env_, nullptr, nullptr, nullptr, 0, 1, &state, Finalize, &state, CallJS,
+      &state.function);
+  env_->napi_create_threadsafe_function_spec_compliant = create;
+  EXPECT_EQ(status, napi_generic_failure);
+  EXPECT_EQ(state.function, nullptr);
+  EXPECT_EQ(state.finalizers, 0);
+}
+
+#ifdef ENABLE_CODECACHE
+TEST_F(NAPIThreadSafeFunctionTest, RuntimeShutdownWakesItsBlockedWorker) {
+  auto* state = Create(2, 1);
+  int data[] = {1, 2};
+  EXPECT_EQ(napi_call_threadsafe_function_primjs(state->function, &data[0],
+                                                 napi_tsfn_nonblocking),
+            napi_ok);
+  std::promise<void> started;
+  std::promise<napi_status> result;
+  auto future = result.get_future();
+  ASSERT_EQ(env_->napi_post_worker_task(
+                env_,
+                [&] {
+                  started.set_value();
+                  result.set_value(napi_call_threadsafe_function_primjs(
+                      state->function, &data[1], napi_tsfn_blocking));
+                }),
+            napi_ok);
+  started.get_future().wait();
+  EXPECT_EQ(future.wait_for(std::chrono::milliseconds(30)),
+            std::future_status::timeout);
+  CloseEnvironment();
+  EXPECT_EQ(future.get(), napi_closing);
+  EXPECT_EQ(state->finalizers, 1);
+  EXPECT_EQ(state->discarded, std::vector<void*>({&data[0]}));
+  EXPECT_EQ(napi_release_threadsafe_function_primjs(state->function,
+                                                    napi_tsfn_release),
+            napi_ok);
+}
+#endif
+
+class NAPILegacyThreadSafeFunctionTest : public NAPIThreadSafeFunctionTest {};
+
+TEST_F(NAPILegacyThreadSafeFunctionTest, NormalCallContextAndExplicitDelete) {
+  auto* state = CreateLegacy();
+  int payload = 1;
+  void* context = nullptr;
+  EXPECT_EQ(
+      napi_runtime_get_threadsafe_function_context(state->function, &context),
+      napi_ok);
+  EXPECT_EQ(context, state);
+  EXPECT_EQ(napi_runtime_call_threadsafe_function(state->function, &payload,
+                                                  napi_tsfn_nonblocking),
+            napi_ok);
+  RunTasks();
+  EXPECT_EQ(state->delivered, std::vector<void*>({&payload}));
+  EXPECT_EQ(state->finalizers, 0);
+  EXPECT_EQ(napi_runtime_delete_threadsafe_function(state->function), napi_ok);
+#ifdef NAPI_TEST_ASAN
+  EXPECT_NE(__asan_address_is_poisoned(state->function), 0);
+#endif
+  RunTasks();
+  EXPECT_EQ(state->finalizers, 1);
+  EXPECT_TRUE(state->discarded.empty());
+}
+
+TEST_F(NAPILegacyThreadSafeFunctionTest, BlockingCallWaitsForJSExecution) {
+  auto* state = CreateLegacy();
+  int payload = 1;
+  std::promise<void> started;
+  std::promise<napi_status> result;
+  auto future = result.get_future();
+  std::thread thread([&] {
+    started.set_value();
+    result.set_value(napi_runtime_call_threadsafe_function(
+        state->function, &payload, napi_tsfn_blocking));
+  });
+  started.get_future().wait();
+  EXPECT_EQ(future.wait_for(std::chrono::milliseconds(30)),
+            std::future_status::timeout);
+  RunTasks();
+  bool finished =
+      future.wait_for(std::chrono::seconds(5)) == std::future_status::ready;
+  EXPECT_TRUE(finished);
+  if (!finished) CloseEnvironment();
+  thread.join();
+  EXPECT_EQ(future.get(), napi_ok);
+  EXPECT_EQ(state->delivered, std::vector<void*>({&payload}));
+  EXPECT_EQ(napi_runtime_delete_threadsafe_function(state->function), napi_ok);
+  RunTasks();
+  EXPECT_EQ(state->finalizers, 1);
+}
+
+TEST_F(NAPILegacyThreadSafeFunctionTest,
+       TeardownDrainsQueueAndKeepsNativeHandle) {
+  auto* state = CreateLegacy();
+  int payload = 1;
+  EXPECT_EQ(napi_runtime_call_threadsafe_function(state->function, &payload,
+                                                  napi_tsfn_nonblocking),
+            napi_ok);
+  CloseEnvironment();
+  EXPECT_EQ(state->delivered, std::vector<void*>({&payload}));
+  EXPECT_TRUE(state->discarded.empty());
+  EXPECT_EQ(state->finalizers, 1);
+#ifdef NAPI_TEST_ASAN
+  EXPECT_EQ(__asan_address_is_poisoned(state->function), 0);
+#endif
+  void* context = nullptr;
+  EXPECT_EQ(
+      napi_runtime_get_threadsafe_function_context(state->function, &context),
+      napi_ok);
+  EXPECT_EQ(context, state);
+  EXPECT_EQ(napi_runtime_call_threadsafe_function(state->function, nullptr,
+                                                  napi_tsfn_nonblocking),
+            napi_closing);
+  EXPECT_EQ(napi_runtime_delete_threadsafe_function(state->function), napi_ok);
+  DiscardTasks();
+}
+
+TEST_F(NAPILegacyThreadSafeFunctionTest, ReleasePreservesStatusesAndOwnership) {
+  auto* state = CreateLegacy();
+  int payload = 1;
+  EXPECT_EQ(napi_runtime_acquire_threadsafe_function(state->function), napi_ok);
+  EXPECT_EQ(napi_runtime_release_threadsafe_function(state->function,
+                                                     napi_tsfn_release),
+            napi_ok);
+  EXPECT_EQ(napi_runtime_call_threadsafe_function(state->function, &payload,
+                                                  napi_tsfn_nonblocking),
+            napi_ok);
+  EXPECT_EQ(napi_runtime_release_threadsafe_function(state->function,
+                                                     napi_tsfn_release),
+            napi_ok);
+  EXPECT_EQ(napi_runtime_acquire_threadsafe_function(state->function),
+            napi_closing);
+  EXPECT_EQ(napi_runtime_call_threadsafe_function(state->function, nullptr,
+                                                  napi_tsfn_nonblocking),
+            napi_closing);
+  EXPECT_EQ(napi_runtime_release_threadsafe_function(state->function,
+                                                     napi_tsfn_release),
+            napi_invalid_arg);
+  RunTasks();
+  EXPECT_EQ(state->finalizers, 1);
+#ifdef NAPI_TEST_ASAN
+  EXPECT_EQ(__asan_address_is_poisoned(state->function), 0);
+#endif
+  EXPECT_EQ(napi_runtime_delete_threadsafe_function(state->function), napi_ok);
+}
+
+TEST_F(NAPILegacyThreadSafeFunctionTest,
+       AbortPreservesQueuedJSAndReturnStatuses) {
+  auto* state = CreateLegacy();
+  int payload = 1;
+  EXPECT_EQ(napi_runtime_acquire_threadsafe_function(state->function), napi_ok);
+  EXPECT_EQ(napi_runtime_call_threadsafe_function(state->function, &payload,
+                                                  napi_tsfn_nonblocking),
+            napi_ok);
+  EXPECT_EQ(napi_runtime_release_threadsafe_function(state->function,
+                                                     napi_tsfn_abort),
+            napi_ok);
+  EXPECT_EQ(napi_runtime_acquire_threadsafe_function(state->function),
+            napi_closing);
+  EXPECT_EQ(napi_runtime_call_threadsafe_function(state->function, nullptr,
+                                                  napi_tsfn_nonblocking),
+            napi_closing);
+  EXPECT_EQ(napi_runtime_release_threadsafe_function(state->function,
+                                                     napi_tsfn_release),
+            napi_invalid_arg);
+  RunTasks();
+  EXPECT_EQ(state->delivered, std::vector<void*>({&payload}));
+  EXPECT_TRUE(state->discarded.empty());
+  EXPECT_EQ(state->finalizers, 1);
+  EXPECT_EQ(napi_runtime_delete_threadsafe_function(state->function), napi_ok);
+}
+
+#ifdef ENABLE_CODECACHE
+TEST_F(NAPILegacyThreadSafeFunctionTest,
+       WorkerStopCanQueueCleanupBeforeFinalizing) {
+  auto* state = CreateLegacy();
+  int payload = 1;
+  CallDuringWorkerStop(state->function, &payload);
+  std::promise<void> started;
+  ASSERT_EQ(env_->napi_post_worker_task(env_, [&] { started.set_value(); }),
+            napi_ok);
+  started.get_future().wait();
+  CloseEnvironment();
+  EXPECT_EQ(WorkerStopStatus(), napi_ok);
+  EXPECT_EQ(state->delivered, std::vector<void*>({&payload}));
+  EXPECT_TRUE(state->discarded.empty());
+  EXPECT_EQ(state->finalizers, 1);
+  EXPECT_EQ(napi_runtime_delete_threadsafe_function(state->function), napi_ok);
+  DiscardTasks();
+}
+#endif
+
+}  // namespace
