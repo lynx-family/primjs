@@ -798,7 +798,8 @@ class Constructor {
  public:
   static napi_status Create(napi_env env, const char* utf8name, size_t length,
                             napi_callback cb, void* data,
-                            napi_class super_class, napi_class* result) {
+                            napi_class super_class, napi_class* result,
+                            bool spec_compliant) {
     static std::once_flag constructorClassOnceFlag;
     static JSClassRef constructorClass{};
 
@@ -820,8 +821,8 @@ class Constructor {
     }
 
     NativeInfo* info = new NativeInfo(env, NativeType::Constructor);
-    Constructor* ctor_data =
-        new Constructor(env, utf8name, length, cb, data, prototype);
+    Constructor* ctor_data = new Constructor(env, utf8name, length, cb, data,
+                                             prototype, spec_compliant);
     info->Data(ctor_data);
 
     // function A() {}
@@ -881,12 +882,13 @@ class Constructor {
 
  private:
   Constructor(napi_env env, const char* name, size_t length, napi_callback cb,
-              void* cb_data, JSObjectRef proto)
+              void* cb_data, JSObjectRef proto, bool spec_compliant)
       : _ctx{env->ctx->context},
         _name{name, (length == NAPI_AUTO_LENGTH ? std::strlen(name) : length)},
         _cb{cb},
         _cb_data{cb_data},
-        _proto(proto) {
+        _proto(proto),
+        _spec_compliant(spec_compliant) {
     JSValueProtect(_ctx, _proto);
   }
 
@@ -947,6 +949,13 @@ class Constructor {
           *exception = exception_value;
         });
 
+    if (cons_data->_spec_compliant && (!exception || !*exception) &&
+        (!result || !JSValueIsObject(ctx, ToJSValue(result)))) {
+      // Standard constructors keep the instance when the callback returns no
+      // value or a primitive. Legacy constructors retain their return behavior.
+      return instance;
+    }
+
     return ToJSObject(result);
   }
 
@@ -997,6 +1006,7 @@ class Constructor {
   napi_callback _cb;
   void* _cb_data;
   JSObjectRef _proto;
+  bool _spec_compliant;
 };
 
 enum WrapType { retrievable, anonymous };
@@ -1140,7 +1150,7 @@ napi_status napi_define_class_internal(
     const napi_property_descriptor* properties, napi_class super_class,
     napi_class* result, bool spec_compliant) {
   CHECK_NAPI(jscimpl::Constructor::Create(env, utf8name, length, cb, data,
-                                          super_class, result));
+                                          super_class, result, spec_compliant));
 
   napi_value constructor = ToNapi((*result)->_ctor);
 

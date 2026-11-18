@@ -116,6 +116,37 @@ static napi_value NewExtra(napi_env env, napi_callback_info info) {
   return _this;
 }
 
+static napi_value ReturnValueConstructor(napi_env env,
+                                         napi_callback_info info) {
+  size_t argc = 1;
+  napi_value value, receiver, new_target;
+  NAPI_CALL(env, napi_get_cb_info(env, info, &argc, &value, &receiver, NULL));
+  NAPI_CALL(env, napi_get_new_target(env, info, &new_target));
+  NAPI_CALL(env, napi_set_named_property(env, receiver, "nativeConstructor",
+                                         new_target));
+  return argc == 0 ? NULL : value;
+}
+
+static napi_value CreateReturnValueConstructor(napi_env env,
+                                               napi_callback_info info) {
+  napi_value constructor;
+  NAPI_CALL(env, napi_define_class(env, "ReturnValueConstructor",
+                                   NAPI_AUTO_LENGTH, ReturnValueConstructor,
+                                   NULL, 0, NULL, &constructor));
+  return constructor;
+}
+
+static napi_value ConstructWithReturnValue(napi_env env,
+                                           napi_callback_info info) {
+  size_t argc = 2;
+  napi_value args[2], instance;
+  NAPI_CALL(env, napi_get_cb_info(env, info, &argc, args, NULL, NULL));
+  NAPI_ASSERT(env, argc >= 1, "A constructor is required");
+  NAPI_CALL(env,
+            napi_new_instance(env, args[0], argc - 1, args + 1, &instance));
+  return instance;
+}
+
 EXTERN_C_START
 napi_value Init(napi_env env, napi_value exports) {
   napi_value number, cons;
@@ -144,6 +175,10 @@ napi_value Init(napi_env env, napi_value exports) {
        napi_enumerable | napi_static, NULL},
       {"TestDefineClass", NULL, TestDefineClass, NULL, NULL, NULL,
        napi_enumerable | napi_static, NULL},
+      {"createReturnValueConstructor", NULL, CreateReturnValueConstructor, NULL,
+       NULL, NULL, napi_default | napi_static, NULL},
+      {"constructWithReturnValue", NULL, ConstructWithReturnValue, NULL, NULL,
+       NULL, napi_default | napi_static, NULL},
   };
 
   NAPI_CALL(env, napi_define_class(env, "MyObject", NAPI_AUTO_LENGTH, New, NULL,

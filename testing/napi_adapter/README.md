@@ -9,7 +9,7 @@ execute the bundles. See UPSTREAM.md and THIRD-PARTY-NOTICES.md for provenance.
 ## GN builds
 
 These tests are run manually. They are not included in the default test group,
-CI or CQ test scripts. The production adapter implementation is unchanged.
+CI or CQ test scripts.
 
 Prepare the repository's GN dependencies and put Node.js (18.12 or newer), npm
 and pnpm 9.12.0 on PATH. The bundler installs dependencies with the pnpm version
@@ -81,6 +81,12 @@ CMake configuration.
 The harness triggers collection on each backend and checks callback counts
 before destroying its runtime. Receiver mutation, integer conversion boundaries
 and JSC reference/finalizer ordering assertions remain in the suite.
+
+The constructor fixtures also cover callbacks that leave their result unset or
+return a primitive, through both JavaScript `new` and `napi_new_instance`.
+Object and function replacements preserve their identity. The native harness
+checks pending exceptions and the existing JSC/PrimJS legacy return behavior;
+run those focused cases with `--gtest_filter='*ConstructorReturn*'`.
 
 ## Known JSC failures
 
