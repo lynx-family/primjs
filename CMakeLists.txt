@@ -202,6 +202,7 @@ set(quickjs_sources
     ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/quickjs_gc.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/quickjs_version.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/quickjs-libc.cc
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/quickjs-parser-lookahead.h
     ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/quickjs.cc
     ${CMAKE_CURRENT_SOURCE_DIR}/src/interpreter/quickjs/source/quickjs-opt-bytecode.cc
 )

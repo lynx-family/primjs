@@ -83,6 +83,7 @@ extern "C" {
 
 #include "gc/global-handles.h"
 #include "gc/trace-gc.h"
+#include "quickjs-parser-lookahead.h"
 #include "quickjs/include/bignum.h"
 #include "quickjs/include/quickjs-inner.h"
 #include "quickjs/include/quickjs-opt-bytecode.h"
@@ -1076,6 +1077,9 @@ QJS_STATIC LEPUSRuntime *JS_NewRuntime_RC(const LEPUSMallocFunctions *mf,
 
   rt->qjsvaluevalue_allocator = new QJSValueValueSpace(rt);
 
+  rt->parser_lookahead_flags = primjs::ParserLookaheadFlagsFromSettings(
+      settingsFlag & PARSER_ASSIGNMENT_SCAN_ENABLE,
+      settingsFlag & PARSER_WRAPPER_SHORTCUT_ENABLE);
   rt->use_primjs = false;
   rt->mf = *mf;
 #if defined(__aarch64__) && (defined(ANDROID) || defined(__ANDROID__)) && \
@@ -20794,6 +20798,10 @@ typedef struct JSParsePos {
   const uint8_t *utf8_parse_front;
   int utf8_adapte_size;
   int last_utf8_adapte_size;
+  // Column sources for compute_column(). Must match the copy in the other
+  // parser file.
+  const uint8_t *last_ptr;
+  const uint8_t *last_last_ptr;
   // <Primjs end>
 } JSParsePos;
 
@@ -20808,6 +20816,8 @@ int js_parse_get_pos(JSParseState *s, JSParsePos *sp) {
   sp->utf8_adapte_size = s->utf8_adapte_size;
   sp->last_utf8_adapte_size = s->last_utf8_adapte_size;
   sp->utf8_parse_front = s->utf8_parse_front;
+  sp->last_ptr = s->last_ptr;
+  sp->last_last_ptr = s->last_last_ptr;
   // <Primjs end>
   return 0;
 }
@@ -20823,7 +20833,14 @@ __exception int js_parse_seek_token(JSParseState *s, const JSParsePos *sp) {
   s->line_begin_ptr = sp->line_begin_ptr;
   // <Primjs end>
   s->got_lf = sp->got_lf;
-  return next_token(s);
+  int ret = next_token(s);
+  // next_token() only moves last_last_ptr forward, so after a lookahead scan
+  // it would still point at the end of the scanned group and later
+  // identifiers on the same line would report that column. Restore the
+  // values from before the scan.
+  s->last_ptr = sp->last_ptr;
+  s->last_last_ptr = sp->last_last_ptr;
+  return ret;
 }
 
 /* return TRUE if a regexp literal is allowed after this token */
@@ -22752,6 +22769,11 @@ QJS_STATIC __exception int js_parse_postfix_expr(JSParseState *s,
     } break;
     case '(':
       if ((parse_flags & PF_ARROW_FUNC) &&
+          !((s->experimental_lookahead & primjs::kSkipWrappedExpression) &&
+            primjs::StartsWithUnambiguousArrowWrapper(s->token.ptr,
+                                                      s->buf_end)) &&
+          !((s->experimental_lookahead & primjs::kSkipAssignmentScan) &&
+            primjs::CanSkipAssignmentLookahead(s->token.ptr, s->buf_end)) &&
           js_parse_skip_parens_token(s, NULL, TRUE) == TOK_ARROW) {
         if (js_parse_function_decl(s, JS_PARSE_FUNC_ARROW, JS_FUNC_NORMAL,
                                    JS_ATOM_NULL, s->token.ptr,
@@ -22842,7 +22864,9 @@ QJS_STATIC __exception int js_parse_postfix_expr(JSParseState *s,
     case '{':
     case '[': {
       int skip_bits;
-      if (js_parse_skip_parens_token(s, &skip_bits, FALSE) == '=') {
+      if (!((s->experimental_lookahead & primjs::kSkipAssignmentScan) &&
+            primjs::CanSkipAssignmentLookahead(s->token.ptr, s->buf_end)) &&
+          js_parse_skip_parens_token(s, &skip_bits, FALSE) == '=') {
         if (js_parse_destructing_element(
                 s, 0, 0, FALSE, skip_bits & SKIP_HAS_ELLIPSIS, TRUE) < 0)
           return -1;
@@ -31897,6 +31921,7 @@ void js_parse_init(LEPUSContext *ctx, JSParseState *s, const char *input,
   memset(s, 0, sizeof(*s));
   s->ctx = ctx;
   s->filename = filename;
+  s->experimental_lookahead = ctx->rt->parser_lookahead_flags;
   s->line_num = 1 + start_line_number;
   s->buf_ptr = (const uint8_t *)input;
   s->buf_end = s->buf_ptr + input_len;

@@ -558,6 +558,9 @@ struct LEPUSRuntime {
   struct list_head finrec_job_list;
   int finalizer_depth; /* nesting of class finalizers, which must not run JS */
   bool finalizer_js_call_reported;
+  // Appended to keep existing field offsets. primjs::kSkipWrappedExpression
+  // etc., read once when the runtime is created.
+  uint8_t parser_lookahead_flags;
 };
 
 // Temporarily attributes allocations to the Runtime-wide common memory slot.
@@ -1296,6 +1299,12 @@ enum {
   GC_MEMORY_POLICY_LEVEL_BIT1 = 0b10000000000000000000,
   GC_MEMORY_POLICY_LEVEL_BIT2 = 0b100000000000000000000,
   LEPUS_REF_CYCLE_CLEANUP_ENABLE = 0b1000000000000000000000,
+  // Parser lookahead shortcuts in quickjs-parser-lookahead.h. Each bit
+  // enables one shortcut independently.
+  // Byte scan that skips the token lookahead for '(', '[' and '{' groups.
+  PARSER_ASSIGNMENT_SCAN_ENABLE = 0b10000000000000000000000,
+  // Prefix check that skips the lookahead for '(function' and '() =>'.
+  PARSER_WRAPPER_SHORTCUT_ENABLE = 0b100000000000000000000000,
 };
 
 inline int settingsFlag = 0;
@@ -3167,6 +3176,7 @@ typedef struct JSParseState {
   JSFunctionDef *cur_func;
   BOOL is_module; /* parsing a module */
   BOOL allow_html_comments;
+  uint8_t experimental_lookahead;
 } JSParseState;
 #endif
 QJS_HIDE LEPUSValue js_finalizationRegistry_unregister(LEPUSContext *ctx,
