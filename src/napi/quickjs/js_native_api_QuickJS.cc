@@ -2828,6 +2828,19 @@ napi_status napi_get_all_property_names_internal(
   LEPUSValue raw_val = ToJSValue(object);
 
   std::vector<LEPUSValue> values;
+  // GetPrototype returns a borrowed value whose owner a proxy trap in a later
+  // iteration can release, so every visited prototype is owned here.
+  std::vector<LEPUSValue> protos;
+  // Frees the owned values on every return, including exception paths.
+  struct ValuesReleaser {
+    LEPUSContext* ctx;
+    std::vector<LEPUSValue>& values;
+    ~ValuesReleaser() {
+      for (LEPUSValue v : values) {
+        LEPUS_FreeValue(ctx, v);
+      }
+    }
+  } values_releaser{ctx, values}, protos_releaser{ctx, protos};
   uint32_t total_len = 0;
 
   LEPUSValue proto = raw_val;
@@ -2848,14 +2861,13 @@ napi_status napi_get_all_property_names_internal(
 
     if (key_mode == napi_key_include_prototypes) {
       proto = LEPUS_GetPrototype(ctx, proto);
+      CHECK_QJS(env, !LEPUS_IsException(proto));
+      protos.push_back(LEPUS_DupValue(ctx, proto));
     } else {
       proto = LEPUS_NULL;
     }
   }
   LEPUSValue arr = LEPUS_NewArrayWithValue(ctx, total_len, values.data());
-  for (LEPUSValue v : values) {
-    LEPUS_FreeValue(ctx, v);
-  }
   CHECK_QJS(env, !LEPUS_IsException(arr));
   *result = env->ctx->CreateHandle(arr);
   return napi_clear_last_error(env);
@@ -2873,6 +2885,8 @@ napi_status napi_get_all_property_names_internal_gc(
   uint32_t total_len = 0;
 
   LEPUSValue proto = raw_val;
+  // A proxy trap can drop the last reference to the prototype being walked.
+  func_scope.PushHandle(&proto, HANDLE_TYPE_LEPUS_VALUE);
   while (!LEPUS_IsNull(proto)) {
     uint32_t props_length = 0;
     CHECK_QJS(env, LEPUS_GetOwnPropertyNames(ctx, &props, &props_length, proto,
@@ -2890,6 +2904,7 @@ napi_status napi_get_all_property_names_internal_gc(
 
     if (key_mode == napi_key_include_prototypes) {
       proto = LEPUS_GetPrototype(ctx, proto);
+      CHECK_QJS(env, !LEPUS_IsException(proto));
     } else {
       proto = LEPUS_NULL;
     }

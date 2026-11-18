@@ -608,6 +608,64 @@ TEST_P(NAPITest, ObjectWrapTest) {
   EXPECT_TRUE(eval("Test.prototype.testMethod").IsFunction());
 }
 
+TEST_P(NAPITest, AllPropertyNamesKeepsPrototypeTrapException) {
+  if (std::get<0>(GetParam()) == "JSC") {
+    GTEST_SKIP() << "JSObjectGetPrototype cannot report trap exceptions";
+  }
+  HandleScope hscope(env);
+  // A numeric key is converted to a freshly allocated string rather than a
+  // shared atom string, so leak checkers catch keys left unreleased.
+  Value proxy = eval(R"(new Proxy({0: 1}, {
+    getPrototypeOf: function() { throw new Error('trap failed'); },
+  }))");
+  napi_env raw_env = env;
+  napi_value names;
+  EXPECT_EQ(raw_env->napi_get_all_property_names(
+                raw_env, proxy, napi_key_include_prototypes,
+                napi_key_all_properties, napi_key_numbers_to_strings, &names),
+            napi_pending_exception);
+  EXPECT_EQ(env.GetAndClearPendingException()
+                .As<Error>()
+                .Get("message")
+                .ToString()
+                .Utf8Value(),
+            "trap failed");
+}
+
+TEST_P(NAPITest, AllPropertyNamesKeepsPrototypeAliveAcrossTraps) {
+  if (std::get<0>(GetParam()) != "QJS") {
+    GTEST_SKIP() << "Only the QuickJS walk holds prototypes across traps";
+  }
+  HandleScope hscope(env);
+  env.Global()["collectGarbage"] =
+      Function::New(env, [](const CallbackInfo& info) -> Value {
+        LEPUS_RunGC(LEPUS_GetRuntime(napi_get_env_context_quickjs(info.Env())));
+        return info.Env().Undefined();
+      });
+  // The ownKeys trap drops the only reference to the proxy being walked, so
+  // the collection reclaims it unless the walk itself owns or roots it.
+  Value holder = eval(R"((function() {
+    var holder = {a: 1};
+    var ref;
+    Object.setPrototypeOf(holder, new Proxy({}, {
+      ownKeys: function() {
+        Object.setPrototypeOf(holder, null);
+        collectGarbage();
+        if (ref.deref() === undefined) throw new Error('prototype collected');
+        return [];
+      },
+    }));
+    ref = new WeakRef(Object.getPrototypeOf(holder));
+    return holder;
+  })())");
+  napi_env raw_env = env;
+  napi_value names;
+  EXPECT_EQ(raw_env->napi_get_all_property_names(
+                raw_env, holder, napi_key_include_prototypes,
+                napi_key_all_properties, napi_key_numbers_to_strings, &names),
+            napi_ok);
+}
+
 TEST_P(NAPITest, ArrayTest) {
   HandleScope hscope(env);
   eval("x = {1:2, '3':4, 5:'six', 'seven':['eight', 'nine']}");
