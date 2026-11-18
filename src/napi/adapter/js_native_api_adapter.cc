@@ -954,6 +954,13 @@ napi_status napi_set_instance_data_primjs(napi_env env, void* data,
                                           napi_finalize finalize_cb,
                                           void* finalize_hint) {
   CHECK_ENV(env);
+  // Compatibility exception: Node-API overwrites instance data without calling
+  // the old finalizer. Existing embedders can have multiple setters and rely on
+  // finalization of superseded data to release the previous owner's resources.
+  // Keep the shipped backend behavior instead of silently changing ownership
+  // and leaking that data. The "spec_compliant" slot names the adapter entry;
+  // it does not promise Node-API's overwrite/finalizer contract. The legacy
+  // keyed entry has a separate conflict policy and must also remain unchanged.
   return env->napi_set_instance_data_spec_compliant(
       env, kNapiAdapterInstanceDataKey, data, finalize_cb, finalize_hint);
 }
