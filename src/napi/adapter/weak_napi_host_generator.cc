@@ -147,6 +147,8 @@ extern "C" const void* PrimJSGetWeakNodeApiRawPtrHost(void) {
     host->napi_escape_handle_rawptr =
         reinterpret_cast<void*>(napi_escape_handle_primjs);
     host->napi_throw_rawptr = reinterpret_cast<void*>(napi_throw_primjs);
+    host->napi_fatal_exception_rawptr =
+        reinterpret_cast<void*>(napi_fatal_exception_primjs);
     host->napi_throw_error_rawptr =
         reinterpret_cast<void*>(napi_throw_error_primjs);
     host->napi_throw_type_error_rawptr =

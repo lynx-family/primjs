@@ -270,6 +270,16 @@ napi_escape_handle_primjs(napi_env env, napi_escapable_handle_scope scope,
                           napi_value escapee, napi_value* result);
 
 // Error handling
+// Synchronously report on the JavaScript thread through the configured runtime
+// uncaught handler. Normal return means the embedding accepted the exception;
+// the embedding retains its termination policy. A missing handler or recursive
+// report returns napi_generic_failure. Existing or handler-created exceptions
+// remain pending and return napi_pending_exception. Values need not be Errors.
+// The handler must not detach or destroy the environment/engine before
+// returning.
+NAPI_ADAPTER_EXTERN napi_status napi_fatal_exception_primjs(napi_env env,
+                                                            napi_value error);
+
 NAPI_ADAPTER_EXTERN napi_status napi_throw_primjs(napi_env env,
                                                   napi_value error);
 NAPI_ADAPTER_EXTERN napi_status napi_throw_error_primjs(napi_env env,
