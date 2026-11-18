@@ -201,6 +201,146 @@ INSTANTIATE_TEST_SUITE_P(
       return std::get<0>(info.param);
     });
 
+namespace {
+struct ConstructorReturnState {
+  napi_value value;
+  bool throw_error = false;
+};
+
+napi_value ConstructorReturnCallback(napi_env env, napi_callback_info info) {
+  napi_value receiver, new_target;
+  ConstructorReturnState* state = nullptr;
+  CHECK_NAPI(napi_get_cb_info_primjs(env, info, nullptr, nullptr, &receiver,
+                                     reinterpret_cast<void**>(&state)));
+  CHECK_NAPI(napi_get_new_target_primjs(env, info, &new_target));
+  CHECK_NAPI(napi_set_named_property_primjs(env, receiver, "nativeConstructor",
+                                            new_target));
+  if (state->throw_error) {
+    CHECK_NAPI(napi_throw_error_primjs(env, nullptr, "constructor throw"));
+  }
+  return state->value;
+}
+
+std::vector<napi_value> ConstructorReturnValues(napi_env env) {
+  std::vector<napi_value> values(9, nullptr);
+  CHECK_NAPI(napi_get_undefined_primjs(env, &values[1]));
+  CHECK_NAPI(napi_get_null_primjs(env, &values[2]));
+  CHECK_NAPI(napi_get_boolean_primjs(env, false, &values[3]));
+  CHECK_NAPI(napi_create_double_primjs(env, 42, &values[4]));
+  CHECK_NAPI(napi_create_string_utf8_primjs(env, "ignored", NAPI_AUTO_LENGTH,
+                                            &values[5]));
+  CHECK_NAPI(napi_create_symbol_primjs(env, nullptr, &values[6]));
+  CHECK_NAPI(napi_create_object_primjs(env, &values[7]));
+  CHECK_NAPI(napi_create_function_primjs(
+      env, "Replacement", NAPI_AUTO_LENGTH,
+      [](napi_env, napi_callback_info) -> napi_value { return nullptr; },
+      nullptr, &values[8]));
+  return values;
+}
+}  // namespace
+
+TEST_P(NAPITest, ConstructorReturnValues) {
+  env_ = runtime_->Env();
+  Napi::HandleScope scope{Napi::Env(env_)};
+  auto values = ConstructorReturnValues(env_);
+  for (size_t i = 0; i < values.size(); ++i) {
+    SCOPED_TRACE(i);
+    ConstructorReturnState state{values[i]};
+    napi_value constructor, instance;
+    ASSERT_EQ(napi_define_class_primjs(
+                  env_, "ReturnValueConstructor", NAPI_AUTO_LENGTH,
+                  ConstructorReturnCallback, &state, 0, nullptr, &constructor),
+              napi_ok);
+    ASSERT_EQ(
+        napi_new_instance_primjs(env_, constructor, 0, nullptr, &instance),
+        napi_ok);
+    ASSERT_NE(instance, nullptr);
+    bool equal = false;
+    if (i < 7) {
+      bool is_instance = false;
+      CHECK_NAPI(
+          napi_instanceof_primjs(env_, instance, constructor, &is_instance));
+      EXPECT_TRUE(is_instance);
+      napi_value new_target;
+      CHECK_NAPI(napi_get_named_property_primjs(
+          env_, instance, "nativeConstructor", &new_target));
+      CHECK_NAPI(
+          napi_strict_equals_primjs(env_, constructor, new_target, &equal));
+    } else {
+      CHECK_NAPI(napi_strict_equals_primjs(env_, instance, values[i], &equal));
+    }
+    EXPECT_TRUE(equal);
+  }
+}
+
+TEST_P(NAPITest, ConstructorReturnExceptions) {
+  env_ = runtime_->Env();
+  Napi::HandleScope scope{Napi::Env(env_)};
+  napi_value object;
+  CHECK_NAPI(napi_create_object_primjs(env_, &object));
+  for (napi_value value : {napi_value(nullptr), object}) {
+    ConstructorReturnState state{value, true};
+    napi_value constructor, instance;
+    ASSERT_EQ(napi_define_class_primjs(
+                  env_, "ThrowingConstructor", NAPI_AUTO_LENGTH,
+                  ConstructorReturnCallback, &state, 0, nullptr, &constructor),
+              napi_ok);
+    EXPECT_NE(
+        napi_new_instance_primjs(env_, constructor, 0, nullptr, &instance),
+        napi_ok);
+    bool pending = false;
+    CHECK_NAPI(napi_is_exception_pending_primjs(env_, &pending));
+    EXPECT_TRUE(pending);
+    napi_value exception, message;
+    CHECK_NAPI(napi_get_and_clear_last_exception_primjs(env_, &exception));
+    CHECK_NAPI(
+        napi_get_named_property_primjs(env_, exception, "message", &message));
+    char text[64];
+    size_t length;
+    CHECK_NAPI(napi_get_value_string_utf8_primjs(env_, message, text,
+                                                 sizeof(text), &length));
+    EXPECT_STREQ(text, "constructor throw");
+  }
+}
+
+TEST_P(NAPITest, LegacyConstructorReturnValues) {
+  if (GetParam().first != "JSC" && GetParam().first != "QJS") {
+    GTEST_SKIP() << "Checks the existing JSC and PrimJS legacy contracts";
+  }
+  env_ = runtime_->Env();
+  Napi::HandleScope scope{Napi::Env(env_)};
+  auto values = ConstructorReturnValues(env_);
+  for (size_t i = 0; i < values.size(); ++i) {
+    SCOPED_TRACE(i);
+    ConstructorReturnState state{values[i]};
+    napi_class clazz;
+    ASSERT_EQ(
+        env_->napi_define_class(env_, "LegacyReturnValueConstructor",
+                                NAPI_AUTO_LENGTH, ConstructorReturnCallback,
+                                &state, 0, nullptr, nullptr, &clazz),
+        napi_ok);
+    napi_value constructor, instance;
+    CHECK_NAPI(env_->napi_class_get_function(env_, clazz, &constructor));
+    auto status =
+        napi_new_instance_primjs(env_, constructor, 0, nullptr, &instance);
+    CHECK_NAPI(env_->napi_release_class(env_, clazz));
+    ASSERT_EQ(status, napi_ok);
+    if (!values[i]) {
+      if (GetParam().first == "JSC") {
+        EXPECT_EQ(instance, nullptr);
+      } else {
+        napi_valuetype type;
+        CHECK_NAPI(napi_typeof_primjs(env_, instance, &type));
+        EXPECT_EQ(type, napi_undefined);
+      }
+    } else {
+      bool equal = false;
+      CHECK_NAPI(napi_strict_equals_primjs(env_, instance, values[i], &equal));
+      EXPECT_TRUE(equal);
+    }
+  }
+}
+
 #ifndef JS_ENGINE_HARMONY
 
 #ifndef NAPI_ADAPTER_TEST_ROOT
