@@ -40,6 +40,7 @@ unittest_set("quickjs_testset") {
   public_deps = [ "../../../src:quickjs_lib" ]
 
   sources = [
+    "test_allocation_failure_sweep.cc",
     "test_common.cc",
     "test_coverage.cc",
     "test_coverage_perf.cc",
