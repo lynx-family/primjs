@@ -68,6 +68,7 @@ extern "C" {
 #include "gc/collector.h"
 #include "gc/gc_safe_list.h"
 #include "gc/global-handles.h"
+#include "quickjs-parser-lookahead.h"
 #include "quickjs/include/bignum.h"
 #include "quickjs/include/quickjs-inner.h"
 
@@ -744,6 +745,9 @@ LEPUSRuntime *JS_NewRuntime2_GC(const LEPUSMallocFunctions *mf, void *opaque,
   if (!rt) return NULL;
   memset(rt, 0, sizeof(*rt));
   rt->gc_enable = true;
+  rt->parser_lookahead_flags = primjs::ParserLookaheadFlagsFromSettings(
+      settingsFlag & PARSER_ASSIGNMENT_SCAN_ENABLE,
+      settingsFlag & PARSER_WRAPPER_SHORTCUT_ENABLE);
   rt->use_primjs = true;
   rt->mf = *mf;
   if (!rt->mf.lepus_malloc_usable_size) {
@@ -10251,6 +10255,10 @@ typedef struct JSParsePos {
   const uint8_t *utf8_parse_front;
   int utf8_adapte_size;
   int last_utf8_adapte_size;
+  // Column sources for compute_column(). Must match the copy in the other
+  // parser file.
+  const uint8_t *last_ptr;
+  const uint8_t *last_last_ptr;
   // <Primjs end>
 } JSParsePos;
 
@@ -10931,6 +10939,11 @@ static __exception int js_parse_postfix_expr(JSParseState *s, int parse_flags) {
     } break;
     case '(':
       if ((parse_flags & PF_ARROW_FUNC) &&
+          !((s->experimental_lookahead & primjs::kSkipWrappedExpression) &&
+            primjs::StartsWithUnambiguousArrowWrapper(s->token.ptr,
+                                                      s->buf_end)) &&
+          !((s->experimental_lookahead & primjs::kSkipAssignmentScan) &&
+            primjs::CanSkipAssignmentLookahead(s->token.ptr, s->buf_end)) &&
           js_parse_skip_parens_token(s, NULL, TRUE) == TOK_ARROW) {
         if (js_parse_function_decl(s, JS_PARSE_FUNC_ARROW, JS_FUNC_NORMAL,
                                    JS_ATOM_NULL, s->token.ptr,
@@ -11021,7 +11034,9 @@ static __exception int js_parse_postfix_expr(JSParseState *s, int parse_flags) {
     case '{':
     case '[': {
       int skip_bits;
-      if (js_parse_skip_parens_token(s, &skip_bits, FALSE) == '=') {
+      if (!((s->experimental_lookahead & primjs::kSkipAssignmentScan) &&
+            primjs::CanSkipAssignmentLookahead(s->token.ptr, s->buf_end)) &&
+          js_parse_skip_parens_token(s, &skip_bits, FALSE) == '=') {
         if (js_parse_destructing_element_GC(
                 s, 0, 0, FALSE, skip_bits & SKIP_HAS_ELLIPSIS, TRUE) < 0)
           return -1;

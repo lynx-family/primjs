@@ -11,6 +11,7 @@ primjs_source_set("quickjs") {
     "source/libunicode.cc",
     "source/primjs_monitor.cc",
     "source/quickjs-libc.cc",
+    "source/quickjs-parser-lookahead.h",
     "source/quickjs.cc",
     "source/quickjs_gc.cc",
     "source/quickjs_version.cc",
