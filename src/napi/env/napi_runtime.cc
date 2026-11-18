@@ -209,6 +209,7 @@ struct napi_runtime__ {
       : env_(env), conf_(*conf) {}
 
   ~napi_runtime__() {
+    closing_ = true;
     if (worker_) {
       // must stop worker first to prevent data racing
       worker_->Stop();
@@ -244,6 +245,80 @@ struct napi_runtime__ {
     if (conf_.uncaught_handler) {
       conf_.uncaught_handler(env_, exc, conf_.uncaught_ctx);
     }
+  }
+
+  napi_status ReportFatalException(napi_value exc) {
+    // Teardown callbacks cannot dispatch new JavaScript exceptions. Keep this
+    // check separate from the legacy ErrorScope reporting path.
+    if (closing_) {
+      return napi_set_last_error(env_, napi_generic_failure);
+    }
+    bool pending = false;
+    napi_status status = env_->napi_is_exception_pending(env_, &pending);
+    if (status != napi_ok) {
+      return status;
+    }
+    if (pending) {
+      return napi_set_last_error(env_, napi_pending_exception);
+    }
+    if (exc == nullptr) {
+      return napi_set_last_error(env_, napi_invalid_arg);
+    }
+    if (!conf_.uncaught_handler || reporting_fatal_exception_) {
+      // The embedding owns termination policy. Do not silently drop an
+      // explicit report or recursively invoke a failing handler.
+      return napi_set_last_error(env_, napi_generic_failure);
+    }
+
+    struct DispatchGuard {
+      explicit DispatchGuard(bool& active) : active_(active) { active_ = true; }
+      ~DispatchGuard() { active_ = false; }
+      bool& active_;
+    } guard(reporting_fatal_exception_);
+
+    status = [&]() {
+      Napi::HandleScope hscope(env_);
+      Napi::ContextScope cscope(env_);
+
+      // Some backends have stub handle scopes and references only support
+      // objects. Root a private holder so all exception values, including
+      // strings and symbols, survive JavaScript execution and GC in the
+      // handler.
+      napi_value holder;
+      napi_status result = env_->napi_create_object(env_, &holder);
+      if (result != napi_ok) {
+        return result;
+      }
+      napi_property_descriptor property = {"exception",  nullptr, nullptr,
+                                           nullptr,      nullptr, exc,
+                                           napi_default, nullptr};
+      result = env_->napi_define_properties(env_, holder, 1, &property);
+      if (result != napi_ok) {
+        return result;
+      }
+      napi_ref root;
+      result = env_->napi_create_reference(env_, holder, 1, &root);
+      if (result != napi_ok) {
+        return result;
+      }
+
+      auto handler = conf_.uncaught_handler;
+      void* data = conf_.uncaught_ctx;
+      // No ErrorScope here: the supplied error is reported immediately and is
+      // never made pending. A new exception from the handler stays pending.
+      handler(env_, exc, data);
+      result = env_->napi_delete_reference(env_, root);
+      if (result != napi_ok) {
+        return result;
+      }
+      return env_->napi_is_exception_pending(env_, &pending);
+    }();
+
+    if (status == napi_ok && pending) {
+      status = napi_pending_exception;
+    }
+    return status == napi_ok ? napi_clear_last_error(env_)
+                             : napi_set_last_error(env_, status);
   }
 
   template <typename T>
@@ -307,6 +382,8 @@ struct napi_runtime__ {
 
   napi_runtime_configuration__ conf_{};
   std::unordered_set<AutoCloseable*> closeables_;
+  bool closing_{false};
+  bool reporting_fatal_exception_{false};
 };
 
 namespace {
@@ -930,4 +1007,15 @@ void napi_attach_runtime(napi_env env, napi_foreground_handler task_handler,
 void napi_detach_runtime(napi_env env) {
   delete env->rt;
   env->rt = nullptr;
+}
+
+napi_status napi_runtime_report_fatal_exception(napi_env env,
+                                                napi_value error) {
+  if (env == nullptr || env->state == nullptr) {
+    return napi_invalid_arg;
+  }
+  if (env->ctx == nullptr || env->rt == nullptr) {
+    return napi_set_last_error(env, napi_generic_failure);
+  }
+  return env->rt->ReportFatalException(error);
 }
