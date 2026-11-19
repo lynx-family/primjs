@@ -2137,6 +2137,36 @@ TEST_F(CommonQjsTest, FastStringAndArrayBuiltins) {
   if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
 }
 
+TEST_F(CommonQjsTest, JSONStringifyKeepsSmallNonZeroNumbers) {
+  const char* source = R"(
+    const small = [1e-15, -1e-16, 1e-20, 2.5e-16, -3e-300, 1e-320, 5e-324,
+                   -5e-324, 2.2250738585072014e-308, 0.1 + 0.2 - 0.3];
+    for (const value of small) {
+      Assert(JSON.stringify(value) === String(value));
+      Assert(JSON.parse(JSON.stringify(value)) === value);
+    }
+    Assert(JSON.stringify(1e-15) === "1e-15");
+    Assert(JSON.stringify(5e-324) === "5e-324");
+    Assert(JSON.stringify(1.5e-15) === "1.5e-15");
+    Assert(JSON.stringify(0) === "0");
+    Assert(JSON.stringify(-0) === "0");
+
+    Assert(JSON.stringify([1e-320, -0, 1e-20]) === "[1e-320,0,1e-20]");
+    Assert(JSON.stringify({ a: 1e-20, b: -0, c: [2.5e-16] }) ===
+           "{\"a\":1e-20,\"b\":0,\"c\":[2.5e-16]}");
+    Assert(JSON.stringify({ a: 1e-20 }, null, 1) === "{\n \"a\": 1e-20\n}");
+    Assert(JSON.stringify({ a: 1e-20 }, (key, value) => value) ===
+           "{\"a\":1e-20}");
+    Assert(JSON.stringify({ a: 1e-20, b: 1 }, ["a"]) === "{\"a\":1e-20}");
+    Assert(JSON.stringify(new Number(1e-20)) === "1e-20");
+    Assert(JSON.stringify([Object(5e-324)]) === "[5e-324]");
+  )";
+  auto ret = LEPUS_Eval(ctx_, source, strlen(source), "json-small-numbers.js",
+                        LEPUS_EVAL_TYPE_GLOBAL);
+  ASSERT_FALSE(LEPUS_IsException(ret)) << js_get_exception_string(ctx_);
+  if (!ctx_->rt->gc_enable) LEPUS_FreeValue(ctx_, ret);
+}
+
 TEST_F(CommonQjsTest, DenseArraySliceFastPathSemantics) {
   const char* source = R"(
     const source = [0, 1, 2, 3, 4];
