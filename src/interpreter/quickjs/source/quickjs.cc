@@ -33956,6 +33956,11 @@ QJS_STATIC LEPUSValue JS_ReadBigInt(BCReaderState *s) {
 
   if (bc_get_leb128(s, &len)) return LEPUS_EXCEPTION;
   bc_read_trace(s, "len=%" PRId64 "\n", (int64_t)len);
+  if (len == 0) {
+    /* zero case: JS_WriteBigInt writes no payload bytes */
+    bc_read_trace(s, "}\n");
+    return LEPUS_NewBigInt64(s->ctx, 0);
+  }
   p = js_bigint_new(s->ctx, (len - 1) / (JS_LIMB_BITS / 8) + 1);
   if (!p) return LEPUS_EXCEPTION;
   for (i = 0; i < len / (JS_LIMB_BITS / 8); i++) {

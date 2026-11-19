@@ -2949,6 +2949,42 @@ TEST_F(CommonQjsTest, GlobalBindingsRoundTripThroughSnapshots) {
   }
 }
 
+// JS_WriteBigInt encodes 0n with a zero byte length. Both a serialized
+// BigInt value (structuredClone) and a BigInt literal in a serialized
+// function's constant pool must read back as 0n.
+TEST_F(CommonQjsTest, ZeroBigIntRoundTripsThroughSnapshots) {
+  HandleScope scope(ctx_);
+  const char* source = R"(
+    const values = [0n, -0n, 1n, -1n, 42n, -42n, 2n ** 64n, -(2n ** 64n)];
+    for (const value of values) {
+      const copy = structuredClone(value);
+      Assert(typeof copy === 'bigint' && copy === value);
+    }
+    Assert([1n, 0n, 2n].join() === '1,0,2');
+  )";
+  auto bytecode =
+      LEPUS_Eval(ctx_, source, strlen(source), "zero-bigint-snapshot.js",
+                 LEPUS_EVAL_TYPE_GLOBAL | LEPUS_EVAL_FLAG_COMPILE_ONLY);
+  ASSERT_FALSE(LEPUS_IsException(bytecode));
+  scope.PushHandle(&bytecode, HANDLE_TYPE_LEPUS_VALUE);
+  size_t snapshot_size = 0;
+  auto* snapshot = LEPUS_WriteObject(ctx_, &snapshot_size, bytecode,
+                                     LEPUS_WRITE_OBJ_BYTECODE);
+  ASSERT_NE(snapshot, nullptr);
+  scope.PushHandle(&snapshot, HANDLE_TYPE_HEAP_OBJ);
+  auto loaded =
+      LEPUS_ReadObject(ctx_, snapshot, snapshot_size, LEPUS_READ_OBJ_BYTECODE);
+  ASSERT_FALSE(LEPUS_IsException(loaded)) << js_get_exception_string(ctx_);
+  scope.PushHandle(&loaded, HANDLE_TYPE_LEPUS_VALUE);
+  auto ret = LEPUS_EvalFunction(ctx_, loaded, ctx_->global_obj);
+  ASSERT_FALSE(LEPUS_IsException(ret)) << js_get_exception_string(ctx_);
+  if (!ctx_->rt->gc_enable) {
+    LEPUS_FreeValue(ctx_, bytecode);
+    LEPUS_FreeValue(ctx_, ret);
+    lepus_free(ctx_, snapshot);
+  }
+}
+
 TEST_F(CommonQjsTest, GlobalWriteFlagTwoCreatesMissingBinding) {
   LEPUSAtom atom = LEPUS_NewAtom(ctx_, "legacyGlobalWrite");
   HandleScope scope(ctx_);
