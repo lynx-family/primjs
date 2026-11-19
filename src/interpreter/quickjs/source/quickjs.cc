@@ -43781,7 +43781,9 @@ static int make_json_val(LEPUSContext *ctx, LEPUSValue obj,
       }
       double d;
       LEPUS_ToFloat64(ctx, &d, obj);
-      if (unlikely(abs(d) <= 1e-15)) {
+      // Only +0 and -0 take the integer path, which writes "0" for both.
+      // Other values, including subnormals, need their ToString digits.
+      if (unlikely(d == 0)) {
         goto process_int;
       }
       goto process_float;

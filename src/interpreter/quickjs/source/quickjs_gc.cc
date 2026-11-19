@@ -21648,7 +21648,8 @@ static int json_write_primitive_gc(StringBuffer *buffer, LEPUSValueConst value,
         return string_buffer_write8_gc(
             buffer, reinterpret_cast<const uint8_t *>("null"), 4);
       }
-      if (abs(number) <= 1e-15) return json_write_int64_gc(buffer, 0);
+      // ToString(-0) is "0"; every other value keeps its ToString digits.
+      if (number == 0) return json_write_int64_gc(buffer, 0);
       return json_write_number_gc(buffer, number);
     }
     case JSONPrimitiveKind::kInt:
