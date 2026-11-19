@@ -287,6 +287,142 @@ TEST_F(CommonQjsTest, NullishCoalescingEvaluationOrder) {
   if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, ret);
 }
 
+TEST_F(CommonQjsTest, OptionalChainKeepsReferenceForDeleteAndCall) {
+  std::string src = R"js(
+    function check(condition, message) {
+      if (!condition) throw new Error(message);
+    }
+
+    let getterCalls = 0;
+    const o = {
+      get p() { getterCalls++; return 1; },
+      a: 1, b: { c: 2, d: 3 }, e: 4, f: 5,
+    };
+    check(delete o?.p === true && !("p" in o), "delete o?.p");
+    check(getterCalls === 0, "delete must not read the property");
+    check(delete o?.["a"] === true && !("a" in o), "delete o?.[k]");
+    check(delete o?.b.c === true && !("c" in o.b), "delete o?.b.c");
+    check(delete o?.b["d"] === true && !("d" in o.b), "delete o?.b[k]");
+    check(delete (o?.e) === true && !("e" in o), "delete (o?.e)");
+    check(delete o.b?.missing === true, "delete of a missing property");
+
+    // A short-circuited chain deletes nothing and yields true.
+    let keyEvaluated = false;
+    const key = () => { keyEvaluated = true; return "f"; };
+    for (const base of [null, undefined]) {
+      check(delete base?.f === true, "delete base?.f");
+      check(delete base?.[key()] === true, "delete base?.[k]");
+      check(delete base?.f.g === true, "delete base?.f.g");
+      check(delete base?.f[key()] === true, "delete base?.f[k]");
+    }
+    check(!keyEvaluated, "short circuit must skip the key expression");
+    check(o.f === 5, "short circuit must not delete");
+
+    (function () {
+      "use strict";
+      const frozen = Object.freeze({ x: 1, y: 2 });
+      let threw = 0;
+      try { delete frozen?.x; } catch (e) { threw += e instanceof TypeError; }
+      try { delete frozen?.["y"]; } catch (e) { threw += e instanceof TypeError; }
+      check(threw === 2, "strict delete of a non-configurable property");
+    })();
+
+    // A parenthesized optional chain still passes its base as `this`.
+    const receiver = {
+      method() { return this; },
+      tag(strings) { return this; },
+      ctor: function () {},
+    };
+    check((receiver?.method)() === receiver, "(a?.b)()");
+    check((receiver?.["method"])() === receiver, "(a?.[k])()");
+    check((receiver?.tag)`x` === receiver, "(a?.b)`x`");
+    check(receiver?.method() === receiver, "a?.b()");
+    check(receiver?.["method"]() === receiver, "a?.[k]()");
+    check(receiver.method?.() === receiver, "a.b?.()");
+    const none = null;
+    check(none?.method() === undefined, "null?.b()");
+    let threw = false;
+    try { (none?.method)(); } catch (e) { threw = e instanceof TypeError; }
+    check(threw, "(null?.b)() must throw");
+    threw = false;
+    try { (none?.["method"])(); } catch (e) { threw = e instanceof TypeError; }
+    check(threw, "(null?.[k])() must throw");
+
+    // The chain result is still an ordinary value everywhere else.
+    check(receiver?.method === receiver.method, "a?.b value");
+    check(typeof none?.method === "undefined", "typeof null?.b");
+    check(new (receiver?.ctor)() instanceof receiver.ctor, "new (a?.b)()");
+    for (const code of ["o?.e = 1", "o?.e++", "[o?.e] = [1]"]) {
+      threw = false;
+      try { new Function("o", code); } catch (e) { threw = e instanceof SyntaxError; }
+      check(threw, code + " must be a syntax error");
+    }
+  )js";
+  auto ret = LEPUS_Eval(ctx_, src.c_str(), src.size(), "test.js",
+                        LEPUS_EVAL_TYPE_GLOBAL);
+  if (LEPUS_IsException(ret)) {
+    FAIL() << js_get_exception_string(ctx_);
+  }
+  if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, ret);
+}
+
+TEST_F(CommonQjsTest, ForAwaitOverSyncIterableAwaitsValues) {
+  std::string src = R"js(
+    var forAwaitLog = [];
+    var forAwaitFailure;
+    var forAwaitFinished = false;
+    (async () => {
+      function* gen() { yield Promise.resolve(1); yield 2; }
+      for await (const v of gen()) forAwaitLog.push(v);
+      for await (const v of [Promise.resolve(3), 4]) forAwaitLog.push(v);
+      for await (const v of [{ then(resolve) { resolve(5); } }])
+        forAwaitLog.push(v);
+      async function* delegate() { yield* [Promise.resolve(6)]; }
+      for await (const v of delegate()) forAwaitLog.push(v);
+      try {
+        for await (const v of [Promise.reject(new Error("rejected"))])
+          forAwaitLog.push("unreachable");
+      } catch (e) {
+        forAwaitLog.push(e.message);
+      }
+
+      // The async-from-sync iterator settles with the awaited value.
+      const iter = (async function* () {
+        yield* [Promise.resolve(7)];
+      })();
+      const first = await iter.next();
+      forAwaitLog.push(first.value, first.done);
+      forAwaitLog.push((await iter.next()).done);
+    })().then(() => { forAwaitFinished = true; },
+              error => { forAwaitFailure = error; });
+  )js";
+  auto ret = LEPUS_Eval(ctx_, src.c_str(), src.size(), "test.js",
+                        LEPUS_EVAL_TYPE_GLOBAL);
+  if (LEPUS_IsException(ret)) {
+    FAIL() << js_get_exception_string(ctx_);
+  }
+  if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, ret);
+  LEPUSContext* job_ctx;
+  int result;
+  while ((result = LEPUS_ExecutePendingJob(rt_, &job_ctx)) > 0) {
+    LEPUS_RunGC(rt_);
+  }
+  ASSERT_EQ(result, 0);
+  std::string verify = R"js(
+    if (forAwaitFailure !== undefined) throw forAwaitFailure;
+    if (!forAwaitFinished) throw new Error("for await did not finish");
+    const expected = [1, 2, 3, 4, 5, 6, "rejected", 7, false, true];
+    if (JSON.stringify(forAwaitLog) !== JSON.stringify(expected))
+      throw new Error("unexpected values: " + JSON.stringify(forAwaitLog));
+  )js";
+  ret = LEPUS_Eval(ctx_, verify.c_str(), verify.size(), "verify.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  if (LEPUS_IsException(ret)) {
+    FAIL() << js_get_exception_string(ctx_);
+  }
+  if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, ret);
+}
+
 TEST_F(CommonQjsTest, WStringTest) {
   const char* buf = "testWstring";
   uint16_t* wbuf = (uint16_t*)malloc(24);

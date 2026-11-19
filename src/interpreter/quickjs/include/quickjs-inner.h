@@ -2960,6 +2960,7 @@ QJS_HIDE int cpool_add(JSParseState *s, LEPUSValue val);
 QJS_HIDE int emit_push_const(JSParseState *s, LEPUSValueConst val,
                              BOOL as_atom);
 QJS_HIDE void emit_op(JSParseState *s, uint8_t val);
+QJS_HIDE void emit_label_raw(JSParseState *s, int label);
 QJS_HIDE int emit_label(JSParseState *s, int label);
 QJS_HIDE void emit_return(JSParseState *s, BOOL hasval);
 QJS_HIDE int emit_goto(JSParseState *s, int opcode, int label);

@@ -19845,6 +19845,13 @@ QJS_STATIC int new_label(JSParseState *s) {
   return new_label_fd(s->cur_func, -1);
 }
 
+/* don't update the last opcode and don't emit line number info */
+void emit_label_raw(JSParseState *s, int label) {
+  emit_u8(s, OP_label);
+  emit_u32(s, label);
+  s->cur_func->label_slots[label].pos = s->cur_func->byte_code.size;
+}
+
 /* return the label ID offset */
 int emit_label(JSParseState *s, int label) {
   if (label >= 0) {
@@ -22994,6 +23001,22 @@ QJS_STATIC __exception int js_parse_postfix_expr(JSParseState *s,
             fd->byte_code.buf[fd->last_opcode_pos] = OP_get_field2;
             drop_count = 2;
             break;
+          case OP_get_field_opt_chain: {
+            int opt_chain_label, next_label;
+            opt_chain_label =
+                get_u32(fd->byte_code.buf + fd->last_opcode_pos + 1 + 4 + 1);
+            /* keep the object on the stack */
+            fd->byte_code.buf[fd->last_opcode_pos] = OP_get_field2;
+            fd->byte_code.size = fd->last_opcode_pos + 1 + 4;
+            next_label = emit_goto(s, OP_goto, -1);
+            emit_label(s, opt_chain_label);
+            /* need an additional undefined value for the case where the
+               optional field does not exist */
+            emit_op(s, OP_undefined);
+            emit_label(s, next_label);
+            drop_count = 2;
+            opcode = OP_get_field;
+          } break;
           case OP_scope_get_private_field:
             /* keep the object on the stack */
             fd->byte_code.buf[fd->last_opcode_pos] =
@@ -23005,6 +23028,22 @@ QJS_STATIC __exception int js_parse_postfix_expr(JSParseState *s,
             fd->byte_code.buf[fd->last_opcode_pos] = OP_get_array_el2;
             drop_count = 2;
             break;
+          case OP_get_array_el_opt_chain: {
+            int opt_chain_label, next_label;
+            opt_chain_label =
+                get_u32(fd->byte_code.buf + fd->last_opcode_pos + 1 + 1);
+            /* keep the object on the stack */
+            fd->byte_code.buf[fd->last_opcode_pos] = OP_get_array_el2;
+            fd->byte_code.size = fd->last_opcode_pos + 1;
+            next_label = emit_goto(s, OP_goto, -1);
+            emit_label(s, opt_chain_label);
+            /* need an additional undefined value for the case where the
+               optional field does not exist */
+            emit_op(s, OP_undefined);
+            emit_label(s, next_label);
+            drop_count = 2;
+            opcode = OP_get_array_el;
+          } break;
           case OP_scope_get_var: {
             JSAtom name;
             int scope;
@@ -23288,7 +23327,23 @@ QJS_STATIC __exception int js_parse_postfix_expr(JSParseState *s,
       break;
     }
   }
-  if (optional_chaining_label >= 0) emit_label(s, optional_chaining_label);
+  if (optional_chaining_label >= 0) {
+    JSFunctionDef *fd = s->cur_func;
+    int opcode;
+    emit_label_raw(s, optional_chaining_label);
+    /* modify the last opcode so that it is an indicator of an optional
+       chain */
+    opcode = get_prev_opcode(fd);
+    if (opcode == OP_get_field || opcode == OP_get_array_el) {
+      if (opcode == OP_get_field)
+        opcode = OP_get_field_opt_chain;
+      else
+        opcode = OP_get_array_el_opt_chain;
+      fd->byte_code.buf[fd->last_opcode_pos] = opcode;
+    } else {
+      fd->last_opcode_pos = -1;
+    }
+  }
   return 0;
 }
 
@@ -23300,26 +23355,55 @@ QJS_STATIC __exception int js_parse_delete(JSParseState *s) {
   if (next_token(s)) return -1;
   if (js_parse_unary(s, -1)) return -1;
   switch (opcode = get_prev_opcode(fd)) {
-    case OP_get_field: {
+    case OP_get_field:
+    case OP_get_field_opt_chain: {
       LEPUSValue val;
-      int ret;
+      int ret, opt_chain_label, next_label;
 
+      if (opcode == OP_get_field_opt_chain) {
+        opt_chain_label =
+            get_u32(fd->byte_code.buf + fd->last_opcode_pos + 1 + 4 + 1);
+      } else {
+        opt_chain_label = -1;
+      }
       name = get_u32(fd->byte_code.buf + fd->last_opcode_pos + 1);
       fd->byte_code.size = fd->last_opcode_pos;
-      fd->last_opcode_pos = -1;
       val = JS_AtomToValue_RC(s->ctx, name);
       ret = emit_push_const(s, val, 1);
       LEPUS_FreeValue(s->ctx, val);
       LEPUS_FreeAtom(s->ctx, name);
       if (ret) return ret;
-    }
-      goto do_delete;
+      emit_op(s, OP_delete);
+      if (opt_chain_label >= 0) {
+        next_label = emit_goto(s, OP_goto, -1);
+        emit_label(s, opt_chain_label);
+        /* if the optional chain is not taken, return 'true' */
+        emit_op(s, OP_drop);
+        emit_op(s, OP_push_true);
+        emit_label(s, next_label);
+      }
+      fd->last_opcode_pos = -1;
+    } break;
     case OP_get_array_el:
       fd->byte_code.size = fd->last_opcode_pos;
       fd->last_opcode_pos = -1;
-    do_delete:
       emit_op(s, OP_delete);
       break;
+    case OP_get_array_el_opt_chain: {
+      int opt_chain_label, next_label;
+
+      opt_chain_label =
+          get_u32(fd->byte_code.buf + fd->last_opcode_pos + 1 + 1);
+      fd->byte_code.size = fd->last_opcode_pos;
+      emit_op(s, OP_delete);
+      next_label = emit_goto(s, OP_goto, -1);
+      emit_label(s, opt_chain_label);
+      /* if the optional chain is not taken, return 'true' */
+      emit_op(s, OP_drop);
+      emit_op(s, OP_push_true);
+      emit_label(s, next_label);
+      fd->last_opcode_pos = -1;
+    } break;
     case OP_scope_get_var:
       /* 'delete this': this is not a reference */
       name = get_u32(fd->byte_code.buf + fd->last_opcode_pos + 1);
@@ -29083,6 +29167,14 @@ __exception int resolve_variables(LEPUSContext *ctx, JSFunctionDef *s) {
 
       case OP_nop:
         /* remove erased code */
+        break;
+
+      case OP_get_field_opt_chain: /* equivalent to OP_get_field */
+        dbuf_putc(&bc_out, OP_get_field);
+        dbuf_put_u32(&bc_out, get_u32(bc_buf + pos + 1));
+        break;
+      case OP_get_array_el_opt_chain: /* equivalent to OP_get_array_el */
+        dbuf_putc(&bc_out, OP_get_array_el);
         break;
 
       default:
@@ -48368,18 +48460,19 @@ static const LEPUSCFunctionListEntry js_async_function_proto_funcs[] = {
 QJS_STATIC LEPUSValue js_async_from_async_iterator_unwrap(
     LEPUSContext *ctx, LEPUSValueConst this_val, int argc,
     LEPUSValueConst *argv, int magic, LEPUSValue *func_data) {
-  return js_create_iterator_result(ctx, LEPUS_DupValue(ctx, func_data[0]),
-                                   LEPUS_ToBool(ctx, func_data[1]));
+  /* argv[0] is the settled value of the promise wrapping the value returned by
+     the sync iterator */
+  return js_create_iterator_result(ctx, LEPUS_DupValue(ctx, argv[0]),
+                                   LEPUS_ToBool(ctx, func_data[0]));
 }
 
-QJS_STATIC LEPUSValue js_async_from_async_iterator_unwrap_func_create(
-    LEPUSContext *ctx, LEPUSValueConst value, BOOL done) {
-  LEPUSValueConst func_data[2];
+QJS_STATIC LEPUSValue
+js_async_from_async_iterator_unwrap_func_create(LEPUSContext *ctx, BOOL done) {
+  LEPUSValueConst func_data[1];
 
-  func_data[0] = value;
-  func_data[1] = (LEPUSValueConst)LEPUS_NewBool(ctx, done);
-  return LEPUS_NewCFunctionData(ctx, js_async_from_async_iterator_unwrap, 0, 0,
-                                2, func_data);
+  func_data[0] = (LEPUSValueConst)LEPUS_NewBool(ctx, done);
+  return LEPUS_NewCFunctionData(ctx, js_async_from_async_iterator_unwrap, 1, 0,
+                                1, func_data);
 }
 
 /* AsyncIteratorPrototype */
@@ -48518,7 +48611,7 @@ QJS_STATIC LEPUSValue js_async_from_sync_iterator_next(LEPUSContext *ctx,
     }
 
     resolve_reject[0] =
-        js_async_from_async_iterator_unwrap_func_create(ctx, value, done);
+        js_async_from_async_iterator_unwrap_func_create(ctx, done);
     if (LEPUS_IsException(resolve_reject[0])) {
       LEPUS_FreeValue(ctx, value_wrapper_promise);
       goto fail;

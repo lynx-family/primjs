@@ -870,7 +870,6 @@ test/language/expressions/object/method-definition/static-init-await-reference-a
 test/language/expressions/object/method-definition/static-init-await-reference-generator.js:18: SyntaxError: invalid property name
 test/language/expressions/object/method-definition/static-init-await-reference-normal.js:18: SyntaxError: invalid property name
 test/language/expressions/object/object-spread-proxy-get-not-called-on-dontenum-keys.js:37: Test262Error: Expected [1, enumerableString, Symbol(enumerable_symbol)] and [Symbol(enumerable_symbol), enumerableString, 1] to have the same contents. 
-test/language/expressions/optional-chaining/optional-call-preserves-this.js:21: TypeError: cannot read property 'c' of undefined
 test/language/expressions/postfix-decrement/operator-x-postfix-decrement-calls-putvalue-lhs-newvalue--1.js:19: Test262Error: Expected a ReferenceError to be thrown but no exception was thrown at all
 test/language/expressions/postfix-decrement/operator-x-postfix-decrement-calls-putvalue-lhs-newvalue-.js:19: Test262Error: Expected a ReferenceError to be thrown but no exception was thrown at all
 test/language/expressions/postfix-increment/operator-x-postfix-increment-calls-putvalue-lhs-newvalue--1.js:19: Test262Error: Expected a ReferenceError to be thrown but no exception was thrown at all
