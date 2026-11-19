@@ -149,8 +149,7 @@ TEST_F(ParserLookaheadTest, HostSettingsFlagIsReadPerRuntime) {
     g_test_settings_flag = c.settings;
     LEPUSRuntime* rt = LEPUS_NewRuntime();
     LEPUSContext* ctx = LEPUS_NewContext(rt);
-    EXPECT_EQ(rt->parser_lookahead_flags, c.flags)
-        << "settings=" << c.settings;
+    EXPECT_EQ(rt->parser_lookahead_flags, c.flags) << "settings=" << c.settings;
     EXPECT_NE(EvalAndGetStack(ctx, kWrappedIdentifier).find(":2:13"),
               std::string::npos);
     LEPUS_FreeContext(ctx);
