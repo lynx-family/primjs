@@ -59,17 +59,6 @@ test/built-ins/Array/of/proto-from-ctor-realm.js:23: TypeError: $262.createRealm
 test/built-ins/Array/proto-from-ctor-realm-one.js:28: TypeError: $262.createRealm is not a function
 test/built-ins/Array/proto-from-ctor-realm-two.js:28: TypeError: $262.createRealm is not a function
 test/built-ins/Array/proto-from-ctor-realm-zero.js:26: TypeError: $262.createRealm is not a function
-test/built-ins/Array/prototype/at/index-argument-tointeger.js:17: Test262Error: The value of `typeof Array.prototype.at` is expected to be "function" Expected SameValue(«undefined», «function») to be true
-test/built-ins/Array/prototype/at/index-non-numeric-argument-tointeger-invalid.js:17: Test262Error: The value of `typeof Array.prototype.at` is expected to be "function" Expected SameValue(«undefined», «function») to be true
-test/built-ins/Array/prototype/at/index-non-numeric-argument-tointeger.js:17: Test262Error: The value of `typeof Array.prototype.at` is expected to be "function" Expected SameValue(«undefined», «function») to be true
-test/built-ins/Array/prototype/at/length.js:18: Test262Error: The value of `typeof Array.prototype.at` is expected to be "function" Expected SameValue(«undefined», «function») to be true
-test/built-ins/Array/prototype/at/name.js:18: Test262Error: The value of `typeof Array.prototype.at` is expected to be "function" Expected SameValue(«undefined», «function») to be true
-test/built-ins/Array/prototype/at/prop-desc.js:17: Test262Error: The value of `typeof Array.prototype.at` is expected to be "function" Expected SameValue(«undefined», «function») to be true
-test/built-ins/Array/prototype/at/return-abrupt-from-this.js:17: Test262Error: The value of `typeof Array.prototype.at` is expected to be "function" Expected SameValue(«undefined», «function») to be true
-test/built-ins/Array/prototype/at/returns-item-relative-index.js:25: Test262Error: The value of `typeof Array.prototype.at` is expected to be "function" Expected SameValue(«undefined», «function») to be true
-test/built-ins/Array/prototype/at/returns-item.js:25: Test262Error: The value of `typeof Array.prototype.at` is expected to be "function" Expected SameValue(«undefined», «function») to be true
-test/built-ins/Array/prototype/at/returns-undefined-for-holes-in-sparse-arrays.js:25: Test262Error: The value of `typeof Array.prototype.at` is expected to be "function" Expected SameValue(«undefined», «function») to be true
-test/built-ins/Array/prototype/at/returns-undefined-for-out-of-range-index.js:16: Test262Error: The value of `typeof Array.prototype.at` is expected to be "function" Expected SameValue(«undefined», «function») to be true
 test/built-ins/Array/prototype/concat/create-proto-from-ctor-realm-array.js:27: TypeError: $262.createRealm is not a function
 test/built-ins/Array/prototype/concat/create-proto-from-ctor-realm-non-array.js:28: TypeError: $262.createRealm is not a function
 test/built-ins/Array/prototype/filter/create-proto-from-ctor-realm-array.js:28: TypeError: $262.createRealm is not a function
@@ -556,17 +545,6 @@ test/built-ins/ShadowRealm/prototype/importValue/validates-realm-object.js:11: R
 test/built-ins/ShadowRealm/prototype/proto.js:15: ReferenceError: ShadowRealm is not defined
 test/built-ins/SharedArrayBuffer/proto-from-ctor-realm.js:23: TypeError: $262.createRealm is not a function
 test/built-ins/String/proto-from-ctor-realm.js:22: TypeError: $262.createRealm is not a function
-test/built-ins/String/prototype/at/index-argument-tointeger.js:27: Test262Error: Expected SameValue(«undefined», «function») to be true
-test/built-ins/String/prototype/at/index-non-numeric-argument-tointeger-invalid.js:18: Test262Error: Expected SameValue(«undefined», «function») to be true
-test/built-ins/String/prototype/at/index-non-numeric-argument-tointeger.js:14: Test262Error: Expected SameValue(«undefined», «function») to be true
-test/built-ins/String/prototype/at/length.js:19: Test262Error: Expected SameValue(«undefined», «function») to be true
-test/built-ins/String/prototype/at/name.js:19: Test262Error: Expected SameValue(«undefined», «function») to be true
-test/built-ins/String/prototype/at/prop-desc.js:19: Test262Error: Expected SameValue(«undefined», «function») to be true
-test/built-ins/String/prototype/at/return-abrupt-from-this.js:16: Test262Error: Expected SameValue(«undefined», «function») to be true
-test/built-ins/String/prototype/at/returns-code-unit.js:22: Test262Error: Expected SameValue(«undefined», «function») to be true
-test/built-ins/String/prototype/at/returns-item-relative-index.js:22: Test262Error: Expected SameValue(«undefined», «function») to be true
-test/built-ins/String/prototype/at/returns-item.js:22: Test262Error: Expected SameValue(«undefined», «function») to be true
-test/built-ins/String/prototype/at/returns-undefined-for-out-of-range-index.js:13: Test262Error: Expected SameValue(«undefined», «function») to be true
 test/built-ins/String/prototype/localeCompare/15.5.4.9_CE.js:62: Test262Error: String.prototype.localeCompare considers ö (\u006f\u0308) ≠ ö (\u00f6).
 test/built-ins/String/prototype/matchAll/flags-nonglobal-throws.js:19: Test262Error: Expected a TypeError to be thrown but no exception was thrown at all
 test/built-ins/String/prototype/matchAll/flags-undefined-throws.js:21: Test262Error: Expected a TypeError but got a SyntaxError
