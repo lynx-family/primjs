@@ -1,0 +1,10 @@
+// Copyright 2024 The Lynx Authors. All rights reserved.
+// Licensed under the Apache License Version 2.0 that can be found in the
+// LICENSE file in the root directory of this source tree.
+
+// Without this file SwiftPM would treat the whole directory, C++ headers
+// included, as the module and `import PrimJS` would fail.
+module PrimJS {
+  umbrella header "PrimJS.h"
+  export *
+}
