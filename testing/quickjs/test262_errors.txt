@@ -74,36 +74,6 @@ test/built-ins/Array/prototype/concat/create-proto-from-ctor-realm-array.js:27: 
 test/built-ins/Array/prototype/concat/create-proto-from-ctor-realm-non-array.js:28: TypeError: $262.createRealm is not a function
 test/built-ins/Array/prototype/filter/create-proto-from-ctor-realm-array.js:28: TypeError: $262.createRealm is not a function
 test/built-ins/Array/prototype/filter/create-proto-from-ctor-realm-non-array.js:29: TypeError: $262.createRealm is not a function
-test/built-ins/Array/prototype/findLast/array-altered-during-loop.js:27: TypeError: arr.findLast is not a function
-test/built-ins/Array/prototype/findLast/call-with-boolean.js:11: TypeError: cannot read property 'call' of undefined
-test/built-ins/Array/prototype/findLast/length.js:13: TypeError: cannot read property 'length' of undefined
-test/built-ins/Array/prototype/findLast/name.js:17: TypeError: cannot read property 'name' of undefined
-test/built-ins/Array/prototype/findLast/predicate-call-parameters.js:26: TypeError: arr.findLast is not a function
-test/built-ins/Array/prototype/findLast/predicate-call-this-non-strict.js:24: TypeError: [1].findLast is not a function
-test/built-ins/Array/prototype/findLast/predicate-call-this-strict.js:24: strict mode: TypeError: [1].findLast is not a function
-test/built-ins/Array/prototype/findLast/predicate-called-for-each-array-property.js:24: TypeError: arr.findLast is not a function
-test/built-ins/Array/prototype/findLast/predicate-not-called-on-empty-array.js:27: TypeError: [].findLast is not a function
-test/built-ins/Array/prototype/findLast/prop-desc.js:12: Test262Error: `typeof Array.prototype.findLast` is `function` Expected SameValue(«undefined», «function») to be true
-test/built-ins/Array/prototype/findLast/return-abrupt-from-predicate-call.js:21: Test262Error: Expected a Test262Error but got a TypeError
-test/built-ins/Array/prototype/findLast/return-abrupt-from-property.js:27: Test262Error: Expected a Test262Error but got a TypeError
-test/built-ins/Array/prototype/findLast/return-abrupt-from-this-length.js:19: Test262Error: Expected a Test262Error but got a TypeError
-test/built-ins/Array/prototype/findLast/return-found-value-predicate-result-is-true.js:25: TypeError: arr.findLast is not a function
-test/built-ins/Array/prototype/findLast/return-undefined-if-predicate-returns-false-value.js:25: TypeError: arr.findLast is not a function
-test/built-ins/Array/prototype/findLastIndex/array-altered-during-loop.js:27: TypeError: arr.findLastIndex is not a function
-test/built-ins/Array/prototype/findLastIndex/call-with-boolean.js:11: TypeError: cannot read property 'call' of undefined
-test/built-ins/Array/prototype/findLastIndex/length.js:13: TypeError: cannot read property 'length' of undefined
-test/built-ins/Array/prototype/findLastIndex/name.js:17: TypeError: cannot read property 'name' of undefined
-test/built-ins/Array/prototype/findLastIndex/predicate-call-parameters.js:25: TypeError: arr.findLastIndex is not a function
-test/built-ins/Array/prototype/findLastIndex/predicate-call-this-non-strict.js:24: TypeError: [1].findLastIndex is not a function
-test/built-ins/Array/prototype/findLastIndex/predicate-call-this-strict.js:24: strict mode: TypeError: [1].findLastIndex is not a function
-test/built-ins/Array/prototype/findLastIndex/predicate-called-for-each-array-property.js:24: TypeError: arr.findLastIndex is not a function
-test/built-ins/Array/prototype/findLastIndex/predicate-not-called-on-empty-array.js:26: TypeError: [].findLastIndex is not a function
-test/built-ins/Array/prototype/findLastIndex/prop-desc.js:12: Test262Error: `typeof Array.prototype.findLastIndex` is `function` Expected SameValue(«undefined», «function») to be true
-test/built-ins/Array/prototype/findLastIndex/return-abrupt-from-predicate-call.js:21: Test262Error: Expected a Test262Error but got a TypeError
-test/built-ins/Array/prototype/findLastIndex/return-abrupt-from-property.js:25: Test262Error: Expected a Test262Error but got a TypeError
-test/built-ins/Array/prototype/findLastIndex/return-abrupt-from-this-length.js:19: Test262Error: Expected a Test262Error but got a TypeError
-test/built-ins/Array/prototype/findLastIndex/return-index-predicate-result-is-true.js:25: TypeError: arr.findLastIndex is not a function
-test/built-ins/Array/prototype/findLastIndex/return-negative-one-if-predicate-returns-false-value.js:25: TypeError: arr.findLastIndex is not a function
 test/built-ins/Array/prototype/map/create-proto-from-ctor-realm-array.js:28: TypeError: $262.createRealm is not a function
 test/built-ins/Array/prototype/map/create-proto-from-ctor-realm-non-array.js:29: TypeError: $262.createRealm is not a function
 test/built-ins/Array/prototype/slice/create-proto-from-ctor-realm-array.js:28: TypeError: $262.createRealm is not a function
