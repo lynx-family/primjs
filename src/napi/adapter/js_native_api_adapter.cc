@@ -738,6 +738,10 @@ napi_status napi_throw_primjs(napi_env env, napi_value error) {
   return env->napi_throw_(env, error);
 }
 
+napi_status napi_fatal_exception_primjs(napi_env env, napi_value error) {
+  return napi_runtime_report_fatal_exception(env, error);
+}
+
 napi_status napi_throw_error_primjs(napi_env env, const char* code,
                                     const char* msg) {
   CHECK_ENV(env);

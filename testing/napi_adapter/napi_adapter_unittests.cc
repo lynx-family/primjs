@@ -466,3 +466,316 @@ class WeakNodeApiSetup {
 };
 WeakNodeApiSetup weak_node_api_setup;
 }  // namespace
+
+#include "weak_node_api.hpp"
+#ifdef USE_PRIMJS_NAPI
+#include "primjs_napi_defines.h"
+#endif
+
+class FatalExceptionTest : public test::NAPITestBase {
+ public:
+  void SetUp() override { ConfigureHandler(); }
+
+  void TearDown() override {
+    bool pending = false;
+    CHECK_NAPI(napi_is_exception_pending_primjs(env_, &pending));
+    EXPECT_FALSE(pending);
+    if (pending) {
+      napi_value error;
+      CHECK_NAPI(napi_get_and_clear_last_exception_primjs(env_, &error));
+    }
+    // Destroy the runtime while its callback data is still alive.
+    runtime_.reset();
+  }
+
+  void ConfigureHandler(bool enabled = true) {
+    napi_detach_runtime(env_);
+    auto conf = napi_create_runtime_configuration();
+    napi_runtime_config_foreground_handler(conf, test::PostNAPIJSTask,
+                                           &delegate_);
+    if (enabled) {
+      napi_runtime_config_uncaught_handler(
+          conf,
+          [](napi_env env, napi_value error, void* data) {
+            auto* self = static_cast<FatalExceptionTest*>(data);
+            ++self->reports_;
+            bool pending = true;
+            CHECK_NAPI(napi_is_exception_pending_primjs(env, &pending));
+            EXPECT_FALSE(pending);
+            if (self->handler_) self->handler_(error);
+          },
+          this);
+    }
+    napi_attach_runtime_with_configuration(env_, conf);
+    napi_delete_runtime_configuration(conf);
+  }
+
+  napi_value Value(const char* source) {
+    napi_value result = nullptr;
+    // Match the newline-terminated input used by the bundled adapter suites.
+    CHECK_NAPI(eval(std::string(source) + "\n", &result));
+    return result;
+  }
+
+  void ExpectSame(napi_value expected, napi_value actual) {
+    bool same = false;
+    CHECK_NAPI(napi_strict_equals_primjs(env_, expected, actual, &same));
+    EXPECT_TRUE(same);
+  }
+
+  void ExpectStatus(napi_status expected, napi_status actual) {
+    EXPECT_EQ(expected, actual);
+    const napi_extended_error_info* info;
+    CHECK_NAPI(napi_get_last_error_info_primjs(env_, &info));
+    EXPECT_EQ(expected, info->error_code);
+  }
+
+  static void Complete(napi_env env, napi_status status, void* data) {
+    auto* self = static_cast<FatalExceptionTest*>(data);
+    ++self->completions_;
+    self->completion_status_ = status;
+    self->dispatch_status_ = napi_fatal_exception_primjs(env, self->error_);
+  }
+
+  std::shared_ptr<test::TaskDelegate> delegate_ = test::TaskDelegate::Create();
+  std::function<void(napi_value)> handler_;
+  napi_value error_ = nullptr;
+  napi_status dispatch_status_ = napi_generic_failure;
+  napi_status completion_status_ = napi_generic_failure;
+  napi_async_work closing_work_ = nullptr;
+  int reports_ = 0;
+  int completions_ = 0;
+};
+
+INSTANTIATE_TEST_SUITE_P(
+    EngineTest, FatalExceptionTest, ::testing::ValuesIn(test::runtimeFactory),
+    [](const testing::TestParamInfo<FatalExceptionTest::ParamType>& info) {
+      return std::get<0>(info.param);
+    });
+
+TEST_P(FatalExceptionTest, SynchronousValuesSurviveGC) {
+  for (const char* source : {"new Error('fatal')", "undefined", "null", "true",
+                             "42", "'fatal string'", "Symbol('fatal')"}) {
+    napi_value error = Value(source);
+    bool returned = false;
+    handler_ = [&](napi_value actual) {
+      EXPECT_FALSE(returned);
+      Value("Array.from({length: 1000}, () => ({value: 'allocation'}))");
+      runtime_->TriggerGC();
+      ExpectSame(error, actual);
+    };
+    int before = reports_;
+    ExpectStatus(napi_ok, napi_fatal_exception_primjs(env_, error));
+    returned = true;
+    EXPECT_EQ(before + 1, reports_);
+  }
+}
+
+TEST_P(FatalExceptionTest, PendingAndInvalidArguments) {
+  EXPECT_EQ(napi_invalid_arg, napi_fatal_exception_primjs(nullptr, nullptr));
+  napi_env unattached = napi_new_env();
+  EXPECT_EQ(napi_generic_failure,
+            napi_fatal_exception_primjs(unattached, nullptr));
+  napi_free_env(unattached);
+  ExpectStatus(napi_invalid_arg, napi_fatal_exception_primjs(env_, nullptr));
+  napi_value first = Value("new Error('pending')");
+  napi_value second = Value("new Error('fatal')");
+  CHECK_NAPI(napi_throw_primjs(env_, first));
+  ExpectStatus(napi_pending_exception,
+               napi_fatal_exception_primjs(env_, second));
+  ExpectStatus(napi_pending_exception,
+               napi_fatal_exception_primjs(env_, nullptr));
+  EXPECT_EQ(0, reports_);
+  napi_value pending;
+  CHECK_NAPI(napi_get_and_clear_last_exception_primjs(env_, &pending));
+  ExpectSame(first, pending);
+  ExpectStatus(napi_ok, napi_fatal_exception_primjs(env_, second));
+  EXPECT_EQ(1, reports_);
+}
+
+TEST_P(FatalExceptionTest, MissingHandlerOrRuntimeFails) {
+  napi_value error = Value("new Error('fatal')");
+  ConfigureHandler(false);
+  ExpectStatus(napi_generic_failure, napi_fatal_exception_primjs(env_, error));
+  napi_detach_runtime(env_);
+  ExpectStatus(napi_generic_failure, napi_fatal_exception_primjs(env_, error));
+  ConfigureHandler();
+  ExpectStatus(napi_ok, napi_fatal_exception_primjs(env_, error));
+  EXPECT_EQ(1, reports_);
+}
+
+TEST_P(FatalExceptionTest, HandlerExceptionIsPreserved) {
+  napi_value primary = Value("new Error('primary')");
+  napi_value secondary = Value("new Error('secondary')");
+  handler_ = [&](napi_value error) {
+    if (reports_ == 1) {
+      ExpectSame(primary, error);
+      CHECK_NAPI(napi_throw_primjs(env_, secondary));
+    } else {
+      ExpectSame(secondary, error);
+    }
+  };
+  {
+    Napi::ErrorScope scope(env_);
+    ExpectStatus(napi_pending_exception,
+                 napi_fatal_exception_primjs(env_, primary));
+    EXPECT_EQ(1, reports_);
+    napi_value pending;
+    CHECK_NAPI(napi_get_and_clear_last_exception_primjs(env_, &pending));
+    ExpectSame(secondary, pending);
+    CHECK_NAPI(napi_throw_primjs(env_, pending));
+  }
+  // The legacy outer scope reports the secondary error, never the primary
+  // twice.
+  EXPECT_EQ(2, reports_);
+}
+
+TEST_P(FatalExceptionTest, HandlerJavaScriptExceptionIsPreserved) {
+  napi_value primary = Value("new Error('primary')");
+  napi_value secondary = Value("'secondary JavaScript error'");
+  handler_ = [&](napi_value error) {
+    ExpectSame(primary, error);
+    napi_value ignored;
+    EXPECT_NE(napi_ok, eval("throw 'secondary JavaScript error';\n", &ignored));
+    bool pending = false;
+    CHECK_NAPI(napi_is_exception_pending_primjs(env_, &pending));
+    EXPECT_TRUE(pending);
+  };
+  ExpectStatus(napi_pending_exception,
+               napi_fatal_exception_primjs(env_, primary));
+  EXPECT_EQ(1, reports_);
+  napi_value pending;
+  CHECK_NAPI(napi_get_and_clear_last_exception_primjs(env_, &pending));
+  ExpectSame(secondary, pending);
+}
+
+TEST_P(FatalExceptionTest, RecursiveDispatchIsRejectedAndGuardResets) {
+  napi_value error = Value("new Error('fatal')");
+  handler_ = [&](napi_value actual) {
+    ExpectSame(error, actual);
+    ExpectStatus(napi_generic_failure,
+                 napi_fatal_exception_primjs(env_, actual));
+  };
+  ExpectStatus(napi_ok, napi_fatal_exception_primjs(env_, error));
+  ExpectStatus(napi_ok, napi_fatal_exception_primjs(env_, error));
+  EXPECT_EQ(2, reports_);
+}
+
+TEST_P(FatalExceptionTest, LegacyErrorScopeTimingIsUnchanged) {
+  napi_value error = Value("new Error('legacy')");
+  handler_ = [&](napi_value actual) { ExpectSame(error, actual); };
+  {
+    Napi::ErrorScope outer(env_);
+    {
+      Napi::ErrorScope inner(env_);
+      CHECK_NAPI(env_->napi_throw_(env_, error));
+      EXPECT_EQ(0, reports_);
+    }
+    EXPECT_EQ(1, reports_);
+  }
+  EXPECT_EQ(1, reports_);
+  ConfigureHandler(false);
+  {
+    Napi::ErrorScope scope(env_);
+    CHECK_NAPI(env_->napi_throw_(env_, error));
+  }
+  EXPECT_EQ(1, reports_);
+}
+
+TEST_P(FatalExceptionTest, NativeCallbackReportsBeforeReturn) {
+  error_ = Value("new Error('callback')");
+  napi_value callback;
+  CHECK_NAPI(napi_create_function_primjs(
+      env_, "reportFatal", NAPI_AUTO_LENGTH,
+      [](napi_env env, napi_callback_info info) -> napi_value {
+        FatalExceptionTest* self;
+        CHECK_NAPI(napi_get_cb_info_primjs(env, info, nullptr, nullptr, nullptr,
+                                           reinterpret_cast<void**>(&self)));
+        self->dispatch_status_ = napi_fatal_exception_primjs(env, self->error_);
+        EXPECT_EQ(1, self->reports_);
+        return nullptr;
+      },
+      this, &callback));
+  napi_value global;
+  CHECK_NAPI(napi_get_global_primjs(env_, &global));
+  CHECK_NAPI(
+      napi_set_named_property_primjs(env_, global, "reportFatal", callback));
+  {
+    Napi::ErrorScope scope(env_);
+    napi_value caught = Value(
+        "(() => { let caught = false; try { reportFatal(); } "
+        "catch (e) { caught = true; } return caught; })()");
+    bool result = true;
+    CHECK_NAPI(napi_get_value_bool_primjs(env_, caught, &result));
+    EXPECT_FALSE(result);
+    EXPECT_EQ(napi_ok, dispatch_status_);
+  }
+  EXPECT_EQ(1, reports_);
+}
+
+TEST_P(FatalExceptionTest, AsyncWorkAndThreadsafeFunctionReportOnce) {
+  error_ = Value("new Error('async')");
+  napi_value name = Value("'fatal dispatch'");
+  napi_async_work work;
+  CHECK_NAPI(napi_create_async_work_primjs(
+      env_, nullptr, name, [](napi_env, void*) {}, Complete, this, &work));
+  CHECK_NAPI(napi_queue_async_work_primjs(env_, work));
+  EXPECT_EQ(0, reports_);
+  // Pump completion work on the JavaScript thread with a bounded wait.
+  for (int attempt = 0; attempt < 100 && completions_ == 0; ++attempt) {
+    delegate_->ProcessTasks();
+    if (completions_ == 0)
+      std::this_thread::sleep_for(std::chrono::milliseconds(10));
+  }
+  ASSERT_EQ(1, completions_);
+  EXPECT_EQ(napi_ok, completion_status_);
+  EXPECT_EQ(napi_ok, dispatch_status_);
+  EXPECT_EQ(1, reports_);
+  CHECK_NAPI(napi_delete_async_work_primjs(env_, work));
+
+  napi_threadsafe_function tsfn;
+  CHECK_NAPI(napi_create_threadsafe_function_primjs(
+      env_, nullptr, nullptr, name, 0, 1, nullptr, nullptr, this,
+      [](napi_env env, napi_value, void* context, void*) {
+        ASSERT_NE(nullptr, env);
+        auto* self = static_cast<FatalExceptionTest*>(context);
+        self->dispatch_status_ = napi_fatal_exception_primjs(env, self->error_);
+      },
+      &tsfn));
+  CHECK_NAPI(napi_call_threadsafe_function_primjs(tsfn, nullptr,
+                                                  napi_tsfn_nonblocking));
+  CHECK_NAPI(napi_release_threadsafe_function_primjs(tsfn, napi_tsfn_release));
+  delegate_->ProcessTasks();
+  EXPECT_EQ(napi_ok, dispatch_status_);
+  EXPECT_EQ(2, reports_);
+}
+
+TEST_P(FatalExceptionTest, TeardownRejectsExplicitDispatch) {
+  error_ = Value("new Error('teardown')");
+  napi_async_work work;
+  CHECK_NAPI(napi_create_async_work_primjs(
+      env_, nullptr, Value("'cancelled work'"), [](napi_env, void*) {},
+      [](napi_env env, napi_status status, void* data) {
+        auto* self = static_cast<FatalExceptionTest*>(data);
+        Complete(env, status, self);
+        CHECK_NAPI(napi_delete_async_work_primjs(env, self->closing_work_));
+      },
+      this, &work));
+  closing_work_ = work;
+  napi_detach_runtime(env_);
+  EXPECT_EQ(1, completions_);
+  EXPECT_EQ(napi_cancelled, completion_status_);
+  EXPECT_EQ(napi_generic_failure, dispatch_status_);
+  EXPECT_EQ(0, reports_);
+  ConfigureHandler();
+}
+
+TEST_P(FatalExceptionTest, WeakNodeApiDispatchUsesAdapter) {
+  napi_value error = Value("new Error('weak')");
+  handler_ = [&](napi_value actual) { ExpectSame(error, actual); };
+  EXPECT_EQ(static_cast<int>(napi_ok),
+            static_cast<int>(napi_fatal_exception_weak(
+                reinterpret_cast<napi_env_weak>(env_),
+                reinterpret_cast<napi_value_weak>(error))));
+  EXPECT_EQ(1, reports_);
+}

@@ -67,6 +67,11 @@ NAPI_EXTERN void napi_attach_runtime_with_configuration(
 
 NAPI_EXTERN void napi_detach_runtime(napi_env env);
 
+// Internal synchronous entry point used by the C adapter. The caller and the
+// handler must keep the environment and its engine attached until it returns.
+NAPI_EXTERN napi_status napi_runtime_report_fatal_exception(napi_env env,
+                                                            napi_value error);
+
 NAPI_EXTERN napi_status napi_runtime_get_threadsafe_function_context(
     napi_threadsafe_function func, void** result);
 
