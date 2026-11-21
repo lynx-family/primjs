@@ -14,8 +14,10 @@
 
 #include <JavaScriptCore/JavaScript.h>
 
+#include <atomic>
 #include <functional>
 #include <list>
+#include <mutex>
 #include <unordered_map>
 #include <vector>
 
@@ -24,11 +26,6 @@
 #include "js_native_api.h"
 #include "napi_env_jsc.h"
 #include "napi_state.h"
-
-#ifdef NAPI_ENABLE_WASM
-#include <atomic>
-#endif  // NAPI_ENABLE_WASM
-
 #include "quickjs/include/primjs_monitor.h"
 
 #ifdef USE_PRIMJS_NAPI
@@ -42,6 +39,7 @@ class RefTracker {
   RefTracker() {}
   virtual ~RefTracker() {}
   virtual void Finalize(bool isEnvTeardown) {}
+  virtual void FinalizeFromGC() { Finalize(false); }
 
   typedef RefTracker RefList;
 
@@ -105,6 +103,8 @@ struct napi_context__jsc {
   }
 
   ~napi_context__jsc() {
+    // Run queued user callbacks while the context and tracked references exist.
+    DrainFinalizers(true);
 #ifdef NAPI_ENABLE_WASM
     ctx_invalid = true;
 #endif  // NAPI_ENABLE_WASM
@@ -136,6 +136,40 @@ struct napi_context__jsc {
     cb(this->env, data, hint);
   }
 
+  // JSObjectFinalizeCallback may run on a collector thread and must not call
+  // any API that allocates GC objects. Only enqueue native reference records.
+  void EnqueueFinalizer(jscimpl::RefTracker* reference) {
+    std::lock_guard<std::mutex> lock(finalizer_mutex);
+    pending_finalizers.push_back(reference);
+    has_pending_finalizers = true;
+  }
+
+  bool HasPendingFinalizers() const { return has_pending_finalizers; }
+
+  void DrainFinalizers(bool teardown = false) {
+    if (draining_finalizers || (!teardown && last_exception)) return;
+    draining_finalizers = true;
+    std::list<jscimpl::RefTracker*> batch;
+    {
+      std::lock_guard<std::mutex> lock(finalizer_mutex);
+      batch.splice(batch.end(), pending_finalizers);
+    }
+    while (!batch.empty()) {
+      auto* reference = batch.front();
+      batch.pop_front();
+      reference->Finalize(false);
+      if (!teardown && last_exception) break;
+    }
+    {
+      std::lock_guard<std::mutex> lock(finalizer_mutex);
+      // Keep unprocessed callbacks ahead of callbacks queued by reentrant GC.
+      pending_finalizers.splice(pending_finalizers.begin(), batch);
+      has_pending_finalizers = !pending_finalizers.empty();
+    }
+    draining_finalizers = false;
+  }
+
+  unsigned napi_call_depth = 0;
   jscimpl::RefTracker::RefList reflist;
   jscimpl::RefTracker::RefList finalizing_reflist;
 
@@ -146,6 +180,10 @@ struct napi_context__jsc {
   std::unordered_map<uint64_t, void*> instance_data_registry;
 
  private:
+  std::mutex finalizer_mutex;
+  std::list<jscimpl::RefTracker*> pending_finalizers;
+  bool draining_finalizers = false;
+  std::atomic<bool> has_pending_finalizers{false};
   int refs = 1;
 #ifdef NAPI_ENABLE_WASM
   std::atomic<bool> ctx_invalid;
