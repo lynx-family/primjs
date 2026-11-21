@@ -4929,6 +4929,8 @@ redo:
             p->class_id == JS_CLASS_ARGUMENTS) {
           /* Special case deleting the last element of a fast Array */
           if (idx == p->u.array.count - 1) {
+            /* do not keep the deleted element alive through the unused slot */
+            p->u.array.u.values[idx] = LEPUS_UNDEFINED;
             p->u.array.count = idx;
             return TRUE;
           }
@@ -4983,6 +4985,9 @@ int set_array_length_gc(LEPUSContext *ctx, LEPUSObject *p, LEPUSValue val,
   if (likely(p->fast_array)) {
     uint32_t old_len = p->u.array.count;
     if (len < old_len) {
+      /* do not keep the removed elements alive through the unused slots */
+      for (idx = len; idx < old_len; idx++)
+        p->u.array.u.values[idx] = LEPUS_UNDEFINED;
       p->u.array.count = len;
     }
     p->gc_prop[0].u.value = JS_NewUint32(ctx, len);
@@ -16817,11 +16822,12 @@ static LEPUSValue js_array_pop(LEPUSContext *ctx, LEPUSValueConst this_val,
         for (uint32_t i = 0; i < count32 - 1; i++) {
           HeapObjStore(ctx, &arrp[i], arrp[i + 1]);
         }
-        p->u.array.count--;
       } else {
         res = arrp[count32 - 1];
-        p->u.array.count--;
       }
+      /* do not keep the removed element alive through the unused slot */
+      arrp[count32 - 1] = LEPUS_UNDEFINED;
+      p->u.array.count--;
     } else {
       if (shift) {
         res = JS_GetPropertyInt64(ctx, obj, 0);

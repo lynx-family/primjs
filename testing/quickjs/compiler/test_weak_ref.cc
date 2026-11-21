@@ -217,4 +217,43 @@ TEST_F(WeakRefTest, TrigGCCollectsUnreachableCycle) {
   LEPUS_FreeValue(ctx_, result);
 }
 
+TEST_F(WeakRefTest, TrigGCCollectsValuesRemovedFromFastArray) {
+  // A fast array keeps its value buffer when it shrinks. The slots it gives
+  // up must not keep the removed values alive.
+  const char* source = R"(
+    var kept = [[], [], [], [], [], []];
+    var refs = (function() {
+      var popped = {}, shifted = {}, truncated = {}, deleted = {};
+      var spliced = {}, overwritten = {};
+      kept[0].push(popped); kept[0].pop();
+      kept[1].push(shifted); kept[1].shift();
+      kept[2].push({}, truncated); kept[2].length = 1;
+      kept[3].push(deleted); delete kept[3][0];
+      kept[4].push(spliced); kept[4].splice(0);
+      kept[5].push(overwritten); kept[5][0] = {};
+      return [new WeakRef(popped), new WeakRef(shifted),
+              new WeakRef(truncated), new WeakRef(deleted),
+              new WeakRef(spliced), new WeakRef(overwritten)];
+    })();
+  )";
+  LEPUSValue result = LEPUS_Eval(ctx_, source, strlen(source), "test.js",
+                                 LEPUS_EVAL_TYPE_GLOBAL);
+  ASSERT_FALSE(LEPUS_IsException(result));
+  LEPUS_FreeValue(ctx_, result);
+
+  LEPUS_TrigGC(rt_);
+
+  const char* removed[] = {"popped",  "shifted", "truncated",
+                           "deleted", "spliced", "overwritten"};
+  for (int i = 0; i < 6; i++) {
+    SCOPED_TRACE(removed[i]);
+    std::string check = "refs[" + std::to_string(i) + "].deref() === undefined";
+    result = LEPUS_Eval(ctx_, check.c_str(), check.size(), "test.js",
+                        LEPUS_EVAL_TYPE_GLOBAL);
+    ASSERT_FALSE(LEPUS_IsException(result));
+    EXPECT_TRUE(LEPUS_ToBool(ctx_, result));
+    LEPUS_FreeValue(ctx_, result);
+  }
+}
+
 }  // namespace weak_ref_test
