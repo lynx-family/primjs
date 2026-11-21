@@ -385,7 +385,8 @@ class Reference : public RefBase {
 
   inline uint32_t Ref() {
     uint32_t refcount = RefBase::Ref();
-    if (refcount == 1) {
+    // A collected target stays empty even if its native reference is retained.
+    if (refcount == 1 && !_persistent.IsEmpty()) {
       _persistent.ClearWeak();
     }
     return refcount;
@@ -396,7 +397,7 @@ class Reference : public RefBase {
   inline uint32_t Unref() {
     uint32_t old_refcount = RefCount();
     uint32_t refcount = RefBase::Unref();
-    if (old_refcount == 1 && refcount == 0) {
+    if (old_refcount == 1 && refcount == 0 && !_persistent.IsEmpty()) {
       _persistent.SetWeak(this, FinalizeCallback);
     }
     return refcount;
