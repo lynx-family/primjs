@@ -155,3 +155,8 @@ Due to the PrimJs Template interpreter using the x0 and x1 registers to cache th
   
 
  It is important to note that when both the stack top and second-to-top are already cached, pushing another value onto the stack requires a spill. This means the original second-to-top is pushed onto the operand stack, the original stack top moves to the second-to-top in the x0 register, and the pushed value is placed in x1 as the new stack top.  
+
+## Regenerating Bytecode Handlers
+
+Pre-generated AArch64 handler assembly files (`src/interpreter/primjs/interp/{android,ios,mac}/embedded*.S`) are committed directly to the repository. For instructions on building the patched LLVM toolchain (`src/interpreter/primjs/interp/llvm.diff`) and running `update_handlers.sh` when bytecode or object layouts change, see [Regenerating PrimJS Bytecode Handlers](./regenerate_bytecode_handlers.md).
+

@@ -34,7 +34,9 @@ to get wrong.
   `quickjs.cc`. The handlers are generated from
   `src/interpreter/primjs/codegen/` and bake in struct field offsets (see
   `codegen/accessBuilder.h`), so regenerate the files after changing bytecode
-  semantics or those structs.
+  semantics or those structs. See `docs/regenerate_bytecode_handlers.md` for the
+  pinned LLVM commit and `src/interpreter/primjs/interp/llvm.diff` patch
+  required by `update_handlers.sh`.
 
 ## Docs
 
@@ -42,6 +44,7 @@ Read the matching document before changing that area:
 
 - `docs/gc.md`: `src/gc/` and memory management.
 - `docs/template_interpreter.md`: interpreter dispatch and the snapshot.
+- `docs/regenerate_bytecode_handlers.md`: regenerating `embedded*.S` with LLVM.
 - `docs/debugger.md`: `src/inspector/` and the Chrome DevTools Protocol.
 - `docs/wasm.md`: WebAssembly support.
 - `docs/unsupported_sepcifications.md`: ECMAScript features PrimJS does not

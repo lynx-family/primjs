@@ -62,6 +62,9 @@ ninja -C out/Default -j32 qjs_exe
 ### Release Build
 For a release build, set the `is_debug = false` argument during configuration.
 
+### Regenerating Bytecode Handlers
+Pre-generated template interpreter assembly files (`embedded*.S`) are included in the repository, so building LLVM is not required for normal builds. If you modify bytecode semantics, `src/interpreter/primjs/codegen/`, or runtime struct layouts, follow [Regenerating PrimJS Bytecode Handlers](./docs/regenerate_bytecode_handlers.md) to build the patched LLVM toolchain and update `embedded*.S`.
+
 ### Running PrimJS
 The primary binary is `qjs`, located at `out/Default/qjs`. Use it to run JavaScript files:
 

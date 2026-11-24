@@ -45,8 +45,8 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd -P)"
 # Check whether the LLVM path argument is provided.
 if [ $# -eq 0 ]; then
     echo "Usage: $0 <llvm_path>"
-    echo "Example: $0 /Users/Documents/worktree/llvm-project/"
-    echo "Default path example: $0 /Users/Documents/worktree/llvm-project/"
+    echo "Example: $0 /path/to/llvm-project"
+    echo "See docs/regenerate_bytecode_handlers.md for the pinned LLVM commit and patch (src/interpreter/primjs/interp/llvm.diff)."
     exit 1
 fi
 
