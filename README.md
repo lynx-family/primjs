@@ -20,7 +20,7 @@ PrimJS is a lightweight, high-performance JavaScript engine designed specificall
 - **[WebAssembly Support](./docs/wasm.md):** Initial WebAssembly support for module loading, instantiation, and basic JavaScript-to-WASM interoperability.
 
 ## Performance
-For detailed performance benchmarks, please refer to [performance comparison document](./docs/benchmark.md). The benchmark results show that PrimJS outperforms QuickJS by approximately 28% in overall score (3735 vs 2904) on the Octane Benchmark suite.
+For detailed performance benchmarks, please refer to [performance comparison document](./docs/benchmark.md). On the Octane Benchmark suite, PrimJS outperforms QuickJS by approximately 56% in overall score (10326 vs 6630) and matches V8 in JIT-less mode (10326 vs 10296).
 We are continuously working on performance optimizations.
 
 ## Quick Start
