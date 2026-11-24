@@ -1,95 +1,67 @@
 # WebAssembly Support
 
-PrimJS provides initial WebAssembly support through an interoperability layer
-that bridges JavaScript engines with WASM runtimes.
+PrimJS provides WebAssembly support by binding JavaScript engines directly to
+the standard WebAssembly C API (`wasm.h`).
 
-The current implementation focuses on practical module loading, instantiation,
-and JavaScript-to-WASM interoperability. It is not a complete implementation
-of the WebAssembly JavaScript API.
+The implementation focuses on a lean, production-focused JS-to-Wasm binding
+covering module loading, instantiation, function/memory/table interop, and
+deterministic resource reclamation when a JavaScript context exits.
 
 ## Architecture
-
-The WASM implementation follows a layered architecture:
 
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                    WebAssembly API                       │
-│  (Module, Instance, Memory, Table, Global, Function)    │
+│         (Module, Instance, Memory, Table, ...)          │
 └─────────────────────────────────────────────────────────┘
                            │
-┌─────────────────────────────────────────────────────────┐
-│                    InteropRuntime                        │
-│           (Manages JS Env + WASM Runtime)               │
+┌──────────────────────────┴──────────────────────────────┐
+│                 Direct wasm.h Bindings                   │
+│            (qjs/ for QuickJS, jsc/ for JSC)             │
+└──────────────────────────┬──────────────────────────────┘
+                           │
+┌──────────────────────────┴──────────────────────────────┐
+│             WasmStoreOwner + C API Dispatch             │
+│   (wasm_store_owner.h, wasm_c_api_dispatch.{h,cc})      │
+└──────────────────────────┬──────────────────────────────┘
+                           │
+┌──────────────────────────┴──────────────────────────────┐
+│                Prism / wasm.h Runtime                   │
 └─────────────────────────────────────────────────────────┘
-          │                              │
-┌─────────────────────┐      ┌──────────────────────────┐
-│    JS Environment   │      │      WASM Runtime        │
-│  ┌───────┐ ┌───────┐│      │  ┌───────┐ ┌───────────┐│
-│  │ QJSEnv│ │JSCEnv ││      │  │Wasm3  │ │  Prism    ││
-│  └───────┘ └───────┘│      │  │Runtime│ │  Runtime  ││
-└─────────────────────┘      │  └───────┘ └───────────┘│
-                             └──────────────────────────┘
 ```
 
 ### Key Components
 
 | Component | Location | Description |
 |-----------|----------|-------------|
-| `InteropRuntime` | `common/interop_runtime.h` | Bridges JS environment and WASM runtime |
-| `QJSWasm*` | `qjs/` | QuickJS bindings for WASM objects |
-| `JSCWasm*` | `jsc/` | JavaScriptCore bindings (iOS/macOS) |
-| `Wasm3Runtime` | `runtime/wasm3/` | wasm3-based WASM runtime |
-| `PrismRuntime` | `runtime/prism/` | Prism runtime integration code |
-
-### WASM Runtimes
-
-- **WASM3**: Based on the open-source wasm3 engine.
-- **Prism**: Custom WASM runtime with additional optimizations. **Note**: Prism is not open-sourced; only a stub implementation (`prism_dummy.cc`) is provided for build compatibility and cannot execute WASM.
+| `WasmStoreOwner` | `common/wasm_store_owner.h` | Owns the `wasm_engine_t` / `wasm_store_t` and tracks live handles for unified context-exit cleanup |
+| `wasm_c_api_dispatch` | `common/wasm_c_api_dispatch.{h,cc}` | Direct or dynamically bound `wasm.h` C API table |
+| `QJSWasm*` | `qjs/` | QuickJS WebAssembly bindings (RC and Tracing GC) |
+| `JSCWasm*` | `jsc/` | JavaScriptCore WebAssembly bindings (iOS/macOS) |
+| `prism_dummy.cc` | `prism/prism_dummy.cc` | Linkable `wasm_c_api.h` stub when Prism is not linked |
 
 ## Supported Features
 
 ### Available Today
 
-PrimJS currently supports the following core flows:
-
-- Binary module construction via `WebAssembly.Module`
+- Binary and base64 module construction via `WebAssembly.Module` (`{encode: "base64"}` and `WebAssembly.Module.supportBase64`)
 - Module instantiation via `WebAssembly.Instance`
-- Calling exported WASM functions from JavaScript
-- Basic interop with `WebAssembly.Memory`, `WebAssembly.Table`, and
-  `WebAssembly.Global`
-- Support function, memory, table, and global imports during instantiation
+- Calling exported Wasm functions from JavaScript (including `i64` BigInt and multi-value returns)
+- Interoperability with `WebAssembly.Memory` and `WebAssembly.Table` (`funcref`/`anyfunc`)
+- Function, memory, table, and immutable numeric (`i32`, `i64`, `f32`, `f64`) global imports during instantiation, plus `{value}` snapshots for exported globals
+- Deterministic reclamation of Wasm stores, instances, modules, and linear memory buffers on context exit
+
+> Note: Promise-based static helpers (`WebAssembly.compile`, `WebAssembly.instantiate`, and `WebAssembly.validate`), `WebAssembly.Global` / `WebAssembly.Function` constructors, and `WebAssembly.Module.{imports,exports,customSections}` are intentionally omitted to keep the built-in JS binding minimal.
 
 ### API Coverage
 
 | API | Coverage | Notes |
 |-----|----------|-------|
-| **WebAssembly.Module** | ✅ Basic support | Supports constructor-based creation from binary inputs |
-| **WebAssembly.Instance** | ✅ Basic support | Supports instantiation with imports |
-| **WebAssembly.Memory** | ✅ Basic support | Supports `buffer` and `grow()` |
-| **WebAssembly.Table** | ⚠️ Partial support | Supports core table operations, with some advanced behaviors still evolving |
-| **WebAssembly.Global** | ✅ Basic support | Supports basic creation and value access |
-| **WebAssembly.Function** | ⚠️ Partial support | Exported WASM functions are callable from JS, but full constructor-style support is not available |
-
-### Support Scope
-
-The current implementation is mainly centered around:
-
-- `new WebAssembly.Module(...)`
-- `new WebAssembly.Instance(...)`
-
-At this stage, PrimJS provides usable support for common module loading,
-instantiation, and basic interoperability scenarios. However, it does not yet
-cover the complete WebAssembly JavaScript API surface.
-
-In particular:
-
-- Some static APIs on `WebAssembly`, such as `compile`, `instantiate`,
-  `validate`, and streaming variants, are not currently exposed in the
-  open-source implementation
-- Some reflection and advanced API behaviors are still partial; for example,
-  APIs such as `WebAssembly.Module.imports(...)` and
-  `WebAssembly.Module.customSections(...)` are not fully available
-
+| **WebAssembly.Module** | Basic support | Supports constructor-based creation from binary or base64 inputs (`supportBase64`) |
+| **WebAssembly.Instance** | Basic support | Supports instantiation with function, memory, table, and immutable numeric global imports; exported globals expose `{value}` |
+| **WebAssembly.Memory** | Basic support | Supports `buffer` and `grow()` |
+| **WebAssembly.Table** | Partial support | Supports `funcref`/`anyfunc` table `get`, `set`, `grow`, and `length`. When a long-lived `Table` is imported across multiple instantiations, each instance's JS import closures remain retained until that `Table` (or the context) is released |
+| **Exported Functions** | Basic support | Exported Wasm functions are callable from JS with `i32`, `i64` (`BigInt`), `f32`, `f64`, and multi-value returns |
 
 ## Building and Running
 
@@ -106,32 +78,22 @@ The executable will be at `out/default/qjs-cli`.
 Create a JavaScript file `test_wasm.js`:
 
 ```javascript
-// Simple WASM module that exports an add function
-// Equivalent WAT:
-// (module
-//   (func $add (param i32 i32) (result i32)
-//     local.get 0
-//     local.get 1
-//     i32.add)
-//   (export "add" (func $add)))
-
 const wasmBytes = new Uint8Array([
-  0x00, 0x61, 0x73, 0x6d,  // magic number
-  0x01, 0x00, 0x00, 0x00,  // version
-  0x01, 0x07, 0x01, 0x60, 0x02, 0x7f, 0x7f, 0x01, 0x7f,  // type section
-  0x03, 0x02, 0x01, 0x00,  // function section
-  0x07, 0x07, 0x01, 0x03, 0x61, 0x64, 0x64, 0x00, 0x00,  // export section
-  0x0a, 0x09, 0x01, 0x07, 0x00, 0x20, 0x00, 0x20, 0x01, 0x6a, 0x0b  // code section
+  0x00, 0x61, 0x73, 0x6d,
+  0x01, 0x00, 0x00, 0x00,
+  0x01, 0x07, 0x01, 0x60, 0x02, 0x7f, 0x7f, 0x01, 0x7f,
+  0x03, 0x02, 0x01, 0x00,
+  0x07, 0x07, 0x01, 0x03, 0x61, 0x64, 0x64, 0x00, 0x00,
+  0x0a, 0x09, 0x01, 0x07, 0x00, 0x20, 0x00, 0x20, 0x01, 0x6a, 0x0b
 ]);
 
 const module = new WebAssembly.Module(wasmBytes);
 const instance = new WebAssembly.Instance(module);
 
-// Call exported function
 console.log(instance.exports.add(1, 2));  // Returns 3
 ```
 
-Run with qjs-cli:
+Run with `qjs-cli` (when linked with a `wasm.h` engine):
 
 ```bash
 ./out/default/qjs-cli test_wasm.js

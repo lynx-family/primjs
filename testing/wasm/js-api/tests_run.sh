@@ -28,7 +28,7 @@ EOF
 cli_bin=qjs-cli
 abort_fail=false
 show_logging=false
-wasm_engine=wasm3
+wasm_engine=prism
 function options_parse() {
   while test $# -gt 0; do
     case "$1" in

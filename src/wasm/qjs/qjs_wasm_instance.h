@@ -5,45 +5,32 @@
 #ifndef SRC_WASM_QJS_QJS_WASM_INSTANCE_H_
 #define SRC_WASM_QJS_QJS_WASM_INSTANCE_H_
 
-#include "common/one_of.h"
-#include "quickjs/include/quickjs-inner.h"
+#include "common/wasm_store_owner.h"
+#include "qjs/qjs_ext_api.h"
 
-namespace primjs {
-class InteropRuntime;
+namespace primjs::qjs {
 
-namespace wasm {
-class Wasm3Instance;
-class PrismInstance;
-}  // namespace wasm
-
-using WasmInstanceRef = OneOf<wasm::Wasm3Instance*, wasm::PrismInstance*>;
-
-namespace qjs {
-class QJSWasmInstance {
+class QJSWasmInstance : public QJSWasmWrapperBase {
  public:
-  QJSWasmInstance(WasmInstanceRef instance, InteropRuntime* interop);
+  QJSWasmInstance(LEPUSRuntime* rt, LEPUSValue wasm_root,
+                  wasm::WasmStoreOwner* store_owner, wasm_instance_t* instance);
   ~QJSWasmInstance();
 
-  static LEPUSValue CreateConstructor(LEPUSContext* ctx, LEPUSValue wasm_root);
+  static LEPUSClassID class_id() {
+    return GetWasmClassId(WasmQJSClass::kInstance);
+  }
 
+  static bool Register(LEPUSContext* ctx, LEPUSValue wasm_root);
   static LEPUSValue CallAsConstructor(LEPUSContext* ctx,
                                       LEPUSValueConst new_target, int argc,
                                       LEPUSValueConst* argv);
 
-  static void Finalize(LEPUSRuntime* rt, LEPUSValue obj);
-  static LEPUSClassID class_id() {
-    static LEPUSClassID class_id = LEPUS_NewClassID(&class_id);
-    return class_id;
-  }
-
  private:
-  // instance may always exists because of exported values
-  BORROWER WasmInstanceRef instance_;
+  static void DetachInstance(QJSWasmWrapperBase* base, LEPUSRuntime* rt);
 
-  BORROWER InteropRuntime* interop_runtime_;
+  wasm_instance_t* instance_ = nullptr;
 };
 
-}  // namespace qjs
-}  // namespace primjs
+}  // namespace primjs::qjs
 
 #endif  // SRC_WASM_QJS_QJS_WASM_INSTANCE_H_

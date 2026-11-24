@@ -4,33 +4,41 @@
 
 #include "jsc/jsc_wasm_memory.h"
 
-#include <JavaScriptCore/JavaScriptCore.h>
-
 #include <cmath>
 #include <limits>
 
-#include "common/interop_runtime.h"
-#include "common/js_type.h"
 #include "common/messages.h"
-#include "common/wasm_type.h"
 #include "common/wasm_utils.h"
+#include "jsc/js_env_jsc.h"
 #include "jsc/jsc_builtin_objects.h"
 #include "jsc/jsc_class_creator.h"
 #include "jsc/jsc_ext_api.h"
 
 namespace primjs::jsc {
 
+namespace {
+void ReleaseJSCBufferMemory(void* bytes, void* context) {
+  (void)bytes;
+  if (!context) return;
+  auto* keep = static_cast<wasm::WasmBufferKeep*>(context);
+  keep->DropOnce();
+  delete keep;
+}
+}  // namespace
+
 JSClassRef JSCWasmMemory::class_ref() {
-  static JSClassRef class_ref = JSCWasmMemory::InitClassRef();
-  return class_ref;
+  static JSClassRef ref = InitClassRef();
+  return ref;
 }
+
 JSClassRef JSCWasmMemory::prototype_class_ref() {
-  static JSClassRef prototype_class_ref = JSCWasmMemory::InitProtoClassRef();
-  return prototype_class_ref;
+  static JSClassRef ref = InitProtoClassRef();
+  return ref;
 }
+
 JSClassRef JSCWasmMemory::constructor_class_ref() {
-  static JSClassRef constructor_class_ref = JSCWasmMemory::InitCtorClassRef();
-  return constructor_class_ref;
+  static JSClassRef ref = InitCtorClassRef();
+  return ref;
 }
 
 JSClassRef JSCWasmMemory::InitClassRef() {
@@ -41,19 +49,17 @@ JSClassRef JSCWasmMemory::InitClassRef() {
 
 JSClassRef JSCWasmMemory::InitProtoClassRef() {
   JSClassDefinition def =
-      JSClassCreator::GetClassDefinition("Memory.Prototype", NULL);
-
-  JSPropertyAttributes default_attr = JSClassCreator::DefaultAttr();
-
-  JSStaticFunction static_funcs[] = {{"grow", GrowCallback, default_attr},
-                                     {0, 0, 0}};
+      JSClassCreator::GetClassDefinition("Memory.Prototype", nullptr);
+  const JSPropertyAttributes default_attr = JSClassCreator::DefaultAttr();
+  static const JSStaticFunction static_funcs[] = {
+      {"grow", GrowCallback, default_attr}, {nullptr, nullptr, 0}};
   def.staticFunctions = static_funcs;
   return JSClassCreate(&def);
 }
 
 JSClassRef JSCWasmMemory::InitCtorClassRef() {
   JSClassDefinition def = JSClassCreator::GetClassDefinition(
-      "WebAssembly.Memory", NULL, CallAsConstructor);
+      "WebAssembly.Memory", nullptr, CallAsConstructor);
   return JSClassCreate(&def);
 }
 
@@ -63,267 +69,317 @@ void JSCWasmMemory::ReleaseClassRef() {
   JSClassRelease(class_ref());
 }
 
-JSCWasmMemory::JSCWasmMemory(WasmMemoryRef memory, size_t pages,
-                             InteropRuntime* interop)
-    : memory_(std::move(memory)), pages_(pages), buffer_(nullptr) {
-  interop_runtime_ = interop;
-  InteropRuntime::IncreaseRefCount(interop_runtime_);
+JSCWasmMemory::JSCWasmMemory(JSCEnv* env, wasm_memory_t* memory,
+                             uint32_t maximum, JSObjectRef js_obj)
+    : store_owner_(env->store_owner()),
+      memory_(memory),
+      maximum_(maximum),
+      pages_(memory ? (wasm_memory_data_size(memory) / kWasmPageSize) : 0),
+      js_obj_(js_obj) {
+  wasm::WasmStoreOwner::Retain(store_owner_);
+  store_owner_->LinkHandle(&tracked_, this, DetachOnExit);
+  wasm_memory_set_host_info(memory_, this);
 }
 
 JSCWasmMemory::~JSCWasmMemory() {
-  WLOGD("Running JSCWasmMemory::%s...", __func__);
-  if (memory_.is<Wasm3Memory*>()) {
-    delete memory_.get<Wasm3Memory*>();
-  } else {
-    delete memory_.get<PrismMemory*>();
+  if (buffer_ && store_owner_) {
+    if (JSCEnv* env = store_owner_->active_jsc_env()) {
+      env->UnprotectWasmMemoryBufferLater(buffer_);
+    }
   }
-  InteropRuntime::DecreaseRefCount(interop_runtime_);
+  if (store_owner_) {
+    store_owner_->UnlinkHandle(&tracked_);
+  }
+  DetachWasmMemory();
 }
 
-// static
+void JSCWasmMemory::DetachWasmMemory() {
+  if (memory_) {
+    if (Of(memory_) == this) {
+      wasm_memory_set_host_info(memory_, nullptr);
+    }
+    wasm_memory_delete(memory_);
+    memory_ = nullptr;
+  }
+  wasm::WasmStoreOwner::Release(store_owner_);
+}
+
+void JSCWasmMemory::DetachOnExit(wasm::WasmTrackedHandle* handle,
+                                 void* exit_ctx) {
+  (void)exit_ctx;
+  auto* self = static_cast<JSCWasmMemory*>(handle->owner_object);
+  self->buffer_ = nullptr;
+  self->DetachWasmMemory();
+}
+
 void JSCWasmMemory::Finalize(JSObjectRef object) {
-  WLOGD("Running JSCWasmMemory::%s...", __func__);
-  auto memory = static_cast<JSCWasmMemory*>(JSObjectGetPrivate(object));
-  delete memory;
+  auto* mem = static_cast<JSCWasmMemory*>(JSObjectGetPrivate(object));
+  delete mem;
 }
 
-// static
 JSObjectRef JSCWasmMemory::CreatePrototype(JSContextRef ctx,
                                            JSValueRef* exception) {
-  JSObjectRef prototype = JSObjectMake(ctx, prototype_class_ref(), NULL);
-
+  JSObjectRef prototype = JSObjectMake(ctx, prototype_class_ref(), nullptr);
   PropertyDescriptor instance_values[] = {
-      {"buffer", GetBufferCallback, 0, PropertyAttributes::None},
-      {0, 0, 0, PropertyAttributes::None}};
+      {"buffer", GetBufferCallback, nullptr, PropertyAttributes::None},
+      {nullptr, nullptr, nullptr, PropertyAttributes::None}};
   DefineProperties(ctx, prototype, instance_values, exception);
-
   return prototype;
 }
 
-// static
-JSObjectRef JSCWasmMemory::CreateConstructor(JSContextRef ctx,
-                                             InteropRuntime* interop,
+JSObjectRef JSCWasmMemory::CreateConstructor(JSContextRef ctx, JSCEnv* env,
                                              JSValueRef* exception) {
-  JSObjectRef ctor = JSObjectMake(ctx, constructor_class_ref(), interop);
-
+  JSObjectRef ctor = JSObjectMake(ctx, constructor_class_ref(), env);
   JSObjectRef prototype = CreatePrototype(ctx, exception);
   InitConstructor(ctx, ctor, "Memory", prototype, exception);
-
-  auto js_env = interop->js_env<JSCEnv*>();
-  js_env->SetMemoryConstructor(ctor);
-
+  env->SetMemoryConstructor(ctor);
   return ctor;
 }
 
-// static
-JSObjectRef JSCWasmMemory::CreateJSObject(JSContextRef ctx,
-                                          JSObjectRef constructor,
-                                          WasmMemoryRef memory, size_t pages,
-                                          JSValueRef* exception) {
-  auto interop = static_cast<InteropRuntime*>(JSObjectGetPrivate(constructor));
-  WASM_DCHECK(interop != nullptr);
-  auto memory_data = new JSCWasmMemory(memory, pages, interop);
+bool JSCWasmMemory::IsJSCWasmMemory(JSContextRef ctx, JSValueRef target) {
+  if (!target || !JSValueIsObjectOfClass(ctx, target, class_ref())) {
+    return false;
+  }
+  auto* mem = static_cast<JSCWasmMemory*>(
+      JSObjectGetPrivate(JSValueToObject(ctx, target, nullptr)));
+  return mem != nullptr && mem->memory_ != nullptr;
+}
 
-  JSObjectRef obj = JSObjectMake(ctx, class_ref(), memory_data);
+JSObjectRef JSCWasmMemory::WrapOwnedMemory(JSContextRef ctx, JSCEnv* env,
+                                           wasm_memory_t* memory,
+                                           uint32_t maximum,
+                                           JSValueRef* exception) {
+  JSObjectRef ctor = env->js_memory_constructor();
+  if (wasm_unlikely(!ctor)) return nullptr;
+  JSValueRef maybe_proto = JSObjectGetProperty(
+      ctx, ctor, JSCBuiltinObjects::PrototypeStr(), exception);
+  if (exception && *exception) return nullptr;
+  JSObjectRef prototype = JSValueToObject(ctx, maybe_proto, exception);
+  if ((exception && *exception) || !prototype) return nullptr;
 
-  JSValueRef maybe_prototype = JSObjectGetProperty(
-      ctx, constructor, JSCBuiltinObjects::PrototypeStr(), exception);
-  JSObjectRef prototype = JSValueToObject(ctx, maybe_prototype, exception);
-
+  JSObjectRef obj = JSObjectMake(ctx, class_ref(), nullptr);
+  if (!RetainWasmRootOnJSCObject(ctx, obj, env->wasm_root(), exception)) {
+    return nullptr;
+  }
   JSObjectSetPrototype(ctx, obj, prototype);
-
+  auto* memory_data = new JSCWasmMemory(env, memory, maximum, obj);
+  WASM_CHECK(JSObjectSetPrivate(obj, memory_data));
   return obj;
 }
 
-bool JSCWasmMemory::IsJSCWasmMemory(JSContextRef ctx, JSValueRef target) {
-  return target && JSValueIsObjectOfClass(ctx, target, class_ref());
+JSObjectRef JSCWasmMemory::GetOrWrapOwnedMemory(JSContextRef ctx, JSCEnv* env,
+                                                wasm_memory_t* memory,
+                                                JSValueRef* exception) {
+  if (!memory) return nullptr;
+  if (JSCWasmMemory* existing = Of(memory)) {
+    JSObjectRef obj = existing->js_object();
+    wasm_memory_delete(memory);
+    return obj;
+  }
+  uint32_t maximum = wasm_limits_max_default;
+  if (wasm_memorytype_t* mtype = wasm_memory_type(memory)) {
+    if (const wasm_limits_t* limits = wasm_memorytype_limits(mtype)) {
+      maximum = limits->max;
+    }
+    wasm_memorytype_delete(mtype);
+  }
+  JSObjectRef wrapped = WrapOwnedMemory(ctx, env, memory, maximum, exception);
+  if (!wrapped) {
+    wasm_memory_delete(memory);
+  }
+  return wrapped;
 }
 
-// static
 JSObjectRef JSCWasmMemory::CallAsConstructor(JSContextRef ctx,
                                              JSObjectRef constructor,
                                              size_t argc,
                                              const JSValueRef argv[],
                                              JSValueRef* exception) {
-  WLOGD("Running JSCWasmMemory::%s...", __func__);
   constexpr const char* code = "WebAssembly.Memory()";
 
+  auto* env = static_cast<JSCEnv*>(JSObjectGetPrivate(constructor));
+  if (!env || !env->wasm_store()) {
+    return ThrowIfException(ctx, ErrorTypes::kTypeError, code,
+                            "WebAssembly context is not active", exception);
+  }
   if (argc == 0 || !JSValueIsObject(ctx, argv[0])) {
     return ThrowIfException(ctx, ErrorTypes::kTypeError, code,
                             ErrorMessages::kDescriptorNeeded_1002, exception);
   }
 
-  JSObjectRef memory_descriptor = JSValueToObject(ctx, argv[0], exception);
-  auto interop = static_cast<InteropRuntime*>(JSObjectGetPrivate(constructor));
-  bool is_prism = interop->wasm_runtime().is<PrismRuntime*>();
-  if (is_prism && ((exception && *exception) || !memory_descriptor)) {
-    return nullptr;
+  JSObjectRef desc = JSValueToObject(ctx, argv[0], exception);
+  if ((exception && *exception) || !desc) return nullptr;
+
+  auto read_pages = [&](JSValueRef val, uint32_t* out) {
+    double n = JSValueToNumber(ctx, val, exception);
+    if (exception && *exception) return false;
+    if (!std::isfinite(n) || n < 0 ||
+        n > static_cast<double>(std::numeric_limits<uint32_t>::max())) {
+      ThrowIfException(ctx, ErrorTypes::kTypeError, code,
+                       ErrorMessages::kNoConvertibleNum_1002, exception);
+      return false;
+    }
+    *out = static_cast<uint32_t>(std::trunc(n));
+    return true;
+  };
+
+  JSValueRef initial =
+      JSObjectGetProperty(ctx, desc, JSString("initial"), exception);
+  if (exception && *exception) return nullptr;
+  if (JSValueIsUndefined(ctx, initial)) {
+    return ThrowIfException(ctx, ErrorTypes::kTypeError, code,
+                            "Property 'initial' is required", exception);
   }
+  uint32_t init_pages = 0;
+  if (!read_pages(initial, &init_pages)) return nullptr;
 
-  uint32_t initial_page_count = 0;
-  {
-    JSValueRef initial = JSObjectGetProperty(ctx, memory_descriptor,
-                                             JSString("initial"), exception);
-    if (exception && *exception) return nullptr;
-    initial_page_count =
-        static_cast<uint32_t>(JSValueToNumber(ctx, initial, exception));
-    if (exception && *exception) return nullptr;
-  }
-
-  uint32_t maximum_page_count = kMaxPagesNum;
-  {
-    JSValueRef maximum = JSObjectGetProperty(ctx, memory_descriptor,
-                                             JSString("maximum"), exception);
-    if (is_prism && exception && *exception) return nullptr;
-
-    if (!JSValueIsUndefined(ctx, maximum)) {
-      maximum_page_count =
-          static_cast<uint32_t>(JSValueToNumber(ctx, maximum, exception));
-      if (is_prism && exception && *exception) return nullptr;
-
-      if (initial_page_count > maximum_page_count) {
-        return ThrowIfException(
-            ctx, ErrorTypes::kRangeError, code,
-            "Property 'maximum': value is below the lower bound 'initial'",
-            exception);
-      }
+  uint32_t max_pages = kMaxPagesNum;
+  JSValueRef maximum =
+      JSObjectGetProperty(ctx, desc, JSString("maximum"), exception);
+  if (exception && *exception) return nullptr;
+  if (!JSValueIsUndefined(ctx, maximum)) {
+    if (!read_pages(maximum, &max_pages)) return nullptr;
+    if (init_pages > max_pages) {
+      return ThrowIfException(
+          ctx, ErrorTypes::kRangeError, code,
+          "Property 'maximum': value is below the lower bound 'initial'",
+          exception);
     }
   }
-
-  WasmResult result = WasmSucceed;
-  WasmMemoryRef memory =
-      interop->CreateWasmMemory(initial_page_count, maximum_page_count, result);
-  if (result) {
-    return ThrowIfException(
-        ctx, is_prism ? ErrorTypes::kRangeError : ErrorTypes::kError, code,
-        result, exception);
+  if (init_pages > kMaxPagesNum || max_pages > kMaxPagesNum) {
+    return ThrowIfException(ctx, ErrorTypes::kRangeError, code,
+                            ErrorMessages::kMemoryAllocFailed_1001, exception);
   }
 
-  return CreateJSObject(ctx, constructor, memory, initial_page_count,
-                        exception);
+  wasm_limits_t limits = {init_pages, max_pages};
+  wasm_memorytype_t* mtype = wasm_memorytype_new(&limits);
+  wasm_memory_t* memory =
+      mtype ? wasm_memory_new(env->wasm_store(), mtype) : nullptr;
+  if (mtype) wasm_memorytype_delete(mtype);
+  if (wasm_unlikely(!memory)) {
+    return ThrowIfException(ctx, ErrorTypes::kRangeError, code,
+                            ErrorMessages::kMemoryAllocFailed_1001, exception);
+  }
+
+  JSObjectRef wrapped = WrapOwnedMemory(ctx, env, memory, max_pages, exception);
+  if (!wrapped) {
+    wasm_memory_delete(memory);
+  }
+  return wrapped;
 }
 
-// static
 JSValueRef JSCWasmMemory::GetBufferCallback(JSContextRef ctx,
                                             JSObjectRef function,
                                             JSObjectRef thisObject, size_t argc,
                                             const JSValueRef argv[],
                                             JSValueRef* exception) {
-  WLOGD("Running JSCWasmMemory::%s...", __func__);
+  (void)function;
+  (void)argc;
+  (void)argv;
   constexpr const char* code = "WebAssembly.Memory.buffer";
 
-  auto jsc_memory = static_cast<JSCWasmMemory*>(JSObjectGetPrivate(thisObject));
-  if (!jsc_memory) {
-    return ThrowIfException(ctx, ErrorTypes::kError, code,
-                            "No private data found in WebAssembly.Memory!",
-                            exception);
+  if (!JSValueIsObjectOfClass(ctx, thisObject, class_ref())) {
+    ThrowIfException(ctx, ErrorTypes::kTypeError, code,
+                     ErrorMessages::kIllegalInvocation_1001, exception);
+    return JSValueMakeUndefined(ctx);
+  }
+  auto* jsc_memory =
+      static_cast<JSCWasmMemory*>(JSObjectGetPrivate(thisObject));
+  JSCEnv* env = jsc_memory && jsc_memory->store_owner_
+                    ? jsc_memory->store_owner_->active_jsc_env()
+                    : nullptr;
+  if (!jsc_memory || !jsc_memory->memory_ || !env) {
+    ThrowIfException(ctx, ErrorTypes::kError, code,
+                     "No private data found in WebAssembly.Memory!", exception);
+    return JSValueMakeUndefined(ctx);
   }
 
   if (__builtin_available(macos 10.12, ios 10.0, *)) {
-    WasmMemoryRef wasm_memory = jsc_memory->memory_;
+    const size_t current_pages = jsc_memory->pages();
+    void* raw_data = wasm_memory_data(jsc_memory->memory_);
 
-    uint32_t pages = 0;
-    void* buffer = nullptr;
-    // Get Pages and Buffer from Wasm3Memory
-    if (wasm_memory.is<Wasm3Memory*>()) {
-      auto wasm3_memory = wasm_memory.get<Wasm3Memory*>();
-      pages = wasm3_memory->pages();
-      buffer = wasm3_memory->buffer();
-    } else {
-      auto prism_memory = wasm_memory.get<PrismMemory*>();
-      pages = prism_memory->pages();
-      buffer = prism_memory->buffer();
+    if (!jsc_memory->buffer_ || jsc_memory->pages_ != current_pages) {
+      if (raw_data == nullptr) {
+        raw_data = static_cast<void*>(&jsc_memory->pages_);
+      }
+      const size_t buffer_size = current_pages * kWasmPageSize;
+
+      wasm::WasmBufferKeep* keep = nullptr;
+      if (buffer_size != 0) {
+        keep = wasm::WasmBufferKeep::Create(jsc_memory->store_owner_,
+                                            jsc_memory->memory_);
+        if (wasm_unlikely(!keep)) {
+          ThrowIfException(ctx, ErrorTypes::kError, code,
+                           "Unable to retain WebAssembly.Memory buffer",
+                           exception);
+          return JSValueMakeUndefined(ctx);
+        }
+      }
+      // Note: per JSC's API contract, JSObjectMakeArrayBufferWithBytesNoCopy
+      // always invokes `ReleaseJSCBufferMemory` even when throwing/failing.
+      JSObjectRef new_buffer = JSObjectMakeArrayBufferWithBytesNoCopy(
+          ctx, raw_data, buffer_size, keep ? ReleaseJSCBufferMemory : nullptr,
+          keep, exception);
+      if (!new_buffer) {
+        return JSValueMakeUndefined(ctx);
+      }
+      env->UnprotectWasmMemoryBuffer(jsc_memory->buffer_);
+      jsc_memory->buffer_ = new_buffer;
+      jsc_memory->pages_ = current_pages;
+      env->ProtectWasmMemoryBuffer(new_buffer);
     }
-
-    // When pages_ != memory->memory_->pages(), it backing wasm memory is
-    // updated actually, we must provide a new buffer and detach the old one.
-    if (!jsc_memory->buffer_ || jsc_memory->pages_ != pages) {
-      // Reasonably speaking, the old buffer must be make detached here,
-      // but actually no operation will be taken given that no such
-      // interface is provided by JavaScriptCore,
-      auto js_env = jsc_memory->interop_runtime_->js_env<JSCEnv*>();
-      bool is_prism = wasm_memory.is<PrismMemory*>();
-      if (is_prism) {
-        js_env->UnprotectWasmMemoryBuffer(jsc_memory->buffer_);
-      } else {
-        JSValueUnprotect(ctx, jsc_memory->buffer_);
-      }
-
-      if (buffer == nullptr) {
-        // This is a trick to persuade JSC to create an ArrayBuffer
-        // with zero length and no valid backing store.
-        // Otherwise JSC always create a detached ArrayBuffer
-        // as the pointer of its backing store is nullptr.
-        buffer = static_cast<void*>(&(jsc_memory->pages_));
-      }
-
-      jsc_memory->pages_ = pages;
-      size_t buffer_size = jsc_memory->pages_ * kWasmPageSize;
-
-      jsc_memory->buffer_ = JSObjectMakeArrayBufferWithBytesNoCopy(
-          ctx, buffer, buffer_size, nullptr, nullptr, exception);
-
-      if (is_prism) {
-        js_env->ProtectWasmMemoryBuffer(jsc_memory->buffer_);
-      } else {
-        JSValueProtect(ctx, jsc_memory->buffer_);
-      }
-    }
-
-    return jsc_memory->buffer_;
+    return jsc_memory->buffer_ ? jsc_memory->buffer_
+                               : JSValueMakeUndefined(ctx);
   }
 
-  return ThrowIfException(ctx, ErrorTypes::kError, code,
-                          ErrorMessages::kOSVersionUnsupported_1001, exception);
+  ThrowIfException(ctx, ErrorTypes::kError, code,
+                   ErrorMessages::kOSVersionUnsupported_1001, exception);
+  return JSValueMakeUndefined(ctx);
 }
 
-// static
 JSValueRef JSCWasmMemory::GrowCallback(JSContextRef ctx, JSObjectRef function,
                                        JSObjectRef thisObject, size_t argc,
                                        const JSValueRef argv[],
                                        JSValueRef* exception) {
-  WLOGD("Running JSCWasmMemory::%s...", __func__);
+  (void)function;
   constexpr const char* code = "WebAssembly.Memory.grow()";
 
-  auto memory = static_cast<JSCWasmMemory*>(JSObjectGetPrivate(thisObject));
-  if (!memory || argc < 1) {
-    return ThrowIfException(ctx, ErrorTypes::kTypeError, code,
-                            ErrorMessages::kNoConvertibleNum_1001, exception);
+  if (!JSValueIsObjectOfClass(ctx, thisObject, class_ref())) {
+    ThrowIfException(ctx, ErrorTypes::kTypeError, code,
+                     ErrorMessages::kIllegalInvocation_1001, exception);
+    return JSValueMakeUndefined(ctx);
   }
-  double requested_pages = 0;
-  JSValueRef num_obj = argv[0];
-  if (JSValueIsNumber(ctx, num_obj)) {
-    requested_pages = JSValueToNumber(ctx, num_obj, exception);
-  } else {
-    return ThrowIfException(ctx, ErrorTypes::kTypeError, code,
-                            ErrorMessages::kNoConvertibleNum_1002, exception);
+  auto* memory = static_cast<JSCWasmMemory*>(JSObjectGetPrivate(thisObject));
+  if (!memory || !memory->memory_ || argc < 1) {
+    ThrowIfException(ctx, ErrorTypes::kTypeError, code,
+                     ErrorMessages::kNoConvertibleNum_1001, exception);
+    return JSValueMakeUndefined(ctx);
   }
+
+  if (!JSValueIsNumber(ctx, argv[0])) {
+    ThrowIfException(ctx, ErrorTypes::kTypeError, code,
+                     ErrorMessages::kNoConvertibleNum_1002, exception);
+    return JSValueMakeUndefined(ctx);
+  }
+  double requested_pages = JSValueToNumber(ctx, argv[0], exception);
+  if (exception && *exception) return JSValueMakeUndefined(ctx);
   requested_pages = std::trunc(requested_pages);
   if (!std::isfinite(requested_pages) || requested_pages < 0 ||
       requested_pages > std::numeric_limits<uint32_t>::max()) {
-    return ThrowIfException(ctx, ErrorTypes::kTypeError, code,
-                            ErrorMessages::kNoConvertibleNum_1002, exception);
+    ThrowIfException(ctx, ErrorTypes::kTypeError, code,
+                     ErrorMessages::kNoConvertibleNum_1002, exception);
+    return JSValueMakeUndefined(ctx);
   }
+
   const uint32_t grow_pages = static_cast<uint32_t>(requested_pages);
-
-  // grow the memory size
-  uint32_t pages = 0;
-  if (memory->memory_.is<Wasm3Memory*>()) {
-    auto wasm3_memory = memory->memory_.get<Wasm3Memory*>();
-    pages = wasm3_memory->pages();
-    if (grow_pages == 0 || wasm3_memory->grow(grow_pages)) {
-      return JSValueMakeNumber(ctx, pages);
-    }
-  } else {
-    auto prism_memory = memory->memory_.get<PrismMemory*>();
-    pages = prism_memory->pages();
-    if (grow_pages == 0 || prism_memory->grow(grow_pages)) {
-      return JSValueMakeNumber(ctx, pages);
-    }
+  const size_t old_pages = memory->pages();
+  if (grow_pages == 0 || wasm_memory_grow(memory->memory_, grow_pages)) {
+    return JSValueMakeNumber(ctx, static_cast<double>(old_pages));
   }
 
-  return ThrowIfException(ctx, ErrorTypes::kRangeError, code,
-                          ErrorMessages::kGrowFailed_1001, exception);
+  ThrowIfException(ctx, ErrorTypes::kRangeError, code,
+                   ErrorMessages::kGrowFailed_1001, exception);
+  return JSValueMakeUndefined(ctx);
 }
 
 }  // namespace primjs::jsc

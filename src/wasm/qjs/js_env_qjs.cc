@@ -4,417 +4,293 @@
 
 #include "qjs/js_env_qjs.h"
 
-#include "common/js_type.h"
-#include "common/wasm_utils.h"
+#include <climits>
+#include <cstdlib>
+#include <cstring>
+
 #include "qjs/qjs_ext_api.h"
-#include "qjs/qjs_wasm.h"
 #include "qjs/qjs_wasm_function.h"
-#include "qjs/qjs_wasm_memory.h"
-#include "runtime/prism/wasm_function.h"
-#include "runtime/prism/wasm_runtime.h"
-#include "runtime/wasm3/wasm_function.h"
-#include "runtime/wasm3/wasm_runtime.h"
 
 namespace primjs::qjs {
-QJSEnv::QJSEnv(LEPUSContext *ctx, std::atomic_bool *invalid)
-    : js_rt_(ctx->rt), js_ctx_(ctx), ctx_invalid_(invalid) {
+
+namespace {
+bool QJSToDouble(LEPUSContext* ctx, LEPUSValueConst value, double* out) {
+  if (LEPUS_VALUE_IS_FLOAT64(value)) {
+    *out = LEPUS_VALUE_GET_FLOAT64(value);
+    return true;
+  }
+  if (LEPUS_VALUE_IS_INT(value)) {
+    *out = LEPUS_VALUE_GET_INT(value);
+    return true;
+  }
+  return LEPUS_ToFloat64(ctx, out, value) == 0;
+}
+}  // namespace
+
+WASM_MINSIZE QJSEnv::QJSEnv(LEPUSContext* ctx, std::atomic_bool* invalid,
+                            wasm::WasmStoreOwner* store_owner)
+    : js_rt_(LEPUS_GetRuntime(ctx)),
+      js_ctx_(ctx),
+      ctx_invalid_(invalid),
+      store_owner_(store_owner) {
   QJSWasmFunction::CreatePrototype(ctx);
 }
 
-void QJSEnv::Finalize() {
-  WLOGD("Running QJSEnv::Finalize");
-  for (auto &mem : wasm_memory_cache_) FreeValue(mem.second);
-  for (auto &tab : wasm_table_cache_) FreeValue(tab.second);
-  for (auto &glob : wasm_global_cache_) FreeValue(glob.second);
-  for (auto &func : wasm_func_cache_) FreeValue(func.second);
-  for (auto &callback : wasm_import_callback_roots_) FreeValue(callback.value);
-  wasm_import_callback_roots_.clear();
-  if (has_pending_wasm_exception_) {
-    if (!LEPUS_IsGCModeRT(js_rt_)) {
-      LEPUS_FreeValueRT(js_rt_, pending_wasm_exception_);
-    }
-    has_pending_wasm_exception_ = false;
-    pending_wasm_exception_ = LEPUS_UNDEFINED;
-  }
+QJSEnv::~QJSEnv() {
+  Finalize();
+  pthread_mutex_destroy(&gc_mark_mutex_);
 }
 
-QJSEnv::~QJSEnv() { WLOGD("Running QJSEnv::%s...", __func__); }
-
-JSValue QJSEnv::MakeObject() {
-  return FromQJS(LEPUS_NewObject(js_ctx_), js_rt_);
-}
-
-JSValue QJSEnv::MakeNumber(double num) {
-  return FromQJS(LEPUS_NewFloat64(js_ctx_, num), js_rt_);
-}
-
-bool QJSEnv::MakeBigInt64(int64_t num, JSValue *result, JSValue *exception) {
-  LEPUSValue value = LEPUS_NewBigInt64(js_ctx_, num);
-  *result = FromQJS(value, js_rt_);
-  if (exception != nullptr && LEPUS_IsException(value)) {
-    *exception = FromQJS(LEPUS_EXCEPTION, js_rt_);
-  }
-  return !LEPUS_IsException(value);
-}
-
-JSValue QJSEnv::MakeUndefined() {
-  static LEPUSValue undefined = LEPUS_UNDEFINED;
-  return FromQJS(undefined, js_rt_);
-}
-
-JSValue QJSEnv::MakeNull() { return JS_NULL; }
-
-JSValue QJSEnv::MakeString(const char *str) {
-  return FromQJS(LEPUS_NewString(js_ctx_, str), js_rt_);
-}
-
-JSValue QJSEnv::MakeException(ErrorTypes err, const char *code, const char *msg,
-                              JSValue *exception) {
-  return FromQJS(ThrowIfException(js_ctx_, err, code, msg, exception->GetPtr()),
-                 js_rt_);
-}
-
-JSValue QJSEnv::MakeWasmMemory(InteropRuntime *interop, WasmMemoryRef memory,
-                               size_t pages) {
-  LEPUSValue ret =
-      QJSWasmMemory::CreateJSObject(js_ctx_, interop, memory, pages);
-  if (LEPUS_IsException(ret)) return JS_NULL;
-  return FromQJS(ret, js_rt_);
-}
-
-JSValue QJSEnv::MakeWasmGlobal(InteropRuntime *interop, WasmGlobalRef global) {
-  LEPUSValue ret = QJSWasmGlobal::CreateJSObject(js_ctx_, interop, global);
-  if (LEPUS_IsException(ret)) return JS_NULL;
-  return FromQJS(ret, js_rt_);
-}
-
-JSValue QJSEnv::MakeWasmTable(InteropRuntime *interop, WasmTableRef table) {
-  LEPUSValue ret = QJSWasmTable::CreateJSObject(js_ctx_, interop, table);
-  if (LEPUS_IsException(ret)) return JS_NULL;
-  return FromQJS(ret, js_rt_);
-}
-
-JSObject QJSEnv::MakeWasmFunction(InteropRuntime *interop, const char *name,
-                                  WasmFunctionRef function) {
-  LEPUSValue res = QJSWasmFunction::CreateJSObject(js_ctx_, interop, function);
-  if (LEPUS_IsException(res)) return JS_NULL;
-  return FromQJS(res, js_rt_);
-}
-
-WasmGlobalRef QJSEnv::GetWasmGlobal(JSObject value) {
-  if (QJSWasmGlobal::class_id() == LEPUS_GetClassID(js_ctx_, value.Get())) {
-    auto global = static_cast<QJSWasmGlobal *>(
-        LEPUS_GetOpaque(value.Get(), QJSWasmGlobal::class_id()));
-    return global->global();
-  }
-  return {};
-}
-
-WasmMemoryRef QJSEnv::GetWasmMemory(JSObject value) {
-  if (QJSWasmMemory::class_id() == LEPUS_GetClassID(js_ctx_, value.Get())) {
-    auto memory = static_cast<QJSWasmMemory *>(
-        LEPUS_GetOpaque(value.Get(), QJSWasmMemory::class_id()));
-    return memory->memory();
-  }
-  return {};
-}
-
-WasmTableRef QJSEnv::GetWasmTable(JSObject value) {
-  if (QJSWasmTable::class_id() == LEPUS_GetClassID(js_ctx_, value.Get())) {
-    auto table = static_cast<QJSWasmTable *>(
-        LEPUS_GetOpaque(value.Get(), QJSWasmTable::class_id()));
-    return table->table();
-  }
-  return {};
-}
-
-WasmFunctionRef QJSEnv::GetWasmFunction(JSObject value) {
-  if (QJSWasmFunction::class_id() == LEPUS_GetClassID(js_ctx_, value.Get())) {
-    auto function = static_cast<QJSWasmFunction *>(
-        LEPUS_GetOpaque(value.Get(), QJSWasmFunction::class_id()));
-    return function->function();
-  }
-  return {};
-}
-
-JSValue QJSEnv::GetProperty(JSObject target, const char *name,
-                            JSValue *exception) {
-  LEPUSValue res = LEPUS_GetPropertyStr(js_ctx_, target.Get(), name);
-  if (exception != nullptr && LEPUS_IsException(res)) {
-    *exception = FromQJS(LEPUS_EXCEPTION, js_rt_);
-  }
-  if (!LEPUS_IsGCMode(js_ctx_)) {
-    LEPUS_FreeValue(js_ctx_, res);
-  }
-  return FromQJS(res, js_rt_);
-}
-
-JSValue QJSEnv::GetPropertyForPrism(JSObject target, const char *name,
-                                    JSValue *exception) {
-  LEPUSValue res = LEPUS_GetPropertyStr(js_ctx_, target.Get(), name);
-  if (exception != nullptr && LEPUS_IsException(res)) {
-    *exception = FromQJS(LEPUS_EXCEPTION, js_rt_);
-  }
-  return FromQJS(res, js_rt_);
-}
-
-// "SetProperty" will consume refcount, thus the caller need to dup value
-bool QJSEnv::SetProperty(JSValue obj, const char *name, JSValue val) {
-  int ret = LEPUS_DefinePropertyValueStr(js_ctx_, obj.Get(), name, val.Get(),
-                                         LEPUS_PROP_C_W_E);
-  return (ret != -1);
-}
-
-// "SetPropertyAtIndex" will consume refcount, thus the caller need to dup value
-bool QJSEnv::SetPropertyAtIndex(JSValue obj, uint32_t index, JSValue val) {
-  int ret =
-      LEPUS_DefinePropertyValueUint32(js_ctx_, obj.Get(), index, val.Get(), 0);
-  return (ret != -1);
-}
-
-JSValue QJSEnv::ValueToObject(JSValue val) {
-  if (LEPUS_IsObject(val.Get())) return val;
-  JSObject res = FromQJS(LEPUS_ToObject(js_ctx_, val.Get()), js_rt_);
-  if (!LEPUS_IsGCMode(js_ctx_)) {
-    LEPUS_FreeValue(js_ctx_, val.Get());
-  }
-  return res;
-}
-
-JSValue QJSEnv::ValueToFunction(JSValue val) {
-  if (LEPUS_IsFunction(js_ctx_, val.Get())) return val;
-  return JS_NULL;
-}
-
-// spec: https://tc39.es/ecma262/#sec-toint32
-void QJSEnv::ValueToInt32(int32_t &i32, JSValue val, JSValue &exception) {
-  exception = JS_NULL;
-  if (LEPUS_ToInt32(js_ctx_, &i32, val.Get()))
-    exception = FromQJS(LEPUS_EXCEPTION, js_rt_);
-}
-
-// spec: https://tc39.es/ecma262/#sec-tobigint64
-void QJSEnv::ValueToBigInt64(int64_t &i64, JSValue val, JSValue &exception) {
-  exception = JS_NULL;
-  if (LEPUS_ToBigInt64(js_ctx_, &i64, val.Get())) exception = LEPUS_EXCEPTION;
-  if (LEPUS_IsUndefined(val.Get()) || LEPUS_IsNull(val.Get()) ||
-      LEPUS_IsNumber(val.Get())) {
-    exception = FromQJS(
-        LEPUS_ThrowTypeError(
-            js_ctx_, "Undefined or Null or Number cannot convert to BigInt"),
-        js_rt_);
-  } else if (LEPUS_ToInt64(js_ctx_, &i64, val.Get())) {
-    exception = FromQJS(LEPUS_EXCEPTION, js_rt_);
-  }
-}
-
-void QJSEnv::ValueToBigInt64ForPrism(int64_t &i64, JSValue val,
-                                     JSValue &exception) {
-  exception = JS_NULL;
-  if (LEPUS_IsUndefined(val.Get()) || LEPUS_IsNull(val.Get()) ||
-      LEPUS_IsNumber(val.Get())) {
-    exception = FromQJS(
-        LEPUS_ThrowTypeError(
-            js_ctx_, "Undefined or Null or Number cannot convert to BigInt"),
-        js_rt_);
+WASM_MINSIZE void QJSEnv::Finalize() {
+  pthread_mutex_lock(&gc_mark_mutex_);
+  if (finalized_) {
+    pthread_mutex_unlock(&gc_mark_mutex_);
     return;
   }
-  if (LEPUS_ToBigInt64(js_ctx_, &i64, val.Get())) {
-    exception = FromQJS(LEPUS_EXCEPTION, js_rt_);
+  finalized_ = true;
+  ImportCallbackRoot* callbacks = import_callbacks_;
+  const size_t count = callback_count_;
+  import_callbacks_ = nullptr;
+  callback_count_ = 0;
+  callback_cap_ = 0;
+  LEPUSValue pending = LEPUS_UNDEFINED;
+  bool had_pending = false;
+  if (has_pending_wasm_exception_) {
+    pending = pending_wasm_exception_;
+    pending_wasm_exception_ = LEPUS_UNDEFINED;
+    has_pending_wasm_exception_ = false;
+    had_pending = true;
   }
-}
+  pthread_mutex_unlock(&gc_mark_mutex_);
 
-// NOTE: The caller ensures this value is a number.
-void QJSEnv::ValueToNumber(double &num, JSValue val, JSValue &exception) {
-  exception = JS_NULL;
-  if (LEPUS_ToFloat64(js_ctx_, &num, val.Get()))
-    exception = FromQJS(LEPUS_EXCEPTION, js_rt_);
-}
-
-JSValue QJSEnv::CallAsFunction(JSValue function, JSValue thisObject,
-                               size_t argc, JSValue args[],
-                               JSValue *exception) {
-  LEPUSValue *arr = new LEPUSValue[argc];
-  for (size_t i = 0; i < argc; i++) arr[i] = args[i].Get();
-  LEPUSValue res =
-      LEPUS_Call(js_ctx_, function.Get(), thisObject.Get(), argc, arr);
-  delete[] arr;
-  return FromQJS(res, js_rt_);
-}
-
-JSValue QJSEnv::CallAsFunctionForPrism(JSValue function, JSValue thisObject,
-                                       size_t argc, JSValue args[],
-                                       JSValue *exception) {
-  LEPUSValue *arr = new LEPUSValue[argc];
-  for (size_t i = 0; i < argc; i++) arr[i] = args[i].Get();
-  LEPUSValue result =
-      LEPUS_Call(js_ctx_, function.Get(), thisObject.Get(), argc, arr);
-  delete[] arr;
-  if (LEPUS_IsException(result)) {
-    // LEPUS_GetException transfers the pending value to us and clears QJS's
-    // null-sentinel slot. Keep an explicit presence bit so literal null and
-    // undefined remain distinguishable from "no imported exception".
-    LEPUSValue thrown = LEPUS_GetException(js_ctx_);
-    StashWasmException(thrown);
-    if (exception != nullptr) {
-      *exception = FromQJS(thrown, js_rt_);
+  if (!LEPUS_IsGCModeRT(js_rt_)) {
+    for (size_t i = 0; i < count; ++i) {
+      LEPUS_FreeValueRT(js_rt_, callbacks[i].value);
+    }
+    if (had_pending) {
+      LEPUS_FreeValueRT(js_rt_, pending);
     }
   }
-  return FromQJS(result, js_rt_);
+  std::free(callbacks);
 }
 
-void QJSEnv::StashWasmException(LEPUSValue exception) {
-  if (has_pending_wasm_exception_ && !LEPUS_IsGCModeRT(js_rt_)) {
-    LEPUS_FreeValueRT(js_rt_, pending_wasm_exception_);
+WASM_MINSIZE void QJSEnv::StashWasmException(LEPUSValue exception) {
+  LEPUSValue previous = LEPUS_UNDEFINED;
+  bool had_previous = false;
+  const bool gc_mode = LEPUS_IsGCModeRT(js_rt_);
+  if (gc_mode && js_ctx_) {
+    LEPUS_WriteBarrierNoStore(js_ctx_, exception);
+  }
+  pthread_mutex_lock(&gc_mark_mutex_);
+  if (has_pending_wasm_exception_ && !gc_mode) {
+    previous = pending_wasm_exception_;
+    had_previous = true;
   }
   pending_wasm_exception_ = exception;
   has_pending_wasm_exception_ = true;
+  pthread_mutex_unlock(&gc_mark_mutex_);
+  if (had_previous) {
+    LEPUS_FreeValueRT(js_rt_, previous);
+  }
 }
 
-void QJSEnv::CapturePendingWasmException() {
-  StashWasmException(LEPUS_GetException(js_ctx_));
-}
-
-bool QJSEnv::TakeWasmException(LEPUSValue *exception) {
-  if (!has_pending_wasm_exception_ || exception == nullptr) return false;
+bool QJSEnv::TakeWasmException(LEPUSValue* exception) {
+  if (!exception) return false;
+  pthread_mutex_lock(&gc_mark_mutex_);
+  if (!has_pending_wasm_exception_) {
+    pthread_mutex_unlock(&gc_mark_mutex_);
+    return false;
+  }
   *exception = pending_wasm_exception_;
   pending_wasm_exception_ = LEPUS_UNDEFINED;
   has_pending_wasm_exception_ = false;
+  pthread_mutex_unlock(&gc_mark_mutex_);
   return true;
 }
 
-JSValue QJSEnv::DupValue(JSValue value) {
-  if (!LEPUS_IsGCModeRT(js_rt_)) {
-    return FromQJS(LEPUS_DupValueRT(js_rt_, value.Get()), js_rt_);
-  } else {
-    return value;
+uint64_t QJSEnv::BeginImportTransaction() {
+  ++next_import_transaction_;
+  if (next_import_transaction_ == 0) ++next_import_transaction_;
+  return next_import_transaction_;
+}
+
+WASM_MINSIZE void QJSEnv::RetainImportCallback(LEPUSValue fn,
+                                               uint64_t transaction,
+                                               const void* bridge_key) {
+  const bool gc_mode = LEPUS_IsGCModeRT(js_rt_);
+  if (gc_mode && js_ctx_) {
+    LEPUS_WriteBarrierNoStore(js_ctx_, fn);
+  }
+  LEPUSValue kept = gc_mode ? fn : LEPUS_DupValueRT(js_rt_, fn);
+  pthread_mutex_lock(&gc_mark_mutex_);
+  if (callback_count_ == callback_cap_) {
+    const size_t new_cap = callback_cap_ ? callback_cap_ * 2 : 8;
+    auto* grown = static_cast<ImportCallbackRoot*>(
+        std::realloc(import_callbacks_, new_cap * sizeof(ImportCallbackRoot)));
+    if (!grown) {
+      pthread_mutex_unlock(&gc_mark_mutex_);
+      if (!gc_mode) LEPUS_FreeValueRT(js_rt_, kept);
+      return;
+    }
+    import_callbacks_ = grown;
+    callback_cap_ = new_cap;
+  }
+  import_callbacks_[callback_count_++] = {kept, transaction, bridge_key};
+  pthread_mutex_unlock(&gc_mark_mutex_);
+}
+
+WASM_MINSIZE void QJSEnv::ReleaseImportCallback(const void* bridge_key) {
+  if (!bridge_key) return;
+  LEPUSValue to_free = LEPUS_UNDEFINED;
+  bool should_free = false;
+  const bool gc_mode = LEPUS_IsGCModeRT(js_rt_);
+  pthread_mutex_lock(&gc_mark_mutex_);
+  if (!finalized_) {
+    for (size_t i = 0; i < callback_count_; ++i) {
+      if (import_callbacks_[i].bridge_key == bridge_key) {
+        if (!gc_mode) {
+          to_free = import_callbacks_[i].value;
+          should_free = true;
+        }
+        import_callbacks_[i] = import_callbacks_[--callback_count_];
+        break;
+      }
+    }
+  }
+  pthread_mutex_unlock(&gc_mark_mutex_);
+  if (should_free) {
+    LEPUS_FreeValueRT(js_rt_, to_free);
   }
 }
 
-uint64_t QJSEnv::BeginWasmImportCallbackTransaction() {
-  ++next_wasm_import_callback_transaction_;
-  if (next_wasm_import_callback_transaction_ == 0) {
-    ++next_wasm_import_callback_transaction_;
+#if defined(QJS_UNITTEST)
+size_t QJSEnv::ActiveImportCallbackCountForTesting() {
+  pthread_mutex_lock(&gc_mark_mutex_);
+  const size_t n = callback_count_;
+  pthread_mutex_unlock(&gc_mark_mutex_);
+  return n;
+}
+#endif
+
+WASM_MINSIZE size_t QJSEnv::RollbackImportTransaction(uint64_t transaction) {
+  const bool gc_mode = LEPUS_IsGCModeRT(js_rt_);
+  pthread_mutex_lock(&gc_mark_mutex_);
+  LEPUSValue* to_free = nullptr;
+  if (!gc_mode && callback_count_ > 0) {
+    to_free = static_cast<LEPUSValue*>(
+        std::malloc(callback_count_ * sizeof(LEPUSValue)));
   }
-  return next_wasm_import_callback_transaction_;
-}
-
-void QJSEnv::CacheWasmImportCallback(JSObject value, uint64_t transaction) {
-  wasm_import_callback_roots_.push_back({DupValue(value), transaction});
-}
-
-size_t QJSEnv::RollbackWasmImportCallbackTransaction(uint64_t transaction) {
   size_t rolled_back = 0;
-  for (auto it = wasm_import_callback_roots_.begin();
-       it != wasm_import_callback_roots_.end();) {
-    if (it->transaction != transaction) {
-      ++it;
+  size_t free_count = 0;
+  size_t dst = 0;
+  for (size_t i = 0; i < callback_count_; ++i) {
+    if (import_callbacks_[i].transaction != transaction) {
+      import_callbacks_[dst++] = import_callbacks_[i];
       continue;
     }
-    FreeValue(it->value);
-    it = wasm_import_callback_roots_.erase(it);
+    if (!gc_mode && to_free) {
+      to_free[free_count++] = import_callbacks_[i].value;
+    }
     ++rolled_back;
   }
+  callback_count_ = dst;
+  pthread_mutex_unlock(&gc_mark_mutex_);
+  for (size_t i = 0; i < free_count; ++i) {
+    LEPUS_FreeValueRT(js_rt_, to_free[i]);
+  }
+  std::free(to_free);
   return rolled_back;
 }
 
-void QJSEnv::FreeValue(const JSValue &value) {
-  if (!LEPUS_IsGCModeRT(js_rt_)) {
-    LEPUS_FreeValueRT(js_rt_, value.Get());
+void QJSEnv::ReportOuterSize(size_t bytes) {
+  constexpr size_t kMax = static_cast<size_t>(INT32_MAX);
+  if (js_rt_ != nullptr && bytes != 0) {
+    UpdateOuterObjSize(js_rt_, static_cast<int>(bytes < kMax ? bytes : kMax));
   }
 }
 
-JSValue QJSEnv::ReserveValue(JSValue obj) {
-  if (!LEPUS_IsGCModeRT(js_rt_)) {
-    return FromQJS(LEPUS_DupValueRT(js_rt_, obj.Get()), js_rt_);
-  } else {
-    return obj;
-  }
-}
-
-void QJSEnv::ReleaseValue(JSValue obj) {
-  if (!LEPUS_IsGCModeRT(js_rt_)) {
-    LEPUS_FreeValueRT(js_rt_, obj.Get());
-  }
-}
-
-int QJSEnv::RefCount(JSValue value, const char *msg) {
-  int ref_count = -1;
-  if (LEPUS_VALUE_HAS_REF_COUNT(value.Get())) {
-    auto p = (LEPUSRefCountHeader *)LEPUS_VALUE_GET_PTR(value.Get());
-    WLOGI("QJS Refcount is %d; %s", p->ref_count, msg);
-    ref_count = p->ref_count;
-  } else {
-    WLOGI("QJS Refcount is not available; %s", msg);
-  }
-  return ref_count;
-}
-
-void QJSEnv::PrintObjectProperties(LEPUSContext *ctx, LEPUSValueConst obj) {
-  LEPUSPropertyEnum *props = nullptr;
-  HandleScope func_scope(ctx, &props, HANDLE_TYPE_HEAP_OBJ);
-  uint32_t prop_count = 0;
-
-  LEPUS_GetOwnPropertyNames(
-      ctx, &props, &prop_count, obj,
-      LEPUS_GPN_STRING_MASK | LEPUS_GPN_SYMBOL_MASK | LEPUS_GPN_PRIVATE_MASK);
-
-  for (uint32_t i = 0; i < prop_count; i++) {
-    JSAtom prop_name_atom = props[i].atom;
-
-    const char *prop_name_str = LEPUS_AtomToCString(ctx, prop_name_atom);
-
-    LEPUSValue prop_value = LEPUS_GetProperty(ctx, obj, prop_name_atom);
-
-    int ref_count = -1;
-    if (LEPUS_VALUE_HAS_REF_COUNT(prop_value)) {
-      auto p = (LEPUSRefCountHeader *)LEPUS_VALUE_GET_PTR(prop_value);
-      ref_count = p->ref_count;
+void QJSEnv::Mark(LEPUS_MarkFunc* mark_func, LEPUSRuntime* rt,
+                  uint64_t trace_tool) {
+  pthread_mutex_lock(&gc_mark_mutex_);
+  if (!finalized_) {
+    for (size_t i = 0; i < callback_count_; ++i) {
+      LEPUS_MarkValue(rt, import_callbacks_[i].value, mark_func, trace_tool);
     }
+    if (has_pending_wasm_exception_) {
+      LEPUS_MarkValue(rt, pending_wasm_exception_, mark_func, trace_tool);
+    }
+  }
+  pthread_mutex_unlock(&gc_mark_mutex_);
+}
 
-    int64_t prop_tag = LEPUS_VALUE_GET_TAG(prop_value);
-
-    printf("Property Name: \"%s\", RefCount: %d, ", prop_name_str, ref_count);
-
-    if (prop_tag == LEPUS_TAG_STRING) {
-      const char *prop_value_str = LEPUS_ToCString(ctx, prop_value);
-      printf("(String): %s\n", prop_value_str);
-      if (!LEPUS_IsGCMode(ctx)) {
-        LEPUS_FreeCString(ctx, prop_value_str);
+bool QJSEnv::ToWasmValueSlow(LEPUSContext* ctx, LEPUSValueConst value,
+                             wasm_valkind_t kind, wasm_val_t* out) {
+  out->kind = kind;
+  switch (kind) {
+    case WASM_I32:
+      return LEPUS_ToInt32(ctx, &out->of.i32, value) == 0;
+    case WASM_F32: {
+      double d = 0;
+      if (!QJSToDouble(ctx, value, &d)) return false;
+      out->of.f32 = static_cast<float>(d);
+      return true;
+    }
+    case WASM_F64:
+      return QJSToDouble(ctx, value, &out->of.f64);
+    case WASM_I64:
+      if (LEPUS_IsUndefined(value) || LEPUS_IsNull(value) ||
+          LEPUS_IsNumber(value)) {
+        LEPUS_ThrowTypeError(
+            ctx, "Undefined or Null or Number cannot convert to BigInt");
+        return false;
       }
-    } else if (prop_tag == LEPUS_TAG_OBJECT) {
-      printf("(Object)\n");
-    } else {
-      printf("(Unknown Type)\n");
-    }
-
-    if (!LEPUS_IsGCMode(ctx)) {
-      LEPUS_FreeCString(ctx, prop_name_str);
-      LEPUS_FreeValue(ctx, prop_value);
-    }
-  }
-  printf("\n");
-
-  if (!LEPUS_IsGCMode(ctx)) {
-    lepus_free(ctx, props);
+      return LEPUS_ToBigInt64(ctx, &out->of.i64, value) == 0;
+    default:
+      ThrowIfException(ctx, ErrorTypes::kTypeError, "WebAssembly value",
+                       "Unsupported WebAssembly value type");
+      return false;
   }
 }
 
-void QJSEnv::Mark(LEPUS_MarkFunc *mark_func, LEPUSRuntime *rt,
-                  uint64_t trace_tool = 0) {
-  for (auto &mem : wasm_memory_cache_)
-    LEPUS_MarkValue(rt, mem.second.Get(), mark_func, trace_tool);
-  for (auto &tab : wasm_table_cache_)
-    LEPUS_MarkValue(rt, tab.second.Get(), mark_func, trace_tool);
-  for (auto &glob : wasm_global_cache_)
-    LEPUS_MarkValue(rt, glob.second.Get(), mark_func, trace_tool);
-  for (auto &func : wasm_func_cache_)
-    LEPUS_MarkValue(rt, func.second.Get(), mark_func, trace_tool);
-  for (auto &callback : wasm_import_callback_roots_)
-    LEPUS_MarkValue(rt, callback.value.Get(), mark_func, trace_tool);
-  if (has_pending_wasm_exception_) {
-    LEPUS_MarkValue(rt, pending_wasm_exception_, mark_func, trace_tool);
+LEPUSValue QJSEnv::FromWasmValueSlow(LEPUSContext* ctx,
+                                     const wasm_val_t& value) {
+  switch (value.kind) {
+    case WASM_I32:
+      return LEPUS_NewInt32(ctx, value.of.i32);
+    case WASM_F64:
+      return LEPUS_NewFloat64(ctx, value.of.f64);
+    case WASM_F32:
+      return LEPUS_NewFloat64(ctx, static_cast<double>(value.of.f32));
+    case WASM_I64:
+      return LEPUS_NewBigInt64(ctx, value.of.i64);
+    default:
+      return ThrowIfException(ctx, ErrorTypes::kTypeError, "WebAssembly value",
+                              "Unable to convert wasm result");
   }
+}
+
+WASM_MINSIZE LEPUSValue QJSEnv::ThrowTrap(wasm_trap_t* trap, const char* code) {
+  LEPUSValue pending;
+  if (TakeWasmException(&pending)) {
+    wasm_trap_delete(trap);
+    return LEPUS_Throw(js_ctx_, pending);
+  }
+  wasm_message_t message = {0, nullptr};
+  wasm_trap_message(trap, &message);
+  constexpr char kPrefix[] = "WebAssembly Trap: ";
+  char text[256];
+  std::memcpy(text, kPrefix, sizeof(kPrefix) - 1);
+  size_t n = 0;
+  if (message.data && message.size) {
+    n = strnlen(message.data, message.size);
+    const size_t cap = sizeof(text) - sizeof(kPrefix);
+    if (n > cap) n = cap;
+    std::memcpy(text + sizeof(kPrefix) - 1, message.data, n);
+  }
+  text[sizeof(kPrefix) - 1 + n] = '\0';
+  wasm_byte_vec_delete(&message);
+  wasm_trap_delete(trap);
+  return ThrowIfException(js_ctx_, ErrorTypes::kError, code, text);
 }
 
 }  // namespace primjs::qjs

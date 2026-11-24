@@ -452,7 +452,6 @@ int HandleResult(bool test_cache, double exec_time, LEPUSContext *ctx,
 
 int main(int argc, char **argv) {
   bool test_cache = false;
-  primjs::WasmRuntimeType runtime_type = primjs::WasmRuntimeType::WASM3;
   if (argc < 2) {
     std::cout << " Please enter js file path as an argument." << std::endl;
     return 0;
@@ -463,8 +462,10 @@ int main(int argc, char **argv) {
         test_cache = true;
       } else if (strcmp(argv[i], "--wasm-engine") == 0) {
         i += 1;
-        if (strcmp(argv[i], "prism") == 0) {
-          runtime_type = primjs::WasmRuntimeType::PRISM;
+        if (i >= argc - 1 || strcmp(argv[i], "prism") != 0) {
+          std::cerr << "Unsupported --wasm-engine (only prism is supported)"
+                    << std::endl;
+          return 2;
         }
       }
     }
@@ -491,8 +492,13 @@ int main(int argc, char **argv) {
   qjs_runtime_ = LEPUS_NewRuntime();
   ctx = LEPUS_NewContext(qjs_runtime_);
 
-  primjs::qjs::QJSWebAssembly::RegisterWebAssembly(ctx, &ctx_invalid,
-                                                   runtime_type);
+  primjs::qjs::QJSWebAssembly::RegisterWebAssembly(ctx, &ctx_invalid);
+  {
+    LEPUSValue exc = LEPUS_GetException(ctx);
+    if (!LEPUS_IsNull(exc) && !LEPUS_IsUndefined(exc) && !LEPUS_IsGCMode(ctx)) {
+      LEPUS_FreeValue(ctx, exc);
+    }
+  }
 
   inject_js_function(ctx);
   exec_time = execute_js(ctx, (const char *)script, test_cache, &result);

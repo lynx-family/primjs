@@ -5,81 +5,66 @@
 #ifndef SRC_WASM_QJS_QJS_WASM_MEMORY_H_
 #define SRC_WASM_QJS_QJS_WASM_MEMORY_H_
 
+#include "common/wasm_store_owner.h"
 #include "common/wasm_type.h"
-#include "quickjs/include/quickjs-inner.h"
+#include "qjs/qjs_ext_api.h"
 
-namespace primjs {
-class InteropRuntime;
+namespace primjs::qjs {
 
-namespace qjs {
 class QJSEnv;
-}
 
-namespace wasm {
-class Wasm3Memory;
-class PrismMemory;
-}  // namespace wasm
-
-using WasmMemoryRef = OneOf<wasm::Wasm3Memory *, wasm::PrismMemory *>;
-
-namespace qjs {
-class QJSWasmMemory {
+class QJSWasmMemory : public QJSWasmWrapperBase {
  public:
-  QJSWasmMemory(WasmMemoryRef memory, size_t pages, InteropRuntime *interop);
+  QJSWasmMemory(LEPUSRuntime* rt, LEPUSValue wasm_root,
+                wasm::WasmStoreOwner* store_owner, wasm_memory_t* memory,
+                uint32_t maximum, LEPUSValue js_obj);
   ~QJSWasmMemory();
 
-  static LEPUSValue CreateConstructor(LEPUSContext *ctx, LEPUSValue wasm_root);
-
-  static LEPUSValue CreateJSObject(LEPUSContext *ctx, InteropRuntime *interop,
-                                   WasmMemoryRef memory, size_t pages);
-
   static LEPUSClassID class_id() {
-    static LEPUSClassID class_id = LEPUS_NewClassID(&class_id);
-    return class_id;
+    return GetWasmClassId(WasmQJSClass::kMemory);
   }
 
-  static void Finalize(LEPUSRuntime *rt, LEPUSValue obj);
+  static QJSWasmMemory* Of(const wasm_memory_t* memory) {
+    return memory
+               ? static_cast<QJSWasmMemory*>(wasm_memory_get_host_info(memory))
+               : nullptr;
+  }
 
-  static void GCMark(LEPUSRuntime *rt, LEPUSValueConst obj,
-                     LEPUS_MarkFunc *mark_func, uint64_t trace_tool);
-
-  static LEPUSValue CreatePrototype(LEPUSContext *ctx);
-
-  static LEPUSValue CallAsConstructor(LEPUSContext *ctx,
+  static bool Register(LEPUSContext* ctx, LEPUSValue wasm_root);
+  static LEPUSValue CallAsConstructor(LEPUSContext* ctx,
                                       LEPUSValueConst new_target, int argc,
-                                      LEPUSValueConst *argv);
+                                      LEPUSValueConst* argv);
 
-  static LEPUSValue GetBufferCallback(LEPUSContext *ctx,
-                                      LEPUSValueConst this_val);
+  static LEPUSValue GetOrWrapOwnedMemory(LEPUSContext* ctx, QJSEnv* env,
+                                         wasm_memory_t* memory);
 
-  static LEPUSValue GrowCallback(LEPUSContext *ctx, LEPUSValueConst this_val,
-                                 int argc, LEPUSValueConst *argv);
-
-  static LEPUSValue InitializeMemory(LEPUSContext *ctx, uintptr_t memaddr,
-                                     LEPUSValue memory_obj,
-                                     WasmMemoryRef &memory,
-                                     InteropRuntime *interop_runtime);
-
-  WasmMemoryRef &memory() { return memory_; }
-
-  void set_buffer(LEPUSContext *ctx, LEPUSValue buffer) {
-    if (!LEPUS_IsGCMode(ctx)) {
-      LEPUS_FreeValue(ctx, buffer_);
-    }
-    buffer_ = buffer;
+  wasm_memory_t* memory() const { return memory_; }
+  uint32_t maximum() const { return maximum_; }
+  size_t pages() const {
+    return memory_ ? (wasm_memory_data_size(memory_) / kWasmPageSize) : 0;
   }
+  LEPUSValue js_object() const { return js_obj_; }
+
+  static void GCMark(LEPUSRuntime* rt, LEPUSValueConst obj,
+                     LEPUS_MarkFunc* mark_func, uint64_t trace_tool);
 
  private:
-  size_t pages_;
+  static LEPUSValue WrapOwnedMemory(LEPUSContext* ctx, QJSEnv* env,
+                                    wasm_memory_t* memory, uint32_t maximum);
+  static void DetachMemory(QJSWasmWrapperBase* base, LEPUSRuntime* rt);
+  static LEPUSValue GetBufferCallback(LEPUSContext* ctx,
+                                      LEPUSValueConst this_val);
+  static LEPUSValue GrowCallback(LEPUSContext* ctx, LEPUSValueConst this_val,
+                                 int argc, LEPUSValueConst* argv);
 
+  wasm_memory_t* memory_ = nullptr;
+  uint32_t maximum_ = wasm_limits_max_default;
+  size_t pages_ = 0;
+  pthread_mutex_t buffer_mutex_ = PTHREAD_MUTEX_INITIALIZER;
   LEPUSValue buffer_ = LEPUS_UNDEFINED;
-
-  OWNER WasmMemoryRef memory_;
-
-  BORROWER InteropRuntime *interop_runtime_;
+  LEPUSValue js_obj_ = LEPUS_UNDEFINED;
 };
 
-}  // namespace qjs
-}  // namespace primjs
+}  // namespace primjs::qjs
 
 #endif  // SRC_WASM_QJS_QJS_WASM_MEMORY_H_

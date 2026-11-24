@@ -6,6 +6,9 @@
 #define SRC_WASM_COMMON_WASM_UTILS_H_
 
 #include <cassert>
+#include <cstddef>
+#include <cstdint>
+#include <cstdlib>
 
 #include "wasm_log.h"
 
@@ -29,6 +32,14 @@
 #else
 #define wasm_likely(x) (x)
 #define wasm_unlikely(x) (x)
+#endif
+
+#if defined(__clang__)
+#define WASM_MINSIZE __attribute__((minsize, cold))
+#elif defined(__GNUC__)
+#define WASM_MINSIZE __attribute__((optimize("Os"), cold))
+#else
+#define WASM_MINSIZE
 #endif
 
 #define FORCE_INLINE inline __attribute__((always_inline))
@@ -55,5 +66,12 @@
 
 #define OWNER    /* owner of this pointer */
 #define BORROWER /* on-owner of this pointer */
+
+namespace primjs::wasm {
+
+bool DecodeBase64(const uint8_t* src, size_t len, uint8_t** out_data,
+                  size_t* out_len);
+
+}  // namespace primjs::wasm
 
 #endif  // SRC_WASM_COMMON_WASM_UTILS_H_

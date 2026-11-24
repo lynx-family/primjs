@@ -167,7 +167,6 @@ config("wasm_public_config") {
       "WASM_DEBUG",
       "DEBUG",
       "LOG_LEVEL=LOG_LEVEL_VERBOSE",
-      "d_m3HasTracer",
     ]
   }
 }
