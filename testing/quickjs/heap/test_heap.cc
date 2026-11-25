@@ -2395,4 +2395,65 @@ TEST_F(HeapTest, ObjectContextCheckHonorsEachObjectLayout) {
   EXPECT_EQ(p->ctx, ctx);
   SetObjectCtxCheckStatus(ctx, false);
 }
+
+TEST_F(HeapTest, ShrinkingFastArrayReleasesRemovedValues) {
+  if (!ctx->gc_enable) {
+    GTEST_SKIP() << "only tracing GC scans fast array slots past the count";
+  }
+
+  // The arrays stay reachable. Values moved down by shift and splice are then
+  // overwritten, so only a vacated slot could still keep them alive.
+  constexpr char setup[] = R"(
+    var arrays = [];
+    var removed = [];
+    var movesKeepOrder = (function() {
+      function track(operation) {
+        var value = {};
+        removed.push({operation: operation, ref: new WeakRef(value)});
+        return value;
+      }
+      var popped = [track("pop")];
+      var truncated = [track("length"), track("length")];
+      var deleted = [track("delete")];
+      var head = {};
+      var shiftedTail = track("shift");
+      var shifted = [head, shiftedTail];
+      var splicedTail = track("splice");
+      var spliced = [head, splicedTail];
+      arrays.push(popped, truncated, deleted, shifted, spliced);
+      popped.pop();
+      truncated.length = 0;
+      delete deleted[0];
+      var ordered = shifted.shift() === head && shifted.length === 1 &&
+                    shifted[0] === shiftedTail &&
+                    spliced.splice(0, 1)[0] === head && spliced.length === 1 &&
+                    spliced[0] === splicedTail;
+      shifted[0] = null;
+      spliced[0] = null;
+      return ordered;
+    })();
+  )";
+  LEPUSValue result =
+      LEPUS_Eval(ctx, setup, sizeof(setup) - 1, "shrink_fast_array.js",
+                 LEPUS_EVAL_TYPE_GLOBAL);
+  ASSERT_FALSE(LEPUS_IsException(result));
+
+  LEPUS_RunGC(ctx->rt);
+
+  constexpr char check[] = R"(
+    removed.filter(function(entry) {
+      return entry.ref.deref() !== undefined;
+    }).map(function(entry) {
+      return entry.operation;
+    }).join();
+  )";
+  result = LEPUS_Eval(ctx, check, sizeof(check) - 1,
+                      "shrink_fast_array_check.js", LEPUS_EVAL_TYPE_GLOBAL);
+  ASSERT_FALSE(LEPUS_IsException(result));
+  EXPECT_STREQ("", LEPUS_ToCString(ctx, result));
+
+  LEPUSValue global = LEPUS_GetGlobalObject(ctx);
+  EXPECT_TRUE(
+      LEPUS_ToBool(ctx, LEPUS_GetPropertyStr(ctx, global, "movesKeepOrder")));
+}
 }  // namespace heap_test

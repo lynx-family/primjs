@@ -4878,6 +4878,16 @@ static no_inline __exception int convert_fast_array_to_array(LEPUSContext *ctx,
   return 0;
 }
 
+/* The GC scans the whole values buffer, not just the first count slots, so
+   clear the slots given up or they keep the removed values alive. */
+static void shrink_fast_array(LEPUSObject *p, uint32_t new_count) {
+  LEPUSValue *values = p->u.array.u.values;
+  for (uint32_t i = new_count; i < p->u.array.count; i++) {
+    values[i] = LEPUS_UNDEFINED;
+  }
+  p->u.array.count = new_count;
+}
+
 static int delete_property(LEPUSContext *ctx, LEPUSObject *p, JSAtom atom) {
   JSShape *sh;
   JSShapeProperty *pr, *lpr, *prop;
@@ -4929,7 +4939,7 @@ redo:
             p->class_id == JS_CLASS_ARGUMENTS) {
           /* Special case deleting the last element of a fast Array */
           if (idx == p->u.array.count - 1) {
-            p->u.array.count = idx;
+            shrink_fast_array(p, idx);
             return TRUE;
           }
           if (convert_fast_array_to_array(ctx, p)) return -1;
@@ -4983,7 +4993,7 @@ int set_array_length_gc(LEPUSContext *ctx, LEPUSObject *p, LEPUSValue val,
   if (likely(p->fast_array)) {
     uint32_t old_len = p->u.array.count;
     if (len < old_len) {
-      p->u.array.count = len;
+      shrink_fast_array(p, len);
     }
     p->gc_prop[0].u.value = JS_NewUint32(ctx, len);
   } else {
@@ -16817,11 +16827,10 @@ static LEPUSValue js_array_pop(LEPUSContext *ctx, LEPUSValueConst this_val,
         for (uint32_t i = 0; i < count32 - 1; i++) {
           HeapObjStore(ctx, &arrp[i], arrp[i + 1]);
         }
-        p->u.array.count--;
       } else {
         res = arrp[count32 - 1];
-        p->u.array.count--;
       }
+      shrink_fast_array(p, count32 - 1);
     } else {
       if (shift) {
         res = JS_GetPropertyInt64(ctx, obj, 0);
@@ -17156,15 +17165,17 @@ static LEPUSValue js_array_slice(LEPUSContext *ctx, LEPUSValueConst this_val,
         if (item_count < del_count) {
           for (i = 0; i < tail; i++)
             HeapObjStore(ctx, &arrp[start + item_count + i], arrp[final + i]);
-          /* do not keep the moved elements alive through the unused slots */
-          for (i = new_len; i < len; i++) arrp[i] = LEPUS_UNDEFINED;
         } else if (item_count > del_count) {
           for (i = tail; i-- > 0;)
             HeapObjStore(ctx, &arrp[start + item_count + i], arrp[final + i]);
         }
         for (i = 0; i < item_count; i++)
           HeapObjStore(ctx, &arrp[start + i], argv[i + 2]);
-        p->u.array.count = new_len;
+        if (new_len < len) {
+          shrink_fast_array(p, new_len);
+        } else {
+          p->u.array.count = new_len;
+        }
         p->gc_prop[0].u.value = LEPUS_NewInt32(ctx, new_len);
         return arr;
       }
