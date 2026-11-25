@@ -160,6 +160,25 @@ int lre_case_conv(uint32_t *res, uint32_t c, int conv_type) {
   return 1;
 }
 
+uint32_t lre_case_fold_pair(uint32_t c) {
+  switch (c) {
+    case 0x0390:
+      return 0x1fd3;
+    case 0x1fd3:
+      return 0x0390;
+    case 0x03b0:
+      return 0x1fe3;
+    case 0x1fe3:
+      return 0x03b0;
+    case 0xfb05:
+      return 0xfb06;
+    case 0xfb06:
+      return 0xfb05;
+    default:
+      return c;
+  }
+}
+
 static uint32_t get_le24(const uint8_t *ptr) {
 #if defined(__x86__) || defined(__x86_64__)
   return *(uint16_t *)ptr | (ptr[2] << 16);
@@ -409,6 +428,81 @@ int cr_invert(CharRange *cr) {
   cr->len = len + 2;
   cr_compress(cr);
   return 0;
+}
+
+static int cr_interval_cmp(const void *a, const void *b, void *) {
+  uint32_t start_a = *static_cast<const uint32_t *>(a);
+  uint32_t start_b = *static_cast<const uint32_t *>(b);
+  return (start_a > start_b) - (start_a < start_b);
+}
+
+/* The characters that are not their own canonicalization are kept: a
+   canonicalized character is never equal to one of them. */
+int cr_regexp_canonicalize(CharRange *cr, BOOL is_unicode) {
+  CharRange a;
+  uint32_t res[LRE_CC_RES_LEN_MAX];
+  uint32_t v, code, code_end, start, end, c, d, d_start, d_end;
+  int i, j, idx, idx1, len, ret;
+
+  cr_init(&a, cr->mem_opaque, cr->realloc_func);
+  ret = -1;
+  d_start = 0;
+  d_end = 0;
+  idx = 0;
+  for (i = 0; i < cr->len; i += 2) {
+    start = cr->points[i];
+    end = cr->points[i + 1];
+    /* only the characters of case_conv_table1 can change */
+    for (idx1 = idx; idx1 < countof(case_conv_table1); idx1++) {
+      v = case_conv_table1[idx1];
+      code = v >> (32 - 17);
+      code_end = code + ((v >> (32 - 17 - 7)) & 0x7f);
+      if (code >= end) break;
+      if (code_end <= start) {
+        idx = idx1 + 1;
+        continue;
+      }
+      for (c = max_uint32(start, code); c < min_uint32(end, code_end); c++) {
+        /* same as lre_canonicalize() */
+        len = lre_case_conv(res, c, is_unicode ? 2 : 0);
+        d = res[0];
+        if (is_unicode) {
+          if (d == c) d = lre_case_fold_pair(c);
+        } else if (len != 1 || (d < 128 && c >= 128)) {
+          continue;
+        }
+        if (d >= start && d < end) continue; /* already in 'cr' */
+        if (d == d_end && d_start < d_end) {
+          d_end++;
+        } else {
+          if (d_start < d_end && cr_add_interval(&a, d_start, d_end)) goto done;
+          d_start = d;
+          d_end = d + 1;
+        }
+      }
+    }
+  }
+  if (d_start < d_end) {
+    if (cr_add_interval(&a, d_start, d_end)) goto done;
+    /* the intervals are not sorted and may overlap */
+    rqsort(a.points, a.len / 2, 2 * sizeof(a.points[0]), cr_interval_cmp, NULL);
+    j = 0;
+    for (i = 2; i < a.len; i += 2) {
+      if (a.points[i] <= a.points[j + 1]) {
+        a.points[j + 1] = max_uint32(a.points[j + 1], a.points[i + 1]);
+      } else {
+        j += 2;
+        a.points[j] = a.points[i];
+        a.points[j + 1] = a.points[i + 1];
+      }
+    }
+    a.len = j + 2;
+    if (cr_union1(cr, a.points, a.len)) goto done;
+  }
+  ret = 0;
+done:
+  cr_free(&a);
+  return ret;
 }
 
 #ifdef CONFIG_ALL_UNICODE

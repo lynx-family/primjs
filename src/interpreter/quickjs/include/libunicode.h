@@ -50,6 +50,9 @@ typedef enum {
 } UnicodeNormalizationEnum;
 
 QJS_HIDE int lre_case_conv(uint32_t *res, uint32_t c, int conv_type);
+/* Return the character with the same simple case folding as 'c' that
+   lre_case_conv() does not give, or 'c' if there is none. */
+QJS_HIDE uint32_t lre_case_fold_pair(uint32_t c);
 QJS_HIDE LRE_BOOL lre_is_cased(uint32_t c);
 QJS_HIDE LRE_BOOL lre_is_case_ignorable(uint32_t c);
 
@@ -106,6 +109,10 @@ QJS_HIDE int cr_op(CharRange *cr, const uint32_t *a_pt, int a_len,
                    const uint32_t *b_pt, int b_len, int op);
 
 QJS_HIDE int cr_invert(CharRange *cr);
+
+/* add the characters that lre_canonicalize() of libregexp.cc returns for the
+   ones in 'cr' */
+QJS_HIDE int cr_regexp_canonicalize(CharRange *cr, LRE_BOOL is_unicode);
 
 #ifdef CONFIG_ALL_UNICODE
 

@@ -41379,13 +41379,76 @@ QJS_STATIC LEPUSValue js_regexp_test(LEPUSContext *ctx,
   return JS_RegExpExecInternal(ctx, this_val, argv[0], TRUE);
 }
 
+/* Return TRUE if rx.flags only depends on the bytecode of 'rx': it has no
+   other own property than lastIndex and the getters of RegExp.prototype are
+   the original ones. These are the first properties of RegExp.prototype, in
+   the order of js_regexp_proto_funcs: a slot is not used again once its
+   property is deleted, so it holds either that property or none. */
+QJS_STATIC BOOL js_regexp_has_original_flags(LEPUSContext *ctx,
+                                             LEPUSValueConst rx) {
+  LEPUSObject *p, *proto;
+  JSShapeProperty *prs;
+  JSProperty *pr;
+  LEPUSCFunctionType ft;
+  int i;
+
+  p = LEPUS_VALUE_GET_OBJ(rx);
+  proto = LEPUS_VALUE_GET_OBJ(ctx->class_proto[JS_CLASS_REGEXP]);
+  if (p->class_id != JS_CLASS_REGEXP || p->shape->proto != proto ||
+      p->shape->prop_count != 1)
+    return FALSE;
+  if (proto->shape->prop_count < 8) return FALSE;
+  prs = get_shape_prop(proto->shape);
+  pr = proto->prop;
+  if (prs[0].atom != JS_ATOM_flags) return FALSE;
+  for (i = 0; i < 8; i++) {
+    if (i == 1) continue; /* source */
+    if ((prs[i].flags & LEPUS_PROP_TMASK) != LEPUS_PROP_GETSET) return FALSE;
+    if (i == 0)
+      ft.getter = js_regexp_get_flags;
+    else
+      ft.getter_magic = js_regexp_get_flag;
+    if (!pr[i].u.getset.getter ||
+        !JS_IsCFunction(ctx,
+                        LEPUS_MKPTR(LEPUS_TAG_OBJECT, pr[i].u.getset.getter),
+                        ft.generic, i == 0 ? 0 : 1 << (i - 2)))
+      return FALSE;
+  }
+  return TRUE;
+}
+
+/* Read rx.flags. Return LRE_FLAG_GLOBAL if it contains 'g' and LRE_FLAG_UTF16
+   if it contains 'u' or 'v', or -1 if exception. */
+QJS_STATIC int js_regexp_get_match_flags(LEPUSContext *ctx,
+                                         LEPUSValueConst rx) {
+  LEPUSValue val;
+  JSString *p;
+  int flags;
+
+  if (js_regexp_has_original_flags(ctx, rx)) {
+    flags = lre_get_flags(js_get_regexp(ctx, rx, FALSE)->bytecode->u.str8);
+    return flags & (LRE_FLAG_GLOBAL | LRE_FLAG_UTF16);
+  }
+  val = JS_ToStringFree(
+      ctx, JS_GetPropertyInternal_RC(ctx, rx, JS_ATOM_flags, rx, 0));
+  if (LEPUS_IsException(val)) return -1;
+  p = LEPUS_VALUE_GET_STRING(val);
+  flags = 0;
+  if (string_indexof_char(p, 'g', 0) >= 0) flags |= LRE_FLAG_GLOBAL;
+  if (string_indexof_char(p, 'u', 0) >= 0 ||
+      string_indexof_char(p, 'v', 0) >= 0)
+    flags |= LRE_FLAG_UTF16;
+  LEPUS_FreeValue(ctx, val);
+  return flags;
+}
+
 QJS_STATIC LEPUSValue js_regexp_Symbol_match(LEPUSContext *ctx,
                                              LEPUSValueConst this_val, int argc,
                                              LEPUSValueConst *argv) {
   // [Symbol.match](str)
   LEPUSValueConst rx = this_val;
   LEPUSValue A, S, result, matchStr;
-  int global, n, fullUnicode, isEmpty;
+  int flags, n, isEmpty;
   JSString *p;
 
   if (!LEPUS_IsObject(rx)) return JS_ThrowTypeErrorNotAnObject(ctx);
@@ -41396,17 +41459,12 @@ QJS_STATIC LEPUSValue js_regexp_Symbol_match(LEPUSContext *ctx,
   S = JS_ToString_RC(ctx, argv[0]);
   if (LEPUS_IsException(S)) goto exception;
 
-  global = JS_ToBoolFree_RC(
-      ctx, JS_GetPropertyInternal_RC(ctx, rx, JS_ATOM_global, rx, 0));
-  if (global < 0) goto exception;
+  flags = js_regexp_get_match_flags(ctx, rx);
+  if (flags < 0) goto exception;
 
-  if (!global) {
+  if (!(flags & LRE_FLAG_GLOBAL)) {
     A = JS_RegExpExec(ctx, rx, S);
   } else {
-    fullUnicode = JS_ToBoolFree_RC(
-        ctx, JS_GetPropertyInternal_RC(ctx, rx, JS_ATOM_unicode, rx, 0));
-    if (fullUnicode < 0) goto exception;
-
     if (JS_SetPropertyInternal_RC(ctx, rx, JS_ATOM_lastIndex,
                                   LEPUS_NewInt32(ctx, 0), LEPUS_PROP_THROW) < 0)
       goto exception;
@@ -41431,7 +41489,8 @@ QJS_STATIC LEPUSValue js_regexp_Symbol_match(LEPUSContext *ctx,
         p = LEPUS_VALUE_GET_STRING(S);
         nextIndex = thisIndex + 1;
         if (thisIndex < p->len)
-          nextIndex = string_advance_index(p, thisIndex, fullUnicode);
+          nextIndex =
+              string_advance_index(p, thisIndex, (flags & LRE_FLAG_UTF16) != 0);
         if (JS_SetPropertyInternal_RC(ctx, rx, JS_ATOM_lastIndex,
                                       LEPUS_NewInt64(ctx, nextIndex),
                                       LEPUS_PROP_THROW) < 0)
@@ -41671,7 +41730,7 @@ QJS_STATIC LEPUSValue js_regexp_Symbol_replace(LEPUSContext *ctx,
   JSString *sp, *rp;
   StringBuffer b_s, *b = &b_s;
   ValueBuffer v_b, *results = &v_b;
-  int nextSourcePosition, j, functionalReplace, is_global, fullUnicode;
+  int nextSourcePosition, j, functionalReplace, flags, is_global, fullUnicode;
   int64_t nCaptures, n, position;
 
   if (!LEPUS_IsObject(rx)) return JS_ThrowTypeErrorNotAnObject(ctx);
@@ -41696,14 +41755,11 @@ QJS_STATIC LEPUSValue js_regexp_Symbol_replace(LEPUSContext *ctx,
     if (LEPUS_IsException(rep_val)) goto exception;
     rp = LEPUS_VALUE_GET_STRING(rep_val);
   }
-  fullUnicode = 0;
-  is_global = JS_ToBoolFree_RC(
-      ctx, JS_GetPropertyInternal_RC(ctx, rx, JS_ATOM_global, rx, 0));
-  if (is_global < 0) goto exception;
+  flags = js_regexp_get_match_flags(ctx, rx);
+  if (flags < 0) goto exception;
+  is_global = (flags & LRE_FLAG_GLOBAL) != 0;
+  fullUnicode = (flags & LRE_FLAG_UTF16) != 0;
   if (is_global) {
-    fullUnicode = JS_ToBoolFree_RC(
-        ctx, JS_GetPropertyInternal_RC(ctx, rx, JS_ATOM_unicode, rx, 0));
-    if (fullUnicode < 0) goto exception;
     if (JS_SetPropertyInternal_RC(ctx, rx, JS_ATOM_lastIndex,
                                   LEPUS_NewInt32(ctx, 0), LEPUS_PROP_THROW) < 0)
       goto exception;
@@ -41717,7 +41773,10 @@ QJS_STATIC LEPUSValue js_regexp_Symbol_replace(LEPUSContext *ctx,
 #endif
     int is_standard = js_is_standard_regexp(ctx, rx);
     if (is_standard < 0) goto exception;
-    if (is_standard) {
+    JSRegExp *re = js_get_regexp(ctx, rx, FALSE);
+    if (is_standard && re &&
+        (lre_get_flags(re->bytecode->u.str8) &
+         (LRE_FLAG_GLOBAL | LRE_FLAG_UTF16)) == flags) {
       /* use faster version for simple cases */
       res = JS_RegExpReplaceString(ctx, rx, str, rp);
       goto done;
@@ -42006,6 +42065,7 @@ static const LEPUSCFunctionListEntry js_regexp_funcs[] = {
     // LEPUS_CFUNC_DEF("__RegExpDelete", 2, js_regexp___RegExpDelete ),
 };
 
+/* js_regexp_has_original_flags() depends on the order of the first ones */
 static const LEPUSCFunctionListEntry js_regexp_proto_funcs[] = {
     LEPUS_CGETSET_DEF("flags", js_regexp_get_flags, NULL),
     LEPUS_CGETSET_DEF("source", js_regexp_get_source, NULL),

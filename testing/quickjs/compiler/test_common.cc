@@ -4463,6 +4463,23 @@ TEST_F(CommonQjsTest, RegExpCompilerPreservesLegacyFormat) {
   if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, re);
 }
 
+// /\u1fd3/iu as emitted by the original compiler. U+1FD3 and U+0390 match each
+// other, but the original case folding keeps both.
+static const uint8_t kLegacyCaseFoldPairBytecode[] = {
+    0x12, 0x01, 0x00, 0x13, 0x00, 0x00, 0x00, 0x08, 0x06,
+    0x00, 0x00, 0x00, 0x04, 0x07, 0xf5, 0xff, 0xff, 0xff,
+    0x0b, 0x00, 0x01, 0xd3, 0x1f, 0x0c, 0x00, 0x0a,
+};
+
+// Precompiled case insensitive patterns still match their own characters.
+TEST_F(CommonQjsTest, LegacyRegExpBytecodeMatchesCaseFoldPair) {
+  const uint16_t subject = 0x1fd3;
+  uint8_t* capture[2];
+  EXPECT_EQ(lre_exec(capture, kLegacyCaseFoldPairBytecode,
+                     reinterpret_cast<const uint8_t*>(&subject), 0, 1, 1, ctx_),
+            1);
+}
+
 // Adds a global collect() that runs a full GC.
 static void AddCollect(LEPUSContext* ctx) {
   auto collect = LEPUS_NewCFunction(

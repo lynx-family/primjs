@@ -465,7 +465,13 @@ test/built-ins/RegExp/property-escapes/generated/strings/RGI_Emoji_Modifier_Sequ
 test/built-ins/RegExp/property-escapes/generated/strings/RGI_Emoji_Tag_Sequence.js:17: SyntaxError: invalid regular expression flags
 test/built-ins/RegExp/property-escapes/generated/strings/RGI_Emoji_ZWJ_Sequence.js:17: SyntaxError: invalid regular expression flags
 test/built-ins/RegExp/proto-from-ctor-realm.js:24: TypeError: $262.createRealm is not a function
+test/built-ins/RegExp/prototype/Symbol.match/g-get-exec-err.js:29: Test262Error: Error thrown after setting `lastIndex` Expected SameValue(«undefined», «0») to be true
+test/built-ins/RegExp/prototype/Symbol.match/get-global-err.js:16: Test262Error: Expected a Test262Error but got a TypeError
+test/built-ins/RegExp/prototype/Symbol.match/get-unicode-error.js:21: Test262Error: 
 test/built-ins/RegExp/prototype/Symbol.replace/coerce-lastindex.js:27: Test262Error: Expected SameValue(«0», «9007199254740992») to be true
+test/built-ins/RegExp/prototype/Symbol.replace/get-exec-err.js:25: Test262Error: Error thrown after setting `lastIndex` Expected SameValue(«undefined», «0») to be true
+test/built-ins/RegExp/prototype/Symbol.replace/get-global-err.js:17: Test262Error: Expected a Test262Error but got a TypeError
+test/built-ins/RegExp/prototype/Symbol.replace/get-unicode-error.js:21: Test262Error: 
 test/built-ins/RegExp/prototype/Symbol.replace/poisoned-stdlib.js:23: Test262Error: 0 setter should be unreachable.
 test/built-ins/RegExp/prototype/Symbol.replace/result-coerce-groups-err.js:36: Test262Error: Expected a TypeError to be thrown but no exception was thrown at all
 test/built-ins/RegExp/prototype/Symbol.split/splitter-proto-from-ctor-realm.js:20: TypeError: $262.createRealm is not a function
