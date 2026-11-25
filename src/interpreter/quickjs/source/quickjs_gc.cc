@@ -21577,6 +21577,14 @@ exception:
   return LEPUS_EXCEPTION;
 }
 
+// 'list' is an array which user code cannot reach. The specification uses a
+// List there, so append without looking for setters in Array.prototype.
+static int json_list_append_gc(LEPUSContext *ctx, LEPUSValueConst list,
+                               LEPUSValue val) {
+  return add_fast_array_element_gc(ctx, LEPUS_VALUE_GET_OBJ(list), val,
+                                   LEPUS_PROP_THROW);
+}
+
 static force_inline uint32_t json_string_length_gc(LEPUSValueConst str) {
   if (LEPUS_VALUE_IS_STRING(str)) return LEPUS_VALUE_GET_STRING(str)->len;
   return JS_GetSeparableString(str)->len;
@@ -21970,9 +21978,7 @@ static int json_write_value_stream_gc(LEPUSContext *ctx,
     LEPUS_ThrowTypeError(ctx, "circular reference");
     return -1;
   }
-  element = js_array_push(ctx, jsc->stack, 1,
-                          reinterpret_cast<LEPUSValueConst *>(&value), 0);
-  if (LEPUS_IsException(element)) return -1;
+  if (json_list_append_gc(ctx, jsc->stack, value) < 0) return -1;
 
   int is_array = JS_IsArray_GC(ctx, value);
   if (is_array < 0) return -1;
@@ -22065,7 +22071,7 @@ QJS_HIDE LEPUSValue js_json_stringify_opt_GC(LEPUSContext *ctx,
   func_scope.PushHandle(&space, HANDLE_TYPE_LEPUS_VALUE);
   LEPUSValue ret, wrapper;
   int res;
-  int64_t i, j, n;
+  int64_t i, n;
   GCRawStringBuffer json_buffer(ctx);
   if (string_buffer_init_raw_gc(ctx, &json_buffer)) return LEPUS_EXCEPTION;
 
@@ -22101,7 +22107,7 @@ QJS_HIDE LEPUSValue js_json_stringify_opt_GC(LEPUSContext *ctx,
       HeapObjStore(ctx, &jsc->property_list, JS_NewArray_GC(ctx));
       if (LEPUS_IsException(jsc->property_list)) goto exception;
       if (js_get_length64(ctx, &n, replacer)) goto exception;
-      for (i = j = 0; i < n; i++) {
+      for (i = 0; i < n; i++) {
         LEPUSValue present;
         v = JS_GetPropertyInt64(ctx, replacer, i);
         if (LEPUS_IsException(v)) goto exception;
@@ -22125,8 +22131,9 @@ QJS_HIDE LEPUSValue js_json_stringify_opt_GC(LEPUSContext *ctx,
         if (LEPUS_IsException(present)) {
           goto exception;
         }
-        if (!JS_ToBoolFree_GC(ctx, present)) {
-          JS_SetPropertyInt64_GC(ctx, jsc->property_list, j++, v);
+        if (!JS_ToBoolFree_GC(ctx, present) &&
+            json_list_append_gc(ctx, jsc->property_list, v) < 0) {
+          goto exception;
         }
       }
     }

@@ -3787,152 +3787,285 @@ TEST_F(CommonQjsTest, JsonStringifyOrdersLargeArrayIndices) {
   if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, ret);
 }
 
-TEST_F(CommonQjsTest, JsonParseBigIntPositive) {
-  // Verify JSON.parse correctly handles positive BigInt literals without UAF.
-  std::string src = R"(
-    var arr = JSON.parse("[1, 2n]");
-    if (arr[0] !== 1) throw new Error("arr[0] mismatch: " + arr[0]);
-    if (arr[1] !== 2n) throw new Error("arr[1] mismatch: " + arr[1]);
-    if (typeof arr[1] !== "bigint") throw new Error("type mismatch: " + typeof arr[1]);
-  )";
-  auto ret = LEPUS_Eval(ctx_, src.c_str(), src.size(), "test.js",
+TEST_F(CommonQjsTest, JsonParseRejectsNonJsonNumbers) {
+  const char* source = R"JS(
+    const rejected = [
+      "0x10", "0X1F", "-0x10", "0b11", "0o17", "1_000", "0.0_1", "1.", "1.e5",
+      "-.5", ".5", "01", "-01", "00", "09.5", "-", "--1", "+1", "- 1", "-\n1",
+      "-/**/1", "-//\n1", "1e", "1e+", "1.5e", "1.5e-", "1n", "0n", "-3n",
+      "999999999999999999n", "1.5n", "NaN", "Infinity", "-Infinity", "1 2",
+      "1/**/", "1\0"
+    ];
+    for (const text of rejected) {
+      for (const input of [text, "[" + text + "]", "{\"a\":" + text + "}",
+                           "[1.5," + text + "]", "[[], " + text + " ]"]) {
+        let error;
+        try { JSON.parse(input); } catch (e) { error = e; }
+        if (!(error instanceof SyntaxError)) {
+          throw new Error("accepted " + JSON.stringify(input));
+        }
+      }
+    }
+
+    const accepted = [
+      "0", "-0", "-0.0", "0.0", "0e5", "0E-5", "-0e1", "7", "-7", "10", "1.0",
+      "999999999", "-999999999", "1000000000", "2147483647", "2147483648",
+      "-2147483648", "-2147483649", "4294967296", "9007199254740993", "0.1",
+      "-0.5", "1E5", "1e+5", "12.5e-3", "1e21", "1e400", "-1e400", "1e-400",
+      "-1e-400", "5e-324", "1.7976931348623157e308",
+      "123456789012345678901234567890", "0." + "0".repeat(100) + "125",
+      "1" + "0".repeat(100) + ".5e-90"
+    ];
+    for (const text of accepted) {
+      const expected = Number(text);
+      if (!Object.is(JSON.parse(text), expected) ||
+          !Object.is(JSON.parse(" \t\r\n" + text + " \t\r\n"), expected) ||
+          !Object.is(JSON.parse("[" + text + "]")[0], expected) ||
+          !Object.is(JSON.parse("[" + text + " ,1]")[0], expected) ||
+          !Object.is(JSON.parse("{\"a\":" + text + "}").a, expected)) {
+        throw new Error("wrong value for " + text);
+      }
+    }
+  )JS";
+  auto ret = LEPUS_Eval(ctx_, source, strlen(source), "json-numbers.js",
                         LEPUS_EVAL_TYPE_GLOBAL);
-  if (LEPUS_IsException(ret)) {
-    std::string err = js_get_exception_string(ctx_);
-    FAIL() << err;
-  }
+  EXPECT_FALSE(LEPUS_IsException(ret)) << js_get_exception_string(ctx_);
   if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, ret);
 }
 
-TEST_F(CommonQjsTest, LepusParseJsonBigIntPositive) {
-  const char* input = R"({"root":2n,"array":[3n,4n]})";
-  LEPUSValue parsed = LEPUS_ParseJSON(ctx_, input, strlen(input), "test.json");
-  ASSERT_FALSE(LEPUS_IsException(parsed));
+TEST_F(CommonQjsTest, JsonParseKeepsNulCharacters) {
+  const char* source = R"JS(
+    Assert(JSON.parse(JSON.stringify("a\0b")) === "a\0b");
+    Assert(JSON.parse('"\\u0000"') === "\0");
+    Assert(JSON.parse('["x\\u0000y"]')[0] === "x\0y");
+    Assert(JSON.parse('"\u4e2d\\u0000\u6587"') === "\u4e2d\0\u6587");
 
-  LEPUSValue root = LEPUS_GetPropertyStr(ctx_, parsed, "root");
-  ASSERT_TRUE(LEPUS_IsBigInt(root));
-  int64_t value = 0;
-  ASSERT_EQ(0, LEPUS_ToBigInt64(ctx_, &value, root));
-  EXPECT_EQ(2, value);
+    const object = JSON.parse(
+        '{"k\\u0000a":1,"k\\u0000b":{"k":"v\\u0000w"},"k":2,"\\u0000":3}');
+    Assert(Object.keys(object).join() === "k\0a,k\0b,k,\0");
+    Assert(object["k\0a"] === 1);
+    Assert(object["k\0b"].k === "v\0w");
+    Assert(object.k === 2);
+    Assert(object["\0"] === 3);
 
-  LEPUSValue array = LEPUS_GetPropertyStr(ctx_, parsed, "array");
-  ASSERT_TRUE(LEPUS_IsArray(ctx_, array));
-  for (uint32_t i = 0; i < 2; i++) {
-    LEPUSValue element = LEPUS_GetPropertyUint32(ctx_, array, i);
-    ASSERT_TRUE(LEPUS_IsBigInt(element));
-    ASSERT_EQ(0, LEPUS_ToBigInt64(ctx_, &value, element));
-    EXPECT_EQ(static_cast<int64_t>(i + 3), value);
-    if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, element);
+    const seen = [];
+    JSON.parse('{"k\\u0000a":"v\\u0000w"}', (key, value) => {
+      seen.push(key, value);
+      return value;
+    });
+    Assert(seen[0] === "k\0a" && seen[1] === "v\0w");
+
+    for (const input of ['"a\0b"', '{"a\0b":1}', '"a"\0', '\0', '']) {
+      let error;
+      try { JSON.parse(input); } catch (e) { error = e; }
+      Assert(error instanceof SyntaxError);
+    }
+  )JS";
+  auto ret = LEPUS_Eval(ctx_, source, strlen(source), "json-nul.js",
+                        LEPUS_EVAL_TYPE_GLOBAL);
+  EXPECT_FALSE(LEPUS_IsException(ret)) << js_get_exception_string(ctx_);
+  if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, ret);
+}
+
+TEST_F(CommonQjsTest, JsonParseAcceptsLoneSurrogates) {
+  const char* source = R"JS(
+    function escape(text) {
+      let result = "";
+      for (let i = 0; i < text.length; i++) {
+        result += "\\u" + text.charCodeAt(i).toString(16).padStart(4, "0");
+      }
+      return result;
+    }
+    const units = ["\ud800", "\udbff", "\udc00", "\udfff", "a", "\u00e9",
+                   "\u4e2d", "\ud83d\ude00"];
+    for (const a of units) {
+      for (const b of units) {
+        for (const c of units) {
+          const text = a + b + c;
+          // Escaped by JSON.stringify, all escaped, not escaped and mixed.
+          Assert(JSON.parse(JSON.stringify(text)) === text);
+          Assert(JSON.parse('"' + escape(text) + '"') === text);
+          Assert(JSON.parse('"' + text + '"') === text);
+          Assert(JSON.parse('"' + escape(a) + b + escape(c) + '"') === text);
+          Assert(JSON.parse('"' + a + escape(b) + c + '"') === text);
+          const object = JSON.parse('{"' + escape(text) + '":["' + text + '"]}');
+          Assert(Object.keys(object)[0] === text && object[text][0] === text);
+        }
+      }
+    }
+    Assert(JSON.parse('"\\ud83d\\u0041"') === "\ud83dA");
+    Assert(JSON.parse('"\\ud83d\\n"') === "\ud83d\n");
+    Assert(JSON.parse('"\\uD83D\\uDE00"') === "\ud83d\ude00");
+
+    for (const input of ['"\\ud83d', '"\\ud83d\\', '"\\ud83d\\"', '"\\ud83d\\u"',
+                         '"\\ud83d\\u', '"\\ud83d\\u1', '"\\ud83d\\ude0',
+                         '"\\ud83d\\ude0"', '"\\ud83d\\ug000"', '"\\ud83"']) {
+      let error;
+      try { JSON.parse(input); } catch (e) { error = e; }
+      Assert(error instanceof SyntaxError);
+    }
+  )JS";
+  auto ret = LEPUS_Eval(ctx_, source, strlen(source), "json-surrogates.js",
+                        LEPUS_EVAL_TYPE_GLOBAL);
+  EXPECT_FALSE(LEPUS_IsException(ret)) << js_get_exception_string(ctx_);
+  if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, ret);
+}
+
+TEST_F(CommonQjsTest, JsonStringifyIgnoresArrayPrototypeIndices) {
+  const char* source = R"JS(
+    let calls = 0;
+    const accessor = {
+      get() { calls++; },
+      set(value) { calls++; },
+      configurable: true
+    };
+    const readonly = { value: 1, writable: false, configurable: true };
+    function withIndices(descriptor, callback) {
+      for (let i = 0; i < 4; i++) {
+        Object.defineProperty(Array.prototype, i, descriptor);
+      }
+      try {
+        return callback();
+      } finally {
+        for (let i = 0; i < 4; i++) delete Array.prototype[i];
+      }
+    }
+
+    const flat = { a: 1, b: 2, c: 3 };
+    const nested = { a: { b: [1, [2, { c: { d: 3 } }]] }, e: [] };
+    const list = ["c", "a", "c", "b"];
+    const circular = { a: [] };
+    circular.a.push({ circular });
+    for (const descriptor of [accessor, readonly]) {
+      withIndices(descriptor, () => {
+        Assert(JSON.stringify(flat) === '{"a":1,"b":2,"c":3}');
+        Assert(JSON.stringify(flat, list) === '{"c":3,"a":1,"b":2}');
+        Assert(JSON.stringify([flat], list) === '[{"c":3,"a":1,"b":2}]');
+        Assert(JSON.stringify(nested) ===
+               '{"a":{"b":[1,[2,{"c":{"d":3}}]]},"e":[]}');
+        Assert(JSON.stringify(nested, (key, value) => value) ===
+               '{"a":{"b":[1,[2,{"c":{"d":3}}]]},"e":[]}');
+        Assert(JSON.stringify([[flat]], list, 1) ===
+               '[\n [\n  {\n   "c": 3,\n   "a": 1,\n   "b": 2\n  }\n ]\n]');
+        let error;
+        try { JSON.stringify(circular); } catch (e) { error = e; }
+        Assert(error instanceof TypeError);
+      });
+    }
+    Assert(calls === 0);
+
+    // The same object may appear more than once if it is not circular.
+    Assert(JSON.stringify([flat, [flat], { flat }], ["flat", "a"]) ===
+           '[{"a":1},[{"a":1}],{"flat":{"a":1}}]');
+  )JS";
+  auto ret = LEPUS_Eval(ctx_, source, strlen(source), "json-setters.js",
+                        LEPUS_EVAL_TYPE_GLOBAL);
+  EXPECT_FALSE(LEPUS_IsException(ret)) << js_get_exception_string(ctx_);
+  if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, ret);
+}
+
+TEST_F(CommonQjsTest, LepusParseJsonMatchesJsonParse) {
+  const char* rejected[] = {"2n",        "[3n,4n]", "-3n",         "0x10",
+                            "1.",        ".5",      "[1/**/]",     "//\n1",
+                            "\"\\x41\"", "\"\\v\"", "\"\\u{41}\"", "'a'"};
+  for (const char* input : rejected) {
+    LEPUSValue parsed =
+        LEPUS_ParseJSON(ctx_, input, strlen(input), "test.json");
+    EXPECT_TRUE(LEPUS_IsException(parsed)) << input;
+    LEPUSValue error = LEPUS_GetException(ctx_);
+    EXPECT_TRUE(LEPUS_IsError(ctx_, error)) << input;
+    if (!ctx_->gc_enable) {
+      LEPUS_FreeValue(ctx_, error);
+      LEPUS_FreeValue(ctx_, parsed);
+    }
   }
 
+  // The length decides where the text ends, not the first NUL character.
+  const char nul[] = "[1]\0";
+  LEPUSValue parsed = LEPUS_ParseJSON(ctx_, nul, sizeof(nul) - 1, "test.json");
+  EXPECT_TRUE(LEPUS_IsException(parsed));
+  LEPUSValue error = LEPUS_GetException(ctx_);
+  EXPECT_TRUE(LEPUS_IsError(ctx_, error));
   if (!ctx_->gc_enable) {
-    LEPUS_FreeValue(ctx_, array);
-    LEPUS_FreeValue(ctx_, root);
+    LEPUS_FreeValue(ctx_, error);
     LEPUS_FreeValue(ctx_, parsed);
   }
+
+  const char* input =
+      R"({"a\u0000b":"x\u0000y","c":["\ud800",1.5,-0,1e3,true,null,{}]})";
+  LEPUSValue global = LEPUS_GetGlobalObject(ctx_);
+  parsed = LEPUS_ParseJSON(ctx_, input, strlen(input), "test.json");
+  ASSERT_FALSE(LEPUS_IsException(parsed)) << js_get_exception_string(ctx_);
+  LEPUS_SetPropertyStr(ctx_, global, "parsed", parsed);
+  if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, global);
+
+  const char* source = R"JS(
+    Assert(Object.keys(parsed).join() === "a\0b,c");
+    Assert(parsed["a\0b"] === "x\0y");
+    Assert(parsed.c.length === 7);
+    Assert(parsed.c[0] === "\ud800");
+    Assert(parsed.c[1] === 1.5);
+    Assert(Object.is(parsed.c[2], -0));
+    Assert(parsed.c[3] === 1000);
+    Assert(parsed.c[4] === true);
+    Assert(parsed.c[5] === null);
+    Assert(Object.keys(parsed.c[6]).length === 0);
+  )JS";
+  auto ret = LEPUS_Eval(ctx_, source, strlen(source), "parse-json-api.js",
+                        LEPUS_EVAL_TYPE_GLOBAL);
+  EXPECT_FALSE(LEPUS_IsException(ret)) << js_get_exception_string(ctx_);
+  if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, ret);
 }
 
-#ifdef ENABLE_COMPATIBLE_MM
-TEST(JsonParseBigIntGCTest, TemporaryTreeKeepsBigIntsAlive) {
-  LEPUSRuntime* rt = JS_NewRuntime_GC(0);
-  ASSERT_NE(nullptr, rt);
-  LEPUSContext* ctx = LEPUS_NewContext(rt);
-  ASSERT_NE(nullptr, ctx);
+TEST_F(CommonQjsTest, NonAsciiNamesDoNotMatchLatin1Atoms) {
+  // The UTF-8 bytes of "\u00e9" and "\u4e2d" are the characters of
+  // "\u00c3\u00a9" and "\u00e4\u00b8\u00ad". Create these atoms first.
+  const char* setup = R"JS(
+    globalThis.latin1 = {"\u00c3\u00a9": 1, "\u00e4\u00b8\u00ad": 1};
+  )JS";
+  auto ret = LEPUS_Eval(ctx_, setup, strlen(setup), "atoms.js",
+                        LEPUS_EVAL_TYPE_GLOBAL);
+  ASSERT_FALSE(LEPUS_IsException(ret)) << js_get_exception_string(ctx_);
+  if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, ret);
 
-  {
-    std::string input = "[";
-    for (int i = 0; i < 128; i++) {
-      if (i != 0) input += ',';
-      input += std::to_string(i) + "n";
+  LEPUSValue global = LEPUS_GetGlobalObject(ctx_);
+  LEPUSValue latin1 = LEPUS_GetPropertyStr(ctx_, global, "latin1");
+  LEPUSValue value = LEPUS_GetPropertyStr(ctx_, latin1, "\xc3\xa9");
+  EXPECT_TRUE(LEPUS_IsUndefined(value));
+  if (!ctx_->gc_enable) {
+    LEPUS_FreeValue(ctx_, value);
+    LEPUS_FreeValue(ctx_, latin1);
+  }
+
+  const char* input = "{\"\xc3\xa9\":2,\"\xe4\xb8\xad\":3}";
+  LEPUSValue parsed = LEPUS_ParseJSON(ctx_, input, strlen(input), "test.json");
+  ASSERT_FALSE(LEPUS_IsException(parsed)) << js_get_exception_string(ctx_);
+  LEPUS_SetPropertyStr(ctx_, global, "parsed", parsed);
+  if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, global);
+
+  const char* source = R"JS(
+    function check(obj) {
+      Assert(Object.keys(obj).join() === "\u00e9,\u4e2d");
+      Assert(obj["\u00e9"] === 2 && obj["\u4e2d"] === 3);
     }
-    input += ']';
-
-    LEPUSValue parsed = LEPUS_UNDEFINED;
-    HandleScope scope(ctx, &parsed, HANDLE_TYPE_LEPUS_VALUE);
-    parsed = JS_ParseJSONOPT(ctx, input.c_str(), input.size(), "test.json");
-    ASSERT_FALSE(LEPUS_IsException(parsed));
-    ASSERT_TRUE(LEPUS_IsArray(ctx, parsed));
-
-    LEPUS_RunGC(rt);
-    for (uint32_t i = 0; i < 128; i++) {
-      LEPUSValue element = LEPUS_UNDEFINED;
-      HandleScope element_scope(ctx, &element, HANDLE_TYPE_LEPUS_VALUE);
-      element = LEPUS_GetPropertyUint32(ctx, parsed, i);
-      ASSERT_TRUE(LEPUS_IsBigInt(element));
-      int64_t value = -1;
-      ASSERT_EQ(0, LEPUS_ToBigInt64(ctx, &value, element));
-      EXPECT_EQ(static_cast<int64_t>(i), value);
-    }
-  }
-
-  LEPUS_FreeContext(ctx);
-  LEPUS_FreeRuntime(rt);
-}
-#endif
-
-TEST_F(CommonQjsTest, JsonParseBigIntNegative) {
-  // The is_neg path converts BigInt to float64 (LEPUS_ToFloat64 on BigInt
-  // returns NaN in PrimJS). This test verifies no crash and documents behavior.
-  std::string src = R"(
-    var arr = JSON.parse("[-3n]");
-    // Negative BigInt goes through ToFloat64 which yields NaN for BigInt
-    if (typeof arr[0] !== "number")
-      throw new Error("expected number type, got: " + typeof arr[0]);
-    if (!isNaN(arr[0]))
-      throw new Error("expected NaN for negative bigint, got: " + arr[0]);
-  )";
-  auto ret = LEPUS_Eval(ctx_, src.c_str(), src.size(), "test.js",
-                        LEPUS_EVAL_TYPE_GLOBAL);
-  if (LEPUS_IsException(ret)) {
-    std::string err = js_get_exception_string(ctx_);
-    FAIL() << err;
-  }
+    check(parsed);
+    check(JSON.parse('{"\u00e9":2,"\u4e2d":3}'));
+    (0, eval)("var \u00e9 = 4;");
+    Assert(globalThis["\u00e9"] === 4);
+    Assert(!("\u00c3\u00a9" in globalThis));
+  )JS";
+  ret = LEPUS_Eval(ctx_, source, strlen(source), "non-ascii-names.js",
+                   LEPUS_EVAL_TYPE_GLOBAL);
+  EXPECT_FALSE(LEPUS_IsException(ret)) << js_get_exception_string(ctx_);
   if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, ret);
 }
 
-TEST_F(CommonQjsTest, JsonParseBigIntNested) {
-  // Verify nested objects and arrays with BigInt values.
-  std::string src = R"(
-    var obj = JSON.parse('{"a": [1n, 2n], "b": {"c": 999999999999999999n}}');
-    if (obj.a[0] !== 1n) throw new Error("obj.a[0] mismatch");
-    if (obj.a[1] !== 2n) throw new Error("obj.a[1] mismatch");
-    if (typeof obj.b.c !== "bigint") throw new Error("obj.b.c type mismatch");
-  )";
-  auto ret = LEPUS_Eval(ctx_, src.c_str(), src.size(), "test.js",
-                        LEPUS_EVAL_TYPE_GLOBAL);
-  if (LEPUS_IsException(ret)) {
-    std::string err = js_get_exception_string(ctx_);
-    FAIL() << err;
-  }
-  if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, ret);
-}
-
-TEST_F(CommonQjsTest, JsonParseBigIntMixedWithRegularNumbers) {
-  // Verify no interference between regular numbers and BigInt in same parse.
-  std::string src = R"(
-    var arr = JSON.parse("[42, 3.14, 7n, 0, 123456789012345678n]");
-    if (arr[0] !== 42) throw new Error("int mismatch");
-    if (Math.abs(arr[1] - 3.14) > 1e-10) throw new Error("float mismatch");
-    if (arr[2] !== 7n) throw new Error("bigint mismatch");
-    if (arr[3] !== 0) throw new Error("zero mismatch");
-    if (typeof arr[4] !== "bigint") throw new Error("large bigint type mismatch");
-  )";
-  auto ret = LEPUS_Eval(ctx_, src.c_str(), src.size(), "test.js",
-                        LEPUS_EVAL_TYPE_GLOBAL);
-  if (LEPUS_IsException(ret)) {
-    std::string err = js_get_exception_string(ctx_);
-    FAIL() << err;
-  }
-  if (!ctx_->gc_enable) LEPUS_FreeValue(ctx_, ret);
-}
-
-TEST_F(CommonQjsTest, JsonParseErrorAfterBigIntNoLeak) {
-  // Verify error path: parse a BigInt then hit invalid trailing content.
-  // The error path must free the DupValue'd BigInt without leaking.
+TEST_F(CommonQjsTest, JsonParseErrorAfterNumberNoLeak) {
+  // Verify error path: parse a number then hit a trailing comma.
   std::string src = R"(
     var caught = false;
     try {
-      JSON.parse("[1n, ]");
+      JSON.parse("[1.5, ]");
     } catch (e) {
       caught = true;
     }
@@ -3952,7 +4085,7 @@ TEST_F(CommonQjsTest, JsonParseErrorMidArrayAfterNumbers) {
   std::string src = R"(
     var caught = false;
     try {
-      JSON.parse("[1n, 2n, 3n invalid");
+      JSON.parse("[1.5, 2e3, 3 invalid");
     } catch (e) {
       caught = true;
     }
@@ -3972,7 +4105,7 @@ TEST_F(CommonQjsTest, JsonParseErrorAfterDocumentEnd) {
   std::string src = R"(
     var caught = false;
     try {
-      JSON.parse("42n extra");
+      JSON.parse("42 extra");
     } catch (e) {
       caught = true;
     }
@@ -4007,11 +4140,13 @@ TEST_F(CommonQjsTest, JsonParseNormalNumbersNoRegression) {
 }
 
 TEST_F(CommonQjsTest, JsonParseRepeatedCallsNoCumulativeLeak) {
-  // Stress test: repeated parse with BigInt to catch cumulative leaks.
+  // Stress test: repeated parse to catch cumulative leaks.
   std::string src = R"(
     for (var i = 0; i < 1000; i++) {
-      var r = JSON.parse("[" + i + "n]");
-      if (r[0] !== BigInt(i)) throw new Error("mismatch at " + i);
+      var r = JSON.parse('[' + i + '.5,"v\\u0000' + i + '",{"k\\u0000' + i + '":1}]');
+      if (r[0] !== i + 0.5) throw new Error("mismatch at " + i);
+      if (r[1] !== "v\0" + i) throw new Error("wrong string at " + i);
+      if (r[2]["k\0" + i] !== 1) throw new Error("wrong key at " + i);
     }
   )";
   auto ret = LEPUS_Eval(ctx_, src.c_str(), src.size(), "test.js",
@@ -4024,13 +4159,17 @@ TEST_F(CommonQjsTest, JsonParseRepeatedCallsNoCumulativeLeak) {
 }
 
 TEST_F(CommonQjsTest, JsonParseRepeatedErrorsNoCumulativeLeak) {
-  // Stress test: repeated parse failures with BigInt to catch error-path leaks.
+  // Stress test: repeated parse failures to catch error-path leaks.
   std::string src = R"(
     for (var i = 0; i < 1000; i++) {
-      try {
-        JSON.parse("[" + i + "n, ]");
-      } catch (e) {
-        // expected
+      for (var input of ['[' + i + '.5, ]', '["a' + i + '",{"k":' + i + 'n}]',
+                         '[{"a":"' + i + '"}, -.5]']) {
+        try {
+          JSON.parse(input);
+        } catch (e) {
+          continue;
+        }
+        throw new Error("accepted " + input);
       }
     }
   )";

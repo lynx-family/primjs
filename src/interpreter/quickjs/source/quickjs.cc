@@ -3380,12 +3380,22 @@ JSAtom __JS_NewAtomInit(LEPUSRuntime *rt, const char *str, int len,
   return __JS_NewAtom(rt, p, atom_type);
 }
 
+/* 'str' is UTF-8 and is compared byte by byte with 8-bit atoms, whose bytes
+   are Latin-1 characters. Both agree only for ASCII: the UTF-8 bytes C3 A9
+   of U+00E9 would find the atom of U+00C3 U+00A9. */
 QJS_STATIC JSAtom __JS_FindAtom(LEPUSRuntime *rt, const char *str, size_t len,
                                 int atom_type) {
   uint32_t h, h1, i;
   JSAtomStruct *p;
+  uint8_t bits = 0;
 
-  h = hash_string8((const uint8_t *)str, len, JS_ATOM_TYPE_STRING);
+  h = JS_ATOM_TYPE_STRING;
+  for (size_t k = 0; k < len; k++) {
+    uint8_t c = str[k];
+    bits |= c;
+    h = h * 263 + c;
+  }
+  if (bits >= 0x80) return JS_ATOM_NULL;
   h &= JS_ATOM_HASH_MASK;
   h1 = h & (rt->atom_hash_size - 1);
   i = rt->atom_hash[h1];
@@ -42205,11 +42215,12 @@ static force_inline const char *unsafe_json_get_str(json_val *val) {
   return (const char *)(val->uni.str);
 }
 
+static force_inline size_t unsafe_json_get_len(void *val) {
+  return (size_t)(((json_val *)val)->tag >> JSON_TAG_BIT);
+}
+
 /* JSON */
 #ifndef NO_QUICKJS_COMPILER
-/* XXX: this parser is less strict than the JSON standard because we
-   reuse the Javascript tokenizer. It could be improved by adding a
-   specific JSON parse flag. */
 #define JSON_READER_ESTIMATED_MINIFY_RATIO 6
 
 struct json_obj_iter {
@@ -42321,13 +42332,8 @@ bool read_string(JSParseState *s, uint8_t **ptr, json_val *val) {
    bit require   [....xxxx ..x..... ........] (0F 20 00)
    bit mask      [xxxx.... xx...... xx......] (F0 C0 C0)
    bit pattern   [1110.... 10...... 10......] (E0 80 80)
-   ---------------------------------------------------
-   3 byte invalid (reserved for surrogate halves)
-   unicode range [U+D800, U+DFFF]
-   unicode min   [....1101 ..100000 ..000000]
-   unicode max   [....1101 ..111111 ..111111]
-   bit mask      [....xxxx ..x..... ........] (0F 20 00)
-   bit pattern   [....1101 ..1..... ........] (0D 20 00)
+   Surrogate halves [U+D800, U+DFFF] are accepted because JS strings may contain
+   lone surrogates.
    ---------------------------------------------------
    4 byte
    unicode range [U+10000, U+10FFFF]
@@ -42346,7 +42352,6 @@ bool read_string(JSParseState *s, uint8_t **ptr, json_val *val) {
   v32_uni b3_mask_uni = {{(char)0xF0, (char)0xC0, (char)0xC0, 0x00}};
   v32_uni b3_patt_uni = {{(char)0xE0, (char)0x80, (char)0x80, 0x00}};
   v32_uni b3_requ_uni = {{(char)0x0F, (char)0x20, 0x00, 0x00}};
-  v32_uni b3_erro_uni = {{(char)0x0D, (char)0x20, 0x00, 0x00}};
   v32_uni b4_mask_uni = {{(char)0xF8, (char)0xC0, (char)0xC0, (char)0xC0}};
   v32_uni b4_patt_uni = {{(char)0xF0, (char)0x80, (char)0x80, (char)0x80}};
   v32_uni b4_requ_uni = {{(char)0x07, (char)0x30, 0x00, 0x00}};
@@ -42360,7 +42365,6 @@ bool read_string(JSParseState *s, uint8_t **ptr, json_val *val) {
   uint32_t b3_mask = b3_mask_uni.u;
   uint32_t b3_patt = b3_patt_uni.u;
   uint32_t b3_requ = b3_requ_uni.u;
-  uint32_t b3_erro = b3_erro_uni.u;
   uint32_t b4_mask = b4_mask_uni.u;
   uint32_t b4_patt = b4_patt_uni.u;
   uint32_t b4_requ = b4_requ_uni.u;
@@ -42371,9 +42375,7 @@ bool read_string(JSParseState *s, uint8_t **ptr, json_val *val) {
 
 #define is_valid_seq_2(uni) (((uni & b2_mask) == b2_patt) && ((uni & b2_requ)))
 
-#define is_valid_seq_3(uni)                                     \
-  (((uni & b3_mask) == b3_patt) && ((tmp = (uni & b3_requ))) && \
-   ((tmp != b3_erro)))
+#define is_valid_seq_3(uni) (((uni & b3_mask) == b3_patt) && ((uni & b3_requ)))
 
 #define is_valid_seq_4(uni)                                     \
   (((uni & b4_mask) == b4_patt) && ((tmp = (uni & b4_requ))) && \
@@ -42511,37 +42513,20 @@ copy_escape:
           return_err(src - 2, "invalid escaped unicode in string");
         }
         src += 4;
-        if (likely((hi & 0xF800) != 0xD800)) {
-          /* a BMP character */
-          if (hi >= 0x800) {
-            *dst++ = (uint8_t)(0xE0 | (hi >> 12));
-            *dst++ = (uint8_t)(0x80 | ((hi >> 6) & 0x3F));
-            *dst++ = (uint8_t)(0x80 | (hi & 0x3F));
-          } else if (hi >= 0x80) {
-            *dst++ = (uint8_t)(0xC0 | (hi >> 6));
-            *dst++ = (uint8_t)(0x80 | (hi & 0x3F));
-          } else {
-            *dst++ = (uint8_t)hi;
-          }
-        } else {
+        uni = hi;
+        if (is_hi_surrogate(hi) && byte_match_2(src, "\\u") &&
+            read_hex_u16(src + 2, &lo) && is_lo_surrogate(lo)) {
           /* a non-BMP character, represented as a surrogate pair */
-          if (unlikely((hi & 0xFC00) != 0xD800)) {
-            return_err(src - 6, "invalid high surrogate in string");
-          }
-          if (unlikely(!byte_match_2(src, "\\u")) ||
-              unlikely(!read_hex_u16(src + 2, &lo))) {
-            return_err(src, "no matched low surrogate in string");
-          }
-          if (unlikely((lo & 0xFC00) != 0xDC00)) {
-            return_err(src, "invalid low surrogate in string");
-          }
           uni = ((((uint32_t)hi - 0xD800) << 10) | ((uint32_t)lo - 0xDC00)) +
                 0x10000;
-          *dst++ = (uint8_t)(0xF0 | (uni >> 18));
-          *dst++ = (uint8_t)(0x80 | ((uni >> 12) & 0x3F));
+          src += 6;
+        }
+        if (likely(uni >= 0x800 && uni < 0x10000)) {
+          *dst++ = (uint8_t)(0xE0 | (uni >> 12));
           *dst++ = (uint8_t)(0x80 | ((uni >> 6) & 0x3F));
           *dst++ = (uint8_t)(0x80 | (uni & 0x3F));
-          src += 6;
+        } else {
+          dst += unicode_to_utf8(dst, uni);
         }
         break;
       default:
@@ -42721,26 +42706,59 @@ static force_inline bool read_null(const uint8_t **ptr, json_val *val) {
   return false;
 }
 
-QJS_STATIC inline void js_json_get_number(JSParseState *s, bool is_neg,
-                                          json_val *json_val,
-                                          HandleScope &root_scope) {
-  LEPUSContext *ctx = s->ctx;
-  LEPUSValue val = s->token.u.num.val;
-  if (is_neg) {
-    double d;
-    LEPUS_ToFloat64(ctx, &d, val); /* no exception possible */
-    val = LEPUS_NewFloat64(ctx, -d);
-  } else if (ctx->gc_enable) {
-    /* json_val storage is not traced, so keep heap numbers rooted until the
-       temporary tree has been materialized as JS objects. */
-    if (LEPUS_VALUE_HAS_REF_COUNT(val)) {
-      root_scope.PushHandle(LEPUS_VALUE_GET_PTR(val), HANDLE_TYPE_DIR_HEAP_OBJ);
-    }
+/* Read a number of the JSON grammar. The text is null terminated, so the scan
+   cannot run past its end. */
+static bool read_number(JSParseState *s, const uint8_t **ptr, json_val *val) {
+  const uint8_t *start = *ptr;
+  const uint8_t *cur = start;
+  const uint8_t *digits;
+  bool is_neg = *cur == '-';
+  bool is_int = true;
+  uint32_t num = 0;
+
+  if (is_neg) cur++;
+  digits = cur;
+  if (*cur == '0') {
+    cur++;
   } else {
-    val = LEPUS_DupValue(ctx, val);
+    if (unlikely(!is_digit(*cur))) goto fail;
+    /* wraps for large integers, which do not use it */
+    do {
+      num = num * 10 + (*cur++ - '0');
+    } while (is_digit(*cur));
   }
-  json_val->uni.num = val;
-  json_val->tag = JSON_TYPE_NUM;
+  if (*cur == '.') {
+    digits = ++cur;
+    is_int = false;
+    while (is_digit(*cur)) cur++;
+    if (unlikely(cur == digits)) goto fail;
+  }
+  if (*cur == 'e' || *cur == 'E') {
+    cur++;
+    if (*cur == '+' || *cur == '-') cur++;
+    digits = cur;
+    is_int = false;
+    while (is_digit(*cur)) cur++;
+    if (unlikely(cur == digits)) goto fail;
+  }
+
+  if (is_int && cur - digits <= 9 && (num != 0 || !is_neg)) {
+    val->uni.num =
+        LEPUS_NewInt32(s->ctx, is_neg ? -(int32_t)num : (int32_t)num);
+  } else {
+    JSATODTempMem atod_mem;
+    val->uni.num = LEPUS_NewFloat64(
+        s->ctx, js_atod((const char *)start, NULL, 10,
+                        is_int ? JS_ATOD_INT_ONLY : 0, &atod_mem));
+  }
+  val->tag = JSON_TYPE_NUM;
+  *ptr = cur;
+  return true;
+
+fail:
+  s->last_ptr = cur;
+  js_parse_error(s, "invalid number");
+  return false;
 }
 
 static force_inline bool json_is_bool(json_val *val) {
@@ -42796,12 +42814,21 @@ static force_inline json_val *json_obj_iter_next(json_obj_iter *iter) {
   return NULL;
 }
 
-static force_inline bool json_is_str(json_val *val) {
-  return val ? (unsafe_json_get_type(val) == JSON_TYPE_STR) : false;
-}
-
-static force_inline const char *json_get_str(json_val *val) {
-  return json_is_str(val) ? unsafe_json_get_str(val) : NULL;
+/* 'key' is a string of the parsed text and may contain NUL characters. Kept out
+   of line to keep the stack frame of the recursive caller small. */
+static no_inline void json_define_property(LEPUSContext *ctx,
+                                           LEPUSValueConst obj, json_val *key,
+                                           LEPUSValue val) {
+  JSAtom atom =
+      LEPUS_NewAtomLen(ctx, unsafe_json_get_str(key), unsafe_json_get_len(key));
+  if (unlikely(atom == JS_ATOM_NULL)) {
+    if (!ctx->gc_enable) LEPUS_FreeValue(ctx, val);
+    return;
+  }
+  HandleScope func_scope(ctx);
+  func_scope.PushLEPUSAtom(atom);
+  LEPUS_DefinePropertyValue(ctx, obj, atom, val, LEPUS_PROP_C_W_E);
+  if (!ctx->gc_enable) LEPUS_FreeAtom(ctx, atom);
 }
 
 LEPUSValue make_json_object(LEPUSContext *ctx, json_val *cur_val) {
@@ -42817,11 +42844,9 @@ LEPUSValue make_json_object(LEPUSContext *ctx, json_val *cur_val) {
       json_obj_iter iter;
       json_obj_iter_init(cur_val, &iter);
       while ((key = json_obj_iter_next(&iter))) {
-        val = key ? key + 1 : NULL;
-        const char *key_str = json_get_str(key);
+        val = key + 1;
         lepus_val = make_json_object(ctx, val);
-        LEPUS_DefinePropertyValueStr(ctx, js_obj, key_str, lepus_val,
-                                     LEPUS_PROP_C_W_E);
+        json_define_property(ctx, js_obj, key, lepus_val);
       }
       return js_obj;
     }
@@ -42841,7 +42866,8 @@ LEPUSValue make_json_object(LEPUSContext *ctx, json_val *cur_val) {
       return js_arr;
     }
     case JSON_TYPE_STR: {
-      return LEPUS_NewString(ctx, json_get_str(cur_val));
+      return LEPUS_NewStringLen(ctx, unsafe_json_get_str(cur_val),
+                                unsafe_json_get_len(cur_val));
     }
     case JSON_TYPE_NUM: {
       return cur_val->uni.num;
@@ -42859,26 +42885,18 @@ LEPUSValue make_json_object(LEPUSContext *ctx, json_val *cur_val) {
   return LEPUS_NULL;
 }
 
-json_val *json_parse_value(JSParseState *s, size_t dat_len,
-                           HandleScope &root_scope) {
+json_val *json_parse_value(JSParseState *s, size_t dat_len) {
   LEPUSContext *ctx = s->ctx;
-  BOOL is_neg;
   const uint8_t *cur = (uint8_t *)s->buf_ptr;
   const uint8_t *end = cur + dat_len;
   HandleScope func_scope(ctx);
 
-#define json_parse_err(msg)                           \
-  do {                                                \
-    s->last_ptr = cur;                                \
-    if (!ctx->gc_enable) {                            \
-      for (json_val *p = val_hdr; p <= val; p++) {    \
-        if (unsafe_json_get_type(p) == JSON_TYPE_NUM) \
-          LEPUS_FreeValue(ctx, p->uni.num);           \
-      }                                               \
-      lepus_free(ctx, val_hdr);                       \
-    }                                                 \
-    js_parse_error(s, msg);                           \
-    return nullptr;                                   \
+#define json_parse_err(msg)                        \
+  do {                                             \
+    s->last_ptr = cur;                             \
+    if (!ctx->gc_enable) lepus_free(ctx, val_hdr); \
+    js_parse_error(s, msg);                        \
+    return nullptr;                                \
   } while (false)
 
 #define val_incr()                                                        \
@@ -42969,20 +42987,8 @@ arr_val_begin:
   if (char_is_number(*cur)) {
     val_incr();
     ctn_len++;
-    is_neg = 0;
-    if (*cur == '-') {
-      cur++;
-      is_neg = 1;
-    }
-    s->buf_ptr = cur;
-    if (unlikely(next_token(s))) goto fail_number;
-    if (unlikely(s->token.val != TOK_NUMBER)) {
-      json_parse_err("number expected");
-      goto fail_number;
-    }
-    cur = s->buf_ptr;
-    js_json_get_number(s, is_neg, val, root_scope);
-    goto arr_val_end;
+    if (likely(read_number(s, &cur, val))) goto arr_val_end;
+    goto fail_number;
   }
   if (*cur == '"') {
     val_incr();
@@ -43110,20 +43116,8 @@ obj_val_begin:
     val++;
     val->tag = 0;
     ctn_len++;
-    is_neg = 0;
-    if (*cur == '-') {
-      cur++;
-      is_neg = 1;
-    }
-    s->buf_ptr = cur;
-    if (unlikely(next_token(s))) goto fail_number;
-    if (unlikely(s->token.val != TOK_NUMBER)) {
-      json_parse_err("number expected");
-      goto fail_number;
-    }
-    cur = s->buf_ptr;
-    js_json_get_number(s, is_neg, val, root_scope);
-    goto obj_val_end;
+    if (likely(read_number(s, &cur, val))) goto obj_val_end;
+    goto fail_number;
   }
   if (*cur == '{') {
     cur++;
@@ -43196,20 +43190,8 @@ obj_end:
 
 single:
   if (char_is_number(*cur)) {
-    is_neg = 0;
-    if (*cur == '-') {
-      cur++;
-      is_neg = 1;
-    }
-    s->buf_ptr = cur;
-    if (unlikely(next_token(s))) goto fail_number;
-    if (unlikely(s->token.val != TOK_NUMBER)) {
-      json_parse_err("number expected");
-      goto fail_number;
-    }
-    cur = s->buf_ptr;
-    js_json_get_number(s, is_neg, val, root_scope);
-    goto doc_end;
+    if (likely(read_number(s, &cur, val))) goto doc_end;
+    goto fail_number;
   }
   if (*cur == '"') {
     if (likely(read_string(s, (uint8_t **)&cur, val))) goto doc_end;
@@ -43239,8 +43221,6 @@ doc_end:
     while (char_is_space(*cur)) cur++;
     if (unlikely(cur < end)) goto fail;
   }
-  if (!ctx->gc_enable) free_token(s, &s->token);
-  s->token.val = TOK_EOF;
   return val_hdr;
 
 fail_character:
@@ -43261,152 +43241,15 @@ fail:
   json_parse_err("unexpected content after document");
 fail_number:
 fail_string:
-  if (!ctx->gc_enable) {
-    for (json_val *p = val_hdr; p <= val; p++) {
-      if (unsafe_json_get_type(p) == JSON_TYPE_NUM)
-        LEPUS_FreeValue(ctx, p->uni.num);
-    }
-    lepus_free(ctx, val_hdr);
-  }
+  if (!ctx->gc_enable) lepus_free(ctx, val_hdr);
   return nullptr;
 #undef val_incr
-}
-
-QJS_STATIC LEPUSValue json_parse_value(JSParseState *s) {
-  LEPUSContext *ctx = s->ctx;
-  LEPUSValue val = LEPUS_NULL;
-  BOOL is_neg;
-  int ret;
-
-  switch (s->token.val) {
-    case '{': {
-      LEPUSValue prop_val, prop_str;
-
-      if (next_token(s)) goto fail;
-      val = LEPUS_NewObject(ctx);
-      if (LEPUS_IsException(val)) goto fail;
-      if (s->token.val != '}') {
-        for (;;) {
-          if (s->token.val != TOK_STRING) {
-            js_parse_error(s, "expecting property name");
-            goto fail;
-          }
-          prop_str = LEPUS_DupValue(ctx, s->token.u.str.str);
-          if (next_token(s)) {
-            LEPUS_FreeValue(ctx, prop_str);
-            goto fail;
-          }
-          if (js_parse_expect(s, ':')) {
-            LEPUS_FreeValue(ctx, prop_str);
-            goto fail;
-          }
-          prop_val = json_parse_value(s);
-          if (LEPUS_IsException(prop_val)) {
-            LEPUS_FreeValue(ctx, prop_str);
-            goto fail;
-          }
-          ret = JS_DefinePropertyValueValue(ctx, val, prop_str, prop_val,
-                                            LEPUS_PROP_C_W_E);
-          if (ret < 0) goto fail;
-
-          if (s->token.val != ',') break;
-          if (next_token(s)) goto fail;
-        }
-      }
-      if (js_parse_expect(s, '}')) goto fail;
-    } break;
-    case '[': {
-      LEPUSValue el;
-      uint32_t idx;
-
-      if (next_token(s)) goto fail;
-      val = LEPUS_NewArray(ctx);
-      if (LEPUS_IsException(val)) goto fail;
-      if (s->token.val != ']') {
-        idx = 0;
-        for (;;) {
-          el = json_parse_value(s);
-          if (LEPUS_IsException(el)) goto fail;
-          ret = JS_DefinePropertyValueUint32_RC(ctx, val, idx, el,
-                                                LEPUS_PROP_C_W_E);
-          if (ret < 0) goto fail;
-          if (s->token.val != ',') break;
-          if (next_token(s)) goto fail;
-          idx++;
-        }
-      }
-      if (js_parse_expect(s, ']')) goto fail;
-    } break;
-    case TOK_STRING:
-      val = LEPUS_DupValue(ctx, s->token.u.str.str);
-      if (next_token(s)) goto fail;
-      break;
-    case TOK_NUMBER:
-      is_neg = 0;
-      goto number;
-    case '-':
-      if (next_token(s)) goto fail;
-      if (s->token.val != TOK_NUMBER) {
-        js_parse_error(s, "number expected");
-        goto fail;
-      }
-      is_neg = 1;
-    number:
-      val = s->token.u.num.val;
-      if (is_neg) {
-        double d;
-        LEPUS_ToFloat64(ctx, &d, val); /* no exception possible */
-        val = LEPUS_NewFloat64(ctx, -d);
-      } else {
-        val = LEPUS_DupValue(ctx, val);
-      }
-      if (next_token(s)) goto fail;
-      break;
-    case TOK_FALSE:
-    case TOK_TRUE:
-      val = LEPUS_NewBool(ctx, s->token.val - TOK_FALSE);
-      if (next_token(s)) goto fail;
-      break;
-    case TOK_NULL:
-      if (next_token(s)) goto fail;
-      break;
-    default:
-      if (s->token.val == TOK_EOF) {
-        js_parse_error(s, "unexpected end of input");
-      } else {
-        js_parse_error(s, "unexpected token: '%.*s'",
-                       (int)(s->buf_ptr - s->token.ptr), s->token.ptr);
-      }
-      goto fail;
-  }
-  return val;
-fail:
-  LEPUS_FreeValue(ctx, val);
-  return LEPUS_EXCEPTION;
 }
 #endif
 
 LEPUSValue LEPUS_ParseJSON(LEPUSContext *ctx, const char *buf, size_t buf_len,
                            const char *filename) {
-#ifndef NO_QUICKJS_COMPILER
-  CallGCFunc(JS_ParseJSONOPT, ctx, buf, buf_len, filename);
-  JSParseState s1, *s = &s1;
-  LEPUSValue val = LEPUS_UNDEFINED;
-  js_parse_init(ctx, s, buf, buf_len, filename);
-
-  if (next_token(s)) goto fail;
-  val = json_parse_value(s);
-  if (LEPUS_IsException(val)) goto fail;
-  if (s->token.val != TOK_EOF) {
-    if (js_parse_error(s, "unexpected data at the end")) goto fail;
-  }
-  return val;
-fail:
-  free_token(s, &s->token);
-  return LEPUS_EXCEPTION;
-#else
-  return LEPUS_UNDEFINED;
-#endif
+  return JS_ParseJSONOPT(ctx, buf, buf_len, filename);
 }
 
 LEPUSValue JS_ParseJSONOPT(LEPUSContext *ctx, const char *buf, size_t buf_len,
@@ -43426,7 +43269,7 @@ LEPUSValue JS_ParseJSONOPT(LEPUSContext *ctx, const char *buf, size_t buf_len,
 
   memcpy((void *)cur, (void *)buf, buf_len + 1);
   js_parse_init(ctx, s, (const char *)cur, buf_len, filename);
-  func_scope.PushHandle(&s->token, HANDLE_TYPE_LEPUS_TOKEN);
+  s->debugger_last_line_num = s->line_num;
   if (unlikely(char_is_space(*cur))) {
     parse_json_space(s, &cur);  // skip space
   }
@@ -43435,7 +43278,7 @@ LEPUSValue JS_ParseJSONOPT(LEPUSContext *ctx, const char *buf, size_t buf_len,
     goto fail;
   }
 
-  json_val_arr = json_parse_value(s, buf_end - cur, func_scope);
+  json_val_arr = json_parse_value(s, buf_end - cur);
   func_scope.PushHandle(json_val_arr, HANDLE_TYPE_DIR_HEAP_OBJ);
   if (json_val_arr) {
     val = make_json_object(ctx, json_val_arr);
@@ -43446,10 +43289,7 @@ LEPUSValue JS_ParseJSONOPT(LEPUSContext *ctx, const char *buf, size_t buf_len,
     return val;
   }
 fail:
-  if (!ctx->gc_enable) {
-    lepus_free(ctx, str_start);
-    free_token(s, &s->token);
-  }
+  if (!ctx->gc_enable) lepus_free(ctx, str_start);
   return LEPUS_EXCEPTION;
 #else
   return LEPUS_UNDEFINED;
@@ -43615,6 +43455,14 @@ exception:
   return LEPUS_EXCEPTION;
 }
 
+/* 'list' is an array which user code cannot reach. The specification uses a
+   List there, so append without looking for setters in Array.prototype. */
+static int json_list_append(LEPUSContext *ctx, LEPUSValueConst list,
+                            LEPUSValue val) {
+  return add_fast_array_element(ctx, LEPUS_VALUE_GET_OBJ(list), val,
+                                LEPUS_PROP_THROW);
+}
+
 #define U64(hi, lo) ((((uint64_t)hi##UL) << 32U) + lo##UL)
 #define CHAR_ENC_CPY_1 0 /* 1-byte UTF-8, copy. */
 #define CHAR_ENC_ERR_1 1 /* 1-byte UTF-8, error. */
@@ -43722,10 +43570,6 @@ static const uint8_t enc_table[256] = {
     4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4,
     4, 4, 4, 4, 4, 4, 4, 4, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 6,
     8, 8, 8, 8, 8, 8, 8, 8, 1, 1, 1, 1, 1, 1, 1, 1};
-
-static force_inline size_t unsafe_json_get_len(void *val) {
-  return (size_t)(((json_val *)val)->tag >> JSON_TAG_BIT);
-}
 
 // use str_arr to store char* needed to free in the end of JSON.stringify
 const char *generate_json_str(LEPUSContext *ctx, LEPUSValue obj,
@@ -43856,8 +43700,8 @@ static int make_json_val(LEPUSContext *ctx, LEPUSValue obj,
         LEPUS_ThrowTypeError(ctx, "circular reference");
         goto exception;
       }
-      v = js_array_push(ctx, jsc->stack, 1, (LEPUSValueConst *)&obj, 0);
-      if (check_exception_free(ctx, v)) goto exception;
+      if (json_list_append(ctx, jsc->stack, LEPUS_DupValue(ctx, obj)) < 0)
+        goto exception;
 
       ret = LEPUS_IsArray(ctx, obj) || is_lepus_array;
       if (unlikely(ret < 0)) goto exception;
@@ -44737,7 +44581,7 @@ QJS_STATIC LEPUSValue js_json_stringify_opt(LEPUSContext *ctx,
   LEPUSValueConst replacer = argv[1];
   LEPUSValue val, v, space, ret, wrapper;
   int res;
-  int64_t i, j, n;
+  int64_t i, n;
 
   json_val *json_cur_val = nullptr;
   json_val *json_root = nullptr;
@@ -44775,7 +44619,7 @@ QJS_STATIC LEPUSValue js_json_stringify_opt(LEPUSContext *ctx,
       jsc->property_list = LEPUS_NewArray(ctx);
       if (LEPUS_IsException(jsc->property_list)) goto exception;
       if (js_get_length64(ctx, &n, replacer)) goto exception;
-      for (i = j = 0; i < n; i++) {
+      for (i = 0; i < n; i++) {
         LEPUSValue present;
         v = JS_GetPropertyInt64(ctx, replacer, i);
         if (LEPUS_IsException(v)) goto exception;
@@ -44803,7 +44647,7 @@ QJS_STATIC LEPUSValue js_json_stringify_opt(LEPUSContext *ctx,
           goto exception;
         }
         if (!JS_ToBoolFree_RC(ctx, present)) {
-          LEPUS_SetPropertyInt64(ctx, jsc->property_list, j++, v);
+          if (json_list_append(ctx, jsc->property_list, v) < 0) goto exception;
         } else {
           LEPUS_FreeValue(ctx, v);
         }
