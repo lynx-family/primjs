@@ -5,164 +5,145 @@
 #ifndef SRC_WASM_QJS_JS_ENV_QJS_H_
 #define SRC_WASM_QJS_JS_ENV_QJS_H_
 
-// NOTE:
-// THIS HEADER FILE SHOULD NOT BE INCLUDED IN ANY HEADERS IN JSC/QJS MODULE
+#include <pthread.h>
 
 #include <atomic>
+#include <cstddef>
 #include <cstdint>
-#include <map>
-#include <vector>
 
 #include "common/js_type.h"
-#include "common/one_of.h"
-#include "common/wasm_utils.h"
-#include "qjs/qjs_ext_api.h"
-#include "qjs/qjs_wasm_function.h"
-#include "qjs/qjs_wasm_global.h"
-#include "qjs/qjs_wasm_memory.h"
-#include "qjs/qjs_wasm_table.h"
-#include "quickjs/include/quickjs-inner.h"
+#include "common/wasm_store_owner.h"
+#include "common/wasm_type.h"
+#include "gc/trace-gc.h"
+#ifdef __cplusplus
+extern "C" {
+#endif
+#include "quickjs/include/quickjs.h"
+#ifdef __cplusplus
+}
+#endif
 
-namespace primjs {
-class InteropRuntime;
-
-namespace qjs {
-using JSValue = JSValue<LEPUSValue>;
-using JSObject = JSValueType<LEPUSValue>::Object;
-using JSContext = JSContext<LEPUSValue>;
+namespace primjs::qjs {
 
 class QJSEnv {
  public:
-  using JSValue = JSValueType<LEPUSValue>::Type;
-  using JSContext = JSValueType<LEPUSValue>::Context;
-  using JSObject = JSValueType<LEPUSValue>::Object;
-
-  QJSEnv(JSContext ctx, std::atomic_bool *invalid);
+  QJSEnv(LEPUSContext* ctx, std::atomic_bool* invalid,
+         wasm::WasmStoreOwner* store_owner);
   ~QJSEnv();
+
   void Finalize();
 
-  JSValue GetProperty(JSValue target, const char *name,
-                      JSValue *exception = nullptr);
-  // Prism may consume accessor results after GetProperty returns. Keep the
-  // returned QuickJS reference owned until the caller releases it.
-  JSValue GetPropertyForPrism(JSValue target, const char *name,
-                              JSValue *exception = nullptr);
-  bool SetProperty(JSValue obj, const char *name, JSValue val);
-  bool SetPropertyAtIndex(JSValue obj, uint32_t index, JSValue val);
-  JSValue MakeFunction(const char *name, void *pack);
-  JSValue MakeString(const char *str);
-  JSValue MakeNumber(double num);
-  bool MakeBigInt64(int64_t num, JSValue *result, JSValue *exception = nullptr);
-  void SetWasmRoot(LEPUSValue root) { wasm_root_ = WASMGCPersistent(root); }
-  LEPUSValue wasm_root() const { return wasm_root_.Get(); }
-
-  JSValue ReserveObject(JSValue obj);
-  void ReleaseObject(JSValue obj);
-
-  void ValueToInt32(int32_t &num, JSValue val, JSValue &result);
-  void ValueToBigInt64(int64_t &num, JSValue val, JSValue &result);
-  void ValueToBigInt64ForPrism(int64_t &num, JSValue val, JSValue &result);
-  void ValueToNumber(double &num, JSValue val, JSValue &result);
-
-  JSValue ValueToObject(JSValue val);
-  JSValue ValueToFunction(JSValue val);
-  JSValue CallAsFunction(JSValue function, JSValue thisObject, size_t argc,
-                         JSValue args[], JSValue *exception);
-  JSValue CallAsFunctionForPrism(JSValue function, JSValue thisObject,
-                                 size_t argc, JSValue args[],
-                                 JSValue *exception);
-
-  // Prism import callbacks need to carry an arbitrary thrown JS value across
-  // the native trap boundary. The separate boolean is required because both
-  // null and undefined are valid exception payloads.
-  void CapturePendingWasmException();
-  bool TakeWasmException(LEPUSValue *exception);
-
-  inline static LEPUSValue ToQJS(JSValue from) { return from.Get(); }
-
-  inline static LEPUSContext *ToQJS(JSContext from) { return from; }
-
-  inline static JSValue FromQJS(LEPUSValue from, LEPUSRuntime *rt) {
-    return WASMGCPersistent(rt, from);
+  LEPUSContext* js_ctx() const { return js_ctx_; }
+  LEPUSRuntime* js_rt() const { return js_rt_; }
+  wasm::WasmStoreOwner* store_owner() const { return store_owner_; }
+  wasm_store_t* wasm_store() const {
+    return store_owner_ ? store_owner_->store() : nullptr;
   }
 
-  bool IsObject(JSValue val) { return LEPUS_IsObject(val.Get()); }
-  bool IsNumber(JSValue val) { return LEPUS_IsNumber(val.Get()); }
-  bool IsBigInt(JSValue val) { return LEPUS_IsBigInt(val.Get()); }
-  bool IsUndefined(JSValue val) { return LEPUS_IsUndefined(val.Get()); }
-  bool IsNull(JSValue val) { return LEPUS_IsNull(val.Get()); }
-  bool IsException(JSValue val) { return LEPUS_IsException(val.Get()); }
-  bool IsFunction(JSValue val) { return LEPUS_IsFunction(js_ctx_, val.Get()); }
-
-  bool IsWasmFunction(JSValue val) {
-    return LEPUS_GetClassID(js_ctx_, val.Get()) == QJSWasmFunction::class_id();
+  bool IsInvalid() const {
+    return !store_owner_ ||
+           (ctx_invalid_ && ctx_invalid_->load(std::memory_order_acquire));
   }
 
-  JSValue MakeObject();
-  JSValue MakeUndefined();
-  JSValue MakeNull();
-  JSValue MakeException(ErrorTypes err, const char *code, const char *msg,
-                        JSValue *exception);
-  JSValue MakeWasmMemory(InteropRuntime *interop, WasmMemoryRef memory,
-                         size_t pages);
-  JSValue MakeWasmGlobal(InteropRuntime *interop, WasmGlobalRef global);
-  JSValue MakeWasmTable(InteropRuntime *interop, WasmTableRef table);
-  JSValue MakeWasmFunction(InteropRuntime *interop, const char *name,
-                           WasmFunctionRef function);
+  void SetWasmRoot(LEPUSValue wasm_root) { wasm_root_ = wasm_root; }
+  LEPUSValue wasm_root() const {
+    return root_invalidated_ ? LEPUS_UNDEFINED : wasm_root_;
+  }
+  LEPUSValue raw_wasm_root_object() const { return wasm_root_; }
+  void InvalidateWasmRoot() { root_invalidated_ = true; }
 
-  WasmGlobalRef GetWasmGlobal(JSValue value);
-  WasmMemoryRef GetWasmMemory(JSValue value);
-  WasmTableRef GetWasmTable(JSValue value);
-  WasmFunctionRef GetWasmFunction(JSValue value);
+  void StashWasmException(LEPUSValue exception);
+  bool TakeWasmException(LEPUSValue* exception);
 
-  JSValue DupValue(JSValue value);
-  void FreeValue(LEPUSRuntime *rt, JSValue value);
-  void FreeValue(const JSValue &value);
+  uint64_t BeginImportTransaction();
+  void RetainImportCallback(LEPUSValue fn, uint64_t transaction,
+                            const void* bridge_key = nullptr);
+  void ReleaseImportCallback(const void* bridge_key);
+  size_t RollbackImportTransaction(uint64_t transaction);
+  void FinishImportTransaction(uint64_t transaction) {
+    (void)RollbackImportTransaction(transaction);
+  }
+#if defined(QJS_UNITTEST)
+  size_t ActiveImportCallbackCountForTesting();
+#endif
 
-  JSValue ReserveValue(JSValue obj);
-  void ReleaseValue(JSValue obj);
+  void ReportOuterSize(size_t bytes);
+  void Mark(LEPUS_MarkFunc* mark_func, LEPUSRuntime* rt,
+            uint64_t trace_tool = 0);
 
-  bool IsInvalid() const { return (ctx_invalid_ && ctx_invalid_->load()); }
+  static inline bool ToWasmValue(LEPUSContext* ctx, LEPUSValueConst value,
+                                 wasm_valkind_t kind, wasm_val_t* out) {
+    out->kind = kind;
+    if (kind == WASM_I32 && LEPUS_VALUE_IS_INT(value)) {
+      out->of.i32 = LEPUS_VALUE_GET_INT(value);
+      return true;
+    }
+    if (kind == WASM_F64) {
+      if (LEPUS_VALUE_IS_FLOAT64(value)) {
+        out->of.f64 = LEPUS_VALUE_GET_FLOAT64(value);
+        return true;
+      }
+      if (LEPUS_VALUE_IS_INT(value)) {
+        out->of.f64 = LEPUS_VALUE_GET_INT(value);
+        return true;
+      }
+    }
+    if (kind == WASM_F32) {
+      if (LEPUS_VALUE_IS_FLOAT64(value)) {
+        out->of.f32 = static_cast<float>(LEPUS_VALUE_GET_FLOAT64(value));
+        return true;
+      }
+      if (LEPUS_VALUE_IS_INT(value)) {
+        out->of.f32 = static_cast<float>(LEPUS_VALUE_GET_INT(value));
+        return true;
+      }
+    }
+    return ToWasmValueSlow(ctx, value, kind, out);
+  }
 
-  int RefCount(JSValue value, const char *msg);
+  static inline LEPUSValue FromWasmValue(LEPUSContext* ctx,
+                                         const wasm_val_t& value) {
+    switch (value.kind) {
+      case WASM_I32:
+        return LEPUS_NewInt32(ctx, value.of.i32);
+      case WASM_F64:
+        return LEPUS_NewFloat64(ctx, value.of.f64);
+      case WASM_F32:
+        return LEPUS_NewFloat64(ctx, static_cast<double>(value.of.f32));
+      default:
+        return FromWasmValueSlow(ctx, value);
+    }
+  }
 
-  void PrintObjectProperties(LEPUSContext *ctx, LEPUSValueConst obj);
-
-  void Mark(LEPUS_MarkFunc *mark_func, LEPUSRuntime *rt, uint64_t trace_tool);
-
-  auto &wasm_memory_cache() { return wasm_memory_cache_; }
-  auto &wasm_table_cache() { return wasm_table_cache_; }
-  auto &wasm_global_cache() { return wasm_global_cache_; }
-  auto &wasm_func_cache() { return wasm_func_cache_; }
-  uint64_t BeginWasmImportCallbackTransaction();
-  void CacheWasmImportCallback(JSObject value, uint64_t transaction = 0);
-  size_t RollbackWasmImportCallbackTransaction(uint64_t transaction);
-
-  JSContext js_ctx() const { return js_ctx_; }
+  static bool ToWasmValueSlow(LEPUSContext* ctx, LEPUSValueConst value,
+                              wasm_valkind_t kind, wasm_val_t* out);
+  static LEPUSValue FromWasmValueSlow(LEPUSContext* ctx,
+                                      const wasm_val_t& value);
+  LEPUSValue ThrowTrap(wasm_trap_t* trap, const char* code);
 
  private:
-  void StashWasmException(LEPUSValue exception);
-
-  BORROWER LEPUSRuntime *js_rt_;
-  BORROWER JSContext js_ctx_;
-  BORROWER std::atomic_bool *ctx_invalid_;
-
-  std::map<uintptr_t, WASMGCPersistent> wasm_memory_cache_;
-  std::map<uintptr_t, WASMGCPersistent> wasm_table_cache_;
-  std::map<uintptr_t, WASMGCPersistent> wasm_global_cache_;
-  std::map<uintptr_t, WASMGCPersistent> wasm_func_cache_;
-  struct WasmImportCallbackRoot {
-    WASMGCPersistent value;
+  struct ImportCallbackRoot {
+    LEPUSValue value;
     uint64_t transaction;
+    const void* bridge_key;
   };
-  std::vector<WasmImportCallbackRoot> wasm_import_callback_roots_;
-  uint64_t next_wasm_import_callback_transaction_ = 0;
-  BORROWER WASMGCPersistent wasm_root_ = WASMGCPersistent(LEPUS_UNDEFINED);
-  bool has_pending_wasm_exception_ = false;
+
+  LEPUSRuntime* js_rt_ = nullptr;
+  LEPUSContext* js_ctx_ = nullptr;
+  std::atomic_bool* ctx_invalid_ = nullptr;
+  wasm::WasmStoreOwner* store_owner_ = nullptr;
+  LEPUSValue wasm_root_ = LEPUS_UNDEFINED;
+  pthread_mutex_t gc_mark_mutex_ = PTHREAD_MUTEX_INITIALIZER;
+  ImportCallbackRoot* import_callbacks_ = nullptr;
+  size_t callback_count_ = 0;
+  size_t callback_cap_ = 0;
+  uint64_t next_import_transaction_ = 0;
   LEPUSValue pending_wasm_exception_ = LEPUS_UNDEFINED;
+  bool has_pending_wasm_exception_ = false;
+  bool finalized_ = false;
+  bool root_invalidated_ = false;
 };
 
-}  // namespace qjs
-}  // namespace primjs
+}  // namespace primjs::qjs
 
 #endif  // SRC_WASM_QJS_JS_ENV_QJS_H_

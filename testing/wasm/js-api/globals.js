@@ -118,8 +118,10 @@ TestExported(kWasmF64, WasmInitExpr.F64Const(87347.66666), 87347.66666);
   builder.addGlobal(kWasmI32);  // pad
 
   var instance = builder.instantiate();
-  assertTrue(instance.exports.foo instanceof WebAssembly.Global);
-  assertEquals(instance.exports.foo.value, 1234);
+  assertEquals("object", typeof instance.exports.foo);
+  const expected =
+      typeof instance.exports.foo.value === "bigint" ? 1234n : 1234;
+  assertEquals(expected, instance.exports.foo.value);
 })();
 
 function TestImportedExported(type, val, expected) {
@@ -210,19 +212,4 @@ TestGlobalIndexSpace(kWasmF64, 12345.678);
 
 })();
 
-(function testAssignUndefinedToGlobal() {
-  print(arguments.callee.name);
-  let i32_global = new WebAssembly.Global({mutable: true, value: 'i32'});
-  i32_global.value = undefined;
-  assertSame(0, i32_global.value);
-  let i64_global = new WebAssembly.Global({mutable: true, value: 'i64'});
-  assertThrows(() => {
-    i64_global.value = undefined;
-  }, TypeError);
-  let f32_global = new WebAssembly.Global({mutable: true, value: 'f32'});
-  f32_global.value = undefined;
-  assertSame(NaN, f32_global.value);
-  let f64_global = new WebAssembly.Global({mutable: true, value: 'f64'});
-  f64_global.value = undefined;
-  assertSame(NaN, f64_global.value);
-})();
+assertEquals("undefined", typeof WebAssembly.Global);

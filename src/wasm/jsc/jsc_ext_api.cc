@@ -4,7 +4,10 @@
 
 #include "jsc/jsc_ext_api.h"
 
+#include <climits>
 #include <cmath>
+#include <cstdio>
+#include <cstring>
 
 #include "common/js_type.h"
 #include "common/wasm_utils.h"
@@ -12,6 +15,7 @@
 #include "jsc/jsc_class_creator.h"
 
 namespace primjs::jsc {
+
 JSObjectRef JSFunctionMake(JSContextRef ctx, const char* name,
                            JSObjectCallAsFunctionCallback cb) {
   return JSObjectMakeFunctionWithCallback(ctx, JSString(name), cb);
@@ -19,10 +23,6 @@ JSObjectRef JSFunctionMake(JSContextRef ctx, const char* name,
 
 void InitConstructor(JSContextRef ctx, JSObjectRef ctor, const char* name,
                      JSObjectRef prototype, JSValueRef* exception) {
-  // set [[prototype]] = __proto__ for constructor
-  // JSObjectSetPrototype(
-  //     ctx, ctor,
-  //     JSCBuiltinObjects::GetInstance(ctx)->GetFunctionPrototype());
   JSValueRef name_str = JSValueMakeString(ctx, JSString(name));
   JSObjectSetProperty(ctx, ctor, JSString("name"), name_str,
                       kJSPropertyAttributeReadOnly |
@@ -47,34 +47,6 @@ void Attach(JSContextRef ctx, const char* name, JSObjectRef obj,
     parent = JSContextGetGlobalObject(ctx);
   }
   JSObjectSetProperty(ctx, parent, JSString(name), obj, attrs, exception);
-}
-
-static JSValueRef DefaultDebugCallback(JSContextRef ctx, JSObjectRef function,
-                                       JSObjectRef thisObject, size_t argc,
-                                       const JSValueRef argv[],
-                                       JSValueRef* exception) {
-  WLOGI("DebugCallback @ %s\n", __func__);
-  return NULL;
-}
-
-void AttachDebugger(JSContextRef ctx, JSObjectRef obj, const char* name,
-                    JSValueRef* exception, DebugCallback callback) {
-  if (!callback) {
-    callback = DefaultDebugCallback;
-  }
-  JSObjectRef debugger = JSFunctionMake(ctx, name, callback);
-  JSObjectSetProperty(ctx, obj, JSString(name), debugger,
-                      kJSPropertyAttributeNone, exception);
-}
-
-bool ObjectHasProperty(JSContextRef ctx, JSObjectRef object, const char* name) {
-  return JSObjectHasProperty(ctx, object, JSString(name));
-}
-
-JSObjectRef ObjectGetProperty(JSContextRef ctx, JSObjectRef object,
-                              const char* name) {
-  JSValueRef obj = JSObjectGetProperty(ctx, object, JSString(name), NULL);
-  return JSValueToObject(ctx, obj, NULL);
 }
 
 void DefineProperties(JSContextRef ctx, JSObjectRef object,
@@ -105,13 +77,13 @@ void DefineProperty(JSContextRef ctx, JSObjectRef object,
       kJSPropertyAttributeNone, exception);
   if (descriptor.getter) {
     JSObjectRef getter =
-        JSObjectMakeFunctionWithCallback(ctx, NULL, descriptor.getter);
+        JSObjectMakeFunctionWithCallback(ctx, nullptr, descriptor.getter);
     JSObjectSetProperty(ctx, desc_ref, JSString("get"), getter,
                         kJSPropertyAttributeNone, exception);
   }
   if (descriptor.setter) {
     JSObjectRef setter =
-        JSObjectMakeFunctionWithCallback(ctx, NULL, descriptor.setter);
+        JSObjectMakeFunctionWithCallback(ctx, nullptr, descriptor.setter);
     JSObjectSetProperty(ctx, desc_ref, JSString("set"), setter,
                         kJSPropertyAttributeNone, exception);
   }
@@ -123,11 +95,11 @@ void DefineProperty(JSContextRef ctx, JSObjectRef object,
 
 bool HasInstance(JSContextRef ctx, JSObjectRef constructor, JSValueRef value,
                  JSValueRef* exception) {
-  // constructor here is WebAssembly.XXX.prototype.constructor
   constexpr const char* kCodeMessages = "object instanceof WebAssembly.XXX";
 
   JSValueRef proto = JSObjectGetProperty(
       ctx, constructor, JSCBuiltinObjects::PrototypeStr(), exception);
+  if (exception && *exception) return false;
 
   if (!JSValueIsObject(ctx, value)) {
     return false;
@@ -161,68 +133,89 @@ bool HasInstance(JSContextRef ctx, JSObjectRef constructor, JSValueRef value,
       return true;
     }
   }
-
-  return false;
 }
 
 JSValueRef ThrowCallException(JSContextRef ctx, JSObjectRef function,
                               JSObjectRef thisObject, size_t argc,
                               const JSValueRef argv[], JSValueRef* exception) {
+  (void)thisObject;
+  (void)argc;
+  (void)argv;
   if (exception) {
-    JSStringRef js_str = JSValueToStringCopy(ctx, function, NULL);
-    size_t len = JSStringGetLength(js_str);
-    // including null-terminated character
-    char str[len + 1];
-    JSStringGetUTF8CString(js_str, str, len + 1);
+    char str[128] = "an object";
+    JSStringRef js_str = JSValueToStringCopy(ctx, function, nullptr);
+    if (js_str != nullptr) {
+      JSStringGetUTF8CString(js_str, str, sizeof(str));
+      JSStringRelease(js_str);
+    }
     char msg[256] = {0};
-    snprintf(msg, 255, "Exception by invoke Object without [[Call]] on %s",
-             str);
-    ThrowIfException(ctx, ErrorTypes::kError, "", msg, exception);
+    std::snprintf(msg, sizeof(msg),
+                  "Exception by invoke Object without [[Call]] on %s", str);
+    ThrowIfException(ctx, ErrorTypes::kTypeError, "", msg, exception);
   }
   return JSValueMakeUndefined(ctx);
 }
 
-bool JSValueGetInt32(JSContextRef ctx, JSValueRef js_val, int32_t* res) {
-  double ret = JSValueToNumber(ctx, js_val, NULL);
-  if (!std::isfinite(ret) || ret > INT32_MAX) {
+bool JSValueGetInt32(JSContextRef ctx, JSValueRef js_val, int32_t* res,
+                     JSValueRef* exception) {
+  JSValueRef local_exc = nullptr;
+  double ret = JSValueToNumber(ctx, js_val, &local_exc);
+  if (local_exc) {
+    if (exception) *exception = local_exc;
+    return false;
+  }
+  if (!std::isfinite(ret) || ret > INT32_MAX || ret < INT32_MIN) {
     return false;
   }
   *res = static_cast<int32_t>(ret);
   return true;
 }
 
-static FORCE_INLINE JSObjectRef CreateError(JSContextRef ctx,
-                                            JSObjectRef global, const char* err,
-                                            JSValueRef msg,
-                                            JSValueRef* exception) {
+namespace {
+JSObjectRef CreateError(JSContextRef ctx, JSObjectRef global, const char* err,
+                        JSValueRef msg, JSValueRef* exception) {
   JSValueRef error_ctor_value =
       JSObjectGetProperty(ctx, global, JSString(err), exception);
+  if (exception && *exception) return nullptr;
   JSObjectRef error_ctor = JSValueToObject(ctx, error_ctor_value, exception);
-  JSObjectRef error =
-      JSObjectCallAsConstructor(ctx, error_ctor, 1, &msg, exception);
-
-  return error;
+  if ((exception && *exception) || !error_ctor) return nullptr;
+  return JSObjectCallAsConstructor(ctx, error_ctor, 1, &msg, exception);
 }
+}  // namespace
 
 JSValueRef ThrowError(JSContextRef ctx, const char* err, JSValueRef code,
                       JSValueRef msg, JSValueRef* exception) {
-  WASM_DCHECK(msg != nullptr);
-
   JSObjectRef global = JSContextGetGlobalObject(ctx);
-
-  JSObjectRef error{};
-  if (strcmp(err, "Error") != 0) {
-    error = CreateError(ctx, global, err, msg, exception);
-  } else {
-    JSObjectRef cause = JSObjectMake(ctx, NULL, NULL);
-    JSObjectSetProperty(ctx, cause, JSString("code"), code,
-                        kJSPropertyAttributeNone, exception);
-    error = JSObjectMakeError(ctx, 1, &msg, exception);
+  if (std::strcmp(err, "Error") != 0) {
+    return CreateError(ctx, global, err, msg, exception);
+  }
+  JSObjectRef cause = JSObjectMake(ctx, nullptr, nullptr);
+  JSObjectSetProperty(ctx, cause, JSString("code"), code,
+                      kJSPropertyAttributeNone, exception);
+  JSObjectRef error = JSObjectMakeError(ctx, 1, &msg, exception);
+  if (error) {
     JSObjectSetProperty(ctx, error, JSString("cause"), cause,
                         kJSPropertyAttributeDontEnum, exception);
   }
-
   return error;
+}
+
+JSObjectRef ThrowIfException(JSContextRef ctx, ErrorTypes err, const char* code,
+                             const char* msg, JSValueRef* exception) {
+  const uint32_t err_idx = static_cast<uint32_t>(err);
+  const char* safe_code = code ? code : "";
+  const char* safe_msg = msg ? msg : "unknown error";
+  WLOGE("%s: %s: %s", kErrorStrings[err_idx], safe_code, safe_msg);
+
+  if (wasm_likely(exception)) {
+    JSValueRef code_value = JSValueMakeString(ctx, JSString(safe_code));
+    JSValueRef msg_value = JSValueMakeString(ctx, JSString(safe_msg));
+    JSValueRef inner_exc = nullptr;
+    JSValueRef created = ThrowError(ctx, kErrorStrings[err_idx], code_value,
+                                    msg_value, &inner_exc);
+    *exception = inner_exc ? inner_exc : created;
+  }
+  return nullptr;
 }
 
 void SetConstructorProto(JSContextRef ctx, JSObjectRef object,
@@ -231,13 +224,30 @@ void SetConstructorProto(JSContextRef ctx, JSObjectRef object,
   JSValueRef value =
       JSObjectGetProperty(ctx, global, JSString("Function"), exception);
   if (exception && *exception) return;
-  // If we don't have Function then something bad is going on.
   JSObjectRef func_ctor = JSValueToObject(ctx, value, exception);
   if (exception && *exception) return;
   if (func_ctor) {
     JSValueRef func_proto = JSObjectGetPrototype(ctx, func_ctor);
     JSObjectSetPrototype(ctx, object, func_proto);
   }
+}
+
+bool RetainWasmRootOnJSCObject(JSContextRef ctx, JSObjectRef obj,
+                               JSObjectRef wasm_root, JSValueRef* exception) {
+  if (wasm_unlikely(!obj || !wasm_root)) return false;
+  static JSStringRef root_prop =
+      JSStringCreateWithUTF8CString(kWasmRootProperty);
+  JSValueRef local_exc = nullptr;
+  JSObjectSetProperty(ctx, obj, root_prop, wasm_root,
+                      kJSPropertyAttributeReadOnly |
+                          kJSPropertyAttributeDontEnum |
+                          kJSPropertyAttributeDontDelete,
+                      &local_exc);
+  if (local_exc) {
+    if (exception) *exception = local_exc;
+    return false;
+  }
+  return true;
 }
 
 }  // namespace primjs::jsc

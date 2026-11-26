@@ -6,259 +6,182 @@
 
 #include <algorithm>
 #include <array>
-#include <atomic>
-#include <cstddef>
-#include <functional>
 #include <mutex>
-#include <unordered_map>
 #include <utility>
 #include <vector>
 
-#include "common/interop_runtime.h"
+#include "common/wasm_log.h"
+#include "common/wasm_store_owner.h"
 #include "jsc/js_env_jsc.h"
 #include "jsc/jsc_class_creator.h"
 #include "jsc/jsc_ext_api.h"
-#include "jsc/jsc_wasm_global.h"
 #include "jsc/jsc_wasm_instance.h"
 #include "jsc/jsc_wasm_memory.h"
 #include "jsc/jsc_wasm_module.h"
 #include "jsc/jsc_wasm_table.h"
 
 namespace primjs::jsc {
-namespace {
-using PrismRoot = std::pair<JSObjectRef, InteropRuntime*>;
-using PrismRootRegistry =
-    std::unordered_map<JSContextRef, std::vector<PrismRoot>>;
 
-PrismRootRegistry& GetPrismRootRegistry() {
-  static auto* const registry = new PrismRootRegistry();
+namespace {
+struct TrackedRoot {
+  JSContextRef ctx = nullptr;
+  JSObjectRef root = nullptr;
+  JSCEnv* env = nullptr;
+};
+using RootRegistry = std::vector<TrackedRoot>;
+
+RootRegistry& GetRootRegistry() {
+  static auto* const registry = new RootRegistry();
   return *registry;
 }
 
-std::mutex& GetPrismRootRegistryMutex() {
+std::mutex& GetRootRegistryMutex() {
   static auto* const mutex = new std::mutex();
   return *mutex;
 }
 
-void TrackPrismRoot(JSContextRef ctx, JSObjectRef root,
-                    InteropRuntime* interop) {
-  std::lock_guard<std::mutex> lock(GetPrismRootRegistryMutex());
-  GetPrismRootRegistry()[ctx].emplace_back(root, interop);
+void TrackRoot(JSContextRef ctx, JSObjectRef root, JSCEnv* env) {
+  std::lock_guard<std::mutex> lock(GetRootRegistryMutex());
+  GetRootRegistry().push_back({ctx, root, env});
 }
 
-std::vector<PrismRoot> TakePrismRoots(JSContextRef ctx) {
-  std::lock_guard<std::mutex> lock(GetPrismRootRegistryMutex());
-  auto& registry = GetPrismRootRegistry();
-  auto it = registry.find(ctx);
-  if (it == registry.end()) return {};
-  auto roots = std::move(it->second);
-  registry.erase(it);
-  return roots;
-}
-
-void UntrackPrismRoot(JSObjectRef root) {
-  std::lock_guard<std::mutex> lock(GetPrismRootRegistryMutex());
-  auto& registry = GetPrismRootRegistry();
+std::vector<TrackedRoot> TakeRoots(JSContextRef ctx) {
+  std::lock_guard<std::mutex> lock(GetRootRegistryMutex());
+  auto& registry = GetRootRegistry();
+  std::vector<TrackedRoot> taken;
   for (auto it = registry.begin(); it != registry.end();) {
-    auto& roots = it->second;
-    roots.erase(std::remove_if(roots.begin(), roots.end(),
-                               [root](const PrismRoot& entry) {
-                                 return entry.first == root;
-                               }),
-                roots.end());
-    if (roots.empty()) {
+    if (it->ctx == ctx) {
+      taken.push_back(*it);
       it = registry.erase(it);
     } else {
       ++it;
     }
   }
+  return taken;
 }
 
-void ReleasePrismRoot(JSObjectRef root, InteropRuntime*& interop,
-                      bool can_use_jsc_api) {
-  if (!interop) return;
-  if (root && JSObjectGetPrivate(root) == interop) {
+void UntrackRoot(JSObjectRef root) {
+  std::lock_guard<std::mutex> lock(GetRootRegistryMutex());
+  auto& registry = GetRootRegistry();
+  registry.erase(std::remove_if(registry.begin(), registry.end(),
+                                [root](const TrackedRoot& entry) {
+                                  return entry.root == root;
+                                }),
+                 registry.end());
+}
+
+void ReleaseRootEnv(JSObjectRef root, JSCEnv* env, bool can_use_jsc_api,
+                    bool drain_handles) {
+  if (!env) return;
+  if (root && JSObjectGetPrivate(root) == env) {
     JSObjectSetPrivate(root, nullptr);
   }
-  if (can_use_jsc_api) {
-    InteropRuntime::ReleasePrismJSEnv(interop);
-  } else {
-    InteropRuntime::AbandonJSEnv(interop);
+  wasm::WasmStoreOwner* owner = env->store_owner();
+  if (owner && owner->active_jsc_env() == env) {
+    owner->SetActiveJSCEnv(nullptr);
   }
-  InteropRuntime::RequestPrismRelease(interop);
-  InteropRuntime::DecreaseRefCount(interop);
+  if (drain_handles && can_use_jsc_api) {
+    env->DetachAllWasmMemoryBuffers();
+  }
+  if (drain_handles && owner) {
+    owner->DrainHandlesOnExit(nullptr);
+  }
+  if (can_use_jsc_api) {
+    env->Finalize();
+  }
+  delete env;
+  wasm::WasmStoreOwner::RequestReleaseAndConsumeRef(owner);
 }
 }  // namespace
 
 JSClassRef JSCWasmExt::wasm_class_ref() {
-  static JSClassRef class_ref = JSCWasmExt::InitWasmClassRef();
+  static JSClassRef class_ref = InitWasmClassRef();
   return class_ref;
 }
 
 JSClassRef JSCWasmExt::InitWasmClassRef() {
   JSClassDefinition def =
-      JSClassCreator::GetClassDefinition(JSCWasmExt::kWasmName, Finalize);
-  JSStaticFunction static_funcs[] = {{0, 0, 0}};
+      JSClassCreator::GetClassDefinition(kWasmName, Finalize);
+  static const JSStaticFunction static_funcs[] = {{nullptr, nullptr, 0}};
   def.staticFunctions = static_funcs;
   return JSClassCreate(&def);
 }
 
 void JSCWasmExt::RegisterWebAssembly(JSContextRef ctx,
-                                     std::atomic_bool* ctx_invalid,
-                                     WasmRuntimeType runtime_type) {
-#ifdef ENABLE_MONITOR
-  bool is_prism = GetSettingsWithKey("wasm_runtime_type");
-  if (is_prism) {
-    runtime_type = WasmRuntimeType::PRISM;
-  } else {
-    runtime_type = WasmRuntimeType::WASM3;
+                                     std::atomic_bool* ctx_invalid) {
+  if (wasm_unlikely(!ctx)) return;
+
+  wasm::WasmStoreOwner* store_owner = wasm::WasmStoreOwner::Create();
+  if (wasm_unlikely(!store_owner)) {
+    WLOGE("Creating WebAssembly store failed!");
+    return;
   }
-#endif
+  wasm::WasmStoreOwner::Retain(store_owner);
 
-  RegisterWebAssemblyForTesting(ctx, ctx_invalid, runtime_type);
-}
+  auto* env = new JSCEnv(ctx, ctx_invalid, store_owner);
+  store_owner->SetActiveJSCEnv(env);
+  JSObjectRef wasm_obj = JSObjectMake(ctx, wasm_class_ref(), env);
+  env->SetWasmRoot(wasm_obj);
 
-void JSCWasmExt::RegisterWebAssemblyForTesting(JSContextRef ctx,
-                                               std::atomic_bool* ctx_invalid,
-                                               WasmRuntimeType runtime_type) {
-  WLOGI("Registering WebAssembly, WasmRuntimeType: %d", runtime_type);
-
-  // Factory function type, construct InteropRuntime singleton here, remember to
-  // destruct it.
-  using RuntimeFactory = std::function<InteropRuntime*(JSContextRef)>;
-  // New JS Environment and Wasm Environment here, and Creating a Interop
-  // Runtime to manage js env and wasm env.
-  std::array<std::pair<WasmRuntimeType, RuntimeFactory>, 2> factory_array = {{
-      {WasmRuntimeType::WASM3,
-       [ctx_invalid](JSContextRef ctx) -> InteropRuntime* {
-         return InteropRuntime::Constructor(new JSCEnv(ctx, ctx_invalid, false),
-                                            new Wasm3Runtime());
-       }},
-      {WasmRuntimeType::PRISM,
-       [ctx_invalid](JSContextRef ctx) -> InteropRuntime* {
-         return InteropRuntime::Constructor(new JSCEnv(ctx, ctx_invalid, true),
-                                            new PrismRuntime());
-       }},
-  }};
-
-  // Create InteropRuntime instance
-  InteropRuntime* interop = nullptr;
-  for (const auto& elem : factory_array) {
-    if (elem.first == runtime_type) {
-      interop = elem.second(ctx);
-      break;
-    }
-  }
-
-  // Create WebAssembly object, and set it as global.WebAssembly. Move OWNERSHIP
-  // of interop to wasm_obj.
-  JSObjectRef wasm_obj = CreateWasmObject(ctx, interop, ctx_invalid);
-
-  JSValueRef exception{};
-  Attach(ctx, JSCWasmExt::kWasmName, wasm_obj,
+  JSValueRef exception = nullptr;
+  Attach(ctx, kWasmName, wasm_obj,
          kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontEnum, nullptr,
          &exception);
   if (exception) {
     WLOGE("Attach WebAssembly failed!");
-    if (runtime_type == WasmRuntimeType::PRISM) {
-      ReleasePrismRoot(wasm_obj, interop, true);
-    } else {
-      InteropRuntime::DecreaseRefCount(interop);
-    }
+    ReleaseRootEnv(wasm_obj, env, true, true);
     return;
   }
-  if (runtime_type == WasmRuntimeType::PRISM) {
-    TrackPrismRoot(ctx, wasm_obj, interop);
-  }
+  TrackRoot(ctx, wasm_obj, env);
 
-  JSPropertyAttributes default_attr = kJSPropertyAttributeDontEnum;
-  std::array<std::pair<const char*, JSObjectRef>, 5> constructors = {
-      {{JSCWasmExt::kModuleName,
-        JSCWasmModule::CreateConstructor(ctx, interop, &exception)},
-       {JSCWasmExt::kInstanceName,
-        JSCWasmInstance::CreateConstructor(ctx, interop, &exception)},
-       {JSCWasmExt::kMemoryName,
-        JSCWasmMemory::CreateConstructor(ctx, interop, &exception)},
-       {JSCWasmExt::kTableName,
-        JSCWasmTable::CreateConstructor(ctx, interop, &exception)},
-       {JSCWasmExt::kGlobalName,
-        JSCWasmGlobal::CreateConstructor(ctx, interop, &exception)}}};
+  const JSPropertyAttributes default_attr = kJSPropertyAttributeDontEnum;
+  std::array<std::pair<const char*, JSObjectRef>, 4> constructors = {
+      {{kModuleName, JSCWasmModule::CreateConstructor(ctx, env, &exception)},
+       {kInstanceName,
+        JSCWasmInstance::CreateConstructor(ctx, env, &exception)},
+       {kMemoryName, JSCWasmMemory::CreateConstructor(ctx, env, &exception)},
+       {kTableName, JSCWasmTable::CreateConstructor(ctx, env, &exception)}}};
 
-  for (const auto& elem : constructors) {
-    if (runtime_type == WasmRuntimeType::PRISM) {
-      // Prism releases its store once, through the WebAssembly root. Keep that
-      // root reachable while a constructor remains reachable.
-      JSObjectSetProperty(
-          ctx, elem.second, JSString(kWasmRootProperty), wasm_obj,
-          kJSPropertyAttributeReadOnly | kJSPropertyAttributeDontEnum |
-              kJSPropertyAttributeDontDelete,
-          &exception);
-      if (exception) {
-        WLOGE("Retaining WebAssembly root for %s failed!", elem.first);
-        return;
-      }
+  for (const auto& [name, ctor] : constructors) {
+    if (!ctor || exception ||
+        !RetainWasmRootOnJSCObject(ctx, ctor, wasm_obj, &exception)) {
+      WLOGE("Retaining WebAssembly root for %s failed!", name);
+      return;
     }
-    Attach(ctx, elem.first, elem.second, default_attr, wasm_obj, &exception);
+    Attach(ctx, name, ctor, default_attr, wasm_obj, &exception);
     if (exception) {
-      WLOGE("Attach WebAssembly.%s failed!", elem.first);
+      WLOGE("Attach WebAssembly.%s failed!", name);
       return;
     }
   }
 }
 
+void JSCWasmExt::PrepareForContextRelease(JSContextRef ctx) {
+  for (auto& entry : TakeRoots(ctx)) {
+    ReleaseRootEnv(entry.root, entry.env, true, true);
+  }
+}
+
+void JSCWasmExt::Finalize(JSObjectRef obj) {
+  auto* env = static_cast<JSCEnv*>(JSObjectGetPrivate(obj));
+  if (!env) return;
+  JSObjectSetPrivate(obj, nullptr);
+  UntrackRoot(obj);
+  ReleaseRootEnv(nullptr, env, false, false);
+}
+
 #if defined(QJS_UNITTEST)
 bool JSCWasmExt::SetCurrentPrismReleaseCountForTesting(
     JSContextRef ctx, std::atomic_int* release_count) {
-  std::lock_guard<std::mutex> lock(GetPrismRootRegistryMutex());
-  auto& registry = GetPrismRootRegistry();
-  auto it = registry.find(ctx);
-  if (it == registry.end()) return false;
-  for (auto& entry : it->second) {
-    auto* interop = entry.second;
-    if (interop && interop->wasm_runtime().is<PrismRuntime*>()) {
-      InteropRuntime::SetPrismReleaseCountForTesting(interop, release_count);
+  std::lock_guard<std::mutex> lock(GetRootRegistryMutex());
+  for (auto& entry : GetRootRegistry()) {
+    if (entry.ctx == ctx && entry.env && entry.env->store_owner()) {
+      entry.env->store_owner()->SetReleaseCountForTesting(release_count);
       return true;
     }
   }
   return false;
 }
 #endif
-
-void JSCWasmExt::RegisterWebAssembly(JSContextRef ctx,
-                                     std::atomic_bool* ctx_invalid) {
-  JSCWasmExt::RegisterWebAssembly(ctx, ctx_invalid, WasmRuntimeType::WASM3);
-}
-
-void JSCWasmExt::PrepareForContextRelease(JSContextRef ctx) {
-  for (auto& [root, interop] : TakePrismRoots(ctx)) {
-    ReleasePrismRoot(root, interop, true);
-  }
-}
-
-JSObjectRef JSCWasmExt::CreateWasmObject(JSContextRef ctx,
-                                         InteropRuntime* interop,
-                                         std::atomic_bool* ctx_invalid) {
-  JSObjectRef wasm_obj = JSObjectMake(ctx, wasm_class_ref(), interop);
-  InteropRuntime::IncreaseRefCount(interop);
-
-  return wasm_obj;
-}
-
-void JSCWasmExt::Finalize(JSObjectRef obj) {
-  WLOGD("Finalizing globalThis.WebAssembly Object...");
-
-  auto interop = static_cast<InteropRuntime*>(JSObjectGetPrivate(obj));
-  if (interop == nullptr) return;
-
-  auto wasm_runtime = interop->wasm_runtime();
-  JSObjectSetPrivate(obj, nullptr);
-  if (wasm_runtime.is<PrismRuntime*>()) {
-    UntrackPrismRoot(obj);
-    ReleasePrismRoot(nullptr, interop, false);
-  } else {
-    InteropRuntime::ReleaseJSEnv(interop);
-    InteropRuntime::DecreaseRefCount(interop);
-  }
-}
 
 }  // namespace primjs::jsc

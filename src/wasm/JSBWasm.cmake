@@ -3,57 +3,67 @@
 # LICENSE file in the root directory of this source tree.
 
 set(JSB_WASM_SOURCE_ROOT ${CMAKE_CURRENT_LIST_DIR})
-set(JSB_WASM_HEADER_DIR ${JSBWASM_SOURCE_ROOT})
+set(JSB_WASM_HEADER_DIR ${JSB_WASM_SOURCE_ROOT})
 
-file(GLOB_RECURSE JSB_WASM_COMMON_SRC FOLLOW_SYMLINKS
-  "${JSB_WASM_SOURCE_ROOT}/common/*.h"
-  "${JSB_WASM_SOURCE_ROOT}/common/*.cc"
+set(JSB_WASM_COMMON_SRC
+  "${JSB_WASM_SOURCE_ROOT}/common/js_type.h"
+  "${JSB_WASM_SOURCE_ROOT}/common/messages.h"
+  "${JSB_WASM_SOURCE_ROOT}/common/wasm_c_api_dispatch.cc"
+  "${JSB_WASM_SOURCE_ROOT}/common/wasm_c_api_dispatch.h"
+  "${JSB_WASM_SOURCE_ROOT}/common/wasm_log.h"
+  "${JSB_WASM_SOURCE_ROOT}/common/wasm_store_owner.h"
+  "${JSB_WASM_SOURCE_ROOT}/common/wasm_type.h"
+  "${JSB_WASM_SOURCE_ROOT}/common/wasm_utils.h"
 )
 
-file(GLOB_RECURSE JSB_WASM_JSC_SRC FOLLOW_SYMLINKS
-  "${JSB_WASM_SOURCE_ROOT}/runtime/base/*.h"
-  "${JSB_WASM_SOURCE_ROOT}/jsc/*.h"
-  "${JSB_WASM_SOURCE_ROOT}/jsc/*.cc"
+set(JSB_WASM_JSC_SRC
+  "${JSB_WASM_SOURCE_ROOT}/jsc/js_env_jsc.cc"
+  "${JSB_WASM_SOURCE_ROOT}/jsc/js_env_jsc.h"
+  "${JSB_WASM_SOURCE_ROOT}/jsc/jsc_builtin_objects.cc"
+  "${JSB_WASM_SOURCE_ROOT}/jsc/jsc_builtin_objects.h"
+  "${JSB_WASM_SOURCE_ROOT}/jsc/jsc_class_creator.cc"
+  "${JSB_WASM_SOURCE_ROOT}/jsc/jsc_class_creator.h"
+  "${JSB_WASM_SOURCE_ROOT}/jsc/jsc_ext_api.cc"
+  "${JSB_WASM_SOURCE_ROOT}/jsc/jsc_ext_api.h"
+  "${JSB_WASM_SOURCE_ROOT}/jsc/jsc_wasm.cc"
+  "${JSB_WASM_SOURCE_ROOT}/jsc/jsc_wasm.h"
+  "${JSB_WASM_SOURCE_ROOT}/jsc/jsc_wasm_function.cc"
+  "${JSB_WASM_SOURCE_ROOT}/jsc/jsc_wasm_function.h"
+  "${JSB_WASM_SOURCE_ROOT}/jsc/jsc_wasm_instance.cc"
+  "${JSB_WASM_SOURCE_ROOT}/jsc/jsc_wasm_instance.h"
+  "${JSB_WASM_SOURCE_ROOT}/jsc/jsc_wasm_memory.cc"
+  "${JSB_WASM_SOURCE_ROOT}/jsc/jsc_wasm_memory.h"
+  "${JSB_WASM_SOURCE_ROOT}/jsc/jsc_wasm_module.cc"
+  "${JSB_WASM_SOURCE_ROOT}/jsc/jsc_wasm_module.h"
+  "${JSB_WASM_SOURCE_ROOT}/jsc/jsc_wasm_table.cc"
+  "${JSB_WASM_SOURCE_ROOT}/jsc/jsc_wasm_table.h"
 )
 
-file(GLOB_RECURSE JSB_WASM_QJS_SRC FOLLOW_SYMLINKS
-  "${JSB_WASM_SOURCE_ROOT}/runtime/base/*.h"
-  "${JSB_WASM_SOURCE_ROOT}/qjs/*.h"
-  "${JSB_WASM_SOURCE_ROOT}/qjs/*.cc"
-)
-
-file(GLOB_RECURSE JSB_WASM_RUNTIME_PRISM_SRC FOLLOW_SYMLINKS
-  "${JSB_WASM_SOURCE_ROOT}/runtime/base/*.h"
-  "${JSB_WASM_SOURCE_ROOT}/runtime/prism/*.h"
-  "${JSB_WASM_SOURCE_ROOT}/runtime/prism/*.cc"
-)
-
-file(GLOB_RECURSE JSB_WASM_RUNTIME_WASM3_SRC FOLLOW_SYMLINKS
-  "${JSB_WASM_SOURCE_ROOT}/runtime/base/*.h"
-  "${JSB_WASM_SOURCE_ROOT}/runtime/wasm3/*.h"
-  "${JSB_WASM_SOURCE_ROOT}/runtime/wasm3/*.cc"
-)
-
-set(JSC_WASM3_SOURCES
-  ${JSB_WASM_COMMON_SRC}
-  ${JSB_WASM_JSC_SRC}
-  ${JSB_WASM_RUNTIME_WASM3_SRC}
+set(JSB_WASM_QJS_SRC
+  "${JSB_WASM_SOURCE_ROOT}/qjs/js_env_qjs.cc"
+  "${JSB_WASM_SOURCE_ROOT}/qjs/js_env_qjs.h"
+  "${JSB_WASM_SOURCE_ROOT}/qjs/qjs_ext_api.cc"
+  "${JSB_WASM_SOURCE_ROOT}/qjs/qjs_ext_api.h"
+  "${JSB_WASM_SOURCE_ROOT}/qjs/qjs_wasm.cc"
+  "${JSB_WASM_SOURCE_ROOT}/qjs/qjs_wasm.h"
+  "${JSB_WASM_SOURCE_ROOT}/qjs/qjs_wasm_function.cc"
+  "${JSB_WASM_SOURCE_ROOT}/qjs/qjs_wasm_function.h"
+  "${JSB_WASM_SOURCE_ROOT}/qjs/qjs_wasm_instance.cc"
+  "${JSB_WASM_SOURCE_ROOT}/qjs/qjs_wasm_instance.h"
+  "${JSB_WASM_SOURCE_ROOT}/qjs/qjs_wasm_memory.cc"
+  "${JSB_WASM_SOURCE_ROOT}/qjs/qjs_wasm_memory.h"
+  "${JSB_WASM_SOURCE_ROOT}/qjs/qjs_wasm_module.cc"
+  "${JSB_WASM_SOURCE_ROOT}/qjs/qjs_wasm_module.h"
+  "${JSB_WASM_SOURCE_ROOT}/qjs/qjs_wasm_table.cc"
+  "${JSB_WASM_SOURCE_ROOT}/qjs/qjs_wasm_table.h"
 )
 
 set(JSC_PRISM_SOURCES
   ${JSB_WASM_COMMON_SRC}
   ${JSB_WASM_JSC_SRC}
-  ${JSB_WASM_RUNTIME_PRISM_SRC}
-)
-
-set(QJS_WASM3_SOURCES
-  ${JSB_WASM_COMMON_SRC}
-  ${JSB_WASM_QJS_SRC}
-  ${JSB_WASM_RUNTIME_WASM3_SRC}
 )
 
 set(QJS_PRISM_SOURCES
   ${JSB_WASM_COMMON_SRC}
   ${JSB_WASM_QJS_SRC}
-  ${JSB_WASM_RUNTIME_PRISM_SRC}
 )

@@ -2,52 +2,68 @@
 // Licensed under the Apache License Version 2.0 that can be found in the
 // LICENSE file in the root directory of this source tree.
 
-#ifndef SRC_WASM_JSC_WASM_TABLE_
-#define SRC_WASM_JSC_WASM_TABLE_
+#ifndef SRC_WASM_JSC_TABLE_H_
+#define SRC_WASM_JSC_TABLE_H_
 
 #include <JavaScriptCore/JavaScriptCore.h>
 
-#include "common/one_of.h"
+#include "common/wasm_store_owner.h"
+#include "common/wasm_type.h"
+#include "jsc/js_env_jsc.h"
 
-namespace primjs {
-class InteropRuntime;
+namespace primjs::jsc {
 
-namespace wasm {
-class Wasm3Table;
-class PrismTable;
-}  // namespace wasm
-
-using WasmTableRef = OneOf<wasm::Wasm3Table*, wasm::PrismTable*>;
-
-namespace jsc {
 class JSCWasmTable {
  public:
-  JSCWasmTable(WasmTableRef table, InteropRuntime* interop);
+  static constexpr int32_t kMaxSaneTableSize = 100000;
 
+  JSCWasmTable(JSCEnv* env, wasm_table_t* table, uint32_t maximum,
+               JSObjectRef js_obj);
   ~JSCWasmTable();
 
-  // return the WebAssembly.Table() Constructor
-  // ctx : A JavaScript execution context
-  // wctx: WebAssembly execution context representing the "WebAssembly"
-  // namespace
-  static JSObjectRef CreateConstructor(JSContextRef ctx,
-                                       InteropRuntime* interop,
+  static JSClassRef class_ref();
+  static JSClassRef prototype_class_ref();
+  static JSClassRef constructor_class_ref();
+  static void ReleaseClassRef();
+
+  static JSCWasmTable* Of(const wasm_table_t* table) {
+    return table ? static_cast<JSCWasmTable*>(wasm_table_get_host_info(table))
+                 : nullptr;
+  }
+
+  static bool IsJSCWasmTable(JSContextRef ctx, JSValueRef target);
+
+  static JSObjectRef CreateConstructor(JSContextRef ctx, JSCEnv* env,
                                        JSValueRef* exception);
-
-  // create JSObject with self Constructor
-  static JSObjectRef CreateJSObject(JSContextRef ctx, JSObjectRef constructor,
-                                    WasmTableRef table, JSValueRef* exception);
-
-  static JSObjectRef CreatePrototype(JSContextRef ctx, JSValueRef* exception);
-
   static JSObjectRef CallAsConstructor(JSContextRef ctx,
                                        JSObjectRef constructor, size_t argc,
                                        const JSValueRef argv[],
                                        JSValueRef* exception);
 
-  static void Finalize(JSObjectRef object);
+  static JSObjectRef GetOrWrapOwnedTable(JSContextRef ctx, JSCEnv* env,
+                                         wasm_table_t* table,
+                                         JSValueRef* exception);
 
-  static bool IsJSCWasmTable(JSContextRef ctx, JSValueRef target);
+  wasm_table_t* table() const { return table_; }
+  wasm::WasmStoreOwner* store_owner() const { return store_owner_; }
+  uint32_t maximum() const { return maximum_; }
+  uint32_t size() const { return table_ ? wasm_table_size(table_) : 0; }
+  JSObjectRef js_object() const { return js_obj_; }
+  JSCKeepSet& keep_set() { return keep_set_; }
+  const JSCKeepSet& keep_set() const { return keep_set_; }
+
+ private:
+  static JSClassRef InitClassRef();
+  static JSClassRef InitProtoClassRef();
+  static JSClassRef InitCtorClassRef();
+  static void Finalize(JSObjectRef object);
+  static void DetachOnExit(wasm::WasmTrackedHandle* handle, void* exit_ctx);
+  void DetachWasmTable();
+
+  static JSObjectRef CreatePrototype(JSContextRef ctx, JSValueRef* exception);
+  static JSObjectRef WrapOwnedTable(JSContextRef ctx, JSCEnv* env,
+                                    wasm_table_t* table, uint32_t maximum,
+                                    JSValueRef* exception);
 
   static JSValueRef GetLengthCallback(JSContextRef ctx, JSObjectRef function,
                                       JSObjectRef thisObject, size_t argc,
@@ -66,27 +82,14 @@ class JSCWasmTable {
                                  const JSValueRef argv[],
                                  JSValueRef* exception);
 
-  WasmTableRef& table() { return table_; }
-  static void ReleaseClassRef();
-
- private:
-  //  Default max table size of wasm3 we used is 100000. Table imported from JS
-  //  will be compared with wasm3 table declaration. If the table size in JS is
-  //  not specified, max size in JS and wasm3 will be different. This will cause
-  //  import failure.
-  static constexpr uint32_t MaxSaneTableSize = 100000;
-
-  OWNER WasmTableRef table_;
-
-  BORROWER InteropRuntime* interop_runtime_;
-
-  static JSClassRef InitClassRef();
-  static JSClassRef InitProtoClassRef();
-  static JSClassRef InitCtorClassRef();
-  static JSClassRef class_ref();
-  static JSClassRef prototype_class_ref();
-  static JSClassRef constructor_class_ref();
+  wasm::WasmTrackedHandle tracked_;
+  wasm::WasmStoreOwner* store_owner_ = nullptr;
+  wasm_table_t* table_ = nullptr;
+  uint32_t maximum_ = wasm_limits_max_default;
+  JSObjectRef js_obj_ = nullptr;
+  JSCKeepSet keep_set_;
 };
-}  // namespace jsc
-}  // namespace primjs
-#endif  // SRC_WASM_JSC_WASM_TABLE_
+
+}  // namespace primjs::jsc
+
+#endif  // SRC_WASM_JSC_TABLE_H_

@@ -2,63 +2,51 @@
 // Licensed under the Apache License Version 2.0 that can be found in the
 // LICENSE file in the root directory of this source tree.
 
-#ifndef SRC_WASM_JSC_WASM_INSTANCE_
-#define SRC_WASM_JSC_WASM_INSTANCE_
+#ifndef SRC_WASM_JSC_INSTANCE_H_
+#define SRC_WASM_JSC_INSTANCE_H_
 
 #include <JavaScriptCore/JavaScriptCore.h>
 
-#include "common/one_of.h"
-#include "common/wasm_utils.h"
+#include "common/wasm_store_owner.h"
+#include "jsc/js_env_jsc.h"
 
-namespace primjs {
-class InteropRuntime;
+namespace primjs::jsc {
 
-namespace wasm {
-class Wasm3Instance;
-class PrismInstance;
-}  // namespace wasm
-
-using WasmInstanceRef = OneOf<wasm::Wasm3Instance*, wasm::PrismInstance*>;
-
-namespace jsc {
 class JSCWasmInstance {
  public:
-  JSCWasmInstance(WasmInstanceRef instance, InteropRuntime* interop);
+  JSCWasmInstance(JSCEnv* env, wasm_instance_t* instance);
   ~JSCWasmInstance();
-
-  static JSObjectRef CreateConstructor(JSContextRef ctx,
-                                       InteropRuntime* interop,
-                                       JSValueRef* exception);
-
-  static JSObjectRef CreateJSObject(JSContextRef ctx, JSObjectRef constructor,
-                                    WasmInstanceRef instance,
-                                    JSValueRef* exception);
-
-  static JSObjectRef CreatePrototype(JSContextRef ctx, JSValueRef* exception);
-
-  static JSObjectRef CallAsConstructor(JSContextRef ctx,
-                                       JSObjectRef constructor, size_t argc,
-                                       const JSValueRef argv[],
-                                       JSValueRef* exception);
-
-  static void Finalize(JSObjectRef object);
-
-  static void ReleaseClassRef();
-
- private:
-  // WasmInstance has a lot of links from/to imports&exports,
-  // so that it is maintained by shared_ptr.
-  OWNER WasmInstanceRef instance_;
-  BORROWER InteropRuntime* interop_runtime_;
-
-  static JSClassRef InitClassRef();
-  static JSClassRef InitCtorClassRef();
-  static JSClassRef InitProtoClassRef();
 
   static JSClassRef class_ref();
   static JSClassRef prototype_class_ref();
   static JSClassRef constructor_class_ref();
+  static void ReleaseClassRef();
+
+  static JSObjectRef CreateConstructor(JSContextRef ctx, JSCEnv* env,
+                                       JSValueRef* exception);
+  static JSObjectRef CallAsConstructor(JSContextRef ctx,
+                                       JSObjectRef constructor, size_t argc,
+                                       const JSValueRef argv[],
+                                       JSValueRef* exception);
+  JSCKeepSet& keep_set() { return keep_set_; }
+  const JSCKeepSet& keep_set() const { return keep_set_; }
+
+ private:
+  static JSClassRef InitClassRef();
+  static JSClassRef InitProtoClassRef();
+  static JSClassRef InitCtorClassRef();
+  static void Finalize(JSObjectRef object);
+  static void DetachOnExit(wasm::WasmTrackedHandle* handle, void* exit_ctx);
+  void DetachWasmInstance();
+
+  static JSObjectRef CreatePrototype(JSContextRef ctx, JSValueRef* exception);
+
+  wasm::WasmTrackedHandle tracked_;
+  wasm::WasmStoreOwner* store_owner_ = nullptr;
+  wasm_instance_t* instance_ = nullptr;
+  JSCKeepSet keep_set_;
 };
-}  // namespace jsc
-}  // namespace primjs
-#endif  // SRC_WASM_JSC_WASM_INSTANCE_
+
+}  // namespace primjs::jsc
+
+#endif  // SRC_WASM_JSC_INSTANCE_H_

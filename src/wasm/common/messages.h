@@ -29,20 +29,21 @@ class ErrorMessages {
   T(UnsupportedElemType,                                                  \
     "Descriptor property 'element' must be a WebAssembly reference type") \
   T(InvalidTableElem, "Argument 1's type is invalid for table")           \
+  T(IllegalInvocation, "Illegal invocation")                              \
   T(OSVersionUnsupported,                                                 \
     "Such operation is not supported on this version yet.")
 
-#define DEF_MESSAGES(NAME, STRING)                               \
-  static constexpr const char* k##NAME##_1001 = "[1001]" STRING; \
-  static constexpr const char* k##NAME##_1002 = "[1002]" STRING; \
-  static constexpr const char* k##NAME##_1003 = "[1003]" STRING; \
-  static constexpr const char* k##NAME##_1004 = "[1004]" STRING; \
-  static constexpr const char* k##NAME##_1005 = "[1005]" STRING; \
-  static constexpr const char* k##NAME##_1006 = "[1006]" STRING; \
-  static constexpr const char* k##NAME##_1007 = "[1007]" STRING; \
-  static constexpr const char* k##NAME##_1008 = "[1008]" STRING; \
-  static constexpr const char* k##NAME##_1009 = "[1009]" STRING; \
-  static constexpr const char* k##NAME##_1010 = "[1010]" STRING;
+#define DEF_MESSAGES(NAME, STRING)                      \
+  static constexpr const char* k##NAME##_1001 = STRING; \
+  static constexpr const char* k##NAME##_1002 = STRING; \
+  static constexpr const char* k##NAME##_1003 = STRING; \
+  static constexpr const char* k##NAME##_1004 = STRING; \
+  static constexpr const char* k##NAME##_1005 = STRING; \
+  static constexpr const char* k##NAME##_1006 = STRING; \
+  static constexpr const char* k##NAME##_1007 = STRING; \
+  static constexpr const char* k##NAME##_1008 = STRING; \
+  static constexpr const char* k##NAME##_1009 = STRING; \
+  static constexpr const char* k##NAME##_1010 = STRING;
 
   MESSAGE_TEMPLATE(DEF_MESSAGES)
 #undef DEF_MESSAGES

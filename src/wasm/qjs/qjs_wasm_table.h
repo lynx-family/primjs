@@ -5,72 +5,64 @@
 #ifndef SRC_WASM_QJS_QJS_WASM_TABLE_H_
 #define SRC_WASM_QJS_QJS_WASM_TABLE_H_
 
-#include "common/one_of.h"
-#include "quickjs/include/quickjs-inner.h"
+#include "common/wasm_store_owner.h"
+#include "common/wasm_type.h"
+#include "qjs/qjs_ext_api.h"
 
-namespace primjs {
-class InteropRuntime;
+namespace primjs::qjs {
 
-namespace wasm {
-class Wasm3Table;
-class PrismTable;
-}  // namespace wasm
+class QJSEnv;
 
-using WasmTableRef = OneOf<wasm::Wasm3Table *, wasm::PrismTable *>;
-
-namespace qjs {
-class QJSWasmTable {
+class QJSWasmTable : public QJSWasmWrapperBase {
  public:
-  QJSWasmTable(WasmTableRef table, InteropRuntime *interop);
+  static constexpr int32_t kMaxSaneTableSize = 100000;
+
+  QJSWasmTable(LEPUSRuntime* rt, LEPUSValue wasm_root, QJSEnv* env,
+               wasm_table_t* table, uint32_t maximum, LEPUSValue js_obj);
   ~QJSWasmTable();
 
-  static LEPUSValue CreateConstructor(LEPUSContext *ctx, LEPUSValue wasm_root);
-
-  static LEPUSValue CreateJSObject(LEPUSContext *ctx, InteropRuntime *interop,
-                                   const WasmTableRef &table);
-
-  static inline LEPUSClassID class_id() {
-    static LEPUSClassID class_id = LEPUS_NewClassID(&class_id);
-    return class_id;
+  static LEPUSClassID class_id() {
+    return GetWasmClassId(WasmQJSClass::kTable);
   }
 
-  WasmTableRef &table() { return table_; }
+  static QJSWasmTable* Of(const wasm_table_t* table) {
+    return table ? static_cast<QJSWasmTable*>(wasm_table_get_host_info(table))
+                 : nullptr;
+  }
 
- protected:
-  static void Finalize(LEPUSRuntime *rt, LEPUSValue obj);
-
-  static LEPUSValue CreatePrototype(LEPUSContext *ctx, LEPUSClassID class_id_);
-
-  static LEPUSValue CallAsConstructor(LEPUSContext *ctx,
+  static bool Register(LEPUSContext* ctx, LEPUSValue wasm_root);
+  static LEPUSValue CallAsConstructor(LEPUSContext* ctx,
                                       LEPUSValueConst new_target, int argc,
-                                      LEPUSValueConst *argv);
+                                      LEPUSValueConst* argv);
 
-  static LEPUSValue GetLengthCallback(LEPUSContext *ctx,
-                                      LEPUSValueConst this_val);
+  static LEPUSValue GetOrWrapOwnedTable(LEPUSContext* ctx, QJSEnv* env,
+                                        wasm_table_t* table);
 
-  static LEPUSValue GetIndexCallback(LEPUSContext *ctx,
-                                     LEPUSValueConst this_val, int argc,
-                                     LEPUSValueConst *argv);
-  static LEPUSValue SetIndexCallback(LEPUSContext *ctx,
-                                     LEPUSValueConst this_val, int argc,
-                                     LEPUSValueConst *argv);
-
-  static LEPUSValue GrowCallback(LEPUSContext *ctx, LEPUSValueConst this_val,
-                                 int argc, LEPUSValueConst *argv);
+  wasm_table_t* table() const { return table_; }
+  uint32_t maximum() const { return maximum_; }
+  uint32_t size() const { return table_ ? wasm_table_size(table_) : 0; }
+  LEPUSValue js_object() const { return js_obj_; }
 
  private:
-  //  Default max table size of wasm3 we used is 100000. Table imported from JS
-  //  will be compared with wasm3 table declaration. If the table size in JS is
-  //  not specified, max size in JS and wasm3 will be different. This will cause
-  //  import failure.
-  static constexpr uint32_t MaxSaneTableSize = 100000;
+  static LEPUSValue WrapOwnedTable(LEPUSContext* ctx, QJSEnv* env,
+                                   wasm_table_t* table, uint32_t maximum);
+  static void DetachTable(QJSWasmWrapperBase* base, LEPUSRuntime* rt);
+  static LEPUSValue GetLengthCallback(LEPUSContext* ctx,
+                                      LEPUSValueConst this_val);
+  static LEPUSValue GetIndexCallback(LEPUSContext* ctx,
+                                     LEPUSValueConst this_val, int argc,
+                                     LEPUSValueConst* argv);
+  static LEPUSValue SetIndexCallback(LEPUSContext* ctx,
+                                     LEPUSValueConst this_val, int argc,
+                                     LEPUSValueConst* argv);
+  static LEPUSValue GrowCallback(LEPUSContext* ctx, LEPUSValueConst this_val,
+                                 int argc, LEPUSValueConst* argv);
 
-  OWNER WasmTableRef table_;
-
-  BORROWER InteropRuntime *interop_runtime_;
+  wasm_table_t* table_ = nullptr;
+  uint32_t maximum_ = wasm_limits_max_default;
+  LEPUSValue js_obj_ = LEPUS_UNDEFINED;
 };
 
-}  // namespace qjs
-}  // namespace primjs
+}  // namespace primjs::qjs
 
 #endif  // SRC_WASM_QJS_QJS_WASM_TABLE_H_

@@ -2,55 +2,41 @@
 // Licensed under the Apache License Version 2.0 that can be found in the
 // LICENSE file in the root directory of this source tree.
 
-#ifndef SRC_WASM_JSC_WASM_EXT_H_
-#define SRC_WASM_JSC_WASM_EXT_H_
+#ifndef SRC_WASM_JSC_WASM_H_
+#define SRC_WASM_JSC_WASM_H_
 
 #include <JavaScriptCore/JavaScriptCore.h>
 
 #include <atomic>
 
-#include "../common/wasm_runtime_type.h"
+namespace primjs::jsc {
 
-namespace primjs {
-class InteropRuntime;
+class JSCEnv;
 
-namespace jsc {
 class JSCWasmExt {
  public:
-  static void RegisterWebAssembly(JSContextRef ctx,
-                                  std::atomic_bool* ctx_invalid,
-                                  WasmRuntimeType runtime_type);
-  // Test-only entry point that bypasses the app's settings-driven engine
-  // selection. Production callers must use RegisterWebAssembly above.
-  static void RegisterWebAssemblyForTesting(JSContextRef ctx,
-                                            std::atomic_bool* ctx_invalid,
-                                            WasmRuntimeType runtime_type);
-#if defined(QJS_UNITTEST)
-  static bool SetCurrentPrismReleaseCountForTesting(
-      JSContextRef ctx, std::atomic_int* release_count);
-#endif
-  static void RegisterWebAssembly(JSContextRef ctx,
-                                  std::atomic_bool* ctx_invalid);
-  static void PrepareForContextRelease(JSContextRef ctx);
-
   static constexpr const char* kWasmName = "WebAssembly";
   static constexpr const char* kModuleName = "Module";
-  static constexpr const char* kGlobalName = "Global";
   static constexpr const char* kInstanceName = "Instance";
   static constexpr const char* kMemoryName = "Memory";
   static constexpr const char* kTableName = "Table";
 
- protected:
-  static JSObjectRef CreateWasmObject(JSContextRef ctx, InteropRuntime* interop,
-                                      std::atomic_bool* ctx_invalid);
-  static void Finalize(JSObjectRef obj);
+  static void RegisterWebAssembly(JSContextRef ctx,
+                                  std::atomic_bool* ctx_invalid = nullptr);
+  static void PrepareForContextRelease(JSContextRef ctx);
+
+#if defined(QJS_UNITTEST)
+  static bool SetCurrentPrismReleaseCountForTesting(
+      JSContextRef ctx, std::atomic_int* release_count);
+#endif
+
+  static JSClassRef wasm_class_ref();
 
  private:
   static JSClassRef InitWasmClassRef();
-  static JSClassRef wasm_class_ref();
+  static void Finalize(JSObjectRef obj);
 };
 
-}  // namespace jsc
-}  // namespace primjs
+}  // namespace primjs::jsc
 
-#endif  // SRC_WASM_JSC_WASM_EXT_H_
+#endif  // SRC_WASM_JSC_WASM_H_

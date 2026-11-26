@@ -4,225 +4,160 @@
 
 #include "qjs/qjs_wasm_module.h"
 
-#include <cstddef>
+#include <cstdlib>
+#include <cstring>
 
-#include "basic/modp_b64/modp_b64.h"
-#include "common/interop_runtime.h"
 #include "common/messages.h"
 #include "common/wasm_utils.h"
 #include "gc/trace-gc.h"
-#include "qjs/qjs_ext_api.h"
+#include "qjs/js_env_qjs.h"
 #include "qjs/qjs_wasm.h"
 
 namespace primjs::qjs {
-QJSWasmModule::QJSWasmModule(InteropRuntime* interop, WasmModuleRef module)
-    : module_(std::move(module)) {
-  WLOGD("Running QJSWasmModule::%s...", __func__);
-  interop_runtime_ = interop;
-  InteropRuntime::IncreaseRefCount(interop_runtime_);
+
+QJSWasmModule::QJSWasmModule(LEPUSRuntime* rt, LEPUSValue wasm_root,
+                             wasm::WasmStoreOwner* store_owner,
+                             wasm_module_t* module)
+    : QJSWasmWrapperBase(rt, wasm_root, store_owner, DetachModule),
+      module_(module) {
+#if defined(QJS_UNITTEST)
+  wasm::WasmStoreOwner::live_modules_for_testing_.fetch_add(1);
+#endif
 }
 
-QJSWasmModule::~QJSWasmModule() {
-  WLOGD("Running QJSWasmModule::%s...", __func__);
-  if (module_.is<Wasm3Module*>()) {
-    delete module_.get<Wasm3Module*>();
-  } else {
-    delete module_.get<PrismModule*>();
+QJSWasmModule::~QJSWasmModule() { UnlinkAndDetach(); }
+
+void QJSWasmModule::DetachModule(QJSWasmWrapperBase* base, LEPUSRuntime*) {
+  auto* self = static_cast<QJSWasmModule*>(base);
+  if (self->imports_loaded_) {
+    wasm_importtype_vec_delete(&self->import_types_);
+    self->imports_loaded_ = false;
   }
-  InteropRuntime::DecreaseRefCount(interop_runtime_);
+  if (self->module_) {
+    wasm_module_delete(self->module_);
+    self->module_ = nullptr;
+#if defined(QJS_UNITTEST)
+    wasm::WasmStoreOwner::live_modules_for_testing_.fetch_sub(1);
+#endif
+  }
 }
 
-LEPUSValue QJSWasmModule::CreateConstructor(LEPUSContext* ctx,
-                                            LEPUSValue wasm_root) {
-  LEPUSClassDef def = {.class_name = "WebAssembly.Module",
-                       .finalizer = Finalize,
-                       .gc_mark = QJSWasmModule::GCMark};
-  if (JSSafeNewClass(ctx, class_id(), &def) != 0) {
-    WLOGE("New Class failed in WebAssembly.Module.");
-    return LEPUS_EXCEPTION;
+const wasm_importtype_vec_t* QJSWasmModule::ImportTypes() {
+  if (!imports_loaded_) {
+    wasm_module_imports(module_, &import_types_);
+    imports_loaded_ = true;
+#if defined(QJS_UNITTEST)
+    ++wasm::WasmStoreOwner::import_descriptor_enumerations_for_testing_;
+#endif
   }
+  return &import_types_;
+}
 
-  LEPUSValue proto = LEPUS_NewObject(ctx);
-  HandleScope func_scope(ctx, &proto, HANDLE_TYPE_LEPUS_VALUE);
-  LEPUS_SetClassProto(ctx, class_id(), proto);
-
-  const char* name = "Module";
-  LEPUSValue constructor =
-      InitConstructor(ctx, wasm_root, name, CallAsConstructor, 1, proto);
-  func_scope.PushHandle(&constructor, HANDLE_TYPE_LEPUS_VALUE);
-
-  // Note: All methods on a class are declared here.
-  static const LEPUSCFunctionListEntry func_list[] = {
-      LEPUS_CFUNC_DEF("customSections", 2, CustomSections),
-      LEPUS_CFUNC_DEF("exports", 1, Exports),
-      LEPUS_CFUNC_DEF("imports", 1, Imports),
+bool QJSWasmModule::Register(LEPUSContext* ctx, LEPUSValue wasm_root) {
+  static const LEPUSCFunctionListEntry static_funcs[] = {
       LEPUS_CGETSET_DEF("supportBase64", SupportBase64, nullptr),
   };
-  LEPUS_SetPropertyFunctionList(ctx, constructor, func_list,
-                                countof(func_list));
-  return constructor;
-}
-
-void QJSWasmModule::Finalize(LEPUSRuntime* rt, LEPUSValue obj) {
-  WLOGD("Running QJSWasmModule::%s...", __func__);
-
-  auto opaque = static_cast<QJSWasmModule*>(LEPUS_GetOpaque(obj, class_id()));
-  if (opaque && !LEPUS_IsGCModeRT(rt)) LEPUS_FreeValueRT(rt, opaque->bytes_);
-  delete opaque;
-  LEPUS_SetOpaque(obj, nullptr);
+  return RegisterWasmClass(ctx, wasm_root, WasmQJSClass::kModule,
+                           "WebAssembly.Module", "Module", CallAsConstructor,
+                           nullptr, 0, static_funcs, countof(static_funcs));
 }
 
 LEPUSValue QJSWasmModule::CallAsConstructor(LEPUSContext* ctx,
                                             LEPUSValueConst new_target,
                                             int argc, LEPUSValueConst* argv) {
-  WLOGD("Running QJSWasmModule::%s...", __func__);
-
   constexpr const char* code = "WebAssembly.Module()";
+
+  QJSEnv* env = RequireConstructorEnv(ctx, new_target, code);
+  if (!env) return LEPUS_EXCEPTION;
 
   if (argc == 0) {
     return ThrowIfException(ctx, ErrorTypes::kTypeError, code,
                             ErrorMessages::kArrayBufferNeeded_1004);
   }
-  bool useBase64 = false;
-  if (argc > 1) {
-    LEPUSValue encode_obj = argv[1];
-    if (LEPUS_IsObject(encode_obj)) {
-      LEPUSValue encode = LEPUS_GetPropertyStr(ctx, encode_obj, "encode");
-      const char* encode_str = LEPUS_ToCString(ctx, encode);
-      if (strcmp(encode_str, "base64") == 0) {
-        useBase64 = true;
-      }
+
+  bool use_base64 = false;
+  if (argc > 1 && LEPUS_IsObject(argv[1])) {
+    LEPUSValue encode_val = LEPUS_GetPropertyStr(ctx, argv[1], "encode");
+    if (LEPUS_IsException(encode_val)) return LEPUS_EXCEPTION;
+    if (!LEPUS_IsUndefined(encode_val)) {
+      HandleScope scope(ctx, &encode_val, HANDLE_TYPE_LEPUS_VALUE);
+      size_t enc_len = 0;
+      const char* encode_str = LEPUS_ToCStringLen(ctx, &enc_len, encode_val);
+      FreeValueIfRC(ctx, encode_val);
+      if (!encode_str) return LEPUS_EXCEPTION;
+      use_base64 = (enc_len == 6 && std::memcmp(encode_str, "base64", 6) == 0);
+      if (!LEPUS_IsGCMode(ctx)) LEPUS_FreeCString(ctx, encode_str);
     }
   }
+
   size_t byte_length = 0;
   WasmResult result = WasmSucceed;
   uint8_t* data = nullptr;
+  bool free_cstring_data = false;
 
-  // 1. Let stableBytes be a copy of the bytes held by the buffer bytes.
   LEPUSValue buffer_source = argv[0];
-  bool useBase64Str = false;
   if (LEPUS_IsString(buffer_source)) {
-    if (useBase64) {
-      useBase64Str = true;
-      data = (uint8_t*)LEPUS_ToCStringLen(ctx, &byte_length, buffer_source);
-    } else {
-      return ThrowIfException(
-          ctx, ErrorTypes::kTypeError,
-          "First argument must be a ArrayBuffer when not using base64 encode",
-          result);
+    if (!use_base64) {
+      return ThrowIfException(ctx, ErrorTypes::kTypeError, code,
+                              ErrorMessages::kArrayBufferNeeded_1005);
     }
-  } else if (!LEPUS_IsArrayBuffer(buffer_source) &&
-             !LEPUS_IsTypedArray(ctx, buffer_source) &&
-             !LEPUS_IsDataView(ctx, buffer_source)) {
-    return ThrowIfException(ctx, ErrorTypes::kTypeError, code,
-                            ErrorMessages::kArrayBufferNeeded_1005);
+    data = reinterpret_cast<uint8_t*>(const_cast<char*>(
+        LEPUS_ToCStringLen(ctx, &byte_length, buffer_source)));
+    if (!data) return LEPUS_EXCEPTION;
+    free_cstring_data = true;
   } else {
     data = GetBufferFromBytes(ctx, buffer_source, byte_length, result);
-  }
-
-  if (!data) {
-    return ThrowIfException(ctx, ErrorTypes::kTypeError, code, result);
-  }
-  if (useBase64) {
-    size_t decode_len = modp_b64_decode_len(byte_length);
-    uint8_t* wasm_data = (uint8_t*)std::malloc(decode_len);
-    byte_length =
-        modp_b64_decode((char*)wasm_data, (const char*)data, byte_length);
-    if (useBase64Str) {
-      if (!LEPUS_IsGCMode(ctx)) {
-        LEPUS_FreeCString(ctx, (const char*)data);
-      }
+    if (!data) {
+      return ThrowIfException(
+          ctx, ErrorTypes::kTypeError, code,
+          result ? result : ErrorMessages::kArrayBufferNeeded_1005);
     }
-    data = wasm_data;
   }
 
-  // 2. Compile the WebAssembly module stableBytes and store the result as
-  //    module.
-  auto interop =
-      static_cast<InteropRuntime*>(JSGetPrivateData(ctx, new_target));
-  WasmModuleRef module = interop->CreateWasmModule(data, byte_length, result);
-  if (result != WasmSucceed) {
-    return ThrowIfException(ctx, ErrorTypes::kError, code, result);
+  uint8_t* owned_base64 = nullptr;
+  if (use_base64) {
+    size_t decoded = 0;
+    const bool ok =
+        wasm::DecodeBase64(data, byte_length, &owned_base64, &decoded);
+    if (free_cstring_data && !LEPUS_IsGCMode(ctx)) {
+      LEPUS_FreeCString(ctx, reinterpret_cast<const char*>(data));
+    }
+    free_cstring_data = false;
+    if (!ok) {
+      return ThrowIfException(ctx, ErrorTypes::kTypeError, code,
+                              ErrorMessages::kArrayBufferNeeded_1003);
+    }
+    data = owned_base64;
+    byte_length = decoded;
   }
-  LEPUSValue module_obj = LEPUS_NewObjectClass(ctx, class_id());
+
+  wasm_byte_vec_t binary = {byte_length, reinterpret_cast<char*>(data)};
+  wasm_module_t* module = wasm_module_new(env->wasm_store(), &binary);
+  if (free_cstring_data && !LEPUS_IsGCMode(ctx)) {
+    LEPUS_FreeCString(ctx, reinterpret_cast<const char*>(data));
+  }
+  std::free(owned_base64);
+
+  if (wasm_unlikely(!module)) {
+    return ThrowIfException(ctx, ErrorTypes::kError, code,
+                            "create prism module failed");
+  }
+
+  LEPUSValue module_obj =
+      NewWasmWrapperObject(ctx, env, WasmQJSClass::kModule, code);
   if (LEPUS_IsException(module_obj)) {
-    return ThrowIfException(
-        ctx, ErrorTypes::kTypeError, code,
-        "Exception happened when constructing Wasm Module...");
-  }
-  HandleScope func_scope(ctx, &module_obj, HANDLE_TYPE_LEPUS_VALUE);
-  if (interop->wasm_runtime().is<PrismRuntime*>() &&
-      !RetainWasmRoot(ctx, module_obj,
-                      interop->js_env<QJSEnv*>()->wasm_root())) {
-    delete module.get<PrismModule*>();
-    if (useBase64) std::free(data);
-    if (!LEPUS_IsGCMode(ctx)) LEPUS_FreeValue(ctx, module_obj);
+    wasm_module_delete(module);
     return LEPUS_EXCEPTION;
   }
-  auto opaque = new QJSWasmModule(interop, module);
-  LEPUS_SetOpaque(module_obj, opaque);
-
-  // Prism already owns an immutable snapshot; bytes_ has no readers.
-  // Base64 still transfers its decoded buffer to the ArrayBuffer below.
-  if (!useBase64 && module.is<PrismModule*>()) return module_obj;
-
-  // 3. If module is error, throw an exception. handled above.
-  // 4. Set this.[[Module]] to module.
-  // 5. Set this.[[Bytes]] to stableBytes.
-  LEPUSValue stable_bytes =
-      useBase64 ? LEPUS_NewArrayBuffer(
-                      ctx, data, byte_length,
-                      [](LEPUSRuntime* rt, void* opaque, void* ptr) {
-                        std::free(ptr);
-                      },
-                      nullptr, false)
-                : LEPUS_NewArrayBufferCopy(ctx, data, byte_length);
-  opaque->set_bytes(ctx, stable_bytes);
+  LEPUS_SetOpaque(module_obj,
+                  new QJSWasmModule(LEPUS_GetRuntime(ctx), env->wasm_root(),
+                                    env->store_owner(), module));
   return module_obj;
-}
-
-LEPUSValue QJSWasmModule::CustomSections(LEPUSContext* ctx,
-                                         LEPUSValueConst this_val, int argc,
-                                         LEPUSValueConst* argv) {
-  return LEPUS_ThrowSyntaxError(
-      ctx, "WebAssembly.Module.customSections has not been implemented yet.");
-}
-
-LEPUSValue QJSWasmModule::Exports(LEPUSContext* ctx, LEPUSValueConst this_val,
-                                  int argc, LEPUSValueConst* argv) {
-  if (argc < 1 || !LEPUS_IsObject(argv[0]) ||
-      LEPUS_GetClassID(ctx, argv[0]) != class_id()) {
-    return LEPUS_EXCEPTION;
-  }
-  LEPUSValue exports_val = LEPUS_NewArray(ctx);
-  if (LEPUS_IsException(exports_val)) {
-    return exports_val;
-  }
-  HandleScope func_scope(ctx, &exports_val, HANDLE_TYPE_LEPUS_VALUE);
-  auto js_module =
-      static_cast<QJSWasmModule*>(LEPUS_GetOpaque(argv[0], class_id()));
-  WasmModuleRef module = js_module->module_;
-
-  auto interop_runtime = js_module->interop_runtime_;
-  auto js_env = interop_runtime->js_env<QJSEnv*>();
-
-  if (module.is<Wasm3Module*>()) {
-    auto wasm3_module = module.get<Wasm3Module*>();
-    wasm3_module->exports(js_env, exports_val, nullptr);
-  } else {
-    auto prism_module = module.get<PrismModule*>();
-    prism_module->exports(js_env, exports_val, nullptr);
-  }
-  return exports_val;
-}
-
-LEPUSValue QJSWasmModule::Imports(LEPUSContext* ctx, LEPUSValueConst this_val,
-                                  int argc, LEPUSValueConst* argv) {
-  return LEPUS_UNDEFINED;
 }
 
 LEPUSValue QJSWasmModule::SupportBase64(LEPUSContext* ctx,
                                         LEPUSValueConst this_val) {
+  (void)this_val;
   return LEPUS_NewBool(ctx, true);
 }
 
@@ -234,45 +169,33 @@ uint8_t* QJSWasmModule::GetBufferFromBytes(LEPUSContext* ctx,
 
   size_t offset = 0;
   LEPUSValue buffer = LEPUS_UNDEFINED;
-
+  const bool is_typed = LEPUS_IsTypedArray(ctx, buffer_source);
   if (LEPUS_IsArrayBuffer(buffer_source)) {
-    if (!LEPUS_IsGCMode(ctx)) {
-      LEPUS_DupValue(ctx, buffer_source);
-    }
-    buffer = buffer_source;
-  } else if (LEPUS_IsTypedArray(ctx, buffer_source)) {
+    buffer = DupValueIfRC(ctx, buffer_source);
+  } else if (is_typed) {
     buffer = LEPUS_GetTypedArrayBuffer(ctx, buffer_source, &offset,
                                        &byte_length, nullptr);
-  } else if (LEPUS_IsDataView(ctx, buffer_source)) {
-    result = "Cannot get ArrayBuffer from DataView";
+    if (LEPUS_IsException(buffer)) return nullptr;
+  } else {
     return nullptr;
   }
 
-  // Get pointer from array buffer, not copy, do not delete
   size_t buffer_length = 0;
-  uint8_t* data = LEPUS_GetArrayBuffer(ctx, &buffer_length, buffer) + offset;
-
-  // If buffer_source is instanceof TypedArray, byte_length may not as long
-  // as buffer_length because of offset
-  if (byte_length == 0) byte_length = buffer_length;
-
-  if (!LEPUS_IsGCMode(ctx)) {
-    LEPUS_FreeValue(ctx, buffer);
+  uint8_t* base = LEPUS_GetArrayBuffer(ctx, &buffer_length, buffer);
+  FreeValueIfRC(ctx, buffer);
+  if (!base && buffer_length != 0) {
+    result = "ArrayBuffer is detached";
+    return nullptr;
   }
-
-  return data;
-}
-
-// static
-void QJSWasmModule::GCMark(LEPUSRuntime* rt, LEPUSValueConst obj,
-                           LEPUS_MarkFunc* mark_func, uint64_t trace_tool) {
-  auto opaque = static_cast<QJSWasmModule*>(LEPUS_GetOpaque(obj, class_id()));
-  // The tracing collector can visit the class prototype or a module object
-  // before its native payload is installed. A null opaque is therefore a
-  // valid state and simply contributes no native-held JS roots.
-  if (opaque) {
-    LEPUS_MarkValue(rt, opaque->bytes_, mark_func, trace_tool);
+  if (!is_typed) {
+    byte_length = buffer_length;
   }
+  if (offset > buffer_length || byte_length > buffer_length - offset) {
+    result = "Buffer view is out of bounds";
+    return nullptr;
+  }
+  static uint8_t kEmptyByte = 0;
+  return base ? (base + offset) : &kEmptyByte;
 }
 
 }  // namespace primjs::qjs

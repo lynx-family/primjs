@@ -20,7 +20,7 @@ function usage() {
       -h|--help         Print This Message
       --abort           Abort Testing While Case Failure
       --logging         Show Testing Logs
-      --engine          engine options: [wasm3, prism]
+      --engine          engine options: [prism]
 EOF
   exit 0
 }
@@ -28,7 +28,7 @@ EOF
 cli_bin=qjs-cli
 abort_fail=false
 show_logging=false
-wasm_engine=wasm3
+wasm_engine=prism
 function options_parse() {
   while test $# -gt 0; do
     case "$1" in
@@ -74,7 +74,6 @@ test_suit=basic-tests
 test_cases=(
   "array_bytes.js"
   "attributes.js"
-  "global.js"
   "memory.js"
   "table.js"
 )

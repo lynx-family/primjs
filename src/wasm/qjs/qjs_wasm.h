@@ -6,8 +6,8 @@
 #define SRC_WASM_QJS_QJS_WASM_H_
 
 #include <atomic>
+#include <cstddef>
 
-#include "../common/wasm_runtime_type.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -17,49 +17,39 @@ extern "C" {
 #endif
 
 namespace primjs::qjs {
+
+class QJSEnv;
+
 class QJSWebAssembly {
  public:
-  static void RegisterWebAssembly(
-      LEPUSContext *ctx, std::atomic_bool *ctx_invalid,
-      WasmRuntimeType runtime_type = WasmRuntimeType::WASM3);
-  // Test-only entry point that bypasses the app's settings-driven engine
-  // selection. Production callers must use RegisterWebAssembly above.
-  static void RegisterWebAssemblyForTesting(LEPUSContext *ctx,
-                                            std::atomic_bool *ctx_invalid,
-                                            WasmRuntimeType runtime_type);
+  static void RegisterWebAssembly(LEPUSContext* ctx,
+                                  std::atomic_bool* ctx_invalid = nullptr);
+
 #if defined(QJS_UNITTEST)
   static int LivePrismInstancesForTesting();
+  static int LivePrismModulesForTesting();
   static void FailPrismExportAfterForTesting(int exports);
-  static void InvalidateWasmRootForTesting(LEPUSContext *ctx);
-  static int GetCurrentPrismRefCountForTesting(LEPUSContext *ctx);
+  static void InvalidateWasmRootForTesting(LEPUSContext* ctx);
+  static int GetCurrentPrismRefCountForTesting(LEPUSContext* ctx);
   static bool SetCurrentPrismReleaseCountForTesting(
-      LEPUSContext *ctx, std::atomic_int *release_count);
-#endif
-#if defined(QJS_UNITTEST) && !defined(ENABLE_WASM_PERF_TEST_CAPTURE)
-  enum class PrismImportBindingPathForTesting {
-    kUnknown,
-    kBorrowedAllFunctions,
-    kOwnedDescriptors,
-  };
-  static void ResetPrismImportBindingPathForTesting();
-  static PrismImportBindingPathForTesting
-  LastPrismImportBindingPathForTesting();
-  static size_t PrismBorrowedImportViewCallsForTesting();
-  static size_t PrismOwnedImportDescriptorEnumerationsForTesting();
+      LEPUSContext* ctx, std::atomic_int* release_count);
+  static void ResetPrismImportBindingCountersForTesting();
+  static size_t PrismImportDescriptorEnumerationsForTesting();
   static size_t PrismRolledBackImportFunctionsForTesting();
   static size_t PrismRolledBackImportCallbackRootsForTesting();
+  static size_t ActivePrismImportCallbackRootsForTesting(LEPUSContext* ctx);
 #endif
-  static LEPUSClassID class_id() {
-    static LEPUSClassID class_id = LEPUS_NewClassID(&class_id);
-    return class_id;
-  }
 
-  static void GCMark(LEPUSRuntime *rt, LEPUSValueConst obj,
-                     LEPUS_MarkFunc *mark_func, uint64_t trace_tool);
+  static LEPUSClassID class_id();
+
+  static QJSEnv* GetEnvFromRoot(LEPUSValueConst wasm_root);
+
+  static void GCMark(LEPUSRuntime* rt, LEPUSValueConst obj,
+                     LEPUS_MarkFunc* mark_func, uint64_t trace_tool);
 
  private:
-  static LEPUSValue CreateWasmObject(LEPUSContext *ctx);
-  static void Finalize(LEPUSRuntime *rt, LEPUSValue obj);
+  static LEPUSValue CreateWasmObject(LEPUSContext* ctx);
+  static void Finalize(LEPUSRuntime* rt, LEPUSValue obj);
 };
 
 }  // namespace primjs::qjs

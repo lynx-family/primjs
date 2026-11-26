@@ -5,74 +5,44 @@
 #ifndef SRC_WASM_QJS_QJS_WASM_MODULE_H_
 #define SRC_WASM_QJS_QJS_WASM_MODULE_H_
 
-#include "common/one_of.h"
+#include "common/wasm_store_owner.h"
 #include "common/wasm_type.h"
-#include "quickjs/include/quickjs-inner.h"
+#include "qjs/qjs_ext_api.h"
 
-namespace primjs {
-class InteropRuntime;
+namespace primjs::qjs {
 
-namespace wasm {
-class Wasm3Module;
-class PrismModule;
-}  // namespace wasm
+class QJSEnv;
 
-using WasmModuleRef = OneOf<wasm::Wasm3Module *, wasm::PrismModule *>;
-
-namespace qjs {
-class QJSWasmModule {
+class QJSWasmModule : public QJSWasmWrapperBase {
  public:
-  QJSWasmModule(InteropRuntime *interop, WasmModuleRef module_inst);
+  QJSWasmModule(LEPUSRuntime* rt, LEPUSValue wasm_root,
+                wasm::WasmStoreOwner* store_owner, wasm_module_t* module);
   ~QJSWasmModule();
 
-  static LEPUSValue CreateConstructor(LEPUSContext *ctx, LEPUSValue wasm_root);
-
   static LEPUSClassID class_id() {
-    static LEPUSClassID class_id = LEPUS_NewClassID(&class_id);
-    return class_id;
+    return GetWasmClassId(WasmQJSClass::kModule);
   }
 
-  static void Finalize(LEPUSRuntime *rt, LEPUSValue obj);
-
-  static void GCMark(LEPUSRuntime *rt, LEPUSValueConst obj,
-                     LEPUS_MarkFunc *mark_func, uint64_t trace_tool);
-
-  static LEPUSValue CallAsConstructor(LEPUSContext *ctx,
+  static bool Register(LEPUSContext* ctx, LEPUSValue wasm_root);
+  static LEPUSValue CallAsConstructor(LEPUSContext* ctx,
                                       LEPUSValueConst new_target, int argc,
-                                      LEPUSValueConst *argv);
+                                      LEPUSValueConst* argv);
 
-  static LEPUSValue CustomSections(LEPUSContext *ctx, LEPUSValueConst this_val,
-                                   int argc, LEPUSValueConst *argv);
-
-  static LEPUSValue Exports(LEPUSContext *ctx, LEPUSValueConst this_val,
-                            int argc, LEPUSValueConst *argv);
-
-  static LEPUSValue Imports(LEPUSContext *ctx, LEPUSValueConst this_val,
-                            int argc, LEPUSValueConst *argv);
-
-  static LEPUSValue SupportBase64(LEPUSContext *ctx, LEPUSValueConst this_val);
-
-  static uint8_t *GetBufferFromBytes(LEPUSContext *ctx, LEPUSValueConst target,
-                                     size_t &len, WasmResult &result);
-
-  void set_bytes(LEPUSContext *ctx, LEPUSValue bytes) {
-    if (!LEPUS_IsGCMode(ctx)) {
-      LEPUS_FreeValue(ctx, bytes_);
-    }
-    bytes_ = bytes;
-  }
-
-  WasmModuleRef &module() { return module_; }
+  wasm_module_t* module() const { return module_; }
+  const wasm_importtype_vec_t* ImportTypes();
 
  private:
-  OWNER LEPUSValue bytes_ = LEPUS_UNDEFINED;
+  static void DetachModule(QJSWasmWrapperBase* base, LEPUSRuntime* rt);
+  static LEPUSValue SupportBase64(LEPUSContext* ctx, LEPUSValueConst this_val);
+  static uint8_t* GetBufferFromBytes(LEPUSContext* ctx,
+                                     LEPUSValueConst buffer_source,
+                                     size_t& byte_length, WasmResult& result);
 
-  OWNER WasmModuleRef module_;
-
-  BORROWER InteropRuntime *interop_runtime_;
+  wasm_module_t* module_ = nullptr;
+  wasm_importtype_vec_t import_types_ = {0, nullptr};
+  bool imports_loaded_ = false;
 };
 
-}  // namespace qjs
-}  // namespace primjs
+}  // namespace primjs::qjs
 
 #endif  // SRC_WASM_QJS_QJS_WASM_MODULE_H_

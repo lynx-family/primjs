@@ -5,101 +5,126 @@
 #ifndef SRC_WASM_QJS_QJS_WASM_EXT_API_H_
 #define SRC_WASM_QJS_QJS_WASM_EXT_API_H_
 
+#include <pthread.h>
+
+#include <cstddef>
+#include <cstdint>
+
 #include "common/js_type.h"
+#include "common/wasm_store_owner.h"
 #include "common/wasm_utils.h"
-#include "gc/trace-gc.h"
-#include "quickjs/include/quickjs-inner.h"
+#ifdef __cplusplus
+extern "C" {
+#endif
+#include "quickjs/include/quickjs.h"
+#ifdef __cplusplus
+}
+#endif
 
 namespace primjs::qjs {
-constexpr const char *const private_name = "__WASM_PRIVATE__";
 
-bool JSSafeNewClass(LEPUSContext *ctx, LEPUSClassID class_id,
-                    const LEPUSClassDef *class_def);
+class QJSEnv;
 
-LEPUSValueConst InitConstructor(LEPUSContext *ctx, LEPUSValueConst wasm_root,
-                                const char *name, LEPUSCFunction *func,
-                                int length, LEPUSValueConst proto);
-bool RetainWasmRoot(LEPUSContext *ctx, LEPUSValue obj,
-                    LEPUSValueConst wasm_root);
+constexpr const char* const kPrivateWasmRootProp = "__WASM_PRIVATE__";
 
-void *JSGetPrivateData(LEPUSContext *ctx, LEPUSValueConst target);
-int Attach(LEPUSContext *ctx, LEPUSValue target, const char *name,
-           LEPUSValue obj, int flags);
+#ifndef countof
+#define countof(x) (sizeof(x) / sizeof((x)[0]))
+#endif
 
-FORCE_INLINE LEPUSValue JSGetPropertyStrFree(LEPUSContext *ctx,
-                                             LEPUSValueConst this_obj,
-                                             const char *prop) {
-  LEPUSValue prop_value = LEPUS_GetPropertyStr(ctx, this_obj, prop);
-  if (!LEPUS_IsGCMode(ctx)) {
-    LEPUS_FreeValue(ctx, prop_value);
-  }
-  return prop_value;
-}
-
-// Prism consumes descriptor accessors after the property read returns. In RC
-// mode LEPUS_GetPropertyStr returns an owned value; in tracing-GC mode the
-// handle scope keeps it live. Keep this helper Prism-only so wasm3 retains its
-// established ownership behavior.
-class ScopedPrismProperty {
- public:
-  ScopedPrismProperty(LEPUSContext *ctx, LEPUSValueConst object,
-                      const char *name)
-      : ctx_(ctx),
-        value_(LEPUS_GetPropertyStr(ctx, object, name)),
-        scope_(ctx, &value_, HANDLE_TYPE_LEPUS_VALUE) {}
-
-  ~ScopedPrismProperty() {
-    if (!LEPUS_IsGCMode(ctx_)) LEPUS_FreeValue(ctx_, value_);
-  }
-
-  LEPUSValue value() const { return value_; }
-  bool IsException() const { return LEPUS_IsException(value_); }
-
- private:
-  LEPUSContext *ctx_;
-  LEPUSValue value_;
-  HandleScope scope_;
+enum class WasmQJSClass : uint8_t {
+  kWebAssembly = 0,
+  kModule = 1,
+  kInstance = 2,
+  kMemory = 3,
+  kTable = 4,
+  kFunction = 5,
+  kCount = 6,
 };
 
-FORCE_INLINE void *JSObjectGetPrivate(LEPUSContext *ctx,
-                                      LEPUSValueConst target) {
-  LEPUSClassID class_id = LEPUS_GetClassID(ctx, target);
-  return LEPUS_GetOpaque(target, class_id);
+LEPUSClassID GetWasmClassId(WasmQJSClass kind);
+
+void WasmWrapperFinalizer(LEPUSRuntime* rt, LEPUSValue obj);
+void WasmWrapperGCMark(LEPUSRuntime* rt, LEPUSValueConst obj,
+                       LEPUS_MarkFunc* mark_func, uint64_t trace_tool);
+
+bool JSSafeNewClass(LEPUSContext* ctx, LEPUSClassID class_id,
+                    const LEPUSClassDef* class_def);
+
+bool RegisterWasmClass(LEPUSContext* ctx, LEPUSValueConst wasm_root,
+                       WasmQJSClass kind, const char* class_name,
+                       const char* ctor_name, LEPUSCFunction* ctor_fn,
+                       const LEPUSCFunctionListEntry* proto_funcs = nullptr,
+                       size_t proto_func_count = 0,
+                       const LEPUSCFunctionListEntry* static_funcs = nullptr,
+                       size_t static_func_count = 0,
+                       LEPUSClassGCMark* custom_mark = nullptr);
+
+// Resolves QJSEnv from a constructor's `new_target`. Throws TypeError and
+// returns nullptr when invoked without `new` or with a detached root.
+QJSEnv* RequireConstructorEnv(LEPUSContext* ctx, LEPUSValueConst new_target,
+                              const char* code);
+
+// Allocates a wrapper object of `kind` after verifying `env->wasm_root()`.
+LEPUSValue NewWasmWrapperObject(LEPUSContext* ctx, QJSEnv* env,
+                                WasmQJSClass kind, const char* code);
+
+inline void FreeValueIfRC(LEPUSContext* ctx, LEPUSValue v) {
+  LEPUSRuntime* rt = LEPUS_GetRuntime(ctx);
+  if (!LEPUS_IsGCModeRT(rt)) {
+    LEPUS_FreeValueRT(rt, v);
+  }
 }
 
-FORCE_INLINE void JSObjectSetPrivate(LEPUSValue obj, void *opaque) {
-  LEPUS_SetOpaque(obj, opaque);
+inline LEPUSValue DupValueIfRC(LEPUSContext* ctx, LEPUSValueConst v) {
+  LEPUSRuntime* rt = LEPUS_GetRuntime(ctx);
+  return LEPUS_IsGCModeRT(rt) ? v : LEPUS_DupValueRT(rt, v);
 }
 
-bool JSValueGetInt32(LEPUSContext *ctx, LEPUSValue js_val, int32_t *res);
+// Shared base for native opaque payloads that keep `wasm_root` reachable and
+// participate in deterministic context-exit store reclamation.
+class QJSWasmWrapperBase {
+ public:
+  using DetachNativeFn = void (*)(QJSWasmWrapperBase* self, LEPUSRuntime* rt);
 
-FORCE_INLINE LEPUSValue ThrowError(LEPUSContext *ctx, const char *fmt, ...) {
-  LEPUSValue val;
-  va_list ap;
+  QJSWasmWrapperBase(LEPUSRuntime* rt, LEPUSValue wasm_root,
+                     wasm::WasmStoreOwner* store_owner,
+                     DetachNativeFn detach_native);
+  ~QJSWasmWrapperBase();
 
-  va_start(ap, fmt);
-  char buf[256];
-  vsnprintf(buf, sizeof(buf), fmt, ap);
-  LEPUSValue str = LEPUS_NewString(ctx, buf);
-  HandleScope(ctx, &str, HANDLE_TYPE_LEPUS_VALUE);
-  val = LEPUS_Throw(ctx, str);
-  va_end(ap);
+  void UnlinkAndDetach(LEPUSRuntime* rt = nullptr);
+  void DetachNative(LEPUSRuntime* rt);
+  void ReleaseRoot(LEPUSRuntime* rt);
+  void MarkRoot(LEPUSRuntime* rt, LEPUS_MarkFunc* mark_func,
+                uint64_t trace_tool) const;
+  void AddKeepToken(LEPUSContext* ctx, LEPUSValueConst val);
+  void MergeKeepSet(LEPUSContext* ctx, const QJSWasmWrapperBase& other);
+  bool HasKeepTokens() const;
 
-  return val;
-}
+  LEPUSValue wasm_root() const { return wasm_root_; }
+  wasm::WasmStoreOwner* store_owner() const { return store_owner_; }
 
-constexpr decltype(&ThrowError) ThrowFuncs[] = {
-    ThrowError, LEPUS_ThrowTypeError, LEPUS_ThrowRangeError};
+ private:
+  static void SharedDetachOnExit(wasm::WasmTrackedHandle* handle,
+                                 void* exit_ctx);
 
-FORCE_INLINE LEPUSValue ThrowIfException(LEPUSContext *ctx, ErrorTypes err,
-                                         const char *code, const char *msg,
-                                         LEPUSValue *exception = nullptr) {
-  uint32_t err_idx = static_cast<uint32_t>(err);
-  WLOGE("%s: %s: %s", kErrorStrings[err_idx], code, msg);
-  LEPUSValue value = ThrowFuncs[err_idx](ctx, "%s: %s", code, msg);
-  if (exception) *exception = value;
-  return value;
-}
+  wasm::WasmTrackedHandle tracked_;
+  wasm::WasmStoreOwner* store_owner_ = nullptr;
+  DetachNativeFn detach_native_ = nullptr;
+  mutable pthread_mutex_t keep_mutex_ = PTHREAD_MUTEX_INITIALIZER;
+  LEPUSValue wasm_root_ = LEPUS_UNDEFINED;
+  LEPUSValue* keep_set_ = nullptr;
+  uint32_t keep_count_ = 0;
+  uint32_t keep_cap_ = 0;
+};
+
+bool JSValueGetInt32(LEPUSContext* ctx, LEPUSValue js_val, int32_t* res);
+
+#if defined(__GNUC__) || defined(__clang__)
+__attribute__((cold, noinline))
+#endif
+LEPUSValue
+ThrowIfException(LEPUSContext* ctx, ErrorTypes err, const char* code,
+                 const char* msg, LEPUSValue* exception = nullptr);
 
 }  // namespace primjs::qjs
 

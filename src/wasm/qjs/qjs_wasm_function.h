@@ -5,59 +5,61 @@
 #ifndef SRC_WASM_QJS_QJS_WASM_FUNCTION_H_
 #define SRC_WASM_QJS_QJS_WASM_FUNCTION_H_
 
-#include "common/one_of.h"
-#include "quickjs/include/quickjs-inner.h"
+#include "common/wasm_store_owner.h"
+#include "common/wasm_type.h"
+#include "qjs/qjs_ext_api.h"
 
-namespace primjs {
-class InteropRuntime;
+namespace primjs::qjs {
 
-namespace wasm {
-class Wasm3Function;
-class PrismFunction;
-}  // namespace wasm
+class QJSEnv;
 
-using WasmFunctionRef = OneOf<wasm::Wasm3Function *, wasm::PrismFunction *>;
-
-namespace qjs {
-class QJSWasmFunction {
+class QJSWasmFunction : public QJSWasmWrapperBase {
  public:
-  QJSWasmFunction(WasmFunctionRef function, InteropRuntime *interop);
+  QJSWasmFunction(LEPUSRuntime* rt, LEPUSValue wasm_root, QJSEnv* env,
+                  wasm_func_t* func, LEPUSValue js_obj);
   ~QJSWasmFunction();
 
-  static LEPUSValue CreateJSObject(LEPUSContext *ctx, InteropRuntime *interop,
-                                   WasmFunctionRef function);
-
-  static LEPUSValue CreatePrototype(LEPUSContext *ctx);
-
-  static LEPUSValue CreateConstructor(LEPUSContext *ctx, LEPUSValue wasm_root);
-
-  static LEPUSValue CallAsConstructor(LEPUSContext *ctx,
-                                      LEPUSValueConst constructor, int argc,
-                                      LEPUSValueConst *argv);
-
-  static inline LEPUSClassID class_id() {
-    static LEPUSClassID class_id = LEPUS_NewClassID(&class_id);
-    return class_id;
+  static LEPUSClassID class_id() {
+    return GetWasmClassId(WasmQJSClass::kFunction);
   }
 
-  WasmFunctionRef &function() { return function_; }
+  static QJSWasmFunction* Of(const wasm_func_t* func) {
+    return func ? static_cast<QJSWasmFunction*>(wasm_func_get_host_info(func))
+                : nullptr;
+  }
 
- protected:
-  static void Finalize(LEPUSRuntime *rt, LEPUSValue obj);
+  static LEPUSValue CreatePrototype(LEPUSContext* ctx);
 
-  static LEPUSValue CallWasmFunction(LEPUSContext *ctx,
+  static LEPUSValue WrapOwnedFunc(LEPUSContext* ctx, QJSEnv* env,
+                                  wasm_func_t* func);
+
+  static LEPUSValue GetOrWrapOwnedFunc(LEPUSContext* ctx, QJSEnv* env,
+                                       wasm_func_t* func);
+
+  static wasm_func_t* CreateImportBridge(QJSEnv* env, LEPUSValue js_fn,
+                                         const wasm_functype_t* expected_type,
+                                         uint64_t transaction);
+
+  wasm_func_t* function() const { return func_; }
+  LEPUSValue js_object() const { return js_obj_; }
+  bool EnsureSignature() { return sig_.Ensure(func_); }
+  const WasmSignature& signature() const { return sig_; }
+
+  static LEPUSValue CallWasmFunction(LEPUSContext* ctx,
                                      LEPUSValueConst func_obj,
                                      LEPUSValueConst this_val, int argc,
-                                     LEPUSValueConst *argv, int flags);
+                                     LEPUSValueConst* argv, int flags);
 
  private:
-  // Weak ref here
-  OWNER WasmFunctionRef function_;
+  static void DetachFunc(QJSWasmWrapperBase* base, LEPUSRuntime* rt);
+  LEPUSValue CallWith(LEPUSContext* ctx, int argc, LEPUSValueConst* argv,
+                      wasm_val_t* values);
 
-  BORROWER InteropRuntime *interop_runtime_;
+  wasm_func_t* func_ = nullptr;
+  LEPUSValue js_obj_ = LEPUS_UNDEFINED;
+  WasmSignature sig_;
 };
 
-}  // namespace qjs
-}  // namespace primjs
+}  // namespace primjs::qjs
 
 #endif  // SRC_WASM_QJS_QJS_WASM_FUNCTION_H_

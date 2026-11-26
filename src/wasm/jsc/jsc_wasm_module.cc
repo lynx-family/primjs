@@ -4,33 +4,32 @@
 
 #include "jsc/jsc_wasm_module.h"
 
-#include <JavaScriptCore/JavaScriptCore.h>
+#include <cstdlib>
+#include <cstring>
+#include <string>
 
-#include "basic/modp_b64/modp_b64.h"
-#include "common/interop_runtime.h"
 #include "common/messages.h"
-#include "common/wasm_type.h"
 #include "common/wasm_utils.h"
+#include "jsc/js_env_jsc.h"
 #include "jsc/jsc_builtin_objects.h"
 #include "jsc/jsc_class_creator.h"
 #include "jsc/jsc_ext_api.h"
-#include "jsc/jsc_wasm_memory.h"
 
 namespace primjs::jsc {
 
-// static
 JSClassRef JSCWasmModule::class_ref() {
-  static JSClassRef class_ref = JSCWasmModule::InitClassRef();
-  return class_ref;
+  static JSClassRef ref = InitClassRef();
+  return ref;
 }
+
 JSClassRef JSCWasmModule::constructor_class_ref() {
-  static JSClassRef constructor_class_ref = JSCWasmModule::InitCtorClassRef();
-  return constructor_class_ref;
+  static JSClassRef ref = InitCtorClassRef();
+  return ref;
 }
 
 JSClassRef JSCWasmModule::prototype_class_ref() {
-  static JSClassRef prototype_class_ref = JSCWasmModule::InitProtoClassRef();
-  return prototype_class_ref;
+  static JSClassRef ref = InitProtoClassRef();
+  return ref;
 }
 
 JSClassRef JSCWasmModule::InitClassRef() {
@@ -41,112 +40,123 @@ JSClassRef JSCWasmModule::InitClassRef() {
 
 JSClassRef JSCWasmModule::InitProtoClassRef() {
   JSClassDefinition def =
-      JSClassCreator::GetClassDefinition("Module.Prototype", NULL);
-
+      JSClassCreator::GetClassDefinition("Module.Prototype", nullptr);
   return JSClassCreate(&def);
 }
 
 JSClassRef JSCWasmModule::InitCtorClassRef() {
   JSClassDefinition def = JSClassCreator::GetClassDefinition(
-      "WebAssembly.Module", NULL, CallAsConstructor);
+      "WebAssembly.Module", nullptr, CallAsConstructor);
 
-  JSPropertyAttributes default_attr = JSClassCreator::DefaultAttr();
-  JSStaticFunction static_funcs[] = {
-      {"exports", ExportsCallback, default_attr},
-      {"imports", ImportsCallback, default_attr},
-      // FIXME(wasm): implement this function.
-      //  {"customSection", nullptr, default_attr},
-      {0, 0, 0}};
-  JSStaticValue static_values[] = {
-      {"supportBase64", SupportBase64, nullptr, kJSPropertyAttributeNone},
+  const JSPropertyAttributes default_attr = JSClassCreator::DefaultAttr();
+  static const JSStaticValue static_values[] = {
+      {"supportBase64", SupportBase64, nullptr, default_attr},
       {nullptr, nullptr, nullptr, 0}};
-  def.staticFunctions = static_funcs;
-  def.staticValues = static_values;
 
+  def.staticValues = static_values;
   return JSClassCreate(&def);
 }
 
 void JSCWasmModule::ReleaseClassRef() {
   JSClassRelease(class_ref());
-  JSClassRelease(prototype_class_ref());
   JSClassRelease(constructor_class_ref());
+  JSClassRelease(prototype_class_ref());
 }
 
-JSCWasmModule::JSCWasmModule(WasmModuleRef module, InteropRuntime* interop)
-    : module_(std::move(module)) {
-  interop_runtime_ = interop;
-  InteropRuntime::IncreaseRefCount(interop_runtime_);
+JSCWasmModule::JSCWasmModule(JSCEnv* env, wasm_module_t* module)
+    : store_owner_(env->store_owner()), module_(module) {
+  wasm::WasmStoreOwner::Retain(store_owner_);
+  store_owner_->LinkHandle(&tracked_, this, DetachOnExit);
 }
 
 JSCWasmModule::~JSCWasmModule() {
-  WLOGD("Running JSCWasmModule::%s...", __func__);
-  if (module_.is<Wasm3Module*>()) {
-    delete module_.get<Wasm3Module*>();
-  } else {
-    delete module_.get<PrismModule*>();
+  if (store_owner_) {
+    store_owner_->UnlinkHandle(&tracked_);
   }
-  InteropRuntime::DecreaseRefCount(interop_runtime_);
+  DetachWasmModule();
 }
 
-bool JSCWasmModule::IsWasmModuleObject(JSContextRef ctx,
-                                       JSObjectRef constructor,
-                                       JSObjectRef target,
-                                       JSValueRef* exception) {
-  auto interop = static_cast<InteropRuntime*>(JSObjectGetPrivate(constructor));
-  if (interop && interop->wasm_runtime().is<Wasm3Runtime*>()) {
-    return HasInstance(ctx, constructor, target, exception);
+void JSCWasmModule::DetachWasmModule() {
+  if (imports_loaded_) {
+    wasm_importtype_vec_delete(&import_types_);
+    imports_loaded_ = false;
   }
-  return target && JSValueIsObjectOfClass(ctx, target, class_ref()) &&
-         JSObjectGetPrivate(target) != nullptr;
+  if (module_) {
+    wasm_module_delete(module_);
+    module_ = nullptr;
+  }
+  wasm::WasmStoreOwner::Release(store_owner_);
 }
 
-JSObjectRef JSCWasmModule::CreateJSObject(JSContextRef ctx,
-                                          JSObjectRef constructor,
-                                          WasmModuleRef module,
-                                          JSValueRef* exception) {
-  auto interop = static_cast<InteropRuntime*>(JSObjectGetPrivate(constructor));
-  WASM_DCHECK(interop != nullptr);
-  JSCWasmModule* module_data = new JSCWasmModule(module, interop);
+void JSCWasmModule::DetachOnExit(wasm::WasmTrackedHandle* handle,
+                                 void* exit_ctx) {
+  (void)exit_ctx;
+  auto* self = static_cast<JSCWasmModule*>(handle->owner_object);
+  self->DetachWasmModule();
+}
 
-  JSObjectRef obj = JSObjectMake(ctx, class_ref(), module_data);
+const wasm_importtype_vec_t* JSCWasmModule::ImportTypes() {
+  if (!imports_loaded_) {
+    wasm_module_imports(module_, &import_types_);
+    imports_loaded_ = true;
+  }
+  return &import_types_;
+}
 
-  JSValueRef prototype = JSObjectGetProperty(
-      ctx, constructor, JSCBuiltinObjects::PrototypeStr(), exception);
-  prototype = JSValueToObject(ctx, prototype, exception);
-  JSObjectSetPrototype(ctx, obj, prototype);
-
-  return obj;
+bool JSCWasmModule::IsWasmModuleObject(JSContextRef ctx, JSValueRef target) {
+  if (!target || !JSValueIsObjectOfClass(ctx, target, class_ref())) {
+    return false;
+  }
+  auto* mod = static_cast<JSCWasmModule*>(
+      JSObjectGetPrivate(JSValueToObject(ctx, target, nullptr)));
+  return mod != nullptr && mod->module_ != nullptr;
 }
 
 void JSCWasmModule::Finalize(JSObjectRef object) {
-  WLOGD("Running JSCWasmModule::%s...", __func__);
-  auto module = static_cast<JSCWasmModule*>(JSObjectGetPrivate(object));
-  delete module;
+  auto* mod = static_cast<JSCWasmModule*>(JSObjectGetPrivate(object));
+  delete mod;
 }
 
 JSObjectRef JSCWasmModule::CreatePrototype(JSContextRef ctx,
                                            JSValueRef* exception) {
-  // FIXME(): add the private data to be attached to constructor;
-  JSObjectRef prototype = JSObjectMake(ctx, prototype_class_ref(), NULL);
-
-  return prototype;
+  (void)exception;
+  return JSObjectMake(ctx, prototype_class_ref(), nullptr);
 }
 
-// static
-JSObjectRef JSCWasmModule::CreateConstructor(JSContextRef ctx,
-                                             InteropRuntime* interop,
+JSObjectRef JSCWasmModule::CreateConstructor(JSContextRef ctx, JSCEnv* env,
                                              JSValueRef* exception) {
-  WASM_DCHECK(interop != nullptr);
-  // Do not own interop here, do not destroy it.
-  JSObjectRef ctor = JSObjectMake(ctx, constructor_class_ref(), interop);
-
+  JSObjectRef ctor = JSObjectMake(ctx, constructor_class_ref(), env);
   JSObjectRef prototype = CreatePrototype(ctx, exception);
   InitConstructor(ctx, ctor, "Module", prototype, exception);
-
-  auto js_env = interop->js_env<JSCEnv*>();
-  js_env->SetModuleConstructor(ctor);
-
+  env->SetModuleConstructor(ctor);
   return ctor;
+}
+
+JSObjectRef JSCWasmModule::CreateJSObject(JSContextRef ctx,
+                                          JSObjectRef constructor, JSCEnv* env,
+                                          wasm_module_t* module,
+                                          JSValueRef* exception) {
+  JSValueRef proto_val = JSObjectGetProperty(
+      ctx, constructor, JSCBuiltinObjects::PrototypeStr(), exception);
+  if (exception && *exception) {
+    wasm_module_delete(module);
+    return nullptr;
+  }
+  JSObjectRef prototype = JSValueToObject(ctx, proto_val, exception);
+  if ((exception && *exception) || !prototype) {
+    wasm_module_delete(module);
+    return nullptr;
+  }
+
+  JSObjectRef obj = JSObjectMake(ctx, class_ref(), nullptr);
+  if (!RetainWasmRootOnJSCObject(ctx, obj, env->wasm_root(), exception)) {
+    wasm_module_delete(module);
+    return nullptr;
+  }
+  JSObjectSetPrototype(ctx, obj, prototype);
+  auto* module_data = new JSCWasmModule(env, module);
+  WASM_CHECK(JSObjectSetPrivate(obj, module_data));
+  return obj;
 }
 
 JSObjectRef JSCWasmModule::CallAsConstructor(JSContextRef ctx,
@@ -154,85 +164,108 @@ JSObjectRef JSCWasmModule::CallAsConstructor(JSContextRef ctx,
                                              size_t argc,
                                              const JSValueRef argv[],
                                              JSValueRef* exception) {
-  WLOGD("Running JSCWasmModule::%s...", __func__);
   constexpr const char* code = "WebAssembly.Module()";
+
+  auto* env = static_cast<JSCEnv*>(JSObjectGetPrivate(constructor));
+  if (!env || !env->wasm_store()) {
+    return ThrowIfException(ctx, ErrorTypes::kTypeError, code,
+                            "WebAssembly context is not active", exception);
+  }
 
   if (argc == 0) {
     return ThrowIfException(ctx, ErrorTypes::kTypeError, code,
                             ErrorMessages::kArrayBufferNeeded_1001, exception);
   }
-  bool useBase64 = false;
-  if (argc > 1) {
-    JSObjectRef encode = JSValueToObject(ctx, argv[1], exception);
-    if (exception && *exception) {
-      return nullptr;
-    }
 
-    auto encodeVal =
-        JSObjectGetProperty(ctx, encode, JSString("encode"), exception);
-    auto encodeStr = JSValueToStringCopy(ctx, encodeVal, exception);
-    size_t length = JSStringGetMaximumUTF8CStringSize(encodeStr);
-    char encodeName[length];
-    length = JSStringGetUTF8CString(encodeStr, encodeName, length);
-    if (strcmp(encodeName, "base64") == 0) {
-      useBase64 = true;
+  bool use_base64 = false;
+  if (argc > 1 && !JSValueIsUndefined(ctx, argv[1])) {
+    JSObjectRef encode_obj = JSValueToObject(ctx, argv[1], exception);
+    if ((exception && *exception) || !encode_obj) return nullptr;
+
+    JSValueRef encode_val =
+        JSObjectGetProperty(ctx, encode_obj, JSString("encode"), exception);
+    if (exception && *exception) return nullptr;
+    if (!JSValueIsUndefined(ctx, encode_val)) {
+      JSStringRef encode_str = JSValueToStringCopy(ctx, encode_val, exception);
+      if ((exception && *exception) || encode_str == nullptr) return nullptr;
+      use_base64 = JSStringIsEqualToUTF8CString(encode_str, "base64");
+      JSStringRelease(encode_str);
     }
-    JSStringRelease(encodeStr);
   }
 
-  size_t byteLength = 0;
+  size_t byte_length = 0;
   uint8_t* data = nullptr;
-  JSType arg0Type = JSValueGetType(ctx, argv[0]);
-  if (arg0Type == kJSTypeString) {
-    if (useBase64) {
-      JSStringRef base64Str = JSValueToStringCopy(ctx, argv[0], NULL);
-      byteLength = JSStringGetLength(base64Str);
-      // JSStringGetUTF8CString will add '\0' at the end of str
-      data = (uint8_t*)std::malloc(byteLength + 1);
-      JSStringGetUTF8CString(base64Str, (char*)data, byteLength + 1);
-      JSStringRelease(base64Str);
-    } else {
+  uint8_t* owned_str_data = nullptr;
+  const JSType arg0_type = JSValueGetType(ctx, argv[0]);
+  if (arg0_type == kJSTypeString) {
+    if (!use_base64) {
       return ThrowIfException(
           ctx, ErrorTypes::kTypeError, code,
-          "First argument must be a ArrayBuffer when not using base64 encode",
+          "First argument must be an ArrayBuffer when not using base64 encode",
           exception);
     }
+    JSStringRef b64_str = JSValueToStringCopy(ctx, argv[0], exception);
+    if ((exception && *exception) || !b64_str) return nullptr;
+    const size_t max_utf8 = JSStringGetMaximumUTF8CStringSize(b64_str);
+    owned_str_data =
+        static_cast<uint8_t*>(std::malloc(max_utf8 ? max_utf8 : 1));
+    if (!owned_str_data) {
+      JSStringRelease(b64_str);
+      return ThrowIfException(ctx, ErrorTypes::kError, code,
+                              ErrorMessages::kMemoryAllocFailed_1001,
+                              exception);
+    }
+    const size_t written = JSStringGetUTF8CString(
+        b64_str, reinterpret_cast<char*>(owned_str_data), max_utf8);
+    JSStringRelease(b64_str);
+    byte_length = written > 0 ? written - 1 : 0;
+    data = owned_str_data;
   } else {
-    data = GetWireBytes(ctx, argv[0], &byteLength, exception);
+    data = GetWireBytes(ctx, argv[0], &byte_length, exception);
   }
-  if (exception && *exception) return nullptr;
+  if (exception && *exception) {
+    std::free(owned_str_data);
+    return nullptr;
+  }
   if (data == nullptr) {
+    std::free(owned_str_data);
     return ThrowIfException(ctx, ErrorTypes::kTypeError, code,
                             ErrorMessages::kArrayBufferNeeded_1002, exception);
   }
-  if (useBase64) {
-    size_t decode_len = modp_b64_decode_len(byteLength);
-    uint8_t* wasm_data = (uint8_t*)std::malloc(decode_len);
-    byteLength =
-        modp_b64_decode((char*)wasm_data, (const char*)data, byteLength);
-    if (arg0Type == kJSTypeString) {
-      std::free(data);
+
+  uint8_t* owned_decoded = nullptr;
+  if (use_base64) {
+    size_t decoded = 0;
+    const bool ok =
+        wasm::DecodeBase64(data, byte_length, &owned_decoded, &decoded);
+    std::free(owned_str_data);
+    owned_str_data = nullptr;
+    if (!ok) {
+      return ThrowIfException(ctx, ErrorTypes::kTypeError, code,
+                              ErrorMessages::kArrayBufferNeeded_1003,
+                              exception);
     }
-    data = wasm_data;
+    data = owned_decoded;
+    byte_length = decoded;
   }
 
-  auto interop = static_cast<InteropRuntime*>(JSObjectGetPrivate(constructor));
-  WasmResult result = WasmSucceed;
-  WasmModuleRef module = interop->CreateWasmModule(data, byteLength, result);
-  if (useBase64) {
-    std::free(data);
-  }
-  if (result != WasmSucceed) {
-    return ThrowIfException(ctx, ErrorTypes::kError, code, result, exception);
-  }
+  wasm_byte_vec_t binary = {byte_length, reinterpret_cast<char*>(data)};
+  wasm_module_t* module = wasm_module_new(env->wasm_store(), &binary);
+  std::free(owned_str_data);
+  std::free(owned_decoded);
 
-  return CreateJSObject(ctx, constructor, module, exception);
+  if (wasm_unlikely(!module)) {
+    return ThrowIfException(ctx, ErrorTypes::kError, code,
+                            "create prism module failed", exception);
+  }
+  return CreateJSObject(ctx, constructor, env, module, exception);
 }
 
 uint8_t* JSCWasmModule::GetWireBytes(JSContextRef ctx, JSValueRef val,
                                      size_t* byteLength,
                                      JSValueRef* exception) {
-  JSTypedArrayType type{JSValueGetTypedArrayType(ctx, val, exception)};
+  JSTypedArrayType type = JSValueGetTypedArrayType(ctx, val, exception);
+  if (exception && *exception) return nullptr;
   if (type == kJSTypedArrayTypeNone) {
     ThrowIfException(ctx, ErrorTypes::kTypeError, "",
                      ErrorMessages::kArrayBufferNeeded_1003, exception);
@@ -240,88 +273,34 @@ uint8_t* JSCWasmModule::GetWireBytes(JSContextRef ctx, JSValueRef val,
   }
 
   JSObjectRef buffer = JSValueToObject(ctx, val, exception);
+  if ((exception && *exception) || !buffer) return nullptr;
   if (type != kJSTypedArrayTypeArrayBuffer) {
     *byteLength = JSObjectGetTypedArrayByteLength(ctx, buffer, exception);
-    size_t byte_offset{JSObjectGetTypedArrayByteOffset(ctx, buffer, exception)};
-    uint8_t* data = static_cast<uint8_t*>(
-                        JSObjectGetTypedArrayBytesPtr(ctx, buffer, exception)) +
-                    byte_offset;
-    return data;
+    if (exception && *exception) return nullptr;
+    const size_t byte_offset =
+        JSObjectGetTypedArrayByteOffset(ctx, buffer, exception);
+    if (exception && *exception) return nullptr;
+    auto* base = static_cast<uint8_t*>(
+        JSObjectGetTypedArrayBytesPtr(ctx, buffer, exception));
+    if (exception && *exception) return nullptr;
+    static uint8_t kEmptyByte = 0;
+    return base ? (base + byte_offset) : &kEmptyByte;
   }
   *byteLength = JSObjectGetArrayBufferByteLength(ctx, buffer, exception);
-  return static_cast<uint8_t*>(
+  if (exception && *exception) return nullptr;
+  auto* base = static_cast<uint8_t*>(
       JSObjectGetArrayBufferBytesPtr(ctx, buffer, exception));
-}
-
-JSValueRef JSCWasmModule::ExportsCallback(JSContextRef ctx,
-                                          JSObjectRef function,
-                                          JSObjectRef thisObject, size_t argc,
-                                          const JSValueRef argv[],
-                                          JSValueRef* exception) {
-  WLOGD("Running JSCWasmModule::%s...", __func__);
-  constexpr const char* code = "WebAssembly.Module.exports";
-
-  if (argc == 0 && !JSValueIsObject(ctx, argv[0])) {
-    return ThrowIfException(ctx, ErrorTypes::kTypeError, code,
-                            ErrorMessages::kModuleNeeded_1004, exception);
-  }
-  JSObjectRef module_obj = JSValueToObject(ctx, argv[0], nullptr);
-  JSObjectRef exports = JSObjectMakeArray(ctx, 0, NULL, nullptr);
-  auto js_mod = static_cast<JSCWasmModule*>(JSObjectGetPrivate(module_obj));
-  WASM_DCHECK(js_mod != nullptr);
-  auto interop_runtime = js_mod->interop_runtime_;
-  WASM_DCHECK(interop_runtime != nullptr);
-  auto js_env = interop_runtime->js_env<JSCEnv*>();
-
-  WasmModuleRef wasm_module = js_mod->module_;
-  if (wasm_module.is<Wasm3Module*>()) {
-    auto wasm3_module = wasm_module.get<Wasm3Module*>();
-    wasm3_module->exports(js_env, exports, nullptr);
-  } else {
-    auto prism_module = wasm_module.get<PrismModule*>();
-    prism_module->exports(js_env, exports, nullptr);
-  }
-
-  return exports;
-}
-
-JSValueRef JSCWasmModule::ImportsCallback(JSContextRef ctx,
-                                          JSObjectRef function,
-                                          JSObjectRef thisObject, size_t argc,
-                                          const JSValueRef argv[],
-                                          JSValueRef* exception) {
-  WLOGD("Running JSCWasmModule::%s...", __func__);
-  constexpr const char* code = "WebAssembly.Module.imports()";
-
-  if (argc == 0 && !JSValueIsObject(ctx, argv[0])) {
-    return ThrowIfException(ctx, ErrorTypes::kTypeError, code,
-                            ErrorMessages::kModuleNeeded_1005, exception);
-  }
-  JSObjectRef module_obj = JSValueToObject(ctx, argv[0], nullptr);
-  JSObjectRef imports = JSObjectMakeArray(ctx, 0, NULL, nullptr);
-  auto js_mod = static_cast<JSCWasmModule*>(JSObjectGetPrivate(module_obj));
-  WASM_DCHECK(js_mod != nullptr);
-  auto interop_runtime = js_mod->interop_runtime_;
-  auto js_env = interop_runtime->js_env<JSCEnv*>();
-
-  if (js_mod->module_.is<Wasm3Module*>()) {
-    auto wasm3_module = js_mod->module_.get<Wasm3Module*>();
-    wasm3_module->imports(js_env, imports, exception);
-  } else {
-    auto prism_module = js_mod->module_.get<PrismModule*>();
-    prism_module->imports(js_env, imports, exception);
-  }
-
-  if (exception && *exception) {
-    return js_env->MakeUndefined();
-  }
-
-  return imports;
+  if (exception && *exception) return nullptr;
+  static uint8_t kEmptyByte = 0;
+  return base ? base : &kEmptyByte;
 }
 
 JSValueRef JSCWasmModule::SupportBase64(JSContextRef ctx, JSObjectRef object,
                                         JSStringRef propertyName,
                                         JSValueRef* exception) {
+  (void)object;
+  (void)propertyName;
+  (void)exception;
   return JSValueMakeBoolean(ctx, true);
 }
 
