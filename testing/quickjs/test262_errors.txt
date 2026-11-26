@@ -570,46 +570,6 @@ test/built-ins/String/prototype/at/returns-undefined-for-out-of-range-index.js:1
 test/built-ins/String/prototype/localeCompare/15.5.4.9_CE.js:62: Test262Error: String.prototype.localeCompare considers ö (\u006f\u0308) ≠ ö (\u00f6).
 test/built-ins/String/prototype/matchAll/flags-nonglobal-throws.js:19: Test262Error: Expected a TypeError to be thrown but no exception was thrown at all
 test/built-ins/String/prototype/matchAll/flags-undefined-throws.js:21: Test262Error: Expected a TypeError but got a SyntaxError
-test/built-ins/String/prototype/replaceAll/getSubstitution-0x0024-0x003C.js:60: TypeError: str.replaceAll is not a function
-test/built-ins/String/prototype/replaceAll/getSubstitution-0x0024-0x0024.js:54: TypeError: str.replaceAll is not a function
-test/built-ins/String/prototype/replaceAll/getSubstitution-0x0024-0x0026.js:54: TypeError: str.replaceAll is not a function
-test/built-ins/String/prototype/replaceAll/getSubstitution-0x0024-0x0027.js:54: TypeError: str.replaceAll is not a function
-test/built-ins/String/prototype/replaceAll/getSubstitution-0x0024-0x0060.js:54: TypeError: str.replaceAll is not a function
-test/built-ins/String/prototype/replaceAll/getSubstitution-0x0024.js:54: TypeError: str.replaceAll is not a function
-test/built-ins/String/prototype/replaceAll/getSubstitution-0x0024N.js:58: TypeError: str.replaceAll is not a function
-test/built-ins/String/prototype/replaceAll/getSubstitution-0x0024NN.js:58: TypeError: str.replaceAll is not a function
-test/built-ins/String/prototype/replaceAll/length.js:21: TypeError: not an object
-test/built-ins/String/prototype/replaceAll/name.js:21: TypeError: not an object
-test/built-ins/String/prototype/replaceAll/replaceAll.js:16: Test262Error: `typeof String.prototype.replaceAll` is `function` Expected SameValue(«undefined», «function») to be true
-test/built-ins/String/prototype/replaceAll/replaceValue-call-abrupt.js:21: Test262Error: Expected a Test262Error but got a TypeError
-test/built-ins/String/prototype/replaceAll/replaceValue-call-each-match-position.js:33: TypeError: obj.replaceAll is not a function
-test/built-ins/String/prototype/replaceAll/replaceValue-call-matching-empty.js:33: TypeError: obj.replaceAll is not a function
-test/built-ins/String/prototype/replaceAll/replaceValue-call-skip-no-match.js:25: TypeError: 'a'.replaceAll is not a function
-test/built-ins/String/prototype/replaceAll/replaceValue-call-tostring-abrupt.js:23: Test262Error: Expected a Test262Error but got a TypeError
-test/built-ins/String/prototype/replaceAll/replaceValue-fn-skip-toString.js:36: TypeError: 'aaa'.replaceAll is not a function
-test/built-ins/String/prototype/replaceAll/replaceValue-tostring-abrupt.js:49: Test262Error: function must exist Expected SameValue(«undefined», «function») to be true
-test/built-ins/String/prototype/replaceAll/replaceValue-value-replaces-string.js:26: TypeError: 'aaab a a aac'.replaceAll is not a function
-test/built-ins/String/prototype/replaceAll/replaceValue-value-tostring.js:45: TypeError: 'aa'.replaceAll is not a function
-test/built-ins/String/prototype/replaceAll/searchValue-empty-string-this-empty-string.js:40: TypeError: ''.replaceAll is not a function
-test/built-ins/String/prototype/replaceAll/searchValue-empty-string.js:49: TypeError: 'aab c  \nx'.replaceAll is not a function
-test/built-ins/String/prototype/replaceAll/searchValue-flags-no-g-throws.js:38: Test262Error: function must exist Expected SameValue(«undefined», «function») to be true
-test/built-ins/String/prototype/replaceAll/searchValue-flags-null-undefined-throws.js:46: Test262Error: function must exist Expected SameValue(«undefined», «function») to be true
-test/built-ins/String/prototype/replaceAll/searchValue-flags-toString-abrupt.js:50: Test262Error: function must exist Expected SameValue(«undefined», «function») to be true
-test/built-ins/String/prototype/replaceAll/searchValue-get-flags-abrupt.js:25: Test262Error: from custom searchValue object Expected a Test262Error but got a TypeError
-test/built-ins/String/prototype/replaceAll/searchValue-isRegExp-abrupt.js:28: Test262Error: Expected a Test262Error but got a TypeError
-test/built-ins/String/prototype/replaceAll/searchValue-replacer-RegExp-call-fn.js:74: TypeError: obj.replaceAll is not a function
-test/built-ins/String/prototype/replaceAll/searchValue-replacer-RegExp-call.js:75: TypeError: thisValue.replaceAll is not a function
-test/built-ins/String/prototype/replaceAll/searchValue-replacer-before-tostring.js:54: TypeError: cannot read property 'call' of undefined
-test/built-ins/String/prototype/replaceAll/searchValue-replacer-call-abrupt.js:37: Test262Error: Expected a Test262Error but got a TypeError
-test/built-ins/String/prototype/replaceAll/searchValue-replacer-call.js:52: TypeError: str.replaceAll is not a function
-test/built-ins/String/prototype/replaceAll/searchValue-replacer-is-null.js:34: TypeError: "a2b2c".replaceAll is not a function
-test/built-ins/String/prototype/replaceAll/searchValue-replacer-method-abrupt.js:43: Test262Error: custom abrupt Expected a Test262Error but got a TypeError
-test/built-ins/String/prototype/replaceAll/searchValue-tostring-abrupt.js:49: Test262Error: function must exist Expected SameValue(«undefined», «function») to be true
-test/built-ins/String/prototype/replaceAll/searchValue-tostring-regexp.js:34: TypeError: 'aa /./g /./g aa'.replaceAll is not a function
-test/built-ins/String/prototype/replaceAll/this-is-null-throws.js:27: Test262Error: function must exist Expected SameValue(«undefined», «function») to be true
-test/built-ins/String/prototype/replaceAll/this-is-undefined-throws.js:27: Test262Error: function must exist Expected SameValue(«undefined», «function») to be true
-test/built-ins/String/prototype/replaceAll/this-tostring-abrupt.js:37: Test262Error: function must exist Expected SameValue(«undefined», «function») to be true
-test/built-ins/String/prototype/replaceAll/this-tostring.js:47: TypeError: cannot read property 'call' of undefined
 test/built-ins/String/prototype/toString/non-generic-realm.js:21: TypeError: $262.createRealm is not a function
 test/built-ins/String/prototype/valueOf/non-generic-realm.js:21: TypeError: $262.createRealm is not a function
 test/built-ins/Symbol/asyncIterator/cross-realm.js:13: TypeError: $262.createRealm is not a function
