@@ -27,6 +27,7 @@
 #include <mutex>
 #include <queue>
 #include <string>
+#include <unordered_map>
 #include <unordered_set>
 #include <utility>
 
@@ -411,7 +412,13 @@ class Work : AutoCloseable {
     if (state == State::kCreated || state == State::kQueued) {
       state_.store(State::kCancelled);
     }
+    CancelCompletionTask();
+    // A completion callback may delete this work. Also reclaim work with no
+    // callback (or one that leaves deletion to shutdown) without double-free.
+    auto deleted = std::make_shared<bool>(false);
+    closing_deleted_ = deleted;
     Complete(this);
+    if (!*deleted) Delete(this);
   }
 
   static Work* New(napi_runtime rt, napi_async_execute_callback execute,
@@ -421,11 +428,11 @@ class Work : AutoCloseable {
 
   static void Delete(Work* w) { delete w; }
 
-  void ScheduleWork() {
+  bool HasExecuteCallback() const { return execute_ != nullptr; }
+
+  bool ScheduleWork() {
     State expected = State::kCreated;
-    bool queued = state_.compare_exchange_strong(expected, State::kQueued);
-    (void)queued;
-    assert(queued);
+    if (!state_.compare_exchange_strong(expected, State::kQueued)) return false;
 
     rt_->PostWorkerTask([this] {
       State expected = State::kQueued;
@@ -435,8 +442,9 @@ class Work : AutoCloseable {
       } else {
         assert(expected == State::kCancelled);
       }
-      rt_->PostJSTask<Work>(this, Complete);
+      PostCompletionTask();
     });
+    return true;
   }
 
   bool CancelWork() {
@@ -452,9 +460,69 @@ class Work : AutoCloseable {
         complete_(complete),
         data_(data) {}
 
-  ~Work() override = default;
+  ~Work() override {
+    CancelCompletionTask();
+    if (closing_deleted_) *closing_deleted_ = true;
+  }
+
+  struct CompletionTasks {
+    std::mutex mutex;
+    uintptr_t next_id = 1;
+    std::unordered_map<uintptr_t, Work*> pending;
+  };
+
+  static CompletionTasks& Tasks() {
+    // Keep the broker alive through process teardown: global environments may
+    // shut down after function-local static destructors, and hosts may retain
+    // opaque delivery IDs. Individual work entries are still removed on close.
+    static auto* tasks = new CompletionTasks;
+    return *tasks;
+  }
+
+  void CancelCompletionTask() {
+    auto& tasks = Tasks();
+    std::lock_guard<std::mutex> lock(tasks.mutex);
+    if (completion_task_id_) {
+      tasks.pending.erase(completion_task_id_);
+      completion_task_id_ = 0;
+    }
+  }
+
+  void PostCompletionTask() {
+    // The host owns only an opaque ID. Work deletion/teardown removes the
+    // registry entry, making delayed delivery harmless and dropped tasks free
+    // of heap-allocated payloads that the host cannot dispose of.
+    auto& tasks = Tasks();
+    uintptr_t id;
+    {
+      std::lock_guard<std::mutex> lock(tasks.mutex);
+      do {
+        id = tasks.next_id++;
+      } while (!id || tasks.pending.count(id));
+      completion_task_id_ = id;
+      tasks.pending.emplace(id, this);
+    }
+    rt_->PostJSTask<void>(reinterpret_cast<void*>(id), [](void* data) {
+      auto& tasks = Tasks();
+      Work* work;
+      {
+        std::lock_guard<std::mutex> lock(tasks.mutex);
+        auto it = tasks.pending.find(reinterpret_cast<uintptr_t>(data));
+        if (it == tasks.pending.end()) return;
+        work = it->second;
+        tasks.pending.erase(it);
+        work->completion_task_id_ = 0;
+      }
+      Complete(work);
+    });
+  }
 
   static void Complete(Work* work) {
+    // Node-API permits an omitted completion callback. The caller can still
+    // delete completed work; shutdown reclaims it if it remains registered.
+    if (work->completion_called_) return;
+    work->completion_called_ = true;
+    if (!work->complete_) return;
     work->rt_->CallIntoModule([&](Napi::Env env) {
       napi_status status =
           work->state_.load() == State::kCompleted ? napi_ok : napi_cancelled;
@@ -467,32 +535,49 @@ class Work : AutoCloseable {
   napi_async_complete_callback complete_;
   void* data_;
   std::atomic<State> state_{State::kCreated};
+  uintptr_t completion_task_id_ = 0;
+  bool completion_called_ = false;
+  std::shared_ptr<bool> closing_deleted_;
 };
 
 napi_status napi_runtime_create_async_work(
     napi_env env, napi_value async_resource, napi_value async_resource_name,
     napi_async_execute_callback execute, napi_async_complete_callback complete,
     void* data, napi_async_work* result) {
+  if (!env) return napi_invalid_arg;
+  if (!env->rt || !result) return napi_set_last_error(env, napi_invalid_arg);
+  // Preserve legacy creation with empty names and callbacks; an omitted
+  // execute callback is rejected only when the work is actually queued.
   *result = reinterpret_cast<napi_async_work>(
       Work::New(env->rt, execute, complete, data));
   return napi_clear_last_error(env);
 }
 
 napi_status napi_runtime_delete_async_work(napi_env env, napi_async_work work) {
+  if (!env) return napi_invalid_arg;
   Work::Delete(reinterpret_cast<Work*>(work));
 
   return napi_clear_last_error(env);
 }
 
 napi_status napi_runtime_queue_async_work(napi_env env, napi_async_work work) {
+  if (!env) return napi_invalid_arg;
+  if (!work) return napi_set_last_error(env, napi_invalid_arg);
   Work* w = reinterpret_cast<Work*>(work);
 
-  w->ScheduleWork();
+  if (!w->HasExecuteCallback()) {
+    return napi_set_last_error(env, napi_invalid_arg);
+  }
+  if (!w->ScheduleWork()) {
+    return napi_set_last_error(env, napi_generic_failure);
+  }
 
   return napi_clear_last_error(env);
 }
 
 napi_status napi_runtime_cancel_async_work(napi_env env, napi_async_work work) {
+  if (!env) return napi_invalid_arg;
+  if (!work) return napi_set_last_error(env, napi_invalid_arg);
   Work* w = reinterpret_cast<Work*>(work);
 
   if (!w->CancelWork()) {
