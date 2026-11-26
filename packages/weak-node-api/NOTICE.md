@@ -14,8 +14,8 @@ It incorporates and derives from upstream open-source projects as noted below. W
   - Usage: We copy selected headers and generated sources from the `weak-node-api` npm package. Our package publishes the derived headers/sources and additional scaffolding/build integration.
 
 - Node-Addon-API (node-addon-api)
-  - Repository: https://github.com/node-addon-api/node-addon-api
-  - License: MIT (see https://github.com/node-addon-api/node-addon-api/blob/main/LICENSE)
+  - Repository: https://github.com/nodejs/node-addon-api
+  - License: MIT (see https://github.com/nodejs/node-addon-api/blob/main/LICENSE.md)
   - Usage: We merge a subset of Node-Addon-API header files (e.g., `napi.h`, `napi-inl.h`, `napi-inl.deprecated.h`) into this package's `headers/` directory for downstream consumption.
 
 - Node-API C headers (node-api-headers / Node.js)
