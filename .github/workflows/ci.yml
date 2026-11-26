@@ -53,7 +53,7 @@ jobs:
       - name: Run commit-message check
         run: python3 -B tools/cli/commit_message_helper.py
   lint-pod:
-    runs-on: lynx-darwin-14-medium
+    runs-on: lynx-darwin-15.6.1-medium
     steps:
       - name: Download Source
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
@@ -112,7 +112,7 @@ jobs:
           python3 tools/ci/check_test_run.py
 
   check-unittests-darwin:
-    runs-on: lynx-darwin-14-medium
+    runs-on: lynx-darwin-15.6.1-medium
     steps:
       - name: Download Source
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2

@@ -12,7 +12,18 @@
     !defined(_NAPI_V8_EXPORT_SOURCE_ONLY_)
 #define SRC_NAPI_V8_JS_NATIVE_API_V8_INTERNALS_H_
 
+// V8 11.1 erases weak callback types with a function pointer cast. Newer
+// Clang versions diagnose that cast; keep the workaround scoped to V8 headers.
+#if defined(__clang__)
+#pragma clang diagnostic push
+#if __has_warning("-Wcast-function-type-mismatch")
+#pragma clang diagnostic ignored "-Wcast-function-type-mismatch"
+#endif
+#endif
 #include <v8.h>
+#if defined(__clang__)
+#pragma clang diagnostic pop
+#endif
 
 #include <cassert>
 #include <string>

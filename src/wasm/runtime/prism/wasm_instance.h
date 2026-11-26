@@ -317,6 +317,15 @@ class PrismInstance {
           // JS callback bridge for both exported and ordinary callables.
           PrismFunction* prism_function =
               new PrismFunction(func_obj, runtime_, this, nullptr);
+          // Prism uses its own callback ABI behind the generic WASM C API
+          // callback type. Limit the Clang compatibility workaround to these
+          // callback conversions.
+#if defined(__clang__)
+#pragma clang diagnostic push
+#if __has_warning("-Wcast-function-type-mismatch")
+#pragma clang diagnostic ignored "-Wcast-function-type-mismatch"
+#endif
+#endif
           wasm_func_callback_with_env_t cb = nullptr;
           if constexpr (std::is_same_v<JSEnv, qjs::QJSEnv>) {
             cb = (wasm_func_callback_with_env_t)PrismFunction::QJSPrismCallback;
@@ -325,6 +334,9 @@ class PrismInstance {
           else {
             cb = (wasm_func_callback_with_env_t)PrismFunction::JSCPrismCallback;
           }
+#endif
+#if defined(__clang__)
+#pragma clang diagnostic pop
 #endif
           wasm_func_t* w_func = nullptr;
           if (use_borrowed_function_imports) {
