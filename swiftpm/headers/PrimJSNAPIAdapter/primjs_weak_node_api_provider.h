@@ -1,0 +1,1 @@
+../../../src/napi/adapter/primjs_weak_node_api_provider.h
