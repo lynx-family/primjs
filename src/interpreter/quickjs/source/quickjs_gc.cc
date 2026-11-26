@@ -19876,13 +19876,19 @@ static LEPUSValue js_compile_regexp(LEPUSContext *ctx, LEPUSValueConst pattern,
         case 'u':
           mask = LRE_FLAG_UTF16;
           break;
+        case 'v':
+          mask = LRE_FLAG_UNICODE_SETS;
+          break;
         case 'y':
           mask = LRE_FLAG_STICKY;
           break;
         default:
           goto bad_flags;
       }
-      if ((re_flags & mask) != 0) {
+      /* a flag is given once, and 'u' and 'v' exclude each other */
+      if ((re_flags & mask) != 0 ||
+          ((re_flags | mask) & (LRE_FLAG_UTF16 | LRE_FLAG_UNICODE_SETS)) ==
+              (LRE_FLAG_UTF16 | LRE_FLAG_UNICODE_SETS)) {
       bad_flags:
         return LEPUS_ThrowSyntaxError(ctx, "invalid regular expression flags");
       }
@@ -19890,6 +19896,7 @@ static LEPUSValue js_compile_regexp(LEPUSContext *ctx, LEPUSValueConst pattern,
     }
   }
 
+  if (re_flags & LRE_FLAG_UNICODE_SETS) re_flags |= LRE_FLAG_UTF16;
   str = JS_ToCStringLen2_GC(ctx, &len, pattern, !(re_flags & LRE_FLAG_UTF16));
   if (!str) return LEPUS_EXCEPTION;
   re_bytecode_buf = lre_compile(&re_bytecode_len, error_msg, sizeof(error_msg),
@@ -20180,12 +20187,23 @@ static LEPUSValue js_regexp_get_flag(LEPUSContext *ctx,
   if (!re) return LEPUS_EXCEPTION;
 
   flags = lre_get_flags(re->bytecode->u.str8);
+  /* the bytecode of a 'v' regexp also runs in unicode mode */
+  if (mask == LRE_FLAG_UTF16 && (flags & LRE_FLAG_UNICODE_SETS))
+    return LEPUS_FALSE;
   return LEPUS_NewBool(ctx, (flags & mask) != 0);
+}
+
+/* 1 if rx matches by code point: its 'unicode' or 'unicodeSets' is true */
+static int js_regexp_full_unicode(LEPUSContext *ctx, LEPUSValueConst rx) {
+  int res = JS_ToBoolFree_GC(
+      ctx, JS_GetPropertyInternal_GC(ctx, rx, JS_ATOM_unicode, rx, 0));
+  if (res != 0) return res;
+  return JS_ToBoolFree_GC(ctx, JS_GetPropertyStr_GC(ctx, rx, "unicodeSets"));
 }
 
 static LEPUSValue js_regexp_get_flags(LEPUSContext *ctx,
                                       LEPUSValueConst this_val) {
-  char str[8], *p = str;
+  char str[16], *p = str;
   int res;
 
   if (LEPUS_VALUE_IS_NOT_OBJECT(this_val))
@@ -20209,6 +20227,10 @@ static LEPUSValue js_regexp_get_flags(LEPUSContext *ctx,
                                   ctx, this_val, JS_ATOM_unicode, this_val, 0));
   if (res < 0) goto exception;
   if (res) *p++ = 'u';
+  res =
+      JS_ToBoolFree_GC(ctx, JS_GetPropertyStr_GC(ctx, this_val, "unicodeSets"));
+  if (res < 0) goto exception;
+  if (res) *p++ = 'v';
   res = JS_ToBoolFree_GC(ctx, JS_GetPropertyStr_GC(ctx, this_val, "sticky"));
   if (res < 0) goto exception;
   if (res) *p++ = 'y';
@@ -20670,8 +20692,7 @@ static LEPUSValue js_regexp_Symbol_match(LEPUSContext *ctx,
   if (!global) {
     A = JS_RegExpExec(ctx, rx, S);
   } else {
-    fullUnicode = JS_ToBoolFree_GC(
-        ctx, JS_GetPropertyInternal_GC(ctx, rx, JS_ATOM_unicode, rx, 0));
+    fullUnicode = js_regexp_full_unicode(ctx, rx);
     if (fullUnicode < 0) goto exception;
 
     if (JS_SetPropertyInternal_GC(ctx, rx, JS_ATOM_lastIndex,
@@ -20824,7 +20845,8 @@ static LEPUSValue js_regexp_Symbol_matchAll(LEPUSContext *ctx,
   HeapObjStore(ctx, &it->iterated_string, S);
   strp = LEPUS_VALUE_GET_STRING(flags);
   it->global = string_indexof_char(strp, 'g', 0) >= 0;
-  it->unicode = string_indexof_char(strp, 'u', 0) >= 0;
+  it->unicode = string_indexof_char(strp, 'u', 0) >= 0 ||
+                string_indexof_char(strp, 'v', 0) >= 0;
   it->done = FALSE;
   LEPUS_SetHeapOpaque(ctx, iter, it);
 
@@ -20944,8 +20966,7 @@ static LEPUSValue js_regexp_Symbol_replace(LEPUSContext *ctx,
       ctx, JS_GetPropertyInternal_GC(ctx, rx, JS_ATOM_global, rx, 0));
   if (is_global < 0) goto exception;
   if (is_global) {
-    fullUnicode = JS_ToBoolFree_GC(
-        ctx, JS_GetPropertyInternal_GC(ctx, rx, JS_ATOM_unicode, rx, 0));
+    fullUnicode = js_regexp_full_unicode(ctx, rx);
     if (fullUnicode < 0) goto exception;
     if (JS_SetPropertyInternal_GC(ctx, rx, JS_ATOM_lastIndex,
                                   LEPUS_NewInt32(ctx, 0), LEPUS_PROP_THROW) < 0)
@@ -21162,7 +21183,8 @@ static LEPUSValue js_regexp_Symbol_split(LEPUSContext *ctx,
       ctx, JS_GetPropertyInternal_GC(ctx, rx, JS_ATOM_flags, rx, 0));
   if (LEPUS_IsException(flags)) goto exception;
   strp = LEPUS_VALUE_GET_STRING(flags);
-  unicodeMatching = string_indexof_char(strp, 'u', 0) >= 0;
+  unicodeMatching = string_indexof_char(strp, 'u', 0) >= 0 ||
+                    string_indexof_char(strp, 'v', 0) >= 0;
   if (string_indexof_char(strp, 'y', 0) < 0) {
     flags = JS_ConcatString3(ctx, "", flags, "y");
     if (LEPUS_IsException(flags)) goto exception;
@@ -21250,6 +21272,7 @@ static const LEPUSCFunctionListEntry js_regexp_proto_funcs[] = {
     LEPUS_CGETSET_MAGIC_DEF("multiline", js_regexp_get_flag, NULL, 4),
     LEPUS_CGETSET_MAGIC_DEF("dotAll", js_regexp_get_flag, NULL, 8),
     LEPUS_CGETSET_MAGIC_DEF("unicode", js_regexp_get_flag, NULL, 16),
+    LEPUS_CGETSET_MAGIC_DEF("unicodeSets", js_regexp_get_flag, NULL, 64),
     LEPUS_CGETSET_MAGIC_DEF("sticky", js_regexp_get_flag, NULL, 32),
     LEPUS_CFUNC_DEF("exec", 1, js_regexp_exec),
     LEPUS_CFUNC_DEF("compile", 2, js_regexp_compile),
