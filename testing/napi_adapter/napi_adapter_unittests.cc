@@ -16,6 +16,17 @@
 #include <unordered_set>
 #include <vector>
 
+#if defined(__SANITIZE_ADDRESS__)
+#define NAPI_ADAPTER_TEST_ASAN
+#elif defined(__has_feature)
+#if __has_feature(address_sanitizer)
+#define NAPI_ADAPTER_TEST_ASAN
+#endif
+#endif
+#ifdef NAPI_ADAPTER_TEST_ASAN
+#include <sanitizer/asan_interface.h>
+#endif
+
 #include "napi/napi.h"
 
 #ifdef USE_PRIMJS_NAPI
@@ -342,6 +353,142 @@ TEST_P(NAPITest, LegacyConstructorReturnValues) {
 }
 
 #ifndef JS_ENGINE_HARMONY
+
+namespace {
+struct AdapterTSFNLifecycleState {
+  napi_threadsafe_function function = nullptr;
+  int delivered = 0;
+  int discarded = 0;
+  int finalizers = 0;
+  napi_status cleanup_release = napi_generic_failure;
+
+  napi_status Create(napi_env env, size_t holders) {
+    napi_value name;
+    napi_status status = napi_create_string_utf8_primjs(
+        env, "adapter lifecycle", NAPI_AUTO_LENGTH, &name);
+    if (status != napi_ok) return status;
+    return napi_create_threadsafe_function_primjs(
+        env, nullptr, nullptr, name, 0, holders, this,
+        [](napi_env, void* data, void* context) {
+          auto* state = static_cast<AdapterTSFNLifecycleState*>(data);
+          EXPECT_EQ(context, state);
+          ++state->finalizers;
+        },
+        this,
+        [](napi_env env, napi_value callback, void* context, void*) {
+          auto* state = static_cast<AdapterTSFNLifecycleState*>(context);
+          if (env) {
+            ++state->delivered;
+          } else {
+            EXPECT_EQ(callback, nullptr);
+            ++state->discarded;
+          }
+        },
+        &function);
+  }
+};
+
+void ExpectAdapterTSFNFreed(napi_threadsafe_function function) {
+  (void)function;
+#ifdef NAPI_ADAPTER_TEST_ASAN
+  // Inspect allocation state without dereferencing the released handle.
+  EXPECT_NE(__asan_address_is_poisoned(function), 0);
+#endif
+}
+}  // namespace
+
+TEST_P(NAPITest, AdapterTsfnReleaseAfterEnvFree) {
+  AdapterTSFNLifecycleState state;
+  // Local ownership tears down before callback state on an early return too.
+  auto runtime = std::move(runtime_);
+  ASSERT_EQ(state.Create(env_, 1), napi_ok);
+  runtime.reset();
+  env_ = nullptr;
+  EXPECT_EQ(state.finalizers, 1);
+  napi_status holder_release = napi_generic_failure;
+  std::thread holder([&] {
+    holder_release = napi_release_threadsafe_function_primjs(state.function,
+                                                             napi_tsfn_release);
+  });
+  holder.join();
+  EXPECT_EQ(holder_release, napi_ok);
+  ExpectAdapterTSFNFreed(state.function);
+  EXPECT_EQ(state.finalizers, 1);
+}
+
+TEST_P(NAPITest, AdapterTsfnClosingCallConsumesOnlyCallingHolder) {
+  AdapterTSFNLifecycleState state;
+  int payloads[] = {1, 2};
+  auto runtime = std::move(runtime_);
+  ASSERT_EQ(state.Create(env_, 2), napi_ok);
+  for (auto& payload : payloads) {
+    ASSERT_EQ(napi_call_threadsafe_function_primjs(state.function, &payload,
+                                                   napi_tsfn_nonblocking),
+              napi_ok);
+  }
+  runtime.reset();
+  env_ = nullptr;
+  EXPECT_EQ(state.delivered, 0);
+  EXPECT_EQ(state.discarded, 2);
+  EXPECT_EQ(state.finalizers, 1);
+  EXPECT_EQ(napi_call_threadsafe_function_primjs(state.function, nullptr,
+                                                 napi_tsfn_nonblocking),
+            napi_closing);
+  EXPECT_EQ(napi_release_threadsafe_function_primjs(state.function,
+                                                    napi_tsfn_release),
+            napi_ok);
+  ExpectAdapterTSFNFreed(state.function);
+  EXPECT_EQ(state.discarded, 2);
+  EXPECT_EQ(state.finalizers, 1);
+}
+
+TEST_P(NAPITest, AdapterTsfnReleaseInEnvCleanupHook) {
+  AdapterTSFNLifecycleState state;
+  auto runtime = std::move(runtime_);
+  ASSERT_EQ(state.Create(env_, 1), napi_ok);
+  ASSERT_EQ(napi_add_env_cleanup_hook_primjs(
+                env_,
+                [](void* data) {
+                  auto* state = static_cast<AdapterTSFNLifecycleState*>(data);
+                  state->cleanup_release =
+                      napi_release_threadsafe_function_primjs(
+                          state->function, napi_tsfn_release);
+                },
+                &state),
+            napi_ok);
+  runtime.reset();
+  env_ = nullptr;
+  EXPECT_EQ(state.cleanup_release, napi_ok);
+  EXPECT_EQ(state.finalizers, 1);
+  ExpectAdapterTSFNFreed(state.function);
+}
+
+TEST_P(NAPITest, AdapterTsfnFinalizingOnePreservesOtherDispatches) {
+  AdapterTSFNLifecycleState first;
+  AdapterTSFNLifecycleState second;
+  auto runtime = std::move(runtime_);
+  ASSERT_EQ(first.Create(env_, 1), napi_ok);
+  ASSERT_EQ(second.Create(env_, 1), napi_ok);
+  // Finalize the first runner while the second runner still has a posted ID.
+  ASSERT_EQ(napi_release_threadsafe_function_primjs(first.function,
+                                                    napi_tsfn_release),
+            napi_ok);
+  ASSERT_EQ(napi_call_threadsafe_function_primjs(second.function, nullptr,
+                                                 napi_tsfn_nonblocking),
+            napi_ok);
+  runtime->ProcessTasks("TSFN dispatch isolation");
+  EXPECT_EQ(first.finalizers, 1);
+  EXPECT_EQ(second.delivered, 1);
+  EXPECT_EQ(second.discarded, 0);
+  EXPECT_EQ(second.finalizers, 0);
+  ASSERT_EQ(napi_release_threadsafe_function_primjs(second.function,
+                                                    napi_tsfn_release),
+            napi_ok);
+  runtime->ProcessTasks("TSFN dispatch isolation");
+  EXPECT_EQ(second.finalizers, 1);
+  ExpectAdapterTSFNFreed(first.function);
+  ExpectAdapterTSFNFreed(second.function);
+}
 
 #ifndef NAPI_ADAPTER_TEST_ROOT
 #define NAPI_ADAPTER_TEST_ROOT "oss/testing/napi_adapter/js_native_api"

@@ -1048,19 +1048,20 @@ class ThreadSafeFunctionAdaptor {
     }
   }
   ~ThreadSafeFunctionAdaptor() {
-    if (thread_finalize_cb_) {
-      thread_finalize_cb_(env_, thread_finalize_data_, context_);
-    }
     if (func_ref_) {
       napi_delete_reference_primjs(env_, func_ref_);
     }
   }
 
-  void* Context() { return context_; }
-
   static void Call(napi_env env, void* context, void* data) {
     ThreadSafeFunctionAdaptor* adaptor =
         static_cast<ThreadSafeFunctionAdaptor*>(context);
+    if (env == nullptr) {
+      if (adaptor->call_js_cb_) {
+        adaptor->call_js_cb_(nullptr, nullptr, adaptor->context_, data);
+      }
+      return;
+    }
     napi_value func{nullptr};
     if (adaptor->func_ref_) {
       napi_get_reference_value_primjs(env, adaptor->func_ref_, &func);
@@ -1090,6 +1091,10 @@ class ThreadSafeFunctionAdaptor {
   static void Finalize(napi_env env, void* finalize_data, void* finalize_hint) {
     ThreadSafeFunctionAdaptor* adaptor =
         static_cast<ThreadSafeFunctionAdaptor*>(finalize_data);
+    if (adaptor->thread_finalize_cb_) {
+      adaptor->thread_finalize_cb_(env, adaptor->thread_finalize_data_,
+                                   adaptor->context_);
+    }
     delete adaptor;
   }
 
@@ -1111,6 +1116,7 @@ napi_status napi_create_threadsafe_function_primjs(
     napi_threadsafe_function* result) {
   CHECK_ENV(env);
   CHECK_ARG(env, result);
+  RETURN_STATUS_IF_FALSE(env, initial_thread_count > 0, napi_invalid_arg);
   if (func == nullptr) {
     CHECK_ARG(env, call_js_cb);
   } else {
@@ -1119,10 +1125,16 @@ napi_status napi_create_threadsafe_function_primjs(
 
   ThreadSafeFunctionAdaptor* adaptor = new ThreadSafeFunctionAdaptor(
       env, func, thread_finalize_data, thread_finalize_cb, context, call_js_cb);
-  return env->napi_create_threadsafe_function_spec_compliant(
+  napi_status status = env->napi_create_threadsafe_function_spec_compliant(
       env, adaptor, ThreadSafeFunctionAdaptor::Finalize, adaptor,
       ThreadSafeFunctionAdaptor::Call, max_queue_size, initial_thread_count,
       result);
+  if (status == napi_ok) {
+    napi_runtime_set_threadsafe_function_context(*result, context);
+  } else {
+    delete adaptor;
+  }
+  return status;
 }
 
 napi_status napi_call_threadsafe_function_primjs(
@@ -1158,16 +1170,10 @@ napi_status napi_get_threadsafe_function_context_primjs(
   if (func == nullptr) {
     return napi_invalid_arg;
   }
-
-  void* context = nullptr;
-  napi_runtime_get_threadsafe_function_context(func, &context);
-  if (context == nullptr) {
+  if (result == nullptr) {
     return napi_invalid_arg;
   }
-  ThreadSafeFunctionAdaptor* adaptor =
-      static_cast<ThreadSafeFunctionAdaptor*>(context);
-  *result = adaptor->Context();
-  return napi_ok;
+  return napi_runtime_get_threadsafe_function_context(func, result);
 }
 
 napi_status napi_unref_threadsafe_function_primjs(
