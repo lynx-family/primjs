@@ -30,7 +30,7 @@ int g_min_log_level = 0;
 
 void SetMinLogLevel(int level) { g_min_log_level = std::min(LOG_FATAL, level); }
 
-int GetMinAllLogLevel() { return std::min(g_min_log_level, LOG_INFO); }
+int GetMinAllLogLevel() { return g_min_log_level; }
 
 LogMessage::LogMessage(const char *file, int line, LogSeverity severity)
     : severity_(severity), file_(file), line_(line) {
