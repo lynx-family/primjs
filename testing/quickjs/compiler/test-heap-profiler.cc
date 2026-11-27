@@ -1145,5 +1145,50 @@ TEST(HeapProfiler, HeapSnapshotJSONSerialization) {
   if (!env.ctx->rt->gc_enable) LEPUS_FreeValue(env.ctx, ret2);
 }
 
+TEST(HeapProfiler, TakeSnapshotInsideGeneratorAndAsyncFunction) {
+  ::TestQjsContext env;
+  env.RegisterGlobalFunction(
+      "takeSnapshotNow",
+      [](LEPUSContext* ctx, LEPUSValueConst, int, LEPUSValueConst*) {
+        const char* json = js_profile_take_heap_snapshot(ctx);
+        if (!json || json[0] != '{') {
+          if (json) js_profile_free_heap_snapshot(json);
+          return LEPUS_ThrowInternalError(ctx, "invalid heap snapshot");
+        }
+        js_profile_free_heap_snapshot(json);
+        return LEPUS_NewInt32(ctx, 1);
+      },
+      0);
+
+  LEPUSValue ret = env.CompileAndRun(R"(
+    function* gen() {
+      var local = { label: 'in-generator' };
+      yield takeSnapshotNow();
+      return local.label;
+    }
+    var g = gen();
+    if (g.next().value !== 1 || g.next().value !== 'in-generator') {
+      throw new Error('generator snapshot failed');
+    }
+
+    var asyncDone = false;
+    async function runAsync() {
+      await Promise.resolve(1);
+      if (takeSnapshotNow() !== 1) throw new Error('async snapshot failed');
+      asyncDone = true;
+    }
+    runAsync();
+  )");
+  ASSERT_FALSE(LEPUS_IsException(ret));
+  if (!env.ctx->rt->gc_enable) LEPUS_FreeValue(env.ctx, ret);
+
+  LEPUSContext* job_ctx = nullptr;
+  while (LEPUS_ExecutePendingJob(env.rt, &job_ctx) > 0) {
+  }
+  LEPUSValue done = env.GetGlobalPropery("asyncDone");
+  EXPECT_EQ(LEPUS_ToBool(env.ctx, done), 1);
+  if (!env.ctx->rt->gc_enable) LEPUS_FreeValue(env.ctx, done);
+}
+
 }  // namespace heapprofiler
 }  // namespace quickjs

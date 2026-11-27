@@ -17530,15 +17530,19 @@ static LEPUSValue js_array_iterator_next(LEPUSContext *ctx,
   JSArrayIteratorData *it;
   int64_t len, idx;
   LEPUSValue val = LEPUS_UNDEFINED, obj = LEPUS_UNDEFINED;
+  LEPUSValue iter_val = this_val, iter_obj = LEPUS_UNDEFINED;
   HandleScope func_scope(ctx, &val, HANDLE_TYPE_LEPUS_VALUE);
   func_scope.PushHandle(&obj, HANDLE_TYPE_LEPUS_VALUE);
+  func_scope.PushHandle(&iter_val, HANDLE_TYPE_LEPUS_VALUE);
+  func_scope.PushHandle(&iter_obj, HANDLE_TYPE_LEPUS_VALUE);
   LEPUSObject *p;
 
   it = static_cast<JSArrayIteratorData *>(
-      LEPUS_GetOpaque2(ctx, this_val, JS_CLASS_ARRAY_ITERATOR));
+      LEPUS_GetOpaque2(ctx, iter_val, JS_CLASS_ARRAY_ITERATOR));
   if (!it) goto fail1;
   if (LEPUS_IsUndefined(it->obj)) goto done;
-  p = LEPUS_VALUE_GET_OBJ(it->obj);
+  iter_obj = it->obj;
+  p = LEPUS_VALUE_GET_OBJ(iter_obj);
   if (p->class_id >= JS_CLASS_UINT8C_ARRAY &&
       p->class_id <= JS_CLASS_BIG_UINT64_ARRAY) {
     if (typed_array_is_detached(ctx, p)) {
@@ -17551,11 +17555,12 @@ static LEPUSValue js_array_iterator_next(LEPUSContext *ctx,
     /* An Array's length is always its first property. */
     len = LEPUS_VALUE_GET_INT(p->gc_prop[0].u.value);
   } else {
-    if (js_get_length64(ctx, &len, it->obj)) {
+    if (js_get_length64(ctx, &len, iter_obj)) {
     fail1:
       *pdone = FALSE;
       return LEPUS_EXCEPTION;
     }
+    if (LEPUS_IsUndefined(it->obj)) goto done;
   }
   idx = it->idx;
   if (idx >= len) {
@@ -17570,8 +17575,8 @@ static LEPUSValue js_array_iterator_next(LEPUSContext *ctx,
     return LEPUS_NewInt64(ctx, idx);
   } else {
     if (idx > UINT32_MAX || !js_try_get_fast_array_element(
-                                it->obj, static_cast<uint32_t>(idx), &val)) {
-      val = JS_GetPropertyInt64(ctx, it->obj, idx);
+                                iter_obj, static_cast<uint32_t>(idx), &val)) {
+      val = JS_GetPropertyInt64(ctx, iter_obj, idx);
       if (LEPUS_IsException(val)) return LEPUS_EXCEPTION;
     }
     if (it->kind == JS_ITERATOR_KIND_VALUE) {
@@ -20787,15 +20792,17 @@ static LEPUSValue js_regexp_string_iterator_next(LEPUSContext *ctx,
                                                  BOOL *pdone, int magic) {
   JSRegExpStringIteratorData *it;
   LEPUSValueConst R = LEPUS_UNDEFINED, S = LEPUS_UNDEFINED;
+  LEPUSValue iter_val = this_val;
   HandleScope func_scope(ctx, &R, HANDLE_TYPE_LEPUS_VALUE);
   func_scope.PushHandle(&S, HANDLE_TYPE_LEPUS_VALUE);
+  func_scope.PushHandle(&iter_val, HANDLE_TYPE_LEPUS_VALUE);
   LEPUSValue matchStr = LEPUS_UNDEFINED, match = LEPUS_UNDEFINED;
   func_scope.PushHandle(&matchStr, HANDLE_TYPE_LEPUS_VALUE);
   func_scope.PushHandle(&match, HANDLE_TYPE_LEPUS_VALUE);
   JSString *sp;
 
   it = static_cast<JSRegExpStringIteratorData *>(
-      LEPUS_GetOpaque2(ctx, this_val, JS_CLASS_REGEXP_STRING_ITERATOR));
+      LEPUS_GetOpaque2(ctx, iter_val, JS_CLASS_REGEXP_STRING_ITERATOR));
   if (!it) goto exception;
   if (it->done) {
     *pdone = TRUE;
