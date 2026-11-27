@@ -35,12 +35,9 @@ son::node::Node* InterpreterAssembler::TryMalloc(son::node::Node* ctx,
   return result;
 }
 
-son::node::Node* InterpreterAssembler::TryAllocateObject(
-    son::node::Node* ctx, son::node::Node* shape, LEPUSClassID class_id,
-    uint8_t flags, son::node::Label* fail) {
-  auto object = TryMalloc(ctx, IntPtrValue(GetLEPUSObjectAllocSize(class_id)),
-                          ALLOC_TAG_LEPUSObject, fail);
-
+void InterpreterAssembler::InitAllocatedObject(
+    son::node::Node* ctx, son::node::Node* object, son::node::Node* shape,
+    LEPUSClassID class_id, uint8_t flags, bool skip_write_barrier) {
   auto shape_ref_count =
       LoadByteOffset(son::node::MachineType::kInt32, shape, 0);
   StoreByteOffset(son::node::MachineType::kInt32, shape, 0,
@@ -51,12 +48,24 @@ son::node::Node* InterpreterAssembler::TryAllocateObject(
                   AccessBuilder::object_flags_offset(), Int8Value(flags));
   StoreByteOffset(son::node::MachineType::kInt16, object,
                   AccessBuilder::class_id_offset(), Int16Value(class_id));
-  StoreShapeRef(ctx, object, shape);
+  if (skip_write_barrier) {
+    StoreShapeRefNoBarrier(object, shape);
+  } else {
+    StoreShapeRef(ctx, object, shape);
+  }
   auto prop = CastToRaw(
       IntPtrAdd(CastRawToIntPtr(object),
                 IntPtrValue(GetLEPUSObjectInlinePropOffset(class_id))));
   StoreByteOffset(son::node::MachineType::kRawType, object,
                   AccessBuilder::object_prop_offset(), prop);
+}
+
+son::node::Node* InterpreterAssembler::TryAllocateObject(
+    son::node::Node* ctx, son::node::Node* shape, LEPUSClassID class_id,
+    uint8_t flags, son::node::Label* fail) {
+  auto object = TryMalloc(ctx, IntPtrValue(GetLEPUSObjectAllocSize(class_id)),
+                          ALLOC_TAG_LEPUSObject, fail);
+  InitAllocatedObject(ctx, object, shape, class_id, flags, false);
   return object;
 }
 

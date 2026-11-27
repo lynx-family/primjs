@@ -4,11 +4,28 @@
 
 #include "primjs/codegen/llvmCodeGen.h"
 
+#include <llvm/IR/Attributes.h>
 #include <llvm/IR/Module.h>
+#include <llvm/IR/PassManager.h>
 #include <llvm/IR/Verifier.h>
+#include <llvm/Passes/PassBuilder.h>
+#include <llvm/Transforms/InstCombine/InstCombine.h>
+#include <llvm/Transforms/Scalar/ADCE.h>
+#include <llvm/Transforms/Scalar/BDCE.h>
+#include <llvm/Transforms/Scalar/CorrelatedValuePropagation.h>
+#include <llvm/Transforms/Scalar/EarlyCSE.h>
+#include <llvm/Transforms/Scalar/GVN.h>
+#include <llvm/Transforms/Scalar/JumpThreading.h>
+#include <llvm/Transforms/Scalar/LICM.h>
+#include <llvm/Transforms/Scalar/SCCP.h>
+#include <llvm/Transforms/Scalar/SROA.h>
+#include <llvm/Transforms/Scalar/SimplifyCFG.h>
 
+#include <algorithm>
 #include <iostream>
 #include <map>
+#include <string_view>
+#include <unordered_set>
 #include <vector>
 
 #include "llvm-c/Analysis.h"
@@ -20,6 +37,153 @@
 #include "primjs/son/nodeType.h"
 
 namespace primjs {
+
+namespace {
+
+bool IsColdRuntimeCall(son::node::CallId id) {
+  switch (id) {
+    case son::node::CallId::kprim_try_malloc_gc:
+    case son::node::CallId::kfmod:
+    case son::node::CallId::kcall_c_func:
+    case son::node::CallId::kcall_cfunc_func:
+    case son::node::CallId::kcall_cfunc_generic:
+    case son::node::CallId::kcall_cfunc_generic_magic:
+    case son::node::CallId::kcall_getter:
+    case son::node::CallId::kcall_setter:
+    case son::node::CallId::kcall_getter_magic:
+    case son::node::CallId::kcall_setter_magic:
+    case son::node::CallId::kprim_call_c_function_default:
+    case son::node::CallId::kjs_create_ordinary_constructor_this_GC:
+    case son::node::CallId::kDebuggerPause:
+    case son::node::CallId::kDebuggerCallEachOp:
+    case son::node::CallId::kDebuggerCallEachFunc:
+    case son::node::CallId::kprim_debug_trace:
+    case son::node::CallId::kcall_runtime_wrapper:
+      return false;
+    default:
+      return true;
+  }
+}
+
+bool IsColdExtHandler(int call_index) {
+  switch (static_cast<CallBcIndex>(call_index)) {
+    case CallBcIndex::kexception:
+    case CallBcIndex::kexception_spill_top0:
+    case CallBcIndex::kexception_spill_top1:
+    case CallBcIndex::kexception_spill_top0_top1:
+    case CallBcIndex::kSlowCloseVarRefs:
+    case CallBcIndex::kSlowToBoolean:
+    case CallBcIndex::kSlowJSPostInc:
+    case CallBcIndex::kSlowJSNot:
+    case CallBcIndex::kSlowJSAdd:
+    case CallBcIndex::kSlowPutField:
+    case CallBcIndex::kSlowGetArrayEl:
+    case CallBcIndex::kSlowPutArrayEl:
+    case CallBcIndex::kThrowReferenceErrorUninitialized:
+    case CallBcIndex::kThrowThisReferenceError:
+    case CallBcIndex::kThrowTypeErrorNotFunction_Return:
+    case CallBcIndex::kThrowStackOverflow_Return:
+      return true;
+    default:
+      return false;
+  }
+}
+
+bool IsHotHandlerName(std::string_view name) {
+  static const std::unordered_set<std::string_view> kHotExact = {
+      "common_call_asm_h",          "common_return_asm_h",
+      "common_return_direct_asm_h", "common_call_from_entry_asm_h",
+      "call_native_asm_h",          "FastTypedArrayGet_asm_h",
+      "FastTypedArraySet_asm_h",    "FastAddNamedProperty_asm_h",
+      "FastFclosure_asm_h",         "FastStringEqual_asm_h",
+      "FastJSConcatString_asm_h",   "FastCallConstructor_asm_h",
+  };
+  if (kHotExact.count(name) != 0) {
+    return true;
+  }
+
+  // Opcode handlers end with "_0_asm_h", "_1_asm_h", or "_2_asm_h".
+  constexpr std::string_view kSuffix = "_asm_h";
+  if (name.size() <= kSuffix.size() + 2 ||
+      name.substr(name.size() - kSuffix.size()) != kSuffix) {
+    return false;
+  }
+  char table_ch = name[name.size() - kSuffix.size() - 1];
+  if (name[name.size() - kSuffix.size() - 2] != '_' ||
+      (table_ch != '0' && table_ch != '1' && table_ch != '2')) {
+    return false;
+  }
+  std::string_view base = name.substr(0, name.size() - kSuffix.size() - 2);
+  static const std::unordered_set<std::string_view> kHotOpcodes = {
+      "get_loc0",     "get_loc1",     "get_loc2",     "get_loc3",
+      "get_loc8",     "put_loc0",     "put_loc1",     "put_loc2",
+      "put_loc3",     "put_loc8",     "set_loc0",     "set_loc1",
+      "set_loc2",     "set_loc3",     "set_loc8",     "get_arg0",
+      "get_arg1",     "get_arg2",     "get_arg3",     "put_arg0",
+      "put_arg1",     "put_arg2",     "put_arg3",     "get_var_ref0",
+      "get_var_ref1", "get_var_ref2", "get_var_ref3", "put_var_ref0",
+      "put_var_ref1", "put_var_ref2", "put_var_ref3", "push_minus1",
+      "push_0",       "push_1",       "push_2",       "push_3",
+      "push_4",       "push_5",       "push_6",       "push_7",
+      "push_i8",      "push_i16",     "push_i32",     "push_const8",
+      "push_const",   "undefined",    "null",         "push_true",
+      "push_false",   "push_this",    "drop",         "dup",
+      "dup1",         "swap",         "nip",          "add",
+      "sub",          "mul",          "div",          "mod",
+      "and",          "or",           "xor",          "shl",
+      "sar",          "shr",          "neg",          "not",
+      "lnot",         "inc",          "dec",          "post_inc",
+      "post_dec",     "inc_loc",      "dec_loc",      "add_loc",
+      "lt",           "lte",          "gt",           "gte",
+      "eq",           "neq",          "strict_eq",    "strict_neq",
+      "if_false8",    "if_true8",     "if_false",     "if_true",
+      "goto8",        "goto16",       "goto",         "get_field",
+      "get_field2",   "put_field",    "get_array_el", "get_array_el2",
+      "put_array_el", "get_length",   "get_var",      "get_var_undef",
+      "put_var",      "call0",        "call1",        "call2",
+      "call3",        "call",         "call_method",  "call_constructor",
+      "return",       "return_undef", "object",       "array_from",
+      "fclosure8",    "fclosure",     "is_undefined", "is_null",
+      "is_function",  "typeof",
+  };
+  return kHotOpcodes.count(base) != 0;
+}
+
+void ReorderFunctionsHotCold(llvm::Module& module) {
+  std::vector<llvm::Function*> primary_hot_funcs;
+  std::vector<llvm::Function*> secondary_hot_funcs;
+  std::vector<llvm::Function*> cold_funcs;
+  static const std::unordered_set<std::string_view> kSecondaryHot = {
+      "FastTypedArrayGet_asm_h",    "FastTypedArraySet_asm_h",
+      "FastAddNamedProperty_asm_h", "FastFclosure_asm_h",
+      "FastStringEqual_asm_h",      "FastJSConcatString_asm_h",
+      "FastCallConstructor_asm_h",
+  };
+  for (llvm::Function& fn : module) {
+    if (fn.isDeclaration()) {
+      continue;
+    }
+    if (kSecondaryHot.count(fn.getName()) != 0) {
+      secondary_hot_funcs.push_back(&fn);
+    } else if (IsHotHandlerName(fn.getName())) {
+      primary_hot_funcs.push_back(&fn);
+    } else {
+      cold_funcs.push_back(&fn);
+    }
+  }
+  auto& fn_list = module.getFunctionList();
+  for (llvm::Function* fn : primary_hot_funcs) {
+    fn_list.splice(fn_list.end(), fn_list, fn->getIterator());
+  }
+  for (llvm::Function* fn : secondary_hot_funcs) {
+    fn_list.splice(fn_list.end(), fn_list, fn->getIterator());
+  }
+  for (llvm::Function* fn : cold_funcs) {
+    fn_list.splice(fn_list.end(), fn_list, fn->getIterator());
+  }
+}
+
+}  // namespace
 
 void LLVMAssembler::Init(base::Zone* zone, son::CompilationOptions options) {
   _options = options;
@@ -48,18 +212,54 @@ void LLVMAssembler::Deinit() {
 }
 
 void LLVMAssembler::RunPasses() {
-  std::string module_name =
-      llvm::unwrap(_module)->getModuleIdentifier() + ".ll";
+  llvm::Module* mod = llvm::unwrap(_module);
+  std::string module_name = mod->getModuleIdentifier() + ".ll";
 
   LLVMVerifyModule(_module, LLVMAbortProcessAction, &_error);
-  LLVMPassManagerRef funcPass = LLVMCreateFunctionPassManagerForModule(_module);
-  LLVMInitializeFunctionPassManager(funcPass);
-  for (LLVMValueRef fn = LLVMGetFirstFunction(_module); fn;
-       fn = LLVMGetNextFunction(fn)) {
-    LLVMRunFunctionPassManager(funcPass, fn);
+
+  llvm::LoopAnalysisManager lam;
+  llvm::FunctionAnalysisManager fam;
+  llvm::CGSCCAnalysisManager cgam;
+  llvm::ModuleAnalysisManager mam;
+
+  llvm::PassBuilder pb;
+  pb.registerModuleAnalyses(mam);
+  pb.registerCGSCCAnalyses(cgam);
+  pb.registerFunctionAnalyses(fam);
+  pb.registerLoopAnalyses(lam);
+  pb.crossRegisterProxies(lam, fam, cgam, mam);
+
+  llvm::SimplifyCFGOptions cfg_opts;
+  cfg_opts.hoistCommonInsts(false).sinkCommonInsts(false);
+
+  llvm::FunctionPassManager fpm;
+  fpm.addPass(llvm::SimplifyCFGPass(cfg_opts));
+  fpm.addPass(llvm::SROAPass(llvm::SROAOptions::PreserveCFG));
+  fpm.addPass(llvm::EarlyCSEPass(/*UseMemorySSA=*/true));
+  fpm.addPass(llvm::InstCombinePass());
+  fpm.addPass(llvm::JumpThreadingPass());
+  fpm.addPass(llvm::CorrelatedValuePropagationPass());
+  fpm.addPass(llvm::SimplifyCFGPass(cfg_opts));
+  fpm.addPass(llvm::GVNPass());
+  fpm.addPass(llvm::SCCPPass());
+  fpm.addPass(llvm::BDCEPass());
+  fpm.addPass(llvm::InstCombinePass());
+  fpm.addPass(llvm::createFunctionToLoopPassAdaptor(
+      llvm::LICMPass(llvm::LICMOptions()), /*UseMemorySSA=*/true));
+  fpm.addPass(llvm::ADCEPass());
+  fpm.addPass(llvm::SimplifyCFGPass(cfg_opts));
+
+  for (llvm::Function& fn : *mod) {
+    if (!fn.isDeclaration()) {
+      fpm.run(fn, fam);
+    }
   }
-  LLVMFinalizeFunctionPassManager(funcPass);
-  LLVMDisposePassManager(funcPass);
+
+  LLVMVerifyModule(_module, LLVMAbortProcessAction, &_error);
+
+  // Pack frequently executed handlers together at the start of the generated
+  // code block so hot code stays dense in the instruction cache.
+  ReorderFunctionsHotCold(*mod);
 
   // Functions are emitted in module order, so the first function with a body
   // starts the generated code block.
@@ -113,11 +313,18 @@ LLVMValueRef LLVMModule::AddFunction(son::node::CallDescriptorData* desc) {
   if (desc->kind() == son::node::CallKind::kRuntime) {
     LLVMSetLinkage(function, LLVMExternalLinkage);
     LLVMSetFunctionCallConv(function, LLVMCCallConv);
+    if (IsColdRuntimeCall(static_cast<son::node::CallId>(desc->call_index()))) {
+      llvm::unwrap<llvm::Function>(function)->addFnAttr(llvm::Attribute::Cold);
+    }
   } else if (desc->kind() == son::node::CallKind::kStub ||
              desc->has_external_linkage()) {
     LLVMSetVisibility(function, LLVMHiddenVisibility);
   } else {
     LLVMSetLinkage(function, LLVMPrivateLinkage);
+    if (desc->kind() == son::node::CallKind::kBcHandler &&
+        IsColdExtHandler(desc->call_index())) {
+      llvm::unwrap<llvm::Function>(function)->addFnAttr(llvm::Attribute::Cold);
+    }
   }
   _functions[desc->descriptor()] = function;
   return function;

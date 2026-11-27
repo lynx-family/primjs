@@ -95,8 +95,8 @@ class HandlerImpl : public InterpreterAssembler {
                              son::node::Node* call_argv, bool copy_arg,
                              bool from_entry = false);
 
-  using FindPropertyOperation =
-      std::function<void(son::node::Node*, son::node::Node*, son::node::Node*)>;
+  using FindPropertyOperation = std::function<void(
+      son::node::Node*, son::node::Node*, son::node::Node*, son::node::Node*)>;
   void FindProperty(son::node::Node* obj, son::node::Node* atom,
                     son::node::Label* slow, son::node::Label* not_found,
                     const FindPropertyOperation& func);
@@ -118,7 +118,7 @@ class HandlerImpl : public InterpreterAssembler {
   void DispatchAddNamedProperty(son::node::Node* atom);
 
   using FindOwnPropertyOperation =
-      std::function<void(son::node::Node*, son::node::Node*)>;
+      std::function<void(son::node::Node*, son::node::Node*, son::node::Node*)>;
   void FindOwnProperty(son::node::Node* obj, son::node::Node* atom,
                        son::node::Label* fail_exit,
                        const FindOwnPropertyOperation& func);

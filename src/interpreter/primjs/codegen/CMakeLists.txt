@@ -29,6 +29,7 @@ endfunction()
 
 run_llvm_config(LLVM_INCLUDE_DIR --includedir)
 run_llvm_config(LLVM_LIB_DIR --libdir)
+run_llvm_config(LLVM_HAS_RTTI --has-rtti)
 
 run_llvm_config(
   LLVM_LIBS
@@ -120,6 +121,10 @@ target_compile_options(
           -Wno-invalid-constexpr
           -O0
           -g)
+
+if(LLVM_HAS_RTTI STREQUAL "NO")
+  target_compile_options(vm_codegen PRIVATE -fno-rtti)
+endif()
 
 target_link_directories(vm_codegen PRIVATE ${LLVM_LIB_DIR})
 

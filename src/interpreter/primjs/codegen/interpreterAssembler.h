@@ -685,6 +685,9 @@ class InterpreterAssembler : public CodeAssembler {
 
   son::node::Node* TryMalloc(son::node::Node* ctx, son::node::Node* size,
                              int alloc_tag, son::node::Label* fail);
+  void InitAllocatedObject(son::node::Node* ctx, son::node::Node* object,
+                           son::node::Node* shape, LEPUSClassID class_id,
+                           uint8_t flags, bool skip_write_barrier = false);
   son::node::Node* TryAllocateObject(son::node::Node* ctx,
                                      son::node::Node* shape,
                                      LEPUSClassID class_id, uint8_t flags,

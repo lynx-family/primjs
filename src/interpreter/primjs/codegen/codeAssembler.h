@@ -174,17 +174,15 @@ class CodeAssembler : public son::node::GraphBuilder {
   }
 
   son::node::Node* IsUndefinedOrNull(son::node::Node* val) {
-    // (((v).as_int64 & NOT_OTHER_PTR_MASK) == LEPUS_TAG_SEPARABLE_STRING)
-    auto cond1 = IsUndefined(val);
-    auto cond2 = IsNull(val);
-    return BoolOr(cond1, cond2);
+    // VALUE_NULL = 0x02, VALUE_UNDEFINED = 0x12; they differ only at bit 4.
+    auto masked = Int64And(val, Int64Value(~INT64_C(0x10)));
+    return Equal(masked, LepusNull());
   }
 
   son::node::Node* IsLepusBoolean(son::node::Node* val) {
-    // (((v).as_int64 & NOT_OTHER_PTR_MASK) == LEPUS_TAG_SEPARABLE_STRING)
-    auto cond1 = Equal(val, LepusTrue());
-    auto cond2 = Equal(val, LepusFalse());
-    return BoolOr(cond1, cond2);
+    // VALUE_FALSE = 0x06, VALUE_TRUE = 0x07; they differ only at bit 0.
+    auto masked = Int64And(val, Int64Value(~INT64_C(0x1)));
+    return Equal(masked, LepusFalse());
   }
 
   son::node::Node* LoadClassId(son::node::Node* obj) {
@@ -339,9 +337,7 @@ class CodeAssembler : public son::node::GraphBuilder {
     auto val = LoadByteOffset(son::node::MachineType::kInt32, obj, offset);
     int shift = AccessBuilder::object_flags_word_shift() + __builtin_ctz(flag);
     uint32_t mask = getMark(shift, 1);
-    // (value & kMask) >> kShift
-    auto and_val = Int32LSR(Int32And(val, Int32Value(mask)), Int32Value(shift));
-    return Equal(and_val, Int32Value(1));
+    return NotEqual(Int32And(val, Int32Value(mask)), Int32Value(0));
   }
 
   son::node::Node* LoadObjectIsExotic(son::node::Node* obj) {
@@ -712,6 +708,7 @@ class CodeAssembler : public son::node::GraphBuilder {
                        son::node::Node* offset, son::node::Node* value);
   void StoreShapeRef(son::node::Node* ctx, son::node::Node* object,
                      son::node::Node* shape);
+  void StoreShapeRefNoBarrier(son::node::Node* object, son::node::Node* shape);
   void StoreHeapObject(son::node::Node* ctx, son::node::Node* object,
                        int byte_offset, son::node::Node* value) {
     FieldAccess access(son::node::MachineType::kObject, byte_offset, Is32Bit());
@@ -719,6 +716,8 @@ class CodeAssembler : public son::node::GraphBuilder {
   }
   void WriteBarrier(son::node::Node* ctx, son::node::Node* obj,
                     son::node::Node* offset, son::node::Node* value);
+  void WriteBarrierAlwaysPtr(son::node::Node* ctx, son::node::Node* obj,
+                             son::node::Node* offset, son::node::Node* value);
 };
 
 }  // namespace primjs

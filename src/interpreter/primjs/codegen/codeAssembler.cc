@@ -6,14 +6,49 @@
 
 namespace primjs {
 
-void CodeAssembler::WriteBarrier(son::node::Node* ctx, son::node::Node* obj,
-                                 son::node::Node* offset,
-                                 son::node::Node* value) {
+void CodeAssembler::WriteBarrierAlwaysPtr(son::node::Node* ctx,
+                                          son::node::Node* obj,
+                                          son::node::Node* offset,
+                                          son::node::Node* value) {
+  son::node::Label call_barrier(this);
   son::node::Label done(this);
 
   auto con_mark_state = LoadConMarkState(ctx);
   auto cond = Equal(con_mark_state, Int8Value(0));
-  BranchIf(cond, &done, son::node::BranchHint::kTrue);
+  Branch(cond, &done, &call_barrier, son::node::BranchHint::kTrue);
+  Bind(&call_barrier);
+  {
+    auto desc = son::node::CallDescriptors::prim_WriteBarrierNoStore();
+    auto target = FunctionPointer(desc);
+    Call(desc, target, value, ctx);
+    Jump(&done);
+  }
+  Bind(&done);
+}
+
+void CodeAssembler::WriteBarrier(son::node::Node* ctx, son::node::Node* obj,
+                                 son::node::Node* offset,
+                                 son::node::Node* value) {
+  son::node::Label check_value(this);
+  son::node::Label call_barrier(this);
+  son::node::Label done(this);
+
+  auto con_mark_state = LoadConMarkState(ctx);
+  auto cond = Equal(con_mark_state, Int8Value(0));
+  Branch(cond, &done, &check_value, son::node::BranchHint::kTrue);
+  Bind(&check_value);
+  {
+    // Numeric primitives (Int32 and Float64) never need a GC write barrier.
+    // All IEEE-754 doubles satisfy (v - DOUBLE_ENCODE_OFFSET) < 0xfffa<<48,
+    // which keeps INTERNAL_GC_TAG (0xfffd<<48) and all pointer tags covered.
+    auto is_int = IsLepusInt(value);
+    auto f64_shifted = Int64Sub(value, Int64Value(DOUBLE_ENCODE_OFFSET));
+    auto is_float64 =
+        UnsignedLessThan(f64_shifted, Int64Value(UINT64_C(0xfffa000000000000)));
+    Branch(BoolOr(is_int, is_float64), &done, &call_barrier,
+           son::node::BranchHint::kTrue);
+  }
+  Bind(&call_barrier);
   {
     auto desc = son::node::CallDescriptors::prim_WriteBarrierNoStore();
     auto target = FunctionPointer(desc);
@@ -31,14 +66,22 @@ void CodeAssembler::StoreHeapObject(son::node::Node* ctx,
   WriteBarrier(ctx, object, offset, value);
 }
 
+void CodeAssembler::StoreShapeRefNoBarrier(son::node::Node* object,
+                                           son::node::Node* shape) {
+  FieldAccess access(son::node::MachineType::kRawType,
+                     AccessBuilder::shape_offset(), Is32Bit());
+  auto offset = IntValue(access.offset());
+  ReleaseStoreImpl(son::node::MachineType::kRawType, object, offset, shape);
+}
+
 void CodeAssembler::StoreShapeRef(son::node::Node* ctx, son::node::Node* object,
                                   son::node::Node* shape) {
   FieldAccess access(son::node::MachineType::kRawType,
                      AccessBuilder::shape_offset(), Is32Bit());
   auto offset = IntValue(access.offset());
   ReleaseStoreImpl(son::node::MachineType::kRawType, object, offset, shape);
-  WriteBarrier(ctx, object, offset,
-               MakeValue(LEPUS_TAG_SHAPE, CastRawToInt64(shape)));
+  WriteBarrierAlwaysPtr(ctx, object, offset,
+                        MakeValue(LEPUS_TAG_SHAPE, CastRawToInt64(shape)));
 }
 
 void CodeAssembler::Store(son::node::MachineType type, son::node::Node* object,
