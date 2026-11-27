@@ -36193,6 +36193,8 @@ LEPUSValue js_function_apply(LEPUSContext *ctx, LEPUSValueConst this_val,
   if (LEPUS_VALUE_IS_UNDEFINED(array_arg) || LEPUS_VALUE_IS_NULL(array_arg)) {
     return JS_Call_RC(ctx, this_val, this_arg, 0, NULL);
   }
+  ObjectPin func_pin(ctx, this_val);
+  ObjectPin this_pin(ctx, this_arg);
   tab = build_arg_list(ctx, &len, array_arg);
   if (!tab) return LEPUS_EXCEPTION;
   if (magic) {
@@ -38081,33 +38083,50 @@ QJS_STATIC LEPUSValue js_array_iterator_next(LEPUSContext *ctx,
                                              int magic) {
   JSArrayIteratorData *it;
   int64_t len, idx;
-  LEPUSValue val, obj;
+  LEPUSValue val, obj, iter_obj;
   LEPUSObject *p;
 
   it = static_cast<JSArrayIteratorData *>(
       LEPUS_GetOpaque2(ctx, this_val, JS_CLASS_ARRAY_ITERATOR));
-  if (!it) goto fail1;
-  if (LEPUS_IsUndefined(it->obj)) goto done;
+  if (!it) {
+    *pdone = FALSE;
+    return LEPUS_EXCEPTION;
+  }
+  if (LEPUS_IsUndefined(it->obj)) {
+    *pdone = TRUE;
+    return LEPUS_UNDEFINED;
+  }
+
+  /* Pin both the iterator and a snapshot of its source across length and
+     indexed-property lookups, which can reenter JS and exhaust or release this
+     iterator. */
+  ObjectPin iter_pin(ctx, this_val);
+  iter_obj = it->obj;
+  ObjectPin source_pin(ctx, iter_obj);
 
 #ifdef ENABLE_LEPUSNG
-  if (LEPUS_VALUE_IS_LEPUS_REF(it->obj)) {
-    len = ctx->rt->js_callbacks_.get_length(ctx, it->obj);
+  if (LEPUS_VALUE_IS_LEPUS_REF(iter_obj)) {
+    len = ctx->rt->js_callbacks_.get_length(ctx, iter_obj);
   } else {
 #endif
 
-    p = LEPUS_VALUE_GET_OBJ(it->obj);
+    p = LEPUS_VALUE_GET_OBJ(iter_obj);
     if (p->class_id >= JS_CLASS_UINT8C_ARRAY &&
         p->class_id <= JS_CLASS_BIG_UINT64_ARRAY) {
       if (typed_array_is_detached(ctx, p)) {
         JS_ThrowTypeErrorDetachedArrayBuffer(ctx);
-        goto fail1;
+        *pdone = FALSE;
+        return LEPUS_EXCEPTION;
       }
       len = p->u.array.count;
     } else {
-      if (js_get_length64(ctx, &len, it->obj)) {
-      fail1:
+      if (js_get_length64(ctx, &len, iter_obj)) {
         *pdone = FALSE;
         return LEPUS_EXCEPTION;
+      }
+      if (LEPUS_IsUndefined(it->obj)) {
+        *pdone = TRUE;
+        return LEPUS_UNDEFINED;
       }
     }
 
@@ -38121,7 +38140,6 @@ QJS_STATIC LEPUSValue js_array_iterator_next(LEPUSContext *ctx,
        FinalizationRegistry callbacks can synchronously call next() on this
        iterator. */
     set_value(ctx, &it->obj, LEPUS_UNDEFINED);
-  done:
     *pdone = TRUE;
     return LEPUS_UNDEFINED;
   }
@@ -38130,7 +38148,7 @@ QJS_STATIC LEPUSValue js_array_iterator_next(LEPUSContext *ctx,
   if (it->kind == JS_ITERATOR_KIND_KEY) {
     return LEPUS_NewInt64(ctx, idx);
   } else {
-    val = JS_GetPropertyInt64(ctx, it->obj, idx);
+    val = JS_GetPropertyInt64(ctx, iter_obj, idx);
     if (LEPUS_IsException(val)) return LEPUS_EXCEPTION;
     if (it->kind == JS_ITERATOR_KIND_VALUE) {
       return val;
@@ -41558,11 +41576,15 @@ QJS_STATIC LEPUSValue js_regexp_string_iterator_next(LEPUSContext *ctx,
 
   it = static_cast<JSRegExpStringIteratorData *>(
       LEPUS_GetOpaque2(ctx, this_val, JS_CLASS_REGEXP_STRING_ITERATOR));
-  if (!it) goto exception;
+  if (!it) {
+    *pdone = FALSE;
+    return LEPUS_EXCEPTION;
+  }
   if (it->done) {
     *pdone = TRUE;
     return LEPUS_UNDEFINED;
   }
+  ObjectPin iter_pin(ctx, this_val);
   R = it->iterating_regexp;
   S = it->iterated_string;
   match = JS_RegExpExec(ctx, R, S);
@@ -44672,7 +44694,15 @@ QJS_STATIC LEPUSValue js_json_stringify_opt(LEPUSContext *ctx,
     if (JS_ToInt32Clamp(ctx, &n, space, 0, 10, 0)) goto exception;
     jsc->gap = LEPUS_NewStringLen(ctx, "          ", n);
   } else if (LEPUS_IsString(space)) {
-    JSString *p = LEPUS_VALUE_GET_STRING(space);
+    LEPUSValueConst flat_space = space;
+    if (JS_IsSeparableString(space)) {
+      flat_space = JS_GetSeparableStringContentNotDup(ctx, space);
+      if (LEPUS_IsException(flat_space)) {
+        LEPUS_FreeValue(ctx, space);
+        goto exception;
+      }
+    }
+    JSString *p = LEPUS_VALUE_GET_STRING(flat_space);
     jsc->gap = js_sub_string(ctx, p, 0, min_int(p->len, 10));
   } else {
     jsc->gap = LEPUS_DupValue(ctx, jsc->empty);
@@ -44778,6 +44808,8 @@ QJS_STATIC LEPUSValue js_reflect_construct(LEPUSContext *ctx,
   } else {
     new_target = func;
   }
+  ObjectPin func_pin(ctx, func);
+  ObjectPin target_pin(ctx, new_target);
   tab = build_arg_list(ctx, &len, array_arg);
   if (!tab) return LEPUS_EXCEPTION;
   ret = LEPUS_CallConstructor2(ctx, func, new_target, len,

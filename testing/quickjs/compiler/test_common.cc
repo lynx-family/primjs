@@ -4875,4 +4875,248 @@ TEST(ArrayBufferTest, DetachedBufferIsReleasedOnce) {
   EXPECT_EQ(release_count, 1);
 }
 
+// JSON.stringify used to treat a separable indentation string as a flat
+// JSString in reference-counting mode, reading rope node fields (or past the
+// node for wide ropes) into the formatted output.
+TEST_F(CommonQjsTest, JsonStringifySeparableStringSpace) {
+  EvalOrFail(ctx_, R"(
+    function makeRope(left, right) {
+      return left + right;
+    }
+
+    // Short 8-bit rope (length <= 10, hits the full-length substring branch).
+    var shortRope = makeRope('  ', '--');
+    if (JSON.stringify({a: 1}, null, shortRope) !== '{\n  --"a": 1\n}')
+      throw new Error('short 8-bit rope space failed');
+
+    // Long 8-bit rope (length > 10, clamped to 10 characters; left_op holds a
+    // heap flat string whose pointer bytes must never leak into the indent).
+    var marker = '0123456789abcdef'.slice(0);
+    var longRope = makeRope(marker, 'tail');
+    if (JSON.stringify({a: 1}, null, longRope) !== '{\n0123456789"a": 1\n}')
+      throw new Error('long 8-bit rope space leaked or misformatted');
+
+    // Wide 16-bit ropes (short and > 10 chars, which previously read past the
+    // end of JSSeparableString).
+    var shortWideRope = makeRope('\u00a0\u00a0', '\u4e2d\u6587');
+    if (JSON.stringify([1], null, shortWideRope) !==
+        '[\n\u00a0\u00a0\u4e2d\u65871\n]') {
+      throw new Error('short wide rope space failed');
+    }
+
+    var longWideRope = makeRope('ab', '\u4e2d'.repeat(12));
+    var expectedIndent = 'ab' + '\u4e2d'.repeat(8);
+    if (JSON.stringify([1], null, longWideRope) !==
+        '[\n' + expectedIndent + '1\n]') {
+      throw new Error('long wide rope space failed');
+    }
+
+    // Multi-level rope and boxed String wrapper over a rope.
+    var deepRope = makeRope(makeRope('..', '++'), makeRope('==', '~~~~~~~~'));
+    if (JSON.stringify({k: 2}, null, deepRope) !== '{\n..++==~~~~"k": 2\n}')
+      throw new Error('deep rope space failed');
+    if (JSON.stringify({k: 2}, null, new String(deepRope)) !==
+        '{\n..++==~~~~"k": 2\n}') {
+      throw new Error('boxed rope space failed');
+    }
+  )");
+
+  // OOM while linearizing a large separable space string must neither leak nor
+  // corrupt the rope.
+  EvalOrFail(ctx_, R"(
+    var piece = ' '.repeat(1 << 16);
+    globalThis.oomSpaceRope = piece;
+    for (var i = 0; i < 64; i++) globalThis.oomSpaceRope += piece;
+  )");
+  LEPUS_RunGC(rt_);
+  LEPUS_SetMemoryLimit(rt_, LEPUS_GetHeapSize(rt_) + (1 << 19));
+  EvalOrFail(ctx_, R"(
+    var caught = false;
+    try {
+      JSON.stringify({a: 1}, null, globalThis.oomSpaceRope);
+    } catch (e) {
+      caught = e instanceof InternalError;
+    }
+    globalThis.oomSpaceCaught = caught;
+  )");
+  LEPUS_SetMemoryLimit(rt_, SIZE_MAX);
+  EvalOrFail(ctx_, R"(
+    if (!globalThis.oomSpaceCaught)
+      throw new Error('expected OOM while flattening space rope');
+    if (JSON.stringify({a: 1}, null, globalThis.oomSpaceRope) !==
+        '{\n          "a": 1\n}') {
+      throw new Error('space rope corrupted after OOM');
+    }
+    delete globalThis.oomSpaceRope;
+    delete globalThis.oomSpaceCaught;
+  )");
+}
+
+// Array Iterator next() and indirect function-call paths must keep both the
+// iterator and any borrowed source/receiver/callee alive across reentrant JS.
+TEST_F(CommonQjsTest, ArrayIteratorAndCallReentrancyKeepTargetsAlive) {
+  AddCollect(ctx_);
+  EvalOrFail(ctx_, R"(
+    // 1. Sole-owned closure source invoked through Function.prototype.call as
+    //    an indexed getter while nested iterator.next() exhausts it->obj.
+    function checkClosureSource(method, mutateCapture) {
+      var state = { iterator: null, reclaimer: [] };
+      function makeVictim() {
+        var captured = { tag: 42 };
+        return function (a) {
+          var nested = state.iterator.next();
+          if (!nested.done || nested.value !== undefined)
+            throw new Error('nested next should exhaust iterator');
+          // Attempt to reclaim a 1-slot var_refs allocation.
+          state.reclaimer[0] = 1.25;
+          collect();
+          if (mutateCapture) captured = { tag: 99 };
+          return captured.tag;
+        };
+      }
+      state.iterator = (function () {
+        var victim = makeVictim();
+        Object.defineProperty(victim, 0, {
+          get: Function.prototype.call,
+          configurable: true
+        });
+        return Array.prototype[method].call(victim);
+      })();
+      var step = state.iterator.next();
+      if (step.done) throw new Error('outer next unexpectedly done');
+      var expected = mutateCapture ? 99 : 42;
+      if (method === 'entries') {
+        if (step.value[0] !== 0 || step.value[1] !== expected)
+          throw new Error('bad entries result: ' + step.value);
+      } else if (step.value !== expected) {
+        throw new Error('bad values result: ' + step.value);
+      }
+      var after = state.iterator.next();
+      if (!after.done || after.value !== undefined)
+        throw new Error('iterator must stay exhausted');
+    }
+    for (var method of ['values', 'entries', Symbol.iterator]) {
+      checkClosureSource(method, false);
+      checkClosureSource(method, true);
+    }
+
+    // 2. Sole-owned BoundFunction source invoked via Function.prototype.call /
+    //    Function.prototype.apply when iterator exhaustion drops it->obj.
+    for (var helper of [Function.prototype.call, Function.prototype.apply]) {
+      var boundState = { iterator: null };
+      boundState.iterator = (function () {
+        var inner = function (boundArg) {
+          boundState.iterator.next();
+          collect();
+          return this.base + boundArg;
+        };
+        var bound = inner.bind({ base: 10 }, 7);
+        Object.defineProperty(bound, 'length', { value: 1 });
+        Object.defineProperty(bound, 0, { get: helper });
+        return Array.prototype.values.call(bound);
+      })();
+      var r = boundState.iterator.next();
+      if (r.done || r.value !== 17)
+        throw new Error('bound source reentry failed');
+    }
+
+    // 3. Reentrant exhaustion inside the length getter must not read elements
+    //    from undefined or revive an already-exhausted iterator.
+    var lenIter;
+    var firstLen = true;
+    var lenSource = {
+      get length() {
+        if (firstLen) {
+          firstLen = false;
+          var inner = lenIter.next();
+          if (!inner.done) throw new Error('inner next should exhaust');
+          collect();
+          return 4;
+        }
+        return 0;
+      },
+      0: 'unreachable'
+    };
+    lenIter = Array.prototype.values.call(lenSource);
+    var lenStep = lenIter.next();
+    if (!lenStep.done || lenStep.value !== undefined)
+      throw new Error('exhausted iterator revived after length getter');
+
+    // 4. Sole-owned ArrayIterator used as receiver of %ArrayIteratorPrototype%.next
+    //    when its last reference is dropped inside the source's getter.
+    var arrayIterNext = [].values().next;
+    for (var iterMethod of ['values', 'entries']) {
+      var outerIter = (function () {
+        var innerSource = {
+          length: 1,
+          get 0() {
+            outerIter.next();
+            collect();
+            return 77;
+          }
+        };
+        var soleIter = Array.prototype[iterMethod].call(innerSource);
+        Object.defineProperty(soleIter, 'length', { value: 1 });
+        Object.defineProperty(soleIter, 0, { get: arrayIterNext });
+        return Array.prototype.values.call(soleIter);
+      })();
+      var outerStep = outerIter.next();
+      if (outerStep.done || outerStep.value.done)
+        throw new Error('sole-owned array iterator failed');
+      var yielded = outerStep.value.value;
+      if (iterMethod === 'entries') {
+        if (yielded[0] !== 0 || yielded[1] !== 77)
+          throw new Error('sole-owned entries iterator mismatch');
+      } else if (yielded !== 77) {
+        throw new Error('sole-owned values iterator mismatch');
+      }
+    }
+
+    // 5. Sole-owned RegExpStringIterator whose last reference is dropped inside
+    //    custom exec().
+    var regExpIterNext = 'a'.matchAll(/a/g).next;
+    var rxOuter = (function () {
+      var customRe = /a/g;
+      customRe.exec = function () {
+        rxOuter.next();
+        collect();
+        customRe.exec = function () { return null; };
+        return ['a'];
+      };
+      var soleRxIter = 'a'.matchAll(customRe);
+      Object.defineProperty(soleRxIter, 'length', { value: 1 });
+      Object.defineProperty(soleRxIter, 0, { get: regExpIterNext });
+      return Array.prototype.values.call(soleRxIter);
+    })();
+    var rxStep = rxOuter.next();
+    if (rxStep.done || rxStep.value.done || rxStep.value.value[0] !== 'a')
+      throw new Error('sole-owned regexp string iterator failed');
+
+    // 6. Function.prototype.apply and Reflect.construct building argument lists
+    //    whose getters run GC and mutate surrounding holders.
+    var applyArgs = {
+      get length() {
+        collect();
+        return 2;
+      },
+      0: 10,
+      1: 20
+    };
+    var applyRes = (function (a, b) {
+      return this.tag + a + b;
+    }).apply({ tag: 5 }, applyArgs);
+    if (applyRes !== 35)
+      throw new Error('apply with reentrant arg list failed');
+
+    function Ctor(a, b) {
+      this.sum = a + b;
+    }
+    function NewTarget() {}
+    NewTarget.prototype = { marker: 7 };
+    var constructed = Reflect.construct(Ctor, applyArgs, NewTarget);
+    if (constructed.sum !== 30 || constructed.marker !== 7)
+      throw new Error('Reflect.construct with reentrant arg list failed');
+  )");
+}
+
 }  // namespace common_qjs_test
