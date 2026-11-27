@@ -215,35 +215,12 @@ void HandlerImpl::GenBinaryArithOp(PrimjsOpcode opcode) {
   }
   Bind(&slow);
   {
+    ClearNewSp();
     if ((opcode == PrimjsOpcode::OP_add_loc) ||
         (opcode == PrimjsOpcode::OP_add)) {
-      son::node::Label not_string(this);
-      auto cond1 = IsLepusString(op1);
-      auto cond2 = IsLepusString(op2);
-      BranchIfFalse(BoolAnd(cond1, cond2), &not_string);
-      {
-        ClearNewSp();
-        DispatchWithIdArg0(
-            CallBcIndex::kFastJSConcatString,
-            Int64Value(opcode == PrimjsOpcode::OP_add_loc ? 1 : 0));
-      }
-      Bind(&not_string);
-    }
-    ClearNewSp();
-    if (opcode == PrimjsOpcode::OP_add_loc) {
-      auto desc = son::node::CallDescriptors::prim_js_add_slow_gc();
-
-      auto res = CallRuntime(desc, GetCtx(), op1, op2);
-      auto var_buf = RestoreVarBuf();
-      DecSp();
-      StoreLepusVal(var_buf, Fetch_8(0), res);
-      Dispatch(opcode);
-    } else if (opcode == PrimjsOpcode::OP_add) {
-      auto desc = son::node::CallDescriptors::prim_js_add_slow_gc();
-      auto res = CallRuntime(desc, GetCtx(), op1, op2);
-      DecSp();
-      StoreTop0(res);
-      Dispatch(opcode);
+      DispatchWithIdArg0(
+          CallBcIndex::kSlowJSAdd,
+          Int64Value(opcode == PrimjsOpcode::OP_add_loc ? 1 : 0));
     } else {
       auto desc = son::node::CallDescriptors::prim_js_binary_arith_slow_gc();
       auto res = CallRuntime(desc, GetCtx(), op1, op2, Int8Value((int)opcode));
@@ -428,16 +405,14 @@ void HandlerImpl::GenCompareOp(PrimjsOpcode opcode) {
         break;
       case PrimjsOpcode::OP_strict_eq:
       case PrimjsOpcode::OP_eq: {
-        auto cond1 = Equal(f_op1, f_op2);
-        auto cond2 = DoubleNotNaN(f_op1);
-        res = BoolAnd(cond1, cond2);
+        // Float64 Equal emits ordered equality (fcmp oeq), which is already
+        // false when either operand is NaN.
+        res = Equal(f_op1, f_op2);
         break;
       }
       case PrimjsOpcode::OP_strict_neq:
       case PrimjsOpcode::OP_neq: {
-        auto cond1 = Equal(f_op1, f_op2);
-        auto cond2 = DoubleNotNaN(f_op1);
-        res = BoolNot(BoolAnd(cond1, cond2));
+        res = BoolNot(Equal(f_op1, f_op2));
         break;
       }
       default:
@@ -672,25 +647,14 @@ void HandlerImpl::GenCompareOp(PrimjsOpcode opcode) {
 void HandlerImpl::WrapUnaryEntry(son::node::Node* op1, son::node::Label* is_int,
                                  son::node::Label* is_float64,
                                  son::node::Label* slow) {
-  son::node::Label not_ptr(this);
-  // 0xffff000000000000ll
-  auto ptr_tag = Int64Value(LEPUS_PTR_TAG);
-  // 0xfffe000000000000
-  auto numer_tag = Int64Value(NUMBER_TAG);
-  auto cond = UnsignedLessThan(op1, ptr_tag);
-  Branch(cond, &not_ptr, slow, son::node::BranchHint::kTrue);
-  Bind(&not_ptr);
+  son::node::Label not_int(this);
+  Branch(IsLepusInt(op1), is_int, &not_int, son::node::BranchHint::kTrue);
+  Bind(&not_int);
   {
-    son::node::Label op1_not_int(this);
-    cond = UnsignedLessThan(op1, numer_tag);
-    Branch(cond, &op1_not_int, is_int, son::node::BranchHint::kFalse);
-    Bind(&op1_not_int);
-    {
-      auto and_val = Int64And(op1, numer_tag);
-      cond = Equal(and_val, Int64Value(0));
-      // not other ptr
-      Branch(cond, slow, is_float64, son::node::BranchHint::kFalse);
-    }
+    auto shifted = Int64Sub(op1, Int64Value(DOUBLE_ENCODE_OFFSET));
+    auto cond =
+        UnsignedLessThan(shifted, Int64Value(UINT64_C(0xfffc000000000000)));
+    Branch(cond, is_float64, slow, son::node::BranchHint::kTrue);
   }
 }
 
@@ -698,75 +662,50 @@ void HandlerImpl::WrapBinaryEntry(son::node::Node* op1, son::node::Node* op2,
                                   son::node::Label* both_is_int,
                                   son::node::Label* slow,
                                   const BinaryOperation& binary_op) {
-  son::node::Label not_ptr(this);
-  son::node::Label op1_not_int(this);
-  son::node::Label op1_int(this);
-  son::node::Label op1_int_op2_not_int(this);
-  son::node::Label op1_float64_op2_not_int(this);
+  son::node::Label not_both_int(this);
+  son::node::Label both_float64(this);
+  son::node::Label check_mixed(this);
+  son::node::Label mixed_number(this);
+  son::node::Label left_float_right_int(this);
+  son::node::Label left_int_right_float(this);
 
-  // 0xffff000000000000ll
-  auto ptr_tag = Int64Value(LEPUS_PTR_TAG);
-  // 0xfffe000000000000
-  auto numer_tag = Int64Value(NUMBER_TAG);
-  auto cond1 = UnsignedLessThan(op1, ptr_tag);
-  auto cond2 = UnsignedLessThan(op2, ptr_tag);
-  auto cond = BoolAnd(cond1, cond2);
-  Branch(cond, &not_ptr, slow, son::node::BranchHint::kTrue);
-  Bind(&not_ptr);
+  // Combine both Int32 tag checks into a single branch: upper 16 bits of both
+  // operands equal 0xfffe iff ((op1 ^ NUMBER_TAG) | (op2 ^ NUMBER_TAG)) has
+  // zero upper 16 bits.
+  auto x1 = Int64Xor(op1, Int64Value(NUMBER_TAG));
+  auto x2 = Int64Xor(op2, Int64Value(NUMBER_TAG));
+  auto tag_diff = Int64And(Int64Or(x1, x2), Int64Value(NOT_NUMBER_MASK));
+  Branch(Equal(tag_diff, Int64Value(0)), both_is_int, &not_both_int,
+         son::node::BranchHint::kTrue);
+
+  Bind(&not_both_int);
   {
-    cond = UnsignedLessThan(op1, numer_tag);
-    Branch(cond, &op1_not_int, &op1_int, son::node::BranchHint::kFalse);
-    Bind(&op1_int);
-    {
-      cond = UnsignedLessThan(op2, numer_tag);
-      Branch(cond, &op1_int_op2_not_int, both_is_int,
-             son::node::BranchHint::kFalse);
-    }
-    Bind(&op1_not_int);
-    {
-      son::node::Label op1_float64(this);
-      son::node::Label op1_float64_op2_int(this);
+    auto d1 = Int64Sub(op1, Int64Value(DOUBLE_ENCODE_OFFSET));
+    auto d2 = Int64Sub(op2, Int64Value(DOUBLE_ENCODE_OFFSET));
+    auto num_limit = Int64Value(UINT64_C(0xfffd000000000000));
+    auto both_num = BoolAnd(UnsignedLessThan(d1, num_limit),
+                            UnsignedLessThan(d2, num_limit));
+    Branch(both_num, &check_mixed, slow, son::node::BranchHint::kTrue);
 
-      auto and_val = Int64And(op1, numer_tag);
-      cond = Equal(and_val, Int64Value(0));
-      // not other ptr
-      Branch(cond, slow, &op1_float64, son::node::BranchHint::kFalse);
-      Bind(&op1_float64);
+    Bind(&check_mixed);
+    {
+      auto f64_limit = Int64Value(UINT64_C(0xfffc000000000000));
+      auto d1_is_f64 = UnsignedLessThan(d1, f64_limit);
+      Branch(d1_is_f64, &mixed_number, &left_int_right_float,
+             son::node::BranchHint::kTrue);
+
+      Bind(&mixed_number);
       {
-        cond = UnsignedLessThan(op2, numer_tag);
-        Branch(cond, &op1_float64_op2_not_int, &op1_float64_op2_int,
-               son::node::BranchHint::kFalse);
-        Bind(&op1_float64_op2_int);
-        {
-          // 2 is int
-          binary_op(BinaryOpState::kLeftFloat64RightInt);
-        }
+        auto d2_is_f64 = UnsignedLessThan(d2, f64_limit);
+        Branch(d2_is_f64, &both_float64, &left_float_right_int,
+               son::node::BranchHint::kTrue);
       }
-    }
-    Bind(&op1_int_op2_not_int);
-    {
-      son::node::Label op2_is_float64(this);
-
-      auto and_val = Int64And(op2, numer_tag);
-      cond = Equal(and_val, Int64Value(0));
-      // not other ptr
-      Branch(cond, slow, &op2_is_float64, son::node::BranchHint::kFalse);
-      Bind(&op2_is_float64);
-      {
-        // 1 is int
-        binary_op(BinaryOpState::kLeftIntRightFloat64);
-      }
-    }
-    Bind(&op1_float64_op2_not_int);
-    {
-      son::node::Label op2_is_float64(this);
-
-      auto and_val = Int64And(op2, numer_tag);
-      cond = Equal(and_val, Int64Value(0));
-      // not other ptr
-      Branch(cond, slow, &op2_is_float64, son::node::BranchHint::kFalse);
-      Bind(&op2_is_float64);
+      Bind(&both_float64);
       { binary_op(BinaryOpState::kBothFloat64); }
+      Bind(&left_float_right_int);
+      { binary_op(BinaryOpState::kLeftFloat64RightInt); }
+      Bind(&left_int_right_float);
+      { binary_op(BinaryOpState::kLeftIntRightFloat64); }
     }
   }
 }
@@ -1005,49 +944,35 @@ void HandlerImpl::GenNotOp(PrimjsOpcode opcode) {
 }
 
 void HandlerImpl::GenLNotOp(PrimjsOpcode opcode) {
-  // op1 = sp[-1];
-  // int64_t tag = LEPUS_VALUE_GET_TAG(op1);
-  // if (tag == LEPUS_TAG_BOOL) {
-  //   res = LEPUS_VALUE_GET_BOOL(op1);
-  // } else if (tag == LEPUS_TAG_INT) {
-  //   res = LEPUS_VALUE_GET_INT(op1);
-  // } else if (tag == LEPUS_TAG_UNDEFINED) {
-  //   res = 0;
-  // } else if (tag == LEPUS_TAG_NULL) {
-  //   res = 0;
-  // } else {
-  //   res = JS_ToBoolFree_GC(ctx, op1);
-  // }
-  // sp[-1] = LEPUS_NewBool(ctx, !res);
-  son::node::Label is_bool_false(this);
+  son::node::Label is_bool(this);
+  son::node::Label not_bool(this);
   son::node::Label is_int(this);
-  son::node::Label is_undefined_or_null(this);
+  son::node::Label not_int(this);
   son::node::Label to_boolean(this);
   son::node::Label if_false(this);
   son::node::Label if_true(this);
   son::node::Label done(this);
 
   auto op1 = LoadTop0();
-  auto cond = Equal(op1, LepusTrue());
-  Branch(cond, &if_true, &is_bool_false);
-  Bind(&is_bool_false);
+  auto bool_diff = Int64Sub(op1, LepusFalse());
+  Branch(UnsignedLessThanOrEqual(bool_diff, Int64Value(1)), &is_bool, &not_bool,
+         son::node::BranchHint::kTrue);
+  Bind(&is_bool);
+  { Branch(Equal(bool_diff, Int64Value(0)), &if_false, &if_true); }
+  Bind(&not_bool);
   {
-    cond = Equal(op1, LepusFalse());
-    Branch(cond, &if_false, &is_undefined_or_null);
-  }
-  Bind(&is_undefined_or_null);
-  {
-    auto cond1 = Equal(op1, LepusUndefined());
-    auto cond2 = Equal(op1, LepusNull());
-    auto cond3 = Equal(op1, Int64Value(AccessBuilder::JS_NewInt32(0)));
-    cond = BoolOr(cond1, cond2);
-    Branch(BoolOr(cond, cond3), &if_false, &is_int);
-  }
-  Bind(&is_int);
-  {
-    cond = IsLepusInt(op1);
-    // not int 0
-    Branch(cond, &if_true, &to_boolean, son::node::BranchHint::kTrue);
+    Branch(IsLepusInt(op1), &is_int, &not_int, son::node::BranchHint::kTrue);
+    Bind(&is_int);
+    { Branch(Equal(GetLepusInt(op1), IntValue(0)), &if_false, &if_true); }
+    Bind(&not_int);
+    {
+      son::node::Label check_object(this);
+      Branch(IsUndefinedOrNull(op1), &if_false, &check_object,
+             son::node::BranchHint::kTrue);
+      Bind(&check_object);
+      Branch(IsLepusObject(op1), &if_true, &to_boolean,
+             son::node::BranchHint::kTrue);
+    }
   }
   Bind(&to_boolean);
   { DispatchWithIdArg0(CallBcIndex::kSlowToBoolean, op1); }
@@ -1066,68 +991,54 @@ void HandlerImpl::GenLNotOp(PrimjsOpcode opcode) {
 }
 
 void HandlerImpl::GenIfBranch(PrimjsOpcode opcode) {
-  // int res;
-  // LEPUSValue op1;
-
-  // op1 = sp[-1];
-  // pc += 4;
-  // int64_t tag = LEPUS_VALUE_GET_TAG(op1);
-  // if (tag == LEPUS_TAG_BOOL) {
-  //   res = LEPUS_VALUE_GET_BOOL(op1);
-  // } else if (tag == LEPUS_TAG_INT) {
-  //   res = LEPUS_VALUE_GET_INT(op1);
-  // } else if (tag == LEPUS_TAG_UNDEFINED) {
-  //   res = 0;
-  // } else if (tag == LEPUS_TAG_NULL) {
-  //   res = 0;
-  // } else {
-  //   res = JS_ToBoolFree_GC(ctx, op1);
-  // }
-  // sp--;
-  // if (res) {
-  //   pc += (int32_t)get_u32(pc - 4) - 4;
-  // }
   bool branch_condition = (opcode == PrimjsOpcode::OP_if_true8) ||
                           (opcode == PrimjsOpcode::OP_if_true);
-  son::node::Label is_bool_false(this);
-  son::node::Label check_is_int(this);
-  son::node::Label is_undefined_or_null(this);
+  son::node::Label is_bool(this);
+  son::node::Label not_bool(this);
+  son::node::Label is_int(this);
+  son::node::Label not_int(this);
+  son::node::Label check_object(this);
+  son::node::Label check_float64(this);
+  son::node::Label is_float64(this);
   son::node::Label to_boolean(this);
   son::node::Label if_false(this);
   son::node::Label if_true(this);
 
   auto op1 = LoadTop0();
   DecSp();
-  auto cond = Equal(op1, LepusTrue());
-  Branch(cond, &if_true, &is_bool_false);
-  Bind(&is_bool_false);
+  auto bool_diff = Int64Sub(op1, LepusFalse());
+  Branch(UnsignedLessThanOrEqual(bool_diff, Int64Value(1)), &is_bool, &not_bool,
+         son::node::BranchHint::kTrue);
+  Bind(&is_bool);
+  { Branch(Equal(bool_diff, Int64Value(0)), &if_false, &if_true); }
+  Bind(&not_bool);
   {
-    cond = Equal(op1, LepusFalse());
-    Branch(cond, &if_false, &is_undefined_or_null);
-  }
-  Bind(&is_undefined_or_null);
-  {
-    auto cond1 = Equal(op1, LepusUndefined());
-    auto cond2 = Equal(op1, LepusNull());
-    auto cond3 = Equal(op1, Int64Value(AccessBuilder::JS_NewInt32(0)));
-    cond = BoolOr(cond1, cond2);
-    Branch(BoolOr(cond, cond3), &if_false, &check_is_int);
-  }
-  Bind(&check_is_int);
-  {
-    son::node::Label is_float64(this);
-    // not int 0
-    WrapUnaryEntry(op1, &if_true, &is_float64, &to_boolean);
-    cond = IsLepusInt(op1);
-
-    Bind(&is_float64);
+    Branch(IsLepusInt(op1), &is_int, &not_int, son::node::BranchHint::kTrue);
+    Bind(&is_int);
+    { Branch(Equal(GetLepusInt(op1), IntValue(0)), &if_false, &if_true); }
+    Bind(&not_int);
     {
-      // return !isnan(d) && d != 0;
-      auto op1_float64_val = GetLepusFloat64(op1);
-      auto cond1 = NotEqual(op1_float64_val, DoubleValue(0.0));
-      auto cond2 = DoubleNotNaN(op1_float64_val);
-      cond = BoolAnd(cond1, cond2);
-      Branch(cond, &if_true, &if_false);
+      Branch(IsUndefinedOrNull(op1), &if_false, &check_object,
+             son::node::BranchHint::kTrue);
+    }
+    Bind(&check_object);
+    {
+      Branch(IsLepusObject(op1), &if_true, &check_float64,
+             son::node::BranchHint::kTrue);
+    }
+    Bind(&check_float64);
+    {
+      auto shifted = Int64Sub(op1, Int64Value(DOUBLE_ENCODE_OFFSET));
+      Branch(
+          UnsignedLessThan(shifted, Int64Value(UINT64_C(0xfffc000000000000))),
+          &is_float64, &to_boolean, son::node::BranchHint::kFalse);
+      Bind(&is_float64);
+      {
+        // Ordered not-equal (fcmp one) with 0.0 is false for both NaN and +/-0.
+        auto op1_float64_val = BitCastInt64ToDouble(shifted);
+        Branch(NotEqual(op1_float64_val, DoubleValue(0.0)), &if_true,
+               &if_false);
+      }
     }
   }
   if (branch_condition) {
@@ -1366,18 +1277,27 @@ void HandlerImpl::FindOwnProperty(
     Bind(&next);
     {
       // pr = &prop[h - 1];
+      static_assert(sizeof(JSShapeProperty) == 8,
+                    "JSShapeProperty must be 8 bytes");
+      static_assert(offsetof(JSShapeProperty, atom) == 4,
+                    "JSShapeProperty::atom must be in the high 32-bit word");
       auto offset = Int32Mul(Int32Add(*var_h, IntValue(-1)),
                              Int32Value(sizeof(JSShapeProperty)));
       pr = CastToRaw(IntPtrAdd(prop, ZExtInt32ToIntPtr(offset)));
+      // Load hash_next/flags (low 32 bits) and atom (high 32 bits) together
+      // so a hit has flags in a register without a second memory load.
+      auto entry = LoadImpl(son::node::MachineType::kInt64, pr, IntValue(0));
+      auto pr_atom = TruncInt64ToInt32(Int64URshift(entry, Int64Value(32)));
+      auto pr_meta = TruncInt64ToInt32(entry);
       // if (likely(pr->atom == atom)) {
-      auto cond = Equal(LoadJsShapePropertyAtom(pr), atom);
-      Branch(cond, &exit, &next1, son::node::BranchHint::kFalse);
+      auto cond = Equal(pr_atom, atom);
+      Branch(cond, &exit, &next1, son::node::BranchHint::kTrue);
       Bind(&next1);
       // h = pr->hash_next;
-      var_h = LoadJsShapePropertyHashNext(pr);
+      var_h = Int32And(pr_meta, Int32Value((1u << 26) - 1));
       Jump(&loop);
       Bind(&exit);
-      { get_property_value(pr, *var_h); }
+      { get_property_value(pr, pr_meta, *var_h); }
     }
   }
 }
@@ -1394,14 +1314,15 @@ son::node::Node* HandlerImpl::FindPropertyForGet(son::node::Node* obj,
     not_found = &success_exit;
   }
 
-  auto func = [&](son::node::Node* prs, son::node::Node* obj,
-                  son::node::Node* h) {
+  auto func = [&](son::node::Node* prs, son::node::Node* pr_meta,
+                  son::node::Node* obj, son::node::Node* h) {
+    (void)prs;
     son::node::Label check_succ(this);
     // if (unlikely(prs->flags & LEPUS_PROP_TMASK)) {
     // } else {
     // return pr->u.value;
     // }
-    auto flags = LoadJsShapePropertyHashFlags(prs);
+    auto flags = Int32URshift(pr_meta, Int32Value(26));
     auto cond = Equal(Int32And(flags, IntValue(LEPUS_PROP_TMASK)), IntValue(0));
     Branch(cond, &check_succ, slow_get, son::node::BranchHint::kTrue);
     Bind(&check_succ);
@@ -1416,9 +1337,8 @@ son::node::Node* HandlerImpl::FindPropertyForGet(son::node::Node* obj,
     }
   };
   if (own_only) {
-    auto own_func = [&](son::node::Node* prs, son::node::Node* h) {
-      func(prs, obj, h);
-    };
+    auto own_func = [&](son::node::Node* prs, son::node::Node* pr_meta,
+                        son::node::Node* h) { func(prs, pr_meta, obj, h); };
     FindOwnProperty(obj, atom, not_found, own_func);
   } else {
     FindProperty(obj, atom, slow_get, not_found, func);
@@ -1435,11 +1355,13 @@ void HandlerImpl::FindPropertyForSet(son::node::Node* obj,
   son::node::Label prototype_lookup(this);
   son::node::Label success_exit(this);
 
-  auto func = [&](son::node::Node* prs, son::node::Node* h) {
+  auto func = [&](son::node::Node* prs, son::node::Node* pr_meta,
+                  son::node::Node* h) {
+    (void)prs;
     son::node::Label check_succ(this);
     // if (likely((prs->flags & (LEPUS_PROP_TMASK | LEPUS_PROP_WRITABLE |
     //                       LEPUS_PROP_LENGTH)) == LEPUS_PROP_WRITABLE)) {
-    auto flags = LoadJsShapePropertyHashFlags(prs);
+    auto flags = Int32URshift(pr_meta, Int32Value(26));
     auto mask =
         IntValue(LEPUS_PROP_TMASK | LEPUS_PROP_WRITABLE | LEPUS_PROP_LENGTH);
     auto cond = Equal(Int32And(flags, mask), IntValue(LEPUS_PROP_WRITABLE));
@@ -1459,12 +1381,22 @@ void HandlerImpl::FindPropertyForSet(son::node::Node* obj,
 
   Bind(&prototype_lookup);
   {
-    auto func = [&](son::node::Node* prs, son::node::Node* obj,
-                    son::node::Node* h) {
+    son::node::Label not_exotic(this);
+    son::node::Label walk_proto(this);
+    Branch(LoadObjectIsExotic(obj), slow_set, &not_exotic,
+           son::node::BranchHint::kFalse);
+    Bind(&not_exotic);
+    auto proto = LoadShapeProto(LoadObjectShape(obj));
+    Branch(NotEqual(proto, NullptrValue()), &walk_proto, not_found,
+           son::node::BranchHint::kTrue);
+    Bind(&walk_proto);
+    auto func = [&](son::node::Node* prs, son::node::Node* pr_meta,
+                    son::node::Node* obj, son::node::Node* h) {
+      (void)prs;
       (void)obj;
       (void)h;
       son::node::Label can_shadow(this);
-      auto flags = LoadJsShapePropertyHashFlags(prs);
+      auto flags = Int32URshift(pr_meta, Int32Value(26));
       auto mask =
           IntValue(LEPUS_PROP_TMASK | LEPUS_PROP_WRITABLE | LEPUS_PROP_LENGTH);
       auto cond = Equal(Int32And(flags, mask), IntValue(LEPUS_PROP_WRITABLE));
@@ -1472,7 +1404,7 @@ void HandlerImpl::FindPropertyForSet(son::node::Node* obj,
       Bind(&can_shadow);
       { Jump(not_found); }
     };
-    FindProperty(obj, atom, slow_set, not_found, func);
+    FindProperty(proto, atom, slow_set, not_found, func);
   }
   Bind(&success_exit);
 }
@@ -1487,8 +1419,9 @@ void HandlerImpl::FindProperty(son::node::Node* obj, son::node::Node* atom,
   son::node::Variable object_h(this, son::node::NodeType::RawType(), obj);
   BindLoop(&out_loop, 2);
   {
-    auto func = [&](son::node::Node* prs, son::node::Node* h) {
-      found_func(prs, *object_h, h);
+    auto func = [&](son::node::Node* prs, son::node::Node* pr_meta,
+                    son::node::Node* h) {
+      found_func(prs, pr_meta, *object_h, h);
     };
     FindOwnProperty(*object_h, atom, &next_proto, func);
     Bind(&next_proto);
@@ -1628,7 +1561,6 @@ void HandlerImpl::GenSetProperty() {
   PrimjsOpcode opcode = PrimjsOpcode::OP_put_field;
   son::node::Label slow_put(this);
   son::node::Label try_fast_set(this);
-  son::node::Label throw_e(this);
   son::node::Label add_prop(this);
   son::node::Label slow_add_prop(this);
 
@@ -1675,31 +1607,13 @@ void HandlerImpl::GenSetProperty() {
   Bind(&slow_add_prop);
   {
     ClearNewSp();
-    auto desc = son::node::CallDescriptors::add_property_gc();
-    auto pr = CallRuntimeNoCheck(desc, GetCtx(), obj_raw, atom,
-                                 IntValue(LEPUS_PROP_C_W_E));
-    BranchIf(Equal(pr, NullptrValue()), &throw_e);
-    // HeapObjStore(ctx, &pr->u.value, val);
-    auto val1 = LoadTop0();
-    StoreHeapVal(GetCtx(), pr, Int32Value(0), val1);
-    DecSp(2);
-    Dispatch(opcode);
+    DispatchWithIdArg0(CallBcIndex::kSlowPutField, Int64Value(1));
   }
 
   Bind(&slow_put);
   {
     ClearNewSp();
-    auto desc = son::node::CallDescriptors::JS_SetPropertyInternalImpl_GC();
-    CallIntRetRuntime(desc, GetCtx(), obj, atom, val,
-                      IntValue(LEPUS_PROP_THROW_STRICT));
-    DecSp(2);
-    Dispatch(opcode);
-  }
-  Bind(&throw_e);
-  {
-    ClearNewSp();
-    DecSp(2);
-    DispatchException();
+    DispatchWithIdArg0(CallBcIndex::kSlowPutField, Int64Value(0));
   }
 }
 
@@ -1715,7 +1629,10 @@ void HandlerImpl::GenGetGlobalVarCommon(PrimjsOpcode opcode,
                             LepusUndefined());
 
   son::node::Label get_global(this);
-  auto func = [&](son::node::Node* prs, son::node::Node* h) {
+  auto func = [&](son::node::Node* prs, son::node::Node* pr_meta,
+                  son::node::Node* h) {
+    (void)prs;
+    (void)pr_meta;
     // auto ppr = &p->prop[h - 1];
     auto pr = LoadObjectProp(obj);
     auto h_index = Int32Sub(h, IntValue(1));
@@ -1789,10 +1706,10 @@ void HandlerImpl::GenPutGlobalVarFast(PrimjsOpcode opcode,
       IntValue(LEPUS_PROP_TMASK | LEPUS_PROP_WRITABLE | LEPUS_PROP_LENGTH);
   auto property_size = Int32Value(sizeof(JSPropertyGC) / sizeof(int64_t));
 
-  auto store = [&](son::node::Node* obj, son::node::Node* prs,
+  auto store = [&](son::node::Node* obj, son::node::Node* pr_meta,
                    son::node::Node* h, bool check_uninitialized) {
     son::node::Label writable(this);
-    auto flags = LoadJsShapePropertyHashFlags(prs);
+    auto flags = Int32URshift(pr_meta, Int32Value(26));
     Branch(Equal(Int32And(flags, mask), IntValue(LEPUS_PROP_WRITABLE)),
            &writable, slow_put, son::node::BranchHint::kTrue);
     Bind(&writable);
@@ -1809,16 +1726,20 @@ void HandlerImpl::GenPutGlobalVarFast(PrimjsOpcode opcode,
   };
 
   auto var_obj = CastToRaw(GetGlobalVar());
-  FindOwnProperty(var_obj, atom, &try_global_obj,
-                  [&](son::node::Node* prs, son::node::Node* h) {
-                    store(var_obj, prs, h, true);
-                  });
+  FindOwnProperty(
+      var_obj, atom, &try_global_obj,
+      [&](son::node::Node* prs, son::node::Node* pr_meta, son::node::Node* h) {
+        (void)prs;
+        store(var_obj, pr_meta, h, true);
+      });
   Bind(&try_global_obj);
   auto global_obj = CastToRaw(GetGlobal());
-  FindOwnProperty(global_obj, atom, slow_put,
-                  [&](son::node::Node* prs, son::node::Node* h) {
-                    store(global_obj, prs, h, false);
-                  });
+  FindOwnProperty(
+      global_obj, atom, slow_put,
+      [&](son::node::Node* prs, son::node::Node* pr_meta, son::node::Node* h) {
+        (void)prs;
+        store(global_obj, pr_meta, h, false);
+      });
 
   Bind(&success);
   {
@@ -1895,41 +1816,24 @@ son::node::Node* HandlerImpl::TryGetInternedStringAtom(
 }
 
 void HandlerImpl::GenGetArrayEl(PrimjsOpcode opcode) {
-  son::node::Label slow_get(this);
-
   auto obj = LoadTop1();
   auto prop = LoadTop0();
   if (_use_fast_path) {
+    son::node::Label slow_get(this);
     son::node::Label object_ready(this);
     son::node::Label integer_key(this);
-    son::node::Label string_key(this);
-    son::node::Label fast_string_get(this);
     Branch(IsLepusObject(obj), &object_ready, &slow_get,
            son::node::BranchHint::kTrue);
     Bind(&object_ready);
-    Branch(IsLepusInt(prop), &integer_key, &string_key,
+    Branch(IsLepusInt(prop), &integer_key, &slow_get,
            son::node::BranchHint::kTrue);
     Bind(&integer_key);
     GenGetPropertyValue(opcode, obj, prop, &slow_get);
     ClearNewSp();
-    Bind(&string_key);
-    auto obj_raw = CastToRaw(GetObject(obj));
-    BranchIf(NotEqual(LoadClassId(obj_raw), Int16Value(JS_CLASS_OBJECT)),
-             &slow_get, son::node::BranchHint::kFalse);
-    BranchIf(LoadObjectIsExotic(obj_raw), &slow_get,
-             son::node::BranchHint::kFalse);
-    auto atom = TryGetInternedStringAtom(prop, &slow_get);
-    Jump(&fast_string_get);
-    Bind(&fast_string_get);
-    auto ret_val = FindPropertyForGet(obj_raw, atom, &slow_get, nullptr);
-    ClearNewSp();
-    if (opcode == PrimjsOpcode::OP_get_array_el) {
-      DecSp();
-    }
-    StoreTop0(ret_val);
-    Dispatch(opcode);
-    ClearNewSp();
     Bind(&slow_get);
+    ClearNewSp();
+    DispatchWithId(CallBcIndex::kSlowGetArrayEl);
+    return;
   }
   {
     auto desc = son::node::CallDescriptors::JS_GetPropertyValue_GC();
@@ -2172,163 +2076,121 @@ void HandlerImpl::AddFastArrayElement(son::node::Node* obj,
 void HandlerImpl::GenPutArrayEl(PrimjsOpcode opcode) { GenSetPropertyValue(); }
 
 void HandlerImpl::GenSetPropertyValue() {
-  // ret = JS_SetPropertyValue_GC(ctx, sp[-3], sp[-2], sp[-1],
-  //     (LEPUS_IsTypedArray(ctx, sp[-3]) ? 0 : LEPUS_PROP_THROW_STRICT));
-  // sp -= 3;
-  // if (unlikely(ret < 0)) {
-  //   TAIL_CALL return exception_h(HANDLER_PARAM(pc));
-  // }
   PrimjsOpcode opcode = PrimjsOpcode::OP_put_array_el;
   auto prop = LoadTop1();
   auto val = LoadTop0();
   auto this_obj = LoadSp(-3);
   auto obj_raw = CastToRaw(GetObject(this_obj));
 
-  son::node::Node* flags = IntValue(LEPUS_PROP_THROW_STRICT);
-
-  auto init = Int32Value(LEPUS_PROP_THROW_STRICT);
-  son::node::Variable flags_var(this, son::node::NodeType::IntType(), init);
-  son::node::Label is_type_array(this);
-  son::node::Label is_object(this);
-  son::node::Label slow_set(this);
-  son::node::Label slow_set_type_array(this);
-  son::node::Label fast_set_type_array(this);
-  son::node::Label slow_set_object(this);
-  son::node::Label slow_add(this);
-  son::node::Node* class_id = nullptr;
-
-  Branch(IsLepusObject(this_obj), &is_object, &slow_set,
-         son::node::BranchHint::kTrue);
-  Bind(&is_object);
-  {
-    son::node::Label classify_integer_key(this);
-    son::node::Label try_string_key(this);
-    son::node::Label is_array(this);
-    son::node::Label not_array(this);
-
-    class_id = LoadClassId(obj_raw);
-    if (_use_fast_path) {
-      Branch(IsLepusInt(prop), &classify_integer_key, &try_string_key,
-             son::node::BranchHint::kTrue);
-      Bind(&try_string_key);
-      {
-        son::node::Label add_string_property(this);
-        BranchIf(NotEqual(class_id, Int16Value(JS_CLASS_OBJECT)), &slow_set,
-                 son::node::BranchHint::kFalse);
-        BranchIf(LoadObjectIsExotic(obj_raw), &slow_set,
-                 son::node::BranchHint::kFalse);
-        auto atom = TryGetInternedStringAtom(prop, &slow_set);
-        FindPropertyForSet(obj_raw, atom, val, &slow_set, &add_string_property);
-        ClearNewSp();
-        DecSp(3);
-        Dispatch(opcode);
-        ClearNewSp();
-
-        Bind(&add_string_property);
-        BranchIfFalse(LoadObjectIsExtensible(obj_raw), &slow_set,
-                      son::node::BranchHint::kFalse);
-        DispatchAddNamedProperty(atom);
-        ClearNewSp();
-      }
-      Bind(&classify_integer_key);
-    }
-    auto cond = Equal(class_id, Int16Value(JS_CLASS_ARRAY));
-    Branch(cond, &is_array, &not_array, son::node::BranchHint::kTrue);
-    Bind(&is_array);
-    if (_use_fast_path) {
-      son::node::Label fast_set_int(this);
-
-      Branch(IsLepusInt(prop), &fast_set_int, &slow_set,
-             son::node::BranchHint::kTrue);
-      Bind(&fast_set_int);
-      {
-        son::node::Label fast_set(this);
-        son::node::Label length_overflow(this);
-        son::node::Label fast_add(this);
-        son::node::Label sparse_set(this);
-        son::node::Label slow_int_set(this);
-
-        auto int_prop = GetLepusInt(prop);
-        auto length = LoadArrayCount(obj_raw);
-        auto cond = UnsignedLessThan(int_prop, length);
-        Branch(cond, &fast_set, &length_overflow, son::node::BranchHint::kTrue);
-        Bind(&fast_set);
-        {
-          ClearNewSp();
-          auto values = LoadArrayValues(obj_raw);
-          StoreHeapVal(GetCtx(), values, int_prop, val);
-          DecSp(3);
-          Dispatch(opcode);
-        }
-        Bind(&length_overflow);
-        cond = Equal(int_prop, length);
-        Branch(cond, &fast_add, &slow_int_set, son::node::BranchHint::kTrue);
-        Bind(&slow_int_set);
-        cond = GreaterThanOrEqual(int_prop, Int32Value(0));
-        Branch(cond, &sparse_set, &slow_set, son::node::BranchHint::kTrue);
-        Bind(&sparse_set);
-        {
-          ClearNewSp();
-          auto desc =
-              son::node::CallDescriptors::JS_SetArrayIntPropertyValue_GC();
-          CallIntRetRuntime(desc, GetCtx(), obj_raw, int_prop, val, flags);
-          DecSp(3);
-          Dispatch(opcode);
-        }
-        Bind(&fast_add);
-        {
-          ClearNewSp();
-          CheckFastArrayAdd(obj_raw, &slow_set);
-          AddFastArrayElement(obj_raw, length, val, &slow_add);
-          DecSp(3);
-          Dispatch(opcode);
-        }
-      }
-    } else {
-      Jump(&not_array);
-    }
-    Bind(&not_array);
-    {
-      // (class_id >= JS_CLASS_UINT8C_ARRAY) && (class_id <=
-      // JS_CLASS_BIG_UINT64_ARRAY);
-      auto cond1 =
-          GreaterThanOrEqual(class_id, Int16Value(JS_CLASS_UINT8C_ARRAY));
-      // JS_CLASS_BIG_UINT64_ARRAY for bigint
-      auto cond2 =
-          LessThanOrEqual(class_id, Int16Value(JS_CLASS_FLOAT64_ARRAY));
-      auto* typed_array_target =
-          _use_fast_path ? &fast_set_type_array : &slow_set_type_array;
-      Branch(BoolAnd(cond1, cond2), typed_array_target, &slow_set);
-    }
-  }
-  if (_use_fast_path) {
-    Bind(&fast_set_type_array);
-    ClearNewSp();
-    DispatchWithId(CallBcIndex::kFastTypedArraySet);
-  }
-  if (_use_fast_path) {
-    Bind(&slow_add);
-    {
-      ClearNewSp();
-      auto desc = son::node::CallDescriptors::add_fast_array_element_gc();
-      CallIntRetRuntime(desc, GetCtx(), obj_raw, val, flags);
-      DecSp(3);
-      Dispatch(opcode);
-    }
-  }
   if (!_use_fast_path) {
+    son::node::Label is_object(this);
+    son::node::Label not_array(this);
+    son::node::Label slow_set_type_array(this);
+    son::node::Label slow_set(this);
+    auto init = Int32Value(LEPUS_PROP_THROW_STRICT);
+    son::node::Variable flags_var(this, son::node::NodeType::IntType(), init);
+
+    Branch(IsLepusObject(this_obj), &is_object, &slow_set,
+           son::node::BranchHint::kTrue);
+    Bind(&is_object);
+    auto class_id = LoadClassId(obj_raw);
+    Branch(Equal(class_id, Int16Value(JS_CLASS_ARRAY)), &not_array, &not_array);
+    Bind(&not_array);
+    auto cond1 =
+        GreaterThanOrEqual(class_id, Int16Value(JS_CLASS_UINT8C_ARRAY));
+    auto cond2 = LessThanOrEqual(class_id, Int16Value(JS_CLASS_FLOAT64_ARRAY));
+    Branch(BoolAnd(cond1, cond2), &slow_set_type_array, &slow_set);
     Bind(&slow_set_type_array);
     flags_var = Int32Value(0);
     Jump(&slow_set);
-  }
-  Bind(&slow_set);
-  {
+    Bind(&slow_set);
     ClearNewSp();
     auto desc = son::node::CallDescriptors::JS_SetPropertyValue_GC();
     CallIntRetRuntime(desc, GetCtx(), this_obj, prop, val, *flags_var);
     DecSp(3);
     Dispatch(opcode);
+    return;
   }
+
+  son::node::Label is_object(this);
+  son::node::Label is_int_key(this);
+  son::node::Label is_array(this);
+  son::node::Label not_array(this);
+  son::node::Label fast_set_type_array(this);
+  son::node::Label slow_set(this);
+  son::node::Label slow_add(this);
+  son::node::Label sparse_set(this);
+
+  Branch(IsLepusObject(this_obj), &is_object, &slow_set,
+         son::node::BranchHint::kTrue);
+  Bind(&is_object);
+  {
+    auto class_id = LoadClassId(obj_raw);
+    Branch(IsLepusInt(prop), &is_int_key, &slow_set,
+           son::node::BranchHint::kTrue);
+    Bind(&is_int_key);
+    Branch(Equal(class_id, Int16Value(JS_CLASS_ARRAY)), &is_array, &not_array,
+           son::node::BranchHint::kTrue);
+    Bind(&is_array);
+    {
+      son::node::Label fast_set(this);
+      son::node::Label length_overflow(this);
+      son::node::Label fast_add(this);
+      son::node::Label slow_int_set(this);
+
+      auto int_prop = GetLepusInt(prop);
+      auto length = LoadArrayCount(obj_raw);
+      Branch(UnsignedLessThan(int_prop, length), &fast_set, &length_overflow,
+             son::node::BranchHint::kTrue);
+      Bind(&fast_set);
+      {
+        ClearNewSp();
+        auto values = LoadArrayValues(obj_raw);
+        StoreHeapVal(GetCtx(), values, int_prop, val);
+        DecSp(3);
+        Dispatch(opcode);
+      }
+      Bind(&length_overflow);
+      Branch(Equal(int_prop, length), &fast_add, &slow_int_set,
+             son::node::BranchHint::kTrue);
+      Bind(&slow_int_set);
+      Branch(GreaterThanOrEqual(int_prop, Int32Value(0)), &sparse_set,
+             &slow_set, son::node::BranchHint::kTrue);
+      Bind(&fast_add);
+      {
+        ClearNewSp();
+        CheckFastArrayAdd(obj_raw, &slow_set);
+        AddFastArrayElement(obj_raw, length, val, &slow_add);
+        DecSp(3);
+        Dispatch(opcode);
+      }
+    }
+    Bind(&not_array);
+    {
+      auto cond1 =
+          GreaterThanOrEqual(class_id, Int16Value(JS_CLASS_UINT8C_ARRAY));
+      auto cond2 =
+          LessThanOrEqual(class_id, Int16Value(JS_CLASS_FLOAT64_ARRAY));
+      Branch(BoolAnd(cond1, cond2), &fast_set_type_array, &slow_set,
+             son::node::BranchHint::kFalse);
+    }
+  }
+
+  Bind(&fast_set_type_array);
+  ClearNewSp();
+  DispatchWithId(CallBcIndex::kFastTypedArraySet);
+
+  Bind(&slow_add);
+  ClearNewSp();
+  DispatchWithIdArg0(CallBcIndex::kSlowPutArrayEl, Int64Value(1));
+
+  Bind(&sparse_set);
+  ClearNewSp();
+  DispatchWithIdArg0(CallBcIndex::kSlowPutArrayEl, Int64Value(2));
+
+  Bind(&slow_set);
+  ClearNewSp();
+  DispatchWithIdArg0(CallBcIndex::kSlowPutArrayEl, Int64Value(0));
 }
 
 void HandlerImpl::StoreTypedArrayElement(son::node::Node* obj,

@@ -781,9 +781,9 @@ void LLVMIRBuilder::BuildBranch(son::node::Node const* node) {
     LLVMMetadataRef branch_weights =
         LLVMMDStringInContext2(_context, "branch_weights", 14);
     LLVMMetadataRef weight1 =
-        LLVMValueAsMetadata(LLVMConstInt(LLVMIntType(32), 100, 0));
+        LLVMValueAsMetadata(LLVMConstInt(LLVMIntType(32), 2000, 0));
     LLVMMetadataRef weight2 =
-        LLVMValueAsMetadata(LLVMConstInt(LLVMIntType(32), 0, 0));
+        LLVMValueAsMetadata(LLVMConstInt(LLVMIntType(32), 1, 0));
     if (branch_hit == son::node::BranchHint::kFalse) {
       LLVMMetadataRef tmp = weight1;
       weight1 = weight2;
