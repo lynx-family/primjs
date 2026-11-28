@@ -563,10 +563,8 @@ QJS_STATIC int js_arguments_define_own_property(
     LEPUSContext *ctx, LEPUSValueConst this_obj, JSAtom prop,
     LEPUSValueConst val, LEPUSValueConst getter, LEPUSValueConst setter,
     int flags);
-QJS_STATIC int js_string_get_own_property_names(LEPUSContext *ctx,
-                                                LEPUSPropertyEnum **ptab,
-                                                uint32_t *plen,
-                                                LEPUSValueConst obj);
+QJS_STATIC uint32_t js_string_obj_get_length(LEPUSContext *ctx,
+                                             LEPUSValueConst obj);
 
 static void find_name_info(const LEPUSFunctionBytecode *, const uint32_t,
                            DynBuf *);
@@ -579,7 +577,6 @@ static const LEPUSClassExoticMethods js_arguments_exotic_methods = {
 };
 static const LEPUSClassExoticMethods js_string_exotic_methods = {
     .get_own_property = js_string_get_own_property,
-    .get_own_property_names = js_string_get_own_property_names,
     .delete_property = js_string_delete_property,
     .define_own_property = js_string_define_own_property,
 };
@@ -8841,7 +8838,7 @@ JS_GetOwnPropertyNamesInternal(LEPUSContext *ctx, LEPUSPropertyEnum **ptab,
   LEPUSPropertyEnum *tab_atom, *tab_exotic;
   JSAtom atom;
   uint32_t num_keys_count, str_keys_count, sym_keys_count, atom_count;
-  uint32_t num_index, str_index, sym_index, exotic_count;
+  uint32_t num_index, str_index, sym_index, exotic_count, exotic_keys_count;
   BOOL is_enumerable, num_sorted;
   uint32_t num_key;
   JSAtomKindEnum kind;
@@ -8854,6 +8851,7 @@ JS_GetOwnPropertyNamesInternal(LEPUSContext *ctx, LEPUSPropertyEnum **ptab,
   num_keys_count = 0;
   str_keys_count = 0;
   sym_keys_count = 0;
+  exotic_keys_count = 0;
   exotic_count = 0;
   tab_exotic = NULL;
   sh = p->shape;
@@ -8887,17 +8885,14 @@ JS_GetOwnPropertyNamesInternal(LEPUSContext *ctx, LEPUSPropertyEnum **ptab,
 
   if (p->is_exotic) {
     if (p->fast_array) {
-      /* the implicit GetOwnProperty raises an exception if the
-         typed array is detached */
-      if ((flags & (LEPUS_GPN_SET_ENUM | LEPUS_GPN_ENUM_ONLY)) &&
-          (p->class_id >= JS_CLASS_UINT8C_ARRAY &&
-           p->class_id <= JS_CLASS_BIG_UINT64_ARRAY) &&
-          typed_array_is_detached(ctx, p) &&
-          typed_array_get_length(ctx, p) != 0) {
-        JS_ThrowTypeErrorDetachedArrayBuffer(ctx);
-        return -1;
+      if (flags & LEPUS_GPN_STRING_MASK) {
+        num_keys_count += p->u.array.count;
       }
-      num_keys_count += p->u.array.count;
+    } else if (p->class_id == JS_CLASS_STRING) {
+      if (flags & LEPUS_GPN_STRING_MASK) {
+        num_keys_count +=
+            js_string_obj_get_length(ctx, LEPUS_MKPTR(LEPUS_TAG_OBJECT, p));
+      }
     } else {
       const LEPUSClassExoticMethods *em =
           ctx->rt->class_array[p->class_id].exotic;
@@ -8905,7 +8900,7 @@ JS_GetOwnPropertyNamesInternal(LEPUSContext *ctx, LEPUSPropertyEnum **ptab,
         if (em->get_own_property_names(ctx, &tab_exotic, &exotic_count,
                                        LEPUS_MKPTR(LEPUS_TAG_OBJECT, p)))
           return -1;
-        for (i = 0; i < exotic_count; i++) {
+        for (i = 0; i < (int32_t)exotic_count; i++) {
           atom = tab_exotic[i].atom;
           kind = JS_AtomGetKind(ctx, atom);
           if (((flags >> kind) & 1) != 0) {
@@ -8926,13 +8921,7 @@ JS_GetOwnPropertyNamesInternal(LEPUSContext *ctx, LEPUSPropertyEnum **ptab,
               tab_exotic[i].is_enumerable = is_enumerable;
             }
             if (!(flags & LEPUS_GPN_ENUM_ONLY) || is_enumerable) {
-              if (JS_AtomIsArrayIndex(ctx, &num_key, atom)) {
-                num_keys_count++;
-              } else if (kind == JS_ATOM_KIND_STRING) {
-                str_keys_count++;
-              } else {
-                sym_keys_count++;
-              }
+              exotic_keys_count++;
             }
           }
         }
@@ -8942,8 +8931,13 @@ JS_GetOwnPropertyNamesInternal(LEPUSContext *ctx, LEPUSPropertyEnum **ptab,
 
   /* fill them */
 
-  atom_count = num_keys_count + str_keys_count + sym_keys_count;
-  if (atom_count > JS_ATOM_MAX_INT) {
+  atom_count = num_keys_count + str_keys_count;
+  if (atom_count < str_keys_count) goto add_overflow;
+  atom_count += sym_keys_count;
+  if (atom_count < sym_keys_count) goto add_overflow;
+  atom_count += exotic_keys_count;
+  if (atom_count < exotic_keys_count || atom_count > JS_ATOM_MAX_INT) {
+  add_overflow:
     LEPUS_ThrowRangeError(ctx, "Too many properties to enumerate");
     js_free_prop_enum(ctx, tab_exotic, exotic_count);
     return -1;
@@ -8984,41 +8978,44 @@ JS_GetOwnPropertyNamesInternal(LEPUSContext *ctx, LEPUSPropertyEnum **ptab,
   }
 
   if (p->is_exotic) {
+    uint32_t len;
     if (p->fast_array) {
-      for (i = 0; i < p->u.array.count; i++) {
-        tab_atom[num_index].atom = __JS_AtomFromUInt32(i);
-        if (tab_atom[num_index].atom == JS_ATOM_NULL) {
-          js_free_prop_enum(ctx, tab_exotic, exotic_count);
-          js_free_prop_enum(ctx, tab_atom, num_index);
-          return -1;
-        }
-        tab_atom[num_index].is_enumerable = TRUE;
-        num_index++;
+      if (flags & LEPUS_GPN_STRING_MASK) {
+        len = p->u.array.count;
+        goto add_array_keys;
       }
-    }
-    if (exotic_count > 0) {
-      for (i = 0; i < exotic_count; i++) {
+    } else if (p->class_id == JS_CLASS_STRING) {
+      if (flags & LEPUS_GPN_STRING_MASK) {
+        len = js_string_obj_get_length(ctx, LEPUS_MKPTR(LEPUS_TAG_OBJECT, p));
+      add_array_keys:
+        for (uint32_t k = 0; k < len; k++) {
+          tab_atom[num_index].atom = __JS_AtomFromUInt32(k);
+          if (tab_atom[num_index].atom == JS_ATOM_NULL) {
+            js_free_prop_enum(ctx, tab_atom, num_index);
+            return -1;
+          }
+          tab_atom[num_index].is_enumerable = TRUE;
+          num_index++;
+        }
+      }
+    } else {
+      /* Note: exotic keys are not reordered and come after the object own
+         properties. */
+      for (i = 0; i < (int32_t)exotic_count; i++) {
         atom = tab_exotic[i].atom;
         is_enumerable = tab_exotic[i].is_enumerable;
         kind = JS_AtomGetKind(ctx, atom);
         if ((!(flags & LEPUS_GPN_ENUM_ONLY) || is_enumerable) &&
             ((flags >> kind) & 1) != 0) {
-          if (JS_AtomIsArrayIndex(ctx, &num_key, atom)) {
-            j = num_index++;
-            num_sorted = FALSE;
-          } else if (kind == JS_ATOM_KIND_STRING) {
-            j = str_index++;
-          } else {
-            j = sym_index++;
-          }
-          tab_atom[j].atom = atom;
-          tab_atom[j].is_enumerable = is_enumerable;
+          tab_atom[sym_index].atom = atom;
+          tab_atom[sym_index].is_enumerable = is_enumerable;
+          sym_index++;
         } else {
           LEPUS_FreeAtom(ctx, atom);
         }
       }
+      lepus_free(ctx, tab_exotic);
     }
-    lepus_free(ctx, tab_exotic);
   }
 
   assert(num_index == num_keys_count);
@@ -14541,7 +14538,7 @@ QJS_STATIC __exception int JS_CopyDataProperties(LEPUSContext *ctx,
   /* owned wrapper object when the source is a primitive value */
   LEPUSValue source_obj = LEPUS_UNDEFINED;
   uint32_t i, tab_atom_count;
-  LEPUSObject *p;
+  LEPUSObject *p = NULL;
   LEPUSObject *pexcl = NULL;
   int ret = 0, flags;
 // <Primjs begin>
@@ -14564,10 +14561,9 @@ QJS_STATIC __exception int JS_CopyDataProperties(LEPUSContext *ctx,
   }
 
   p = LEPUS_VALUE_GET_OBJ(source);
-  if (JS_GetOwnPropertyNamesInternal(ctx, &tab_atom, &tab_atom_count, p,
-                                     LEPUS_GPN_STRING_MASK |
-                                         LEPUS_GPN_SYMBOL_MASK |
-                                         LEPUS_GPN_ENUM_ONLY)) {
+  if (JS_GetOwnPropertyNamesInternal(
+          ctx, &tab_atom, &tab_atom_count, p,
+          LEPUS_GPN_STRING_MASK | LEPUS_GPN_SYMBOL_MASK)) {
     LEPUS_FreeValue(ctx, source_obj);
     return -1;
   }
@@ -14579,8 +14575,9 @@ CopyValueProperties:
   flags = LEPUS_PROP_C_W_E;
 
   for (i = 0; i < tab_atom_count; i++) {
+    JSAtom atom = tab_atom[i].atom;
     if (pexcl) {
-      ret = JS_GetOwnPropertyInternal(ctx, NULL, pexcl, tab_atom[i].atom);
+      ret = JS_GetOwnPropertyInternal(ctx, NULL, pexcl, atom);
       if (ret) {
         if (ret < 0) break;
         ret = 0;
@@ -14588,14 +14585,118 @@ CopyValueProperties:
       }
     }
     ret = -1;
-    val = JS_GetPropertyInternal_RC(ctx, source, tab_atom[i].atom, source, 0);
-    if (LEPUS_IsException(val)) break;
+    if (likely(p != NULL)) {
+      JSShapeProperty *prs;
+      JSProperty *pr;
+    retry_own_prop:
+      prs = find_own_property(&pr, p, atom);
+      if (likely(prs != NULL)) {
+        if (unlikely(prs->flags & LEPUS_PROP_TMASK)) {
+          if ((prs->flags & LEPUS_PROP_TMASK) == LEPUS_PROP_AUTOINIT) {
+            if (JS_AutoInitProperty(ctx, p, atom, pr, prs)) break;
+            goto retry_own_prop;
+          }
+          if ((prs->flags & LEPUS_PROP_TMASK) == LEPUS_PROP_VARREF) {
+            LEPUSValue v = *pr->u.var_ref->pvalue;
+            if (unlikely(LEPUS_IsUninitialized(v))) {
+              JS_ThrowReferenceErrorUninitialized(ctx, prs->atom);
+              break;
+            }
+            if (!(prs->flags & LEPUS_PROP_ENUMERABLE)) {
+              ret = 0;
+              continue;
+            }
+            val = LEPUS_DupValue(ctx, v);
+          } else {
+            if (!(prs->flags & LEPUS_PROP_ENUMERABLE)) {
+              ret = 0;
+              continue;
+            }
+            if (unlikely(!pr->u.getset.getter)) {
+              val = LEPUS_UNDEFINED;
+            } else {
+              LEPUSValue func = LEPUS_DupValue(
+                  ctx, LEPUS_MKPTR(LEPUS_TAG_OBJECT, pr->u.getset.getter));
+              val = JS_CallFree(ctx, func, source, 0, NULL);
+              if (LEPUS_IsException(val)) break;
+            }
+          }
+        } else {
+          if (!(prs->flags & LEPUS_PROP_ENUMERABLE)) {
+            ret = 0;
+            continue;
+          }
+          val = LEPUS_DupValue(ctx, pr->u.value);
+        }
+      } else if (unlikely(p->is_exotic)) {
+        if (p->fast_array) {
+          if (!__JS_AtomIsTaggedInt(atom)) {
+            ret = 0;
+            continue;
+          }
+          uint32_t idx = __JS_AtomToUInt32(atom);
+          if (idx >= p->u.array.count) {
+            ret = 0;
+            continue;
+          }
+          val = LEPUS_GetPropertyUint32(ctx, source, idx);
+          if (LEPUS_IsException(val)) break;
+        } else {
+          const LEPUSClassExoticMethods *em =
+              ctx->rt->class_array[p->class_id].exotic;
+          if (!em || !em->get_own_property) {
+            ret = 0;
+            continue;
+          }
+          LEPUSPropertyDescriptor desc;
+          int res = em->get_own_property(ctx, &desc, source, atom);
+          if (res < 0) break;
+          if (!res) {
+            ret = 0;
+            continue;
+          }
+          if (!(desc.flags & LEPUS_PROP_ENUMERABLE)) {
+            js_free_desc(ctx, &desc);
+            ret = 0;
+            continue;
+          }
+          if (em->get_property) {
+            js_free_desc(ctx, &desc);
+            val = em->get_property(ctx, source, atom, source);
+          } else if (desc.flags & LEPUS_PROP_GETSET) {
+            LEPUS_FreeValue(ctx, desc.setter);
+            if (unlikely(LEPUS_IsUndefined(desc.getter))) {
+              val = LEPUS_UNDEFINED;
+            } else {
+              val = JS_CallFree(ctx, desc.getter, source, 0, NULL);
+            }
+          } else {
+            val = desc.value;
+          }
+          if (LEPUS_IsException(val)) break;
+        }
+      } else {
+        ret = 0;
+        continue;
+      }
+    } else {
+#ifdef ENABLE_LEPUSNG
+      if (ctx->rt->primjs_callbacks_.js_has_property) {
+        int32_t has = JSRefHasOwnProperty(ctx, source, atom);
+        if (has < 0) break;
+        if (!has) {
+          ret = 0;
+          continue;
+        }
+      }
+#endif
+      val = JS_GetPropertyInternal_RC(ctx, source, atom, source, 0);
+      if (LEPUS_IsException(val)) break;
+    }
     if (setprop)
-      ret = JS_SetPropertyInternal_RC(ctx, target, tab_atom[i].atom, val,
-                                      LEPUS_PROP_THROW);
+      ret = JS_SetPropertyInternal_RC(ctx, target, atom, val, LEPUS_PROP_THROW);
     else
-      ret =
-          JS_DefinePropertyValue_RC(ctx, target, tab_atom[i].atom, val, flags);
+      ret = JS_DefinePropertyValue_RC(ctx, target, atom, val, flags);
     if (ret < 0) break;
     ret = 0;
   }
@@ -38609,29 +38710,6 @@ QJS_STATIC uint32_t js_string_obj_get_length(LEPUSContext *ctx,
     len = JS_GetSeparableString(p->u.object_data)->len;
   }
   return len;
-}
-
-QJS_STATIC int js_string_get_own_property_names(LEPUSContext *ctx,
-                                                LEPUSPropertyEnum **ptab,
-                                                uint32_t *plen,
-                                                LEPUSValueConst obj) {
-  LEPUSPropertyEnum *tab;
-  uint32_t len, i;
-
-  len = js_string_obj_get_length(ctx, obj);
-  tab = NULL;
-  if (len > 0) {
-    /* do not allocate 0 bytes */
-    tab = static_cast<LEPUSPropertyEnum *>(
-        lepus_malloc(ctx, sizeof(LEPUSPropertyEnum) * len));
-    if (!tab) return -1;
-    for (i = 0; i < len; i++) {
-      tab[i].atom = __JS_AtomFromUInt32(i);
-    }
-  }
-  *ptab = tab;
-  *plen = len;
-  return 0;
 }
 
 QJS_STATIC int js_string_define_own_property(LEPUSContext *ctx,
