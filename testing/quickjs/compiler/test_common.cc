@@ -4851,6 +4851,236 @@ TEST_F(CommonQjsTest, ApplyArgumentsDoNotGrowHandleTable) {
   EXPECT_LT(rt_->ptr_handles->GetHandleSize(), 1 << 16);
 }
 
+TEST_F(CommonQjsTest, CopyDataPropertiesReReadsDescriptor) {
+  auto detach = LEPUS_NewCFunction(
+      ctx_,
+      [](LEPUSContext* ctx, LEPUSValue, int32_t argc, LEPUSValue* argv) {
+        if (argc > 0) LEPUS_DetachArrayBuffer(ctx, argv[0]);
+        return LEPUS_UNDEFINED;
+      },
+      "detachBuffer", 1);
+  ASSERT_GE(
+      LEPUS_SetPropertyStr(ctx_, ctx_->global_obj, "detachBuffer", detach), 0);
+
+  EvalOrFail(ctx_, R"(
+    function assertEq(actual, expected, msg) {
+      if (actual !== expected) {
+        throw new Error(msg + ': expected ' + expected + ', got ' + actual);
+      }
+    }
+
+    // Getter hides or deletes a later own property; prototype property must not
+    // be copied in its place.
+    var proto = { b: 99 };
+    function source(change) {
+      var o = Object.create(proto);
+      Object.defineProperty(o, 'a', {
+        get() { change(this); return 1; },
+        enumerable: true,
+        configurable: true,
+      });
+      o.b = 2;
+      return o;
+    }
+    var hide = function(o) { Object.defineProperty(o, 'b', { enumerable: false }); };
+    var drop = function(o) { delete o.b; };
+
+    assertEq(JSON.stringify(Object.keys(Object.assign({}, source(hide)))), '["a"]', 'assign hide');
+    assertEq(JSON.stringify(Object.keys({ ...source(hide) })), '["a"]', 'spread hide');
+    assertEq(JSON.stringify(Object.keys(Object.assign({}, source(drop)))), '["a"]', 'assign drop');
+    assertEq(JSON.stringify(Object.keys({ ...source(drop) })), '["a"]', 'spread drop');
+    var { ...restHide } = source(hide);
+    var { ...restDrop } = source(drop);
+    assertEq(JSON.stringify(Object.keys(restHide)), '["a"]', 'rest hide');
+    assertEq(JSON.stringify(Object.keys(restDrop)), '["a"]', 'rest drop');
+    assertEq('b' in Object.assign({}, source(drop)), false, 'assign drop proto');
+    assertEq('b' in { ...source(drop) }, false, 'spread drop proto');
+
+    // Non-enumerable own property made enumerable during copy is copied; newly
+    // added property is not.
+    function makeUnhide() {
+      var o = {
+        get a() {
+          Object.defineProperty(this, 'b', { enumerable: true });
+          this.c = 3;
+          return 1;
+        },
+      };
+      Object.defineProperty(o, 'b', { value: 2, enumerable: false, configurable: true });
+      return o;
+    }
+    assertEq(JSON.stringify(Object.assign({}, makeUnhide())), '{"a":1,"b":2}', 'assign unhide');
+    assertEq(JSON.stringify({ ...makeUnhide() }), '{"a":1,"b":2}', 'spread unhide');
+
+    // Target setter in Object.assign mutating the source object.
+    var src = { a: 1, b: 2, c: 3 };
+    Object.defineProperty(src, 'd', { value: 4, enumerable: false, configurable: true });
+    var target = {
+      set a(v) {
+        this._a = v;
+        delete src.b;
+        Object.defineProperty(src, 'c', { enumerable: false });
+        Object.defineProperty(src, 'd', { enumerable: true });
+        src.e = 5;
+      },
+    };
+    Object.assign(target, src);
+    assertEq(target._a, 1, 'setter _a');
+    assertEq('b' in target, false, 'setter deleted b');
+    assertEq('c' in target, false, 'setter hidden c');
+    assertEq(target.d, 4, 'setter unhidden d');
+    assertEq('e' in target, false, 'setter added e');
+
+    // Symbol properties hidden, deleted, and unhidden during copy.
+    var s1 = Symbol('s1');
+    var s2 = Symbol('s2');
+    var s3 = Symbol('s3');
+    function makeSymSrc() {
+      var o = {
+        get a() {
+          Object.defineProperty(this, s1, { enumerable: false });
+          delete this[s2];
+          Object.defineProperty(this, s3, { enumerable: true });
+          return 1;
+        },
+        [s1]: 10,
+        [s2]: 20,
+      };
+      Object.defineProperty(o, s3, { value: 30, enumerable: false, configurable: true });
+      return o;
+    }
+    var symAssign = Object.assign({}, makeSymSrc());
+    var symSpread = { ...makeSymSrc() };
+    assertEq(Object.getOwnPropertySymbols(symAssign).map(String).join(','), 'Symbol(s3)', 'sym assign');
+    assertEq(symAssign[s3], 30, 'sym assign val');
+    assertEq(Object.getOwnPropertySymbols(symSpread).map(String).join(','), 'Symbol(s3)', 'sym spread');
+    assertEq(symSpread[s3], 30, 'sym spread val');
+
+    // Fast array mutated during Object.assign target setter.
+    var arr = [10, 20, 30, 40];
+    var arrTarget = {
+      set 0(v) {
+        this._0 = v;
+        arr.pop();
+        Object.defineProperty(arr, '1', { enumerable: false });
+        delete arr[2];
+      },
+    };
+    Object.assign(arrTarget, arr);
+    assertEq(JSON.stringify(Object.keys(arrTarget)), '["0","_0"]', 'fast array mutated');
+    assertEq(arrTarget._0, 10, 'fast array _0');
+
+    // TypedArray detached before and during copy.
+    var ta1 = new Uint8Array([7, 8]);
+    detachBuffer(ta1.buffer);
+    assertEq(JSON.stringify(Object.assign({}, ta1)), '{}', 'assign detached ta');
+    assertEq(JSON.stringify({ ...ta1 }), '{}', 'spread detached ta');
+
+    var ta2 = new Uint8Array([7, 8, 9]);
+    var taTarget = {
+      set 0(v) {
+        this._0 = v;
+        detachBuffer(ta2.buffer);
+      },
+    };
+    Object.assign(taTarget, ta2);
+    assertEq(JSON.stringify(Object.keys(taTarget)), '["0","_0"]', 'ta detached mid-copy');
+    assertEq(taTarget._0, 7, 'ta _0');
+
+    // Setter-only own accessor does not fall through to prototype.
+    var setOnly = Object.create({ x: 42 });
+    Object.defineProperty(setOnly, 'x', { set() {}, enumerable: true, configurable: true });
+    assertEq(Object.assign({}, setOnly).x, undefined, 'assign setter-only');
+    assertEq(({ ...setOnly }).x, undefined, 'spread setter-only');
+
+    // getOwnPropertySymbols does not include fast array or String indices.
+    assertEq(Object.getOwnPropertySymbols([1, 2]).length, 0, 'array symbols');
+    assertEq(Object.getOwnPropertySymbols(new String('ab')).length, 0, 'string symbols');
+  )");
+}
+
+TEST_F(CommonQjsTest, CopyDataPropertiesProxyTrapsAndHandles) {
+  AddCollect(ctx_);
+  EvalOrFail(ctx_, R"(
+    function assertEq(actual, expected, msg) {
+      if (actual !== expected) {
+        throw new Error(msg + ': expected ' + expected + ', got ' + actual);
+      }
+    }
+
+    // getOwnPropertyDescriptor and get interleave per key.
+    function checkInterleaved(run) {
+      var log = [];
+      var p = new Proxy({ a: 1, b: 2 }, {
+        ownKeys(t) { log.push('ownKeys'); return Reflect.ownKeys(t); },
+        getOwnPropertyDescriptor(t, k) {
+          log.push('gOPD ' + k);
+          return Reflect.getOwnPropertyDescriptor(t, k);
+        },
+        get(t, k) { log.push('get ' + k); return Reflect.get(t, k); },
+      });
+      var out = run(p);
+      assertEq(log.join(', '), 'ownKeys, gOPD a, get a, gOPD b, get b', 'trap order');
+      assertEq(JSON.stringify(out), '{"a":1,"b":2}', 'copied values');
+    }
+    checkInterleaved(function(p) { return Object.assign({}, p); });
+    checkInterleaved(function(p) { return { ...p }; });
+    checkInterleaved(function(p) { var { ...r } = p; return r; });
+
+    // Object rest skips excluded keys before getOwnPropertyDescriptor and keeps
+    // Proxy ownKeys order.
+    var exclSym = Symbol('excl');
+    var inclSym = Symbol('incl');
+    var restLog = [];
+    var restProxy = new Proxy({}, {
+      ownKeys() { return [exclSym, 'exclStr', '0', inclSym, 'nonEnum', '1']; },
+      getOwnPropertyDescriptor(_t, k) {
+        restLog.push('gOPD:' + String(k));
+        if (k === 'nonEnum') {
+          return { value: 0, enumerable: false, configurable: true };
+        }
+        return { value: 'desc', enumerable: true, configurable: true };
+      },
+      get(_t, k) {
+        restLog.push('get:' + String(k));
+        return 'val:' + String(k);
+      },
+    });
+    var { [exclSym]: _a, exclStr: _b, 0: _c, ...restObj } = restProxy;
+    assertEq(
+      restLog.join(', '),
+      'get:Symbol(excl), get:exclStr, get:0, gOPD:Symbol(incl), get:Symbol(incl), gOPD:nonEnum, gOPD:1, get:1',
+      'rest proxy traps'
+    );
+    assertEq(restObj[inclSym], 'val:Symbol(incl)', 'rest sym');
+    assertEq(restObj[1], 'val:1', 'rest idx');
+    assertEq('nonEnum' in restObj, false, 'rest nonEnum');
+
+    // Large Proxy copy with GC in between must keep values alive without growing
+    // the handle table linearly.
+    var n = 1 << 14;
+    var keys = [];
+    for (var i = 0; i < n; i++) keys.push('k' + i);
+    var gcProxy = new Proxy({}, {
+      ownKeys() { return keys; },
+      getOwnPropertyDescriptor(_t, k) {
+        return { value: { k: k }, enumerable: true, configurable: true };
+      },
+      get(_t, k) {
+        var idx = +k.slice(1);
+        if (idx % 4096 === 0) collect();
+        return { idx: idx };
+      },
+    });
+    var copied = { ...gcProxy };
+    assertEq(copied.k0.idx, 0, 'gc proxy first');
+    assertEq(copied['k' + (n - 1)].idx, n - 1, 'gc proxy last');
+  )");
+  if (ctx_->gc_enable) {
+    EXPECT_LT(rt_->ptr_handles->GetHandleSize(), 1 << 14);
+  }
+}
+
 // Detaching an ArrayBuffer releases its backing store, so the finalizer must
 // not release it a second time.
 TEST(ArrayBufferTest, DetachedBufferIsReleasedOnce) {

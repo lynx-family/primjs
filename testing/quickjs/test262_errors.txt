@@ -290,7 +290,6 @@ test/built-ins/Proxy/has/trap-is-not-callable-realm.js:22: TypeError: $262.creat
 test/built-ins/Proxy/isExtensible/trap-is-not-callable-realm.js:24: TypeError: $262.createRealm is not a function
 test/built-ins/Proxy/ownKeys/return-not-list-object-throws-realm.js:23: TypeError: $262.createRealm is not a function
 test/built-ins/Proxy/ownKeys/trap-is-not-callable-realm.js:21: TypeError: $262.createRealm is not a function
-test/built-ins/Proxy/ownKeys/trap-is-undefined-target-is-proxy.js:29: Test262Error: Expected [0, length, foo, Symbol()] and [Symbol(), length, foo, 0] to have the same contents. 
 test/built-ins/Proxy/preventExtensions/trap-is-not-callable-realm.js:24: TypeError: $262.createRealm is not a function
 test/built-ins/Proxy/revocable/handler-is-revoked-proxy.js:21: TypeError: revoked proxy
 test/built-ins/Proxy/revocable/target-is-revoked-function-proxy.js:22: TypeError: revoked proxy
@@ -865,8 +864,6 @@ test/language/expressions/object/cpn-obj-lit-computed-property-name-from-assignm
 test/language/expressions/object/cpn-obj-lit-computed-property-name-from-assignment-expression-logical-and.js:29: SyntaxError: unexpected token in expression: '='
 test/language/expressions/object/cpn-obj-lit-computed-property-name-from-assignment-expression-logical-or.js:29: SyntaxError: unexpected token in expression: '='
 test/language/expressions/object/cpn-obj-lit-computed-property-name-from-await-expression.js:29: SyntaxError: unexpected 'await' keyword
-test/language/expressions/object/dstr/object-rest-proxy-get-not-called-on-dontenum-keys.js:37: Test262Error: Expected [1, enumerableString, Symbol(enumerable_symbol)] and [Symbol(enumerable_symbol), enumerableString, 1] to have the same contents. 
-test/language/expressions/object/dstr/object-rest-proxy-gopd-not-called-on-excluded-keys.js:35: Test262Error: Expected [Symbol(excluded_symbol), excludedString, 0, Symbol(included_symbol), includedString, 1] and [Symbol(included_symbol), includedString, 1] to have the same contents. 
 test/language/expressions/object/ident-name-prop-name-literal-await-static-init.js:18: SyntaxError: invalid property name
 test/language/expressions/object/identifier-shorthand-static-init-await-valid.js:15: SyntaxError: invalid property name
 test/language/expressions/object/method-definition/static-init-await-binding-accessor.js:15: SyntaxError: invalid property name
@@ -875,7 +872,6 @@ test/language/expressions/object/method-definition/static-init-await-binding-nor
 test/language/expressions/object/method-definition/static-init-await-reference-accessor.js:18: SyntaxError: invalid property name
 test/language/expressions/object/method-definition/static-init-await-reference-generator.js:18: SyntaxError: invalid property name
 test/language/expressions/object/method-definition/static-init-await-reference-normal.js:18: SyntaxError: invalid property name
-test/language/expressions/object/object-spread-proxy-get-not-called-on-dontenum-keys.js:37: Test262Error: Expected [1, enumerableString, Symbol(enumerable_symbol)] and [Symbol(enumerable_symbol), enumerableString, 1] to have the same contents. 
 test/language/expressions/postfix-decrement/operator-x-postfix-decrement-calls-putvalue-lhs-newvalue--1.js:19: Test262Error: Expected a ReferenceError to be thrown but no exception was thrown at all
 test/language/expressions/postfix-decrement/operator-x-postfix-decrement-calls-putvalue-lhs-newvalue-.js:19: Test262Error: Expected a ReferenceError to be thrown but no exception was thrown at all
 test/language/expressions/postfix-increment/operator-x-postfix-increment-calls-putvalue-lhs-newvalue--1.js:19: Test262Error: Expected a ReferenceError to be thrown but no exception was thrown at all
